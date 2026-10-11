@@ -37,12 +37,111 @@ TERMINAL_HINTS = ('VOCO_INSTALL_ART', 'SSH_CONNECTION', 'SSH_TTY', 'TMUX', 'STY'
                   'NO_COLOR', 'VOCO_INSTALL_PLAIN')
 
 
+# The card as one whole redraw, every line from its start, as a fresh canvas
+# shows it: in Bash from the card's parts, and from the APT display's rows.
+CARD_TEXT = r'''card_text() {
+  local r
+  printf '\r\e[K  %s\e[0m\n' "$VOCO_UI_CARD_TOP"
+  for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+    printf '\r\e[K  %s%s\e[0m\n' "${VOCO_UI_CARD_LEFT[r]}" "${VOCO_UI_CARD_RIGHT[r]}"
+  done
+  printf '\r\e[K  %s\e[0m\n' "$VOCO_UI_CARD_BOTTOM"
+}
+'''
+
+
+def card_text(rows):
+    return ''.join('\r\033[K  ' + (row if isinstance(row, str) else ''.join(row)) + '\033[0m\n' for row in rows)
+
+
+def apt_card(art='quadrant'):
+    """The card and shine arguments install-ui.sh passes the APT display."""
+    with tempfile.TemporaryDirectory() as folder:
+        run = subprocess.run(['bash', '-c', PREFIX + 'VOCO_TERMINAL_MOTION=true\nvoco_ui_configure\nvoco_ui_apt_card\n'
+                              'printf "\\0%s\\0%s" "$VOCO_UI_APT_CARD" "$VOCO_UI_APT_SHINE"\n'],
+                             env=art_env(folder, VOCO_INSTALL_ART=art), capture_output=True, timeout=10, check=True)
+    # Configuring the kitty card sends the image first.
+    _, card, shine = run.stdout.decode().split('\0')
+    return card, shine
+
+
 def art_env(folder, **extra):
     """A truecolor terminal environment with no hints about which terminal it is."""
     env = {key: value for key, value in os.environ.items() if key not in TERMINAL_HINTS}
     env.update({'TERM': 'xterm-256color', 'TMPDIR': folder, 'COLORTERM': 'truecolor', 'VOCO_INSTALL_NO_MOTION': '1'})
     env.update(extra)
     return env
+
+
+class Screen:
+    """A small VT model of what the installer draws: each cell's character and
+    its foreground and background colours, kitty image placements, and only the
+    sequences the installer sends. Erasing fills with the current background,
+    as terminals do. It takes the PTY's output with CR LF already turned to LF."""
+    TOKENS = re.compile(r'(\x1b\[[0-9;?]*[A-Za-z]|\x1b_[^\x1b]*\x1b\\|\x1b[78\\])')
+
+    def __init__(self, rows=60, columns=80):
+        self.rows = [[(' ', None, None)] * columns for _ in range(rows)]
+        self.row = self.column = 0
+        self.fg = self.bg = None
+        self.saved = (0, 0)
+        self.images = {}
+
+    def feed(self, text):
+        for token in self.TOKENS.split(text):
+            if token.startswith('\x1b_G'):
+                keys = dict(item.split('=', 1) for item in token[3:-2].split(';', 1)[0].split(',') if '=' in item)
+                if keys.get('a') == 'p':
+                    self.images[keys['i'], keys['p']] = (self.row, self.column, keys['c'], keys['r'], keys.get('w'))
+                elif keys.get('a') == 'd':
+                    self.images.pop((keys['i'], keys.get('p')), None)
+            elif token in ('\x1b7', '\x1b8'):
+                if token == '\x1b7':
+                    self.saved = (self.row, self.column)
+                else:
+                    self.row, self.column = self.saved
+            elif token.startswith('\x1b['):
+                command, values = token[-1], [int(v) for v in token[2:-1].split(';') if v.isdigit()]
+                if command == 'm':
+                    values = values or [0]
+                    while values:
+                        value = values.pop(0)
+                        if value == 0:
+                            self.fg = self.bg = None
+                        elif value in (38, 48):
+                            colour = tuple(values[1:4])
+                            del values[:4]
+                            if value == 38:
+                                self.fg = colour
+                            else:
+                                self.bg = colour
+                        elif value == 39:
+                            self.fg = None
+                        elif value == 49:
+                            self.bg = None
+                elif command == 'A':
+                    self.row = max(0, self.row - (values[0] if values else 1))
+                elif command == 'G':
+                    self.column = (values[0] if values else 1) - 1
+                elif command == 'K':
+                    line = self.rows[self.row]
+                    line[self.column:] = [(' ', None, self.bg)] * (len(line) - self.column)
+                elif command not in 'tc':
+                    raise AssertionError(f'Unsupported terminal operation: {token!r}')
+            elif token != '\x1b\\':
+                for char in token:
+                    if char == '\r':
+                        self.column = 0
+                    elif char == '\n':
+                        # The PTY turns a newline into CR LF.
+                        self.row += 1
+                        self.column = 0
+                    else:
+                        self.rows[self.row][self.column] = (char, self.fg if char != ' ' else None, self.bg)
+                        self.column += 1
+
+    def cells(self):
+        return [list(row) for row in self.rows], dict(self.images), (self.row, self.column)
 
 
 def terminal(command, env, reply=None, timeout=10, columns=80, rows=24):
@@ -143,14 +242,15 @@ printf 'PROMPT REMAINS VISIBLE\\n'
                 self.assertNotIn(GLOW, output, 'Reduced motion must not light the wordmark')
 
     def test_apt_uses_the_same_static_canvas_and_releases_for_prompt(self):
+        card, shine = apt_card()
         for lines in ('21', '10'):
             with self.subTest(lines=lines), tempfile.TemporaryDirectory() as folder:
                 env = {**os.environ, 'TERM': 'xterm-256color'}
                 (Path(folder) / 'apt.log').touch(mode=0o600)
                 # Feed status separately from a delayed prompt, allowing the real
                 # renderer to paint before it gives terminal output back.
-                command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true joined 2026.0.62 "$3"',
-                           'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), lines]
+                command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true joined 2026.0.62 "$3" "$4" "$5" "" ""',
+                           'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), lines, card, shine]
                 code, output = terminal(command, env, columns=64, rows=24)
                 self.assertEqual(code, 0, output)
                 self.assertIn(f'\x1b[{lines}A'.encode(), output)
@@ -386,11 +486,12 @@ class InstallerArtTests(unittest.TestCase):
             return output.decode().replace('\r\n', '\n')
 
     def drawn(self, body, art, motion=False, **extra):
-        """What BODY printed, then the microphone rows and the full placement."""
-        output = self.bash(body + 'printf "@@%s@@%s" "$VOCO_UI_MIC_ROWS" "${VOCO_UI_PLACE[14]:-}"\n',
+        """What BODY printed, then each row's left part (its padding and the
+        microphone) and the full placement."""
+        output = self.bash(body + 'IFS=$\'\\n\'\nprintf "@@%s@@%s" "${VOCO_UI_LEFT[*]}" "${VOCO_UI_PLACE[14]:-}"\n',
                            motion=motion, art=art, **extra)
         text, rows, place = output.split('@@CONFIGURED@@\n', 1)[1].rsplit('@@', 2)
-        return text, rows.split('\n')[:-1], place
+        return text, rows.split('\n'), place
 
     def probe(self, reply=None, body='', **extra):
         """Configure the canvas in a terminal that answers REPLY to the probe."""
@@ -453,24 +554,23 @@ class InstallerArtTests(unittest.TestCase):
 
     def test_bash_and_the_apt_display_draw_the_same_card(self):
         apt_ui = load('apt_ui', APT_UI)
-        version = re.search(r'^VERSION="([^"]+)"', (ROOT / 'install').read_text(), re.M).group(1)
         for mode in self.MODES:
             with self.subTest(mode=mode):
-                card, mic, place = self.drawn('voco_ui_card\nprintf "%s" "$VOCO_UI_CARD_TEXT"\n', mode)
-                self.assertEqual(len(mic), 11)
-                expected = ''.join('\r\x1b[K  ' + line + '\n' for line in apt_ui.card_lines(version, mic)) + place
-                self.assertEqual(card, expected)
+                card, shine = apt_card(mode)
+                drawn, left, place = self.drawn(CARD_TEXT + 'voco_ui_card\ncard_text\n', mode)
+                self.assertEqual(len(left), 11)
+                self.assertEqual(drawn, card_text(apt_ui.card_rows(card, shine)))
                 self.assertEqual(bool(place), mode == 'kitty')
-                for shine in (0, 140, 279):
-                    lit, _, _ = self.drawn(f'voco_ui_card_at "$VOCO_UI_INTRO_MS" {shine}\nprintf "%s" "$VOCO_UI_CARD_TEXT"\n',
+                for moment in (0, 140, 279):
+                    lit, _, _ = self.drawn(CARD_TEXT + f'voco_ui_card_at "$VOCO_UI_INTRO_MS" {moment}\ncard_text\n',
                                            mode, motion=True)
-                    expected = ''.join('\r\x1b[K  ' + line + '\n' for line in apt_ui.card_lines(version, mic, shine)) + place
-                    self.assertEqual(lit, expected)
+                    self.assertEqual(lit, card_text(apt_ui.card_rows(card, shine, moment)))
 
     def test_every_intro_frame_keeps_the_card_inside_its_canvas(self):
         times = (0, 40, 120, 240, 330, 480, 600, 840, 900, 1000, 1100, 1200, 1300)
-        body = ''.join(f'voco_ui_card_at {t} {s}\nprintf "%s##\\n" "$VOCO_UI_CARD_TEXT"\n'
-                       for t in times for s in (-1, 100))
+        body = CARD_TEXT + ''.join(f'voco_ui_card_at {t} {s}\ncard_text\n'
+                                   f'printf "%s##\\n" "${{VOCO_UI_PLACE[VOCO_UI_CARD_REVEAL]:-}}"\n'
+                                   for t in times for s in (-1, 100))
         for mode in self.MODES:
             with self.subTest(mode=mode):
                 text, mic, _ = self.drawn(body, mode, motion=True)
@@ -494,11 +594,57 @@ class InstallerArtTests(unittest.TestCase):
                     else:
                         self.assertEqual(commands, [])
                         self.assertEqual(all(mic[r] in lines[r + 1] for r in range(11)), swept == 14, t)
-                        self.assertEqual(any(mic[r] in lines[r + 1] for r in range(11)), swept == 14, t)
                 plain = [visible(frame) for frame in frames]
                 self.assertNotIn('The voice', plain[times.index(840) * 2])
                 self.assertIn('The voice layer for Linux.', plain[-2])
                 self.assertIn('Today: private dictation.', plain[-2])
+
+    def frames(self, mode, times, whole, extra=''):
+        """Canvas frames at each of TIMES into the intro, on a steady clock, each
+        drawn in full when WHOLE or else redrawing only what changed."""
+        body = ('printf -v reserve "%*s" 21 ""\nprintf "%s" "${reserve// /$\'\\n\'}"\n'
+                'voco_ui_now_ms() { VOCO_UI_NOW=$FAKE_NOW; }\nVOCO_UI_INTRO_START=1000\n' + extra +
+                ''.join(f'FAKE_NOW={1000 + t}\n{"voco_ui_forget" if whole else ":"}\n'
+                        "voco_ui_frame 'Getting your desktop ready.' 'Checking your system.' '—'\nprintf '@@'\n"
+                        for t in times))
+        output = self.bash(body, art=mode).split('@@CONFIGURED@@\n', 1)[1]
+        return output.split('@@')[:-1]
+
+    def test_redrawing_only_what_changed_leaves_the_same_screen(self):
+        times = list(range(0, 1500, 33)) + [1500, 1500]
+        for mode in ('octant', 'kitty'):
+            with self.subTest(mode=mode):
+                changed, whole = self.frames(mode, times, False), self.frames(mode, times, True)
+                self.assertEqual(len(changed), len(times))
+                left, right = Screen(), Screen()
+                for t, a, b in zip(times, changed, whole):
+                    left.feed(a)
+                    right.feed(b)
+                    self.assertEqual(left.cells(), right.cells(), f'{mode} at {t} ms')
+                self.assertLess(sum(map(len, changed)), sum(map(len, whole)) / 2)
+                # At rest the card isn't built again, and nothing else changed, so
+                # the frame only moves the cursor past the progress lines.
+                self.assertEqual(changed[-1], '\x1b[8A' + '\n' * 8)
+
+    def test_once_the_microphone_shows_only_the_rest_of_its_rows_is_drawn(self):
+        times = [0, 33, 66, 100, 133, 166, 200, 300, 400, 600, 900]
+        frames = self.frames('kitty', times, False)
+        for t, frame in zip(times, frames):
+            placed = [keys for keys, _ in kitty_commands(frame) if keys.get('a') == 'p']
+            rows = frame.split('\n')[1:12]
+            if t >= 200:
+                # By 166 ms the sweep is past it: its cells and the image over
+                # them stay as they are.
+                self.assertEqual(placed, [], t)
+                self.assertFalse(any(row.startswith('\r\x1b[K') for row in rows), t)
+            else:
+                self.assertEqual(len(placed), 1 if t >= 33 else 0, t)
+
+    def test_after_another_process_drew_the_next_frame_is_whole(self):
+        output = self.bash('VOCO_DOWNLOAD_DIR=$(mktemp -d)\nvoco_ui_init\nvoco_ui_settle\nvoco_ui_begin first detail\n'
+                           'voco_ui_sweep second detail\nsleep .1\nvoco_ui_pause\nprintf "@@AFTER@@"\n'
+                           "voco_ui_frame second detail '—'\nvoco_ui_close\n").split('@@AFTER@@')[1]
+        self.assertEqual(output.count('\r\x1b[K'), 21, repr(output[:200]))
 
     def test_the_intro_ends_and_reduced_motion_never_starts_it(self):
         moving = self.bash('voco_ui_now_ms\nVOCO_UI_INTRO_START=$VOCO_UI_NOW\n'
@@ -546,12 +692,12 @@ class InstallerArtTests(unittest.TestCase):
         generator = load('installer_art', ROOT / 'scripts/generate-installer-art.py')
         for mode in ('octant', 'sextant', 'quadrant'):
             with self.subTest(mode=mode):
-                text, mic, place = self.drawn('voco_ui_card\nprintf "%s" "$VOCO_UI_CARD_TEXT"\n', mode)
+                text, mic, place = self.drawn(CARD_TEXT + 'voco_ui_card\ncard_text\n', mode)
                 self.assertEqual(place, '')
                 self.assertNotIn('\x1b_G', text)
                 symbols = set(generator.symbols(mode)) | {' '}
                 for row in mic:
-                    cells = visible(row)
+                    cells = visible(row)[2:]
                     self.assertEqual(len(cells), 14, repr(row))
                     self.assertLessEqual(set(cells), symbols)
                 for line in text.split('\n')[:-1]:
@@ -617,14 +763,17 @@ class InstallerArtTests(unittest.TestCase):
         self.assertTrue(after.startswith('\x1b[21A' + '\r\x1b[K\n' * 21), repr(after[:40]))
 
     def test_the_apt_display_places_and_removes_the_image(self):
-        mic = '\n'.join('\x1b[48;2;17;19;24m' + 'M' * 14 for _ in range(11)) + '\n'
+        card, shine = apt_card('kitty')
+        lines = card.split('\n')
+        # Rows marked M, so the test can find them.
+        card = '\n'.join(lines[:1] + [line.replace(' ', 'M', 16) if r < 11 else line for r, line in enumerate(lines[1:])])
         place = '\x1b7\x1b[12A\x1b[5G\x1b_Ga=p,i=8626,p=1,c=14,r=11,C=1,q=2\x1b\\\x1b8'
         removal = '\x1b_Ga=d,d=i,i=8626,p=1,q=2\x1b\\'
         with tempfile.TemporaryDirectory() as folder:
             (Path(folder) / 'apt.log').touch(mode=0o600)
             command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | '
-                       '/usr/bin/python3 "$1" "$2" true joined 2026.0.62 21 "$3" "$4" "$5"',
-                       'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), mic, place, removal]
+                       '/usr/bin/python3 "$1" "$2" true joined 2026.0.62 21 "$3" "$4" "$5" "$6"',
+                       'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), card, shine, place, removal]
             code, output = terminal(command, {**os.environ, 'TERM': 'xterm-256color'}, columns=64, rows=24)
         self.assertEqual(code, 0, output)
         text = output.decode().replace('\r\n', '\n')
@@ -633,6 +782,10 @@ class InstallerArtTests(unittest.TestCase):
         lines = text[card:].split('\n')
         self.assertTrue(lines[13].startswith(place), repr(lines[13][:80]))
         self.assertTrue(all('M' * 14 in visible(lines[r]) for r in range(1, 12)))
+        # The next frame changes the mark and the detail, so it redraws only those lines.
+        later = text[card + 1:].split('\x1b[8A', 1)[1].split('\x1b_Ga=d', 1)[0]
+        self.assertEqual(later.count('\r\x1b[K'), 2, repr(later))
+        self.assertNotIn(place, later)
         self.assertIn(removal + '\x1b[21A' + '\r\x1b[K\n' * 21, text)
         self.assertIn('Confirm package option: ', text)
 

@@ -249,12 +249,10 @@ VOCO_UI_CELL_HEIGHT=0
 VOCO_UI_PROBE_MS=200
 VOCO_UI_PROBE_TTY=''
 # The image's fixed id ("VOCO" on a phone keypad), its placement once the sweep
-# has revealed 1 to 14 of its columns, and the command that takes it away. The
-# microphone's rows, for the APT display.
+# has revealed 1 to 14 of its columns, and the command that takes it away.
 VOCO_UI_IMAGE_ID=8626
 VOCO_UI_PLACE=()
 VOCO_UI_UNPLACE=''
-VOCO_UI_MIC_ROWS=''
 # True while the APT display draws, which an interrupt can stop mid-sequence.
 VOCO_UI_APT_DRAWING=false
 # The intro, in milliseconds after the canvas opens: a silver line crosses the
@@ -275,8 +273,25 @@ VOCO_UI_INTRO_MS=1300
 VOCO_UI_INTRO_START=0
 VOCO_UI_SHINE_START=0
 VOCO_UI_NOW=0
-VOCO_UI_CARD_TEXT=''
-VOCO_UI_CARD_FINAL=''
+VOCO_UI_FINAL_TOP=''
+VOCO_UI_CARD_LEFT=()
+VOCO_UI_CARD_RIGHT=()
+VOCO_UI_CARD_REVEAL=0
+VOCO_UI_CARD_SWEEP=0
+VOCO_UI_CARD_KINDS=()
+VOCO_UI_APT_CARD=''
+VOCO_UI_APT_SHINE=''
+VOCO_UI_SHOWN_SWEEP=-1
+VOCO_UI_SHOWN_LEFT=-1
+VOCO_UI_SHOWN_RIGHT=()
+VOCO_UI_SHOWN_REVEAL=-1
+VOCO_UI_SHOWN_RESTS=false
+VOCO_UI_SHOWN_HEADING=''
+VOCO_UI_SHOWN_LINES=()
+VOCO_UI_SHOWN_PROGRESS=''
+VOCO_UI_CARD_RESTS=false
+VOCO_UI_PROGRESS=()
+VOCO_UI_PROGRESS_KEY=''
 VOCO_UI_BRAND_LINE='The voice layer for Linux.'
 VOCO_UI_TODAY_LINE='Today: private dictation.'
 # BEGIN GENERATED INSTALLER BRAND
@@ -303,43 +318,43 @@ VOCO_UI_EASE=(0 202 397 560 682 767 828 871 903 928 946 960 971 980 986 991 995 
 # palette, a mosaic of block symbols for each kind of terminal, and its image.
 VOCO_UI_PALETTE=('17;19;24' '20;21;24' '27;27;30' '36;35;35' '41;40;40' '47;45;45' '51;49;49' '54;52;52' '57;55;55' '59;57;57' '61;59;60' '71;68;71' '84;80;81' '96;92;94' '107;103;104' '117;113;114' '127;123;124' '136;132;132' '142;139;139' '148;144;145' '153;150;150' '158;155;155' '164;161;161' '170;167;167' '177;174;173' '182;179;179' '188;185;184' '192;189;189' '196;193;193' '200;198;197' '205;202;202' '210;207;207' '214;211;211' '218;215;215' '222;220;219' '226;224;224' '231;229;228' '236;234;234' '242;240;240' '247;246;245')
 VOCO_UI_MOSAIC_OCTANT=(
-  ' 0000' '▁0100' '🬆031d' '𜴖1a09' '▅0821' '▕1322' '▅0722' '▅0822' '▏1121' '▅0920' '𜴤1a0a' '🬊031f' '▏0200' ' 0000'
-  ' 0000' '▕1902' '▊2206' '𜴂0809' '▕0408' '▕0c24' '▏060a' '▕0709' '▏0623' '▏0a09' '▌0a08' '▍0b24' '▏1f02' ' 0000'
-  ' 0000' '▕1a02' '▋240c' '▗0a0a' '▕0409' '▕0c24' '▏060a' '▕0609' '▏0523' '▏0a09' '▋0a09' '▍0a22' '▎1500' ' 0000'
-  ' 0000' '▕1902' '▋230c' '🬏090a' '▕0408' '▕0b22' '▏060a' '▕0709' '▏0521' '▍080a' '▌0a08' '▍0a20' '▎1400' ' 0000'
-  '🬭2000' '🬏1707' '▋200b' '𜶻0809' '▕0408' '▕0b20' '▏0508' '▕0608' '▏051f' '▎0608' '🬆0807' '▍0a1e' '🬞1a09' '🬭2200'
-  '▏1924' '▎200d' '𜴡0e1f' '▂2206' '▂2405' '▕0e21' '▂2406' '▂2305' '▏0c1f' '▂2105' '▂1e05' '▍0d1e' '▊0e25' '▕1723'
-  '▏1823' '▎1c0c' '▂1018' '🬭1821' '🬭1e26' '🬭1f26' '🬭1c23' '🬭181f' '🬭141b' '▂1118' '▂1016' '▂131c' '▊0c23' '▕1622'
-  '▏1021' '▎1b03' '🬏0c14' '𜴡1f18' '🬏2025' '𜷋2426' '▌2320' '▌1e1b' '𜴍1a18' '𜴍1716' '▊1517' '🬞0d19' '▊0322' '▕101f'
-  '𜴢1803' '🬁051b' '𜴷1603' '𜶻0214' '▁0a18' '▀1f16' '▅181e' '𜴼1915' '🬂1613' '▁0814' '𜷋0215' '𜵱1603' '🬀041b' '𜴏1603'
-  ' 0000' '🬁1b03' '𜶻031b' '𜴳1d0c' '🬂011a' '▅190a' '▔1423' '𜵈1c13' '▅150a' '🬂0119' '𜴳1b0c' '𜷋0219' '🬀1903' ' 0000'
-  ' 0000' ' 0000' ' 0000' '🬦1106' '🬂0118' '🬀0a1f' '▁1e25' '🬠171d' '🬁0b15' '🬂0115' '🬓1407' ' 0000' ' 0000' ' 0000'
+  ' 0000' ▁0100 🬆031d 𜴖1a09 ▅0821 ▕1322 ▅0722 ▅0822 ▏1121 ▅0920 𜴤1a0a 🬊031f ▏0200 ' 0000'
+  ' 0000' ▕1902 ▊2206 𜴂0809 ▕0408 ▕0c24 ▏060a ▕0709 ▏0623 ▏0a09 ▌0a08 ▍0b24 ▏1f02 ' 0000'
+  ' 0000' ▕1a02 ▋240c ▗0a0a ▕0409 ▕0c24 ▏060a ▕0609 ▏0523 ▏0a09 ▋0a09 ▍0a22 ▎1500 ' 0000'
+  ' 0000' ▕1902 ▋230c 🬏090a ▕0408 ▕0b22 ▏060a ▕0709 ▏0521 ▍080a ▌0a08 ▍0a20 ▎1400 ' 0000'
+  🬭2000 🬏1707 ▋200b 𜶻0809 ▕0408 ▕0b20 ▏0508 ▕0608 ▏051f ▎0608 🬆0807 ▍0a1e 🬞1a09 🬭2200
+  ▏1924 ▎200d 𜴡0e1f ▂2206 ▂2405 ▕0e21 ▂2406 ▂2305 ▏0c1f ▂2105 ▂1e05 ▍0d1e ▊0e25 ▕1723
+  ▏1823 ▎1c0c ▂1018 🬭1821 🬭1e26 🬭1f26 🬭1c23 🬭181f 🬭141b ▂1118 ▂1016 ▂131c ▊0c23 ▕1622
+  ▏1021 ▎1b03 🬏0c14 𜴡1f18 🬏2025 𜷋2426 ▌2320 ▌1e1b 𜴍1a18 𜴍1716 ▊1517 🬞0d19 ▊0322 ▕101f
+  𜴢1803 🬁051b 𜴷1603 𜶻0214 ▁0a18 ▀1f16 ▅181e 𜴼1915 🬂1613 ▁0814 𜷋0215 𜵱1603 🬀041b 𜴏1603
+  ' 0000' 🬁1b03 𜶻031b 𜴳1d0c 🬂011a ▅190a ▔1423 𜵈1c13 ▅150a 🬂0119 𜴳1b0c 𜷋0219 🬀1903 ' 0000'
+  ' 0000' ' 0000' ' 0000' 🬦1106 🬂0118 🬀0a1f ▁1e25 🬠171d 🬁0b15 🬂0115 🬓1407 ' 0000' ' 0000' ' 0000'
 )
 VOCO_UI_MOSAIC_SEXTANT=(
-  ' 0000' '▁0100' '🬆031d' '🬅1b0c' '▅0821' '▕1322' '▅0722' '▅0822' '▏1121' '▅0920' '🬈1c0d' '🬊031f' '▏0200' ' 0000'
-  ' 0000' '▕1902' '▊2206' '▆0908' '▕0408' '▕0c24' '▏060a' '▕0709' '▏0623' '▏0a09' '▌0a08' '▍0b24' '▏1f02' ' 0000'
-  ' 0000' '▕1a02' '▋240c' '▗0a0a' '▕0409' '▕0c24' '▏060a' '▕0609' '▏0523' '▏0a09' '▋0a09' '▍0a22' '▎1500' ' 0000'
-  ' 0000' '▕1902' '▋230c' '🬏090a' '▕0408' '▕0b22' '▏060a' '▕0709' '▏0521' '▍080a' '▌0a08' '▍0a20' '▎1400' ' 0000'
-  '🬭2000' '🬏1707' '▋200b' '▖0809' '▕0408' '▕0b20' '▏0508' '▕0608' '▏051f' '▎0608' '🬆0807' '▍0a1e' '🬞1a09' '🬭2200'
-  '▏1924' '▎200d' '▋1f0e' '▂2206' '▂2405' '▕0e21' '▂2406' '▂2305' '▏0c1f' '▂2105' '▂1e05' '▍0d1e' '▊0e25' '▕1723'
-  '▏1823' '▎1c0c' '▂1018' '🬭1821' '🬭1e26' '🬭1f26' '🬭1c23' '🬭181f' '🬭141b' '▂1118' '▂1016' '▂131c' '▊0c23' '▕1622'
-  '▏1021' '▎1b03' '🬏0c14' '🬉1f19' '🬏2025' '▂2425' '▌2320' '▌1e1b' '🬄1a18' '🬄1716' '▊1517' '🬞0d19' '▊0322' '▕101f'
-  '🬉1d09' '🬁051b' '🬑1202' '▃0413' '▁0a18' '▀1f16' '▅181e' '▅161a' '🬂1613' '▁0814' '▃0314' '🬟1302' '🬀041b' '🬄1b08'
-  ' 0000' '🬁1b03' '▃031a' '🬋1d0e' '🬂011a' '▅190a' '▔1423' '🬓1c13' '▅150a' '🬂0119' '🬋1b0e' '▃0319' '🬀1903' ' 0000'
-  ' 0000' ' 0000' ' 0000' '🬦1106' '🬂0118' '🬀0a1f' '▁1e25' '🬠171d' '🬁0b15' '🬂0115' '🬓1407' ' 0000' ' 0000' ' 0000'
+  ' 0000' ▁0100 🬆031d 🬅1b0c ▅0821 ▕1322 ▅0722 ▅0822 ▏1121 ▅0920 🬈1c0d 🬊031f ▏0200 ' 0000'
+  ' 0000' ▕1902 ▊2206 ▆0908 ▕0408 ▕0c24 ▏060a ▕0709 ▏0623 ▏0a09 ▌0a08 ▍0b24 ▏1f02 ' 0000'
+  ' 0000' ▕1a02 ▋240c ▗0a0a ▕0409 ▕0c24 ▏060a ▕0609 ▏0523 ▏0a09 ▋0a09 ▍0a22 ▎1500 ' 0000'
+  ' 0000' ▕1902 ▋230c 🬏090a ▕0408 ▕0b22 ▏060a ▕0709 ▏0521 ▍080a ▌0a08 ▍0a20 ▎1400 ' 0000'
+  🬭2000 🬏1707 ▋200b ▖0809 ▕0408 ▕0b20 ▏0508 ▕0608 ▏051f ▎0608 🬆0807 ▍0a1e 🬞1a09 🬭2200
+  ▏1924 ▎200d ▋1f0e ▂2206 ▂2405 ▕0e21 ▂2406 ▂2305 ▏0c1f ▂2105 ▂1e05 ▍0d1e ▊0e25 ▕1723
+  ▏1823 ▎1c0c ▂1018 🬭1821 🬭1e26 🬭1f26 🬭1c23 🬭181f 🬭141b ▂1118 ▂1016 ▂131c ▊0c23 ▕1622
+  ▏1021 ▎1b03 🬏0c14 🬉1f19 🬏2025 ▂2425 ▌2320 ▌1e1b 🬄1a18 🬄1716 ▊1517 🬞0d19 ▊0322 ▕101f
+  🬉1d09 🬁051b 🬑1202 ▃0413 ▁0a18 ▀1f16 ▅181e ▅161a 🬂1613 ▁0814 ▃0314 🬟1302 🬀041b 🬄1b08
+  ' 0000' 🬁1b03 ▃031a 🬋1d0e 🬂011a ▅190a ▔1423 🬓1c13 ▅150a 🬂0119 🬋1b0e ▃0319 🬀1903 ' 0000'
+  ' 0000' ' 0000' ' 0000' 🬦1106 🬂0118 🬀0a1f ▁1e25 🬠171d 🬁0b15 🬂0115 🬓1407 ' 0000' ' 0000' ' 0000'
 )
 VOCO_UI_MOSAIC_QUADRANT=(
-  ' 0000' '▁0100' '▀0619' '▃0915' '▅0821' '▕1322' '▅0722' '▅0822' '▏1121' '▅0920' '▃0a16' '▅1803' '▏0200' ' 0000'
-  ' 0000' '▕1902' '▊2206' '▆0908' '▕0408' '▕0c24' '▏060a' '▕0709' '▏0623' '▏0a09' '▌0a08' '▍0b24' '▏1f02' ' 0000'
-  ' 0000' '▕1a02' '▋240c' '▗0a0a' '▕0409' '▕0c24' '▏060a' '▕0609' '▏0523' '▏0a09' '▋0a09' '▍0a22' '▎1500' ' 0000'
-  ' 0000' '▕1902' '▋230c' '▖090a' '▕0408' '▕0b22' '▏060a' '▕0709' '▏0521' '▍080a' '▌0a08' '▍0a20' '▎1400' ' 0000'
-  '▃1c00' '▕170a' '▋200b' '▖0809' '▕0408' '▕0b20' '▏0508' '▕0608' '▏051f' '▎0608' '▃0708' '▍0a1e' '▏180b' '▃1d00'
-  '▏1924' '▎200d' '▋1f0e' '▂2206' '▂2405' '▕0e21' '▂2406' '▂2305' '▏0c1f' '▂2105' '▂1e05' '▍0d1e' '▊0e25' '▕1723'
-  '▏1823' '▎1c0c' '▂1018' '▂1720' '▃1f26' '▃2026' '▃1c23' '▂171e' '▂141a' '▂1118' '▂1016' '▂131c' '▊0c23' '▕1622'
-  '▏1021' '▎1b03' '▖0e15' '▌181e' '▖2125' '▂2425' '▌2320' '▌1e1b' '▌1918' '▌1715' '▊1517' '▗0e19' '▊0322' '▕101f'
-  '▝1f0b' '▝0b1d' '▚020e' '▃0413' '▁0a18' '▀1f16' '▅181e' '▅161a' '▅1316' '▁0814' '▃0314' '▚0e02' '▘0b1c' '▘1d0b'
-  ' 0000' '▅0110' '▃031a' '▔0215' '▅1b03' '▅190a' '▔1423' '▔0e18' '▅150a' '▅1a03' '▔0213' '▃0319' '▘1202' ' 0000'
-  ' 0000' ' 0000' ' 0000' '▅0e01' '▅1902' '▅220f' '▁1e25' '▌1e18' '▅170e' '▅1502' '▅1001' ' 0000' ' 0000' ' 0000'
+  ' 0000' ▁0100 ▀0619 ▃0915 ▅0821 ▕1322 ▅0722 ▅0822 ▏1121 ▅0920 ▃0a16 ▅1803 ▏0200 ' 0000'
+  ' 0000' ▕1902 ▊2206 ▆0908 ▕0408 ▕0c24 ▏060a ▕0709 ▏0623 ▏0a09 ▌0a08 ▍0b24 ▏1f02 ' 0000'
+  ' 0000' ▕1a02 ▋240c ▗0a0a ▕0409 ▕0c24 ▏060a ▕0609 ▏0523 ▏0a09 ▋0a09 ▍0a22 ▎1500 ' 0000'
+  ' 0000' ▕1902 ▋230c ▖090a ▕0408 ▕0b22 ▏060a ▕0709 ▏0521 ▍080a ▌0a08 ▍0a20 ▎1400 ' 0000'
+  ▃1c00 ▕170a ▋200b ▖0809 ▕0408 ▕0b20 ▏0508 ▕0608 ▏051f ▎0608 ▃0708 ▍0a1e ▏180b ▃1d00
+  ▏1924 ▎200d ▋1f0e ▂2206 ▂2405 ▕0e21 ▂2406 ▂2305 ▏0c1f ▂2105 ▂1e05 ▍0d1e ▊0e25 ▕1723
+  ▏1823 ▎1c0c ▂1018 ▂1720 ▃1f26 ▃2026 ▃1c23 ▂171e ▂141a ▂1118 ▂1016 ▂131c ▊0c23 ▕1622
+  ▏1021 ▎1b03 ▖0e15 ▌181e ▖2125 ▂2425 ▌2320 ▌1e1b ▌1918 ▌1715 ▊1517 ▗0e19 ▊0322 ▕101f
+  ▝1f0b ▝0b1d ▚020e ▃0413 ▁0a18 ▀1f16 ▅181e ▅161a ▅1316 ▁0814 ▃0314 ▚0e02 ▘0b1c ▘1d0b
+  ' 0000' ▅0110 ▃031a ▔0215 ▅1b03 ▅190a ▔1423 ▔0e18 ▅150a ▅1a03 ▔0213 ▃0319 ▘1202 ' 0000'
+  ' 0000' ' 0000' ' 0000' ▅0e01 ▅1902 ▅220f ▁1e25 ▌1e18 ▅170e ▅1502 ▅1001 ' 0000' ' 0000' ' 0000'
 )
 VOCO_UI_IMAGE_SIZE=(331 496)
 VOCO_UI_IMAGE_MIC=(39 48 252 400)
@@ -401,10 +416,13 @@ voco_ui_probe() {
   local -a stat
   local kitty=$'\e_G[^;\e]*i='"$VOCO_UI_IMAGE_ID"$'[^;\e]*;OK\e' da1=$'\e\\[\\?[0-9;]*c'
   local cell=$'\e\\[6;([0-9]+);([0-9]+)t' area=$'\e\\[4;([0-9]+);([0-9]+)t'
+  # The whole probe, its setup and restore included, takes at most
+  # VOCO_UI_PROBE_MS; the restore needs about 2 of them.
+  voco_ui_now_ms
+  deadline=$((VOCO_UI_NOW + VOCO_UI_PROBE_MS - 5))
   # Only the foreground job may use the terminal: a background one would stop.
   # The process group and the terminal's foreground group follow the command name.
-  [[ -r "/proc/$pid/stat" ]] || return 0
-  process=$(< "/proc/$pid/stat")
+  { read -r process < "/proc/$pid/stat"; } 2>/dev/null || return 0
   read -r -a stat <<< "${process##*) }"
   [[ -n "${stat[5]:-}" && "${stat[2]}" == "${stat[5]}" ]] || return 0
   { exec {tty}<> /dev/tty; } 2>/dev/null || return 0
@@ -413,12 +431,10 @@ voco_ui_probe() {
     trap '' TTIN TTOU
     stty -echo -icanon min 1 time 0 <&"$tty" 2>/dev/null || true
     printf '\033_Gi=%d,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[16t\033[14t\033[c' "$VOCO_UI_IMAGE_ID" >&"$tty" || true
-    voco_ui_now_ms
-    deadline=$((VOCO_UI_NOW + VOCO_UI_PROBE_MS))
+    # Each read runs to a "c", which ends DA1, so an answer takes one or two reads.
     while voco_ui_now_ms; remaining=$((deadline - VOCO_UI_NOW)); (( remaining > 0 )); do
       printf -v wait '%d.%03d' $((remaining / 1000)) $((remaining % 1000))
-      IFS= read -r -n 1 -d '' -t "$wait" char <&"$tty" || break
-      reply+=$char
+      if IFS= read -r -d c -t "$wait" char <&"$tty"; then reply+=${char}c; else reply+=$char; break; fi
       [[ ! "$reply" =~ $da1 ]] || break
     done
     stty "$saved" <&"$tty" 2>/dev/null || true
@@ -495,50 +511,70 @@ voco_ui_image_build() {
   printf '%s' "$send"
 }
 
-# Every cell of the card at rest, built once from the generated brand data.
+# The card's pieces, built once from the generated brand data. A line has an SGR
+# sequence only where its colour changes, which keeps frames small, and each row
+# splits after the microphone, at card column 16, into a left and a right part
+# that each start with their colour: a frame can redraw the right part alone,
+# leaving the microphone and any image over it untouched.
 voco_ui_art_build() {
   [[ "$VOCO_UI_ART_BUILT" != true ]] || return 0
-  local card=$'\e[48;2;'"$VOCO_UI_CARD"'m ' edge=$'\e[38;2;'"$VOCO_UI_CARD"';49m' r x cell glyph line
-  local -a mic=()
-  VOCO_UI_CELLS=() VOCO_UI_TOP_CELLS=() VOCO_UI_BOTTOM_CELLS=() VOCO_UI_WM_LIT=() VOCO_UI_WM_GLOW=()
+  local r x cell glyph sgr last line
+  local -a sgrs=() chars=()
+  declare -gA VOCO_UI_RUNS_SEEN=()
+  VOCO_UI_GRAPHITE=$'\e[48;2;'"$VOCO_UI_CARD"'m'
+  VOCO_UI_EDGE=$'\e[38;2;'"$VOCO_UI_CARD"';49m'
+  printf -v VOCO_UI_SPACES '%58s' ''
+  VOCO_UI_ZEROS=${VOCO_UI_SPACES// /0} VOCO_UI_TEES=${VOCO_UI_SPACES// /t}
   if [[ "$VOCO_UI_MIC_MODE" == octant || "$VOCO_UI_MIC_MODE" == sextant || "$VOCO_UI_MIC_MODE" == quadrant ]]; then
     # Each cell: its symbol, then its foreground and background palette indices.
     local -n mosaic="VOCO_UI_MOSAIC_${VOCO_UI_MIC_MODE^^}"
     for cell in "${mosaic[@]}"; do
-      glyph=${cell%????}
-      if [[ "$glyph" == ' ' ]]; then
-        mic+=($'\e[48;2;'"${VOCO_UI_PALETTE[16#${cell: -2}]}"'m ')
-      else
-        mic+=($'\e[38;2;'"${VOCO_UI_PALETTE[16#${cell: -4:2}]}"';48;2;'"${VOCO_UI_PALETTE[16#${cell: -2}]}"'m'"$glyph")
-      fi
+      glyph=${cell%????} sgr=${VOCO_UI_PALETTE[16#${cell: -2}]}
+      if [[ "$glyph" == ' ' ]]; then sgrs+=($'\e[48;2;'"$sgr"'m')
+      else sgrs+=($'\e[38;2;'"${VOCO_UI_PALETTE[16#${cell: -4:2}]}"';48;2;'"$sgr"'m'); fi
+      chars+=("$glyph")
     done
   else
     # Graphite, under the image the card places over these cells.
-    for ((x=0; x<VOCO_UI_CARD_ROWS*14; x++)); do mic+=("$card"); done
+    for ((x=0; x<VOCO_UI_CARD_ROWS*14; x++)); do sgrs+=("$VOCO_UI_GRAPHITE") chars+=(' '); done
     [[ "$VOCO_UI_MIC_MODE" != kitty ]] || voco_ui_image_build
   fi
-  VOCO_UI_MIC_ROWS=''
+  # Each row's left part, two graphite cells and the microphone's fourteen, and
+  # every shorter one the sweep shows on its way across.
+  VOCO_UI_LEFT=() VOCO_UI_LEFT_CUT=()
   for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
-    line=''
-    for ((x=0; x<VOCO_UI_CARD_WIDTH; x++)); do
-      if (( x >= 2 && x < 16 )); then
-        VOCO_UI_CELLS+=("${mic[r*14+x-2]}")
-        line+=${mic[r*14+x-2]}
-      else
-        VOCO_UI_CELLS+=("$card")
-      fi
+    line=$VOCO_UI_GRAPHITE' ' last=$VOCO_UI_GRAPHITE
+    VOCO_UI_LEFT_CUT+=('' "$line" "$line ")
+    line+=' '
+    for ((x=0; x<14; x++)); do
+      sgr=${sgrs[r*14+x]}
+      [[ "$sgr" == "$last" ]] || line+=$sgr
+      last=$sgr line+=${chars[r*14+x]}
+      VOCO_UI_LEFT_CUT+=("$line")
     done
-    VOCO_UI_MIC_ROWS+=$line$'\n'
+    VOCO_UI_LEFT+=("$line")
   done
   # Rounded edges: the card begins and ends half a cell in, on any background.
-  for ((x=0; x<VOCO_UI_CARD_WIDTH; x++)); do
-    if (( x == 0 )); then VOCO_UI_TOP_CELLS+=("${edge}▗") VOCO_UI_BOTTOM_CELLS+=("${edge}▝")
-    elif (( x == VOCO_UI_CARD_WIDTH - 1 )); then VOCO_UI_TOP_CELLS+=("${edge}▖") VOCO_UI_BOTTOM_CELLS+=("${edge}▘")
-    else VOCO_UI_TOP_CELLS+=("${edge}▄") VOCO_UI_BOTTOM_CELLS+=("${edge}▀"); fi
-  done
+  VOCO_UI_TOP_CHARS=(▗) VOCO_UI_BOTTOM_CHARS=(▝)
+  for ((x=2; x<VOCO_UI_CARD_WIDTH; x++)); do VOCO_UI_TOP_CHARS+=(▄) VOCO_UI_BOTTOM_CHARS+=(▀); done
+  VOCO_UI_TOP_CHARS+=(▖) VOCO_UI_BOTTOM_CHARS+=(▘)
+  printf -v VOCO_UI_EDGE_TOP '%s' "$VOCO_UI_EDGE" "${VOCO_UI_TOP_CHARS[@]}"
+  printf -v VOCO_UI_EDGE_BOTTOM '%s' "$VOCO_UI_EDGE" "${VOCO_UI_BOTTOM_CHARS[@]}"
+  # The wordmark rows' colours, the shine's, and each letter's row as lit (1)
+  # and empty (0) cells; the tagline's lines, when they start and their colours.
+  VOCO_UI_WM_LIT=() VOCO_UI_WM_PATTERN=()
   for ((r=0; r<5; r++)); do
-    VOCO_UI_WM_LIT+=($'\e[38;2;'"${VOCO_UI_WORDMARK[2*r]}"';48;2;'"${VOCO_UI_WORDMARK[2*r+1]}"'m▀')
-    VOCO_UI_WM_GLOW+=($'\e[38;2;'"${VOCO_UI_WORDMARK_SHINE[0]}"';48;2;'"${VOCO_UI_WORDMARK_SHINE[1]}"'m▀')
+    VOCO_UI_WM_LIT+=($'\e[38;2;'"${VOCO_UI_WORDMARK[2*r]}"';48;2;'"${VOCO_UI_WORDMARK[2*r+1]}"'m')
+  done
+  VOCO_UI_WM_GLOW=$'\e[38;2;'"${VOCO_UI_WORDMARK_SHINE[0]}"';48;2;'"${VOCO_UI_WORDMARK_SHINE[1]}"'m'
+  for glyph in "${VOCO_UI_GLYPHS[@]}"; do
+    glyph=${glyph//█/1}
+    VOCO_UI_WM_PATTERN+=("${glyph// /0}")
+  done
+  VOCO_UI_TAGLINE=("$VOCO_UI_BRAND_LINE" "$VOCO_UI_TODAY_LINE") VOCO_UI_TAGLINE_AT=("$VOCO_UI_BRAND_AT" "$VOCO_UI_TODAY_AT")
+  VOCO_UI_TAGLINE_SGR=()
+  for sgr in "$VOCO_UI_TEXT_BRAND" "$VOCO_UI_TEXT_TODAY" "$VOCO_UI_TEXT_VERSION"; do
+    VOCO_UI_TAGLINE_SGR+=($'\e[38;2;'"$sgr"';48;2;'"$VOCO_UI_CARD"'m')
   done
   VOCO_UI_SWEEP_GLOW=$'\e[48;2;'"${VOCO_UI_SWEEP[0]}"'m '
   VOCO_UI_SWEEP_BAR=$'\e[48;2;'"${VOCO_UI_SWEEP[1]}"'m '
@@ -547,75 +583,126 @@ voco_ui_art_build() {
   VOCO_UI_ART_BUILT=true
 }
 
-# Write TEXT's first COUNT characters into the caller's row from column FROM.
-voco_ui_card_text() {
-  local text="$1" color="$2" from="$3" count="$4" i
-  for ((i=0; i<count && i<${#text}; i++)); do
-    row[from+i]=$'\e[38;2;'"$color"';48;2;'"$VOCO_UI_CARD"'m'"${text:i:1}"
+# A row's right part in VOCO_UI_RIGHT, from KINDS, a character for each cell from
+# card column 16: 0 graphite, 1 a letter cell in the row's colour LIT, 2 a letter
+# cell the shine lights, t a cell of TEXT, aligned to KINDS, in TEXT_SGR. Each run
+# of one kind takes one SGR.
+voco_ui_runs() {
+  local kinds="$1" text="$2" text_sgr="$3" lit="$4" kind run n at=0 out='' key="$1|$2|$3|$4"
+  # Most rows repeat from one frame to the next.
+  if [[ -n "${VOCO_UI_RUNS_SEEN[$key]+set}" ]]; then VOCO_UI_RIGHT=${VOCO_UI_RUNS_SEEN[$key]}; return; fi
+  while [[ -n "$kinds" ]]; do
+    kind=${kinds:0:1}
+    run=${kinds%%[!$kind]*}
+    n=${#run}
+    case $kind in
+      0) out+=$VOCO_UI_GRAPHITE${VOCO_UI_SPACES:0:n} ;;
+      t) out+=$text_sgr${text:at:n} ;;
+      *)
+        run=${VOCO_UI_SPACES:0:n}
+        if [[ "$kind" == 1 ]]; then out+=$lit; else out+=$VOCO_UI_WM_GLOW; fi
+        out+=${run// /▀}
+        ;;
+    esac
+    at=$((at + n)) kinds=${kinds:n}
   done
+  VOCO_UI_RIGHT=$out VOCO_UI_RUNS_SEEN[$key]=$out
 }
 
-# The card's 13 lines at T milliseconds into the intro, with the shine S
-# milliseconds in, or no shine when S is negative.
+# The card T milliseconds into the intro, with the shine S milliseconds in, or
+# none when S is negative: VOCO_UI_CARD_TOP and _BOTTOM, the rows' _LEFT and
+# _RIGHT parts, the sweep's position and how many microphone columns it revealed.
 voco_ui_card_at() {
   local t="$1" s="$2" IFS=
-  local W=$VOCO_UI_CARD_WIDTH R=$VOCO_UI_ART_RIGHT sweep=$VOCO_UI_CARD_WIDTH band=-100 out='' line
-  local r gr i c x start p offset glyph label="v${VERSION:-}" count
-  local -a row
+  local W=$VOCO_UI_CARD_WIDTH R=$VOCO_UI_ART_RIGHT sweep=$VOCO_UI_CARD_WIDTH band=-100 cut glow=''
+  local r gr i start p offset at kinds text sgr lit count seg label="v${VERSION:-}" n
   (( t >= VOCO_UI_SWEEP_MS )) || sweep=$(( t * (W + 1) / VOCO_UI_SWEEP_MS ))
   # The shine is a slanted band, three columns wide, crossing the wordmark.
   (( s < 0 )) || band=$(( -8 + s * 51 / VOCO_UI_SHINE_MS ))
-  line="${VOCO_UI_TOP_CELLS[*]:0:sweep}"
-  (( sweep >= W )) || line+="$VOCO_UI_SWEEP_TOP"
-  out+=$'\r\e[K  '"$line"$'\e[0m\n'
+  # Before the sweep's glow and bar, it shows CUT cells of each row.
+  cut=$((sweep - 1))
+  (( sweep < 1 )) || glow=$VOCO_UI_SWEEP_GLOW
+  if (( sweep >= W )); then
+    VOCO_UI_CARD_TOP=$VOCO_UI_EDGE_TOP VOCO_UI_CARD_BOTTOM=$VOCO_UI_EDGE_BOTTOM
+  elif (( sweep > 0 )); then
+    VOCO_UI_CARD_TOP=$VOCO_UI_EDGE"${VOCO_UI_TOP_CHARS[*]:0:sweep}"$VOCO_UI_SWEEP_TOP
+    VOCO_UI_CARD_BOTTOM=$VOCO_UI_EDGE"${VOCO_UI_BOTTOM_CHARS[*]:0:sweep}"$VOCO_UI_SWEEP_BOTTOM
+  else
+    VOCO_UI_CARD_TOP=$VOCO_UI_SWEEP_TOP VOCO_UI_CARD_BOTTOM=$VOCO_UI_SWEEP_BOTTOM
+  fi
   for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
-    row=("${VOCO_UI_CELLS[@]:r*W:W}")
+    kinds=${VOCO_UI_ZEROS:0:42} text='' sgr='' lit=''
     if (( r == 0 && t >= VOCO_UI_VERSION_AT )); then
-      voco_ui_card_text "$label" "$VOCO_UI_TEXT_VERSION" $((R + 37 - ${#label})) "${#label}"
+      n=${#label} at=$((R + 37 - ${#label} - 16))
+      kinds=${VOCO_UI_ZEROS:0:at}${VOCO_UI_TEES:0:n}${VOCO_UI_ZEROS:0:42-at-n}
+      text=${VOCO_UI_SPACES:0:at}$label sgr=${VOCO_UI_TAGLINE_SGR[2]}
     elif (( r >= 2 && r <= 6 )); then
-      gr=$((r - 2))
+      gr=$((r - 2)) lit=${VOCO_UI_WM_LIT[r-2]}
       for ((i=0; i<4; i++)); do
         start=$((VOCO_UI_GLIDE_AT + i * VOCO_UI_GLIDE_STEP))
         (( t >= start )) || continue
         p=$(( (t - start) * 20 / VOCO_UI_GLIDE_MS )); (( p <= 20 )) || p=20
         offset=$(( VOCO_UI_GLIDE_COLUMNS * (1000 - VOCO_UI_EASE[p]) / 1000 ))
-        glyph=${VOCO_UI_GLYPHS[gr*4+i]}
-        for ((c=0; c<8; c++)); do
-          [[ "${glyph:c:1}" == '█' ]] || continue
-          x=$((R + i * 9 + offset + c))
-          (( x < W - 2 )) || continue
-          if (( x - R >= band + 4 - gr && x - R < band + 7 - gr )); then row[x]=${VOCO_UI_WM_GLOW[gr]}
-          else row[x]=${VOCO_UI_WM_LIT[gr]}; fi
-        done
+        at=$((R + i * 9 + offset - 16))
+        (( at < 40 )) || continue
+        kinds=${kinds:0:at}${VOCO_UI_WM_PATTERN[gr*4+i]}${kinds:at+8}
       done
-    elif (( r == 8 && t > VOCO_UI_BRAND_AT )); then
-      count=$(( (t - VOCO_UI_BRAND_AT) / 10 ))
-      voco_ui_card_text "$VOCO_UI_BRAND_LINE" "$VOCO_UI_TEXT_BRAND" "$R" "$count"
-    elif (( r == 9 && t > VOCO_UI_TODAY_AT )); then
-      count=$(( (t - VOCO_UI_TODAY_AT) / 10 ))
-      voco_ui_card_text "$VOCO_UI_TODAY_LINE" "$VOCO_UI_TEXT_TODAY" "$R" "$count"
+      # Cells from W - 2 on are the card's padding, never a letter.
+      kinds=${kinds:0:40}00
+      VOCO_UI_CARD_KINDS[gr]=$kinds
+      if (( band > -100 )); then
+        at=$((band + 7 - gr)) count=3
+        if (( at < 0 )); then count=$((3 + at)) at=0; fi
+        if (( count > 0 && at < 42 )); then
+          seg=${kinds:at:count}
+          kinds=${kinds:0:at}${seg//1/2}${kinds:at+count}
+        fi
+      fi
+    elif (( (r == 8 || r == 9) && t > VOCO_UI_TAGLINE_AT[r-8] )); then
+      # Typed in, a character every 10 ms.
+      text=${VOCO_UI_TAGLINE[r-8]} count=$(( (t - VOCO_UI_TAGLINE_AT[r-8]) / 10 ))
+      (( count <= ${#text} )) || count=${#text}
+      kinds=000${VOCO_UI_TEES:0:count}${VOCO_UI_ZEROS:0:39-count} text="   ${text:0:count}" sgr=${VOCO_UI_TAGLINE_SGR[r-8]}
     fi
-    if (( sweep < W )); then
-      (( sweep < 1 )) || row[sweep-1]=$VOCO_UI_SWEEP_GLOW
-      line="${row[*]:0:sweep}$VOCO_UI_SWEEP_BAR"
+    if (( sweep >= W )); then
+      VOCO_UI_CARD_LEFT[r]=${VOCO_UI_LEFT[r]}
+      voco_ui_runs "$kinds" "$text" "$sgr" "$lit"
+      VOCO_UI_CARD_RIGHT[r]=$VOCO_UI_RIGHT
+    elif (( cut < 16 )); then
+      VOCO_UI_CARD_LEFT[r]=${VOCO_UI_LEFT_CUT[r*17+(cut > 0 ? cut : 0)]}$glow$VOCO_UI_SWEEP_BAR
+      VOCO_UI_CARD_RIGHT[r]=''
     else
-      line="${row[*]}"
+      VOCO_UI_CARD_LEFT[r]=${VOCO_UI_LEFT[r]}
+      voco_ui_runs "${kinds:0:cut-16}" "$text" "$sgr" "$lit"
+      VOCO_UI_CARD_RIGHT[r]=$VOCO_UI_RIGHT$glow$VOCO_UI_SWEEP_BAR
     fi
-    out+=$'\r\e[K  '"$line"$'\e[0m\n'
   done
-  line="${VOCO_UI_BOTTOM_CELLS[*]:0:sweep}"
-  (( sweep >= W )) || line+="$VOCO_UI_SWEEP_BOTTOM"
-  out+=$'\r\e[K  '"$line"$'\e[0m\n'
   # The image covers the microphone cells the sweep has passed.
-  if [[ "$VOCO_UI_MIC_MODE" == kitty ]]; then
-    count=$(( sweep >= W ? 14 : sweep - 3 ))
-    (( count <= 14 )) || count=14
-    (( count < 1 )) || out+=${VOCO_UI_PLACE[count]}
-  fi
-  VOCO_UI_CARD_TEXT=$out
+  VOCO_UI_CARD_SWEEP=$sweep VOCO_UI_CARD_REVEAL=$(( sweep >= W ? 14 : sweep - 3 ))
+  (( VOCO_UI_CARD_REVEAL <= 14 )) || VOCO_UI_CARD_REVEAL=14
+  (( VOCO_UI_CARD_REVEAL >= 0 )) || VOCO_UI_CARD_REVEAL=0
 }
 
-# The card for now: its final state once the intro and any shine are done.
+# The card at rest, and the wordmark rows the APT display's shine draws again:
+# the graphite and shine colours, then each row's colour and kinds.
+voco_ui_apt_card() {
+  local r
+  VOCO_UI_APT_CARD='' VOCO_UI_APT_SHINE=''
+  [[ "$VOCO_UI_ART" == true ]] || return 0
+  voco_ui_card_at "$VOCO_UI_INTRO_MS" -1
+  VOCO_UI_APT_CARD=$VOCO_UI_CARD_TOP
+  for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+    VOCO_UI_APT_CARD+=$'\n'"${VOCO_UI_CARD_LEFT[r]}"$'\t'"${VOCO_UI_CARD_RIGHT[r]}"
+  done
+  VOCO_UI_APT_CARD+=$'\n'$VOCO_UI_CARD_BOTTOM
+  VOCO_UI_APT_SHINE=$VOCO_UI_GRAPHITE$'\n'$VOCO_UI_WM_GLOW
+  for ((r=0; r<5; r++)); do
+    VOCO_UI_APT_SHINE+=$'\n'"${VOCO_UI_WM_LIT[r]}"$'\t'"${VOCO_UI_CARD_KINDS[r]}"
+  done
+}
+
+# The card for now: its final state once the intro and any shine are done,
+# built once and kept.
 voco_ui_card() {
   local t=$VOCO_UI_INTRO_MS s=-1
   if [[ "$VOCO_UI_NO_MOTION" != true ]]; then
@@ -629,12 +716,28 @@ voco_ui_card() {
       s=$((VOCO_UI_NOW - VOCO_UI_SHINE_START))
     fi
   fi
-  if (( t >= VOCO_UI_INTRO_MS && s < 0 )) && [[ -n "$VOCO_UI_CARD_FINAL" ]]; then
-    VOCO_UI_CARD_TEXT=$VOCO_UI_CARD_FINAL
+  VOCO_UI_CARD_RESTS=false
+  (( t < VOCO_UI_INTRO_MS || s >= 0 )) || VOCO_UI_CARD_RESTS=true
+  if [[ "$VOCO_UI_CARD_RESTS" == true && -n "$VOCO_UI_FINAL_TOP" ]]; then
+    VOCO_UI_CARD_TOP=$VOCO_UI_FINAL_TOP VOCO_UI_CARD_BOTTOM=$VOCO_UI_FINAL_BOTTOM
+    VOCO_UI_CARD_SWEEP=$VOCO_UI_CARD_WIDTH VOCO_UI_CARD_REVEAL=14
+    VOCO_UI_CARD_LEFT=("${VOCO_UI_LEFT[@]}") VOCO_UI_CARD_RIGHT=("${VOCO_UI_FINAL_RIGHT[@]}")
     return
   fi
   voco_ui_card_at "$t" "$s"
-  if (( t >= VOCO_UI_INTRO_MS && s < 0 )); then VOCO_UI_CARD_FINAL=$VOCO_UI_CARD_TEXT; fi
+  if [[ "$VOCO_UI_CARD_RESTS" == true ]]; then
+    VOCO_UI_FINAL_TOP=$VOCO_UI_CARD_TOP VOCO_UI_FINAL_BOTTOM=$VOCO_UI_CARD_BOTTOM
+    VOCO_UI_FINAL_RIGHT=("${VOCO_UI_CARD_RIGHT[@]}")
+  fi
+}
+
+# What this process last drew, so a frame redraws only what changed: the sweep's
+# position, which sets the edges and left parts, the right parts, the image's
+# reveal, whether the card rests, the heading and the progress lines. Unknown
+# once the canvas opens or clears, or another process drew.
+voco_ui_forget() {
+  VOCO_UI_SHOWN_SWEEP=-1 VOCO_UI_SHOWN_LEFT=-1 VOCO_UI_SHOWN_RIGHT=() VOCO_UI_SHOWN_REVEAL=-1
+  VOCO_UI_SHOWN_RESTS=false VOCO_UI_SHOWN_HEADING='' VOCO_UI_SHOWN_LINES=() VOCO_UI_SHOWN_PROGRESS=''
 }
 
 # True while the intro or a shine is still moving.
@@ -662,42 +765,99 @@ voco_ui_size() {
   printf -v VOCO_UI_SIZE '%d.%d %s' "$((bytes/divisor))" "$((bytes%divisor*10/divisor))" "$unit"
 }
 
-# One bounded canvas is shared by every normal installation stage. With
-# "progress" as the fourth argument a resting card stays as it is on screen and
-# only the progress lines are drawn again.
+# One bounded canvas is shared by every normal installation stage. A frame
+# redraws only the lines that changed since this process last drew them, and of
+# a card row only its right part when that is all that changed, which leaves the
+# microphone, and any image over it, untouched. With "progress" as the fourth
+# argument a resting card isn't even built, and only the progress lines change.
 voco_ui_frame() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
-  local title="$1" detail="$2" mark="${3:-—}" card="${4:-full}" width i color
-  local stages='' frame='' part='' symbol line2='' rule='────────────────────────────────────────────────────────'
+  local title="$1" detail="$2" mark="${3:-—}" card="${4:-full}" width i r color symbol line2='' stages=''
+  local key frame left heading=''
+  local rule='────────────────────────────────────────────────────────'
   local -a labels=(Check Download Verify Install)
   width=$((${VOCO_TERMINAL_COLUMNS:-80}-5))
   if (( ${#detail} > width )); then
-    local first="${detail:0:width}"
-    if [[ "$first" == *' '* ]]; then first="${first% *}"; fi
-    line2="${detail:${#first}}"; line2="${line2# }"; detail="$first"
+    local head="${detail:0:width}"
+    if [[ "$head" == *' '* ]]; then head="${head% *}"; fi
+    line2="${detail:${#head}}"; line2="${line2# }"; detail="$head"
   fi
-  for i in 0 1 2 3; do
-    symbol='○'; color="$VOCO_UI_MUTED"
-    if (( i < VOCO_UI_STAGE )); then symbol='✓'; color="$VOCO_UI_COMPLETE"
-    elif (( i == VOCO_UI_STAGE )); then symbol='›'; color="$VOCO_UI_ACTIVE"; fi
-    stages+="${color}${symbol} ${labels[i]}${NC}   "
-  done
-  if [[ "$VOCO_UI_ART" == true && "$card" == progress ]] && ! voco_ui_animating; then
+  key="$title|$detail|$mark|$VOCO_UI_STAGE|$VOCO_UI_NOTE|$width"
+  if [[ "$key" != "$VOCO_UI_PROGRESS_KEY" ]]; then
+    for i in 0 1 2 3; do
+      symbol='○'; color="$VOCO_UI_MUTED"
+      if (( i < VOCO_UI_STAGE )); then symbol='✓'; color="$VOCO_UI_COMPLETE"
+      elif (( i == VOCO_UI_STAGE )); then symbol='›'; color="$VOCO_UI_ACTIVE"; fi
+      stages+="${color}${symbol} ${labels[i]}${NC}   "
+    done
+    color="$VOCO_UI_SILVER"
+    [[ "$mark" != '✓' ]] || color="$VOCO_UI_COMPLETE"
+    VOCO_UI_PROGRESS=($'\r\e[K')
+    printf -v 'VOCO_UI_PROGRESS[1]' '\r\033[K  %b%s%b' "$color" "$mark" "$NC"
+    printf -v 'VOCO_UI_PROGRESS[2]' '\r\033[K  %s' "${title:0:width}"
+    printf -v 'VOCO_UI_PROGRESS[3]' '\r\033[K  %s' "$detail"
+    printf -v 'VOCO_UI_PROGRESS[4]' '\r\033[K  %s' "${line2:0:width}"
+    printf -v 'VOCO_UI_PROGRESS[5]' '\r\033[K  %s' "${rule:0:width}"
+    printf -v 'VOCO_UI_PROGRESS[6]' '\r\033[K  %b' "$stages"
+    printf -v 'VOCO_UI_PROGRESS[7]' '\r\033[K  %s' "${VOCO_UI_NOTE:0:width}"
+    VOCO_UI_PROGRESS_KEY=$key
+  fi
+  if [[ "$VOCO_UI_ART" == true && ( "$card" == progress || "$VOCO_UI_SHOWN_RESTS" == true ) ]] && ! voco_ui_animating; then
     printf -v frame '\033[%dA' "$VOCO_UI_PROGRESS_LINES"
   elif [[ "$VOCO_UI_ART" == true ]]; then
-    printf -v frame '\033[%dA' "$VOCO_UI_LINES"
     voco_ui_card
-    frame+="$VOCO_UI_CARD_TEXT"
+    VOCO_UI_SHOWN_RESTS=$VOCO_UI_CARD_RESTS
+    printf -v frame '\033[%dA' "$VOCO_UI_LINES"
+    # The edges follow the sweep, and the rows' left parts follow it until it is
+    # past the microphone; only the right parts change after that.
+    left=$(( VOCO_UI_CARD_SWEEP < 17 ? VOCO_UI_CARD_SWEEP : 17 ))
+    if [[ "$VOCO_UI_CARD_SWEEP" != "$VOCO_UI_SHOWN_SWEEP" ]]; then
+      frame+=$'\r\e[K  '"$VOCO_UI_CARD_TOP"$'\e[0m\n'
+    else
+      frame+=$'\n'
+    fi
+    for ((r=0; r<VOCO_UI_CARD_ROWS; r++)); do
+      if [[ "$left" != "$VOCO_UI_SHOWN_LEFT" ]]; then
+        frame+=$'\r\e[K  '"${VOCO_UI_CARD_LEFT[r]}${VOCO_UI_CARD_RIGHT[r]}"$'\e[0m\n'
+      elif [[ "${VOCO_UI_CARD_RIGHT[r]}" != "${VOCO_UI_SHOWN_RIGHT[r]}" ]]; then
+        # Column 19 is the card's column 16, after the microphone.
+        frame+=$'\e[19G'"${VOCO_UI_CARD_RIGHT[r]}"$'\e[0m\e[K\n'
+      else
+        frame+=$'\n'
+      fi
+    done
+    if [[ "$VOCO_UI_CARD_SWEEP" != "$VOCO_UI_SHOWN_SWEEP" ]]; then
+      frame+=$'\r\e[K  '"$VOCO_UI_CARD_BOTTOM"$'\e[0m\n'
+    else
+      frame+=$'\n'
+    fi
+    # The image goes over the microphone cells again whenever they were drawn,
+    # from just after the card.
+    if [[ "$VOCO_UI_MIC_MODE" == kitty ]] &&
+        [[ "$left" != "$VOCO_UI_SHOWN_LEFT" || "$VOCO_UI_CARD_REVEAL" != "$VOCO_UI_SHOWN_REVEAL" ]]; then
+      (( VOCO_UI_CARD_REVEAL < 1 )) || frame+=${VOCO_UI_PLACE[VOCO_UI_CARD_REVEAL]}
+      VOCO_UI_SHOWN_REVEAL=$VOCO_UI_CARD_REVEAL
+    fi
+    VOCO_UI_SHOWN_RIGHT=("${VOCO_UI_CARD_RIGHT[@]}") VOCO_UI_SHOWN_LEFT=$left VOCO_UI_SHOWN_SWEEP=$VOCO_UI_CARD_SWEEP
   else
     printf -v frame '\033[%dA' "$VOCO_UI_LINES"
-    printf -v part '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux. Today: private dictation.\n' "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
-    frame+="$part"
+    printf -v heading '\r\033[K  %bV O C O%b  v%s\n\r\033[K  The voice layer for Linux. Today: private dictation.\n' \
+      "$VOCO_UI_SILVER" "$NC" "${VERSION:-}"
+    if [[ "$heading" != "$VOCO_UI_SHOWN_HEADING" ]]; then frame+=$heading; else frame+=$'\n\n'; fi
+    VOCO_UI_SHOWN_HEADING=$heading
   fi
-  color="$VOCO_UI_SILVER"
-  [[ "$mark" != '✓' ]] || color="$VOCO_UI_COMPLETE"
-  printf -v part '\r\033[K\n\r\033[K  %b%s%b\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %s\n\r\033[K  %b\n\r\033[K  %s\n' \
-    "$color" "$mark" "$NC" "${title:0:width}" "$detail" "${line2:0:width}" "${rule:0:width}" "$stages" "${VOCO_UI_NOTE:0:width}"
-  frame+="$part"
+  if [[ "$key" != "$VOCO_UI_SHOWN_PROGRESS" ]]; then
+    for ((i=0; i<VOCO_UI_PROGRESS_LINES; i++)); do
+      if [[ "${VOCO_UI_PROGRESS[i]}" != "${VOCO_UI_SHOWN_LINES[i]-}" || -z "$VOCO_UI_SHOWN_PROGRESS" ]]; then
+        frame+=${VOCO_UI_PROGRESS[i]}$'\n'
+      else
+        frame+=$'\n'
+      fi
+    done
+    VOCO_UI_SHOWN_LINES=("${VOCO_UI_PROGRESS[@]}") VOCO_UI_SHOWN_PROGRESS=$key
+  else
+    frame+=$'\n\n\n\n\n\n\n\n'
+  fi
   # A terminating sweep may stop while building the frame, but must never leave
   # the cursor between rows. Bash runs the termination trap after this builtin.
   printf '%s' "$frame"
@@ -707,9 +867,11 @@ voco_ui_begin() {
   [[ "$VOCO_TERMINAL_MOTION" == true ]] || return 0
   voco_ui_pause
   if [[ "$VOCO_UI_OPEN" != true ]]; then
-    local line
-    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\n'; done
+    local lines
+    printf -v lines '%*s' "$VOCO_UI_LINES" ''
+    printf '%s' "${lines// /$'\n'}"
     VOCO_UI_OPEN=true
+    voco_ui_forget
     # The intro plays once, the first time the canvas opens.
     if [[ "$VOCO_UI_ART" == true && "$VOCO_UI_NO_MOTION" != true ]] && (( VOCO_UI_INTRO_START == 0 )); then
       voco_ui_now_ms
@@ -776,6 +938,8 @@ voco_ui_pause() {
     kill "$VOCO_UI_PID" 2>/dev/null || true
     wait "$VOCO_UI_PID" 2>/dev/null || true
     VOCO_UI_PID=""
+    # Its frames changed the canvas behind this process's back.
+    voco_ui_forget
   fi
 }
 
@@ -783,13 +947,13 @@ voco_ui_release() {
   voco_ui_pause
   if [[ "$VOCO_UI_OPEN" == true ]]; then
     # The image would stay where the canvas was, so it goes first.
-    [[ "$VOCO_UI_ART" != true ]] || printf '%s' "$VOCO_UI_UNPLACE"
-    printf '\033[%dA' "$VOCO_UI_LINES"
-    local line
-    for ((line=0;line<VOCO_UI_LINES;line++)); do printf '\r\033[K\n'; done
-    printf '\033[%dA\r' "$VOCO_UI_LINES"
+    local lines unplace=''
+    [[ "$VOCO_UI_ART" != true ]] || unplace=$VOCO_UI_UNPLACE
+    printf -v lines '%*s' "$VOCO_UI_LINES" ''
+    printf '%s\033[%dA%s\033[%dA\r' "$unplace" "$VOCO_UI_LINES" "${lines// /$'\r\e[K\n'}" "$VOCO_UI_LINES"
   fi
   VOCO_UI_OPEN=false
+  voco_ui_forget
 }
 
 voco_ui_download_observer() {
@@ -891,10 +1055,11 @@ voco_run_apt() {
   # APT marks its status descriptor close-on-exec before dpkg starts. A dedicated
   # fd is essential: using stdout would close maintainer-script output. Create fd
   # 3 AFTER sudo, with a fixed wrapper and separate arguments (never interpolation).
+  voco_ui_apt_card
   VOCO_UI_APT_DRAWING=true
   if sudo sh -c "$wrapper" voco-apt "$@" 2>&"$output_fd" |
       voco_apt_display "$VOCO_INSTALL_LOG" "$VOCO_UI_NO_MOTION" separate "${VERSION:-}" "$VOCO_UI_LINES" \
-        "$VOCO_UI_MIC_ROWS" "${VOCO_UI_PLACE[14]:-}" "$VOCO_UI_UNPLACE" 4<&"$output_fd"; then
+        "$VOCO_UI_APT_CARD" "$VOCO_UI_APT_SHINE" "${VOCO_UI_PLACE[14]:-}" "$VOCO_UI_UNPLACE" 4<&"$output_fd"; then
     result=0
   else
     statuses=("${PIPESTATUS[@]}")
@@ -932,6 +1097,7 @@ separate descriptor after sudo; package-script stdout/stderr stay intact. Unknow
 output and non-newline prompts suspend presentation and remain visible.
 """
 import contextlib
+import itertools
 import os
 import re
 import select
@@ -940,12 +1106,7 @@ import sys
 import time
 
 # BEGIN GENERATED INSTALLER BRAND
-BRAND_ROWS = [['██    ██', ' ██████ ', ' ██████ ', ' ██████ '], ['██    ██', '██    ██', '██      ', '██    ██'], [' ██  ██ ', '██    ██', '██      ', '██    ██'], ['  ████  ', '██    ██', '██      ', '██    ██'], ['   ██   ', ' ██████ ', ' ██████ ', ' ██████ ']]
 BRAND_COLORS = {'silver': '\x1b[38;2;199;204;212m', 'muted': '\x1b[38;2;122;128;138m', 'complete': '\x1b[38;2;165;217;178m', 'active': '\x1b[38;2;239;206;131m'}
-BRAND_CARD = '17;19;24'
-BRAND_WORDMARK = ['244;246;249', '233;236;240', '222;225;230', '210;214;221', '199;204;212', '188;193;202', '177;182;192', '165;172;181', '154;161;171', '143;150;161']
-BRAND_WORDMARK_SHINE = ['255;255;255', '238;241;245']
-BRAND_TEXT = {'brand': '199;204;212', 'today': '174;181;191', 'version': '140;146;156'}
 # END GENERATED INSTALLER BRAND
 
 ROUTINE = re.compile(
@@ -958,51 +1119,41 @@ ROUTINE = re.compile(
     r'debconf: delaying package configuration, since apt-utils is not installed$)'
 )
 STATUS = re.compile(r'^(pmstatus|dlstatus):([^:]*):([0-9]+(?:\.[0-9]+)?):(.*)$')
-# install-ui.sh's art canvas: the card's size and layout, and its shine.
-CARD_WIDTH = 58
+# install-ui.sh's art canvas: the card's size, and its shine.
 CARD_ROWS = 11
-ART_RIGHT = 19
 SHINE_MS = 280
 ART_LINES = CARD_ROWS + 2 + 8
 
 
-def card_lines(version, mic, shine_ms=-1):
-    """The card at rest, exactly as install-ui.sh draws it: with the microphone
-    rows install-ui.sh passes in, and the shine shine_ms milliseconds in, or
-    none when negative."""
-    card = f'\033[48;2;{BRAND_CARD}m '
-    edge = f'\033[38;2;{BRAND_CARD};49m'
-    band = -100 if shine_ms < 0 else -8 + shine_ms * 51 // SHINE_MS
-    lines = [edge + '▗' + (edge + '▄') * (CARD_WIDTH - 2) + edge + '▖']
-    for r in range(CARD_ROWS):
-        row = [card] * CARD_WIDTH
-        # The microphone's fourteen cells, as one string.
-        if len(mic) == CARD_ROWS:
-            row[2:16] = [mic[r]] + [''] * 13
+def runs(kinds, graphite, lit, glow):
+    """A wordmark row's right part from its kinds, as install-ui.sh's
+    voco_ui_runs writes it: one SGR for each run of graphite (0), lit (1) or
+    shining (2) cells."""
+    out = []
+    for kind, group in itertools.groupby(kinds):
+        count = len(list(group))
+        out.append(graphite + ' ' * count if kind == '0' else (lit if kind == '1' else glow) + '▀' * count)
+    return ''.join(out)
 
-        def text(value, color, start):
-            for i, char in enumerate(value):
-                row[start + i] = f'\033[38;2;{color};48;2;{BRAND_CARD}m{char}'
-        if r == 0:
-            label = 'v' + version
-            text(label, BRAND_TEXT['version'], ART_RIGHT + 37 - len(label))
-        elif 2 <= r <= 6:
-            glyph_row = r - 2
-            for letter, glyph in enumerate(BRAND_ROWS[glyph_row]):
-                for column, char in enumerate(glyph):
-                    x = ART_RIGHT + letter * 9 + column
-                    if char != '█' or x >= CARD_WIDTH - 2:
-                        continue
-                    lit = (BRAND_WORDMARK_SHINE if band + 4 - glyph_row <= x - ART_RIGHT < band + 7 - glyph_row
-                           else BRAND_WORDMARK[2 * glyph_row:2 * glyph_row + 2])
-                    row[x] = f'\033[38;2;{lit[0]};48;2;{lit[1]}m▀'
-        elif r == 8:
-            text('The voice layer for Linux.', BRAND_TEXT['brand'], ART_RIGHT)
-        elif r == 9:
-            text('Today: private dictation.', BRAND_TEXT['today'], ART_RIGHT)
-        lines.append(''.join(row))
-    lines.append(edge + '▝' + (edge + '▀') * (CARD_WIDTH - 2) + edge + '▘')
-    return [line + '\033[0m' for line in lines]
+
+def card_rows(card, shine, shine_ms=-1):
+    """The card's 13 lines as install-ui.sh passes them: the edges whole and each
+    row as its left and right parts, with the wordmark's right parts drawn again
+    for the shine shine_ms milliseconds in, when that isn't negative."""
+    lines = card.split('\n')
+    rows = [lines[0]] + [tuple(line.split('\t', 1)) for line in lines[1:CARD_ROWS + 1]] + [lines[CARD_ROWS + 1]]
+    if shine_ms >= 0:
+        graphite, glow, *wordmark = shine.split('\n')
+        band = -8 + shine_ms * 51 // SHINE_MS
+        for row, spec in enumerate(wordmark[:5]):
+            lit, kinds = spec.split('\t')
+            kinds = list(kinds)
+            # The same slanted band, three columns wide, as voco_ui_card_at's.
+            for cell in range(max(0, band + 7 - row), min(len(kinds), band + 10 - row)):
+                if kinds[cell] == '1':
+                    kinds[cell] = '2'
+            rows[row + 3] = (rows[row + 3][0], runs(kinds, graphite, lit, glow))
+    return rows
 
 
 def main():
@@ -1010,12 +1161,10 @@ def main():
     separate = len(sys.argv) > 3 and sys.argv[3] == 'separate'
     version = sys.argv[4] if len(sys.argv) > 4 else ''
     # The installer passes its canvas height, so both renderers agree on it, then
-    # the card's microphone rows and the commands that place its image after the
-    # card and take it away.
-    canvas_lines = ART_LINES if len(sys.argv) > 5 and sys.argv[5] == str(ART_LINES) else 10
-    mic = sys.argv[6].split('\n')[:CARD_ROWS] if len(sys.argv) > 6 else []
-    place = sys.argv[7] if len(sys.argv) > 7 else ''
-    unplace = sys.argv[8] if len(sys.argv) > 8 else ''
+    # its card at rest, what the shine needs, and the commands that place the
+    # image after the card and take it away.
+    canvas_lines = ART_LINES if len(sys.argv) > 9 and sys.argv[5] == str(ART_LINES) else 10
+    card, shine, place, unplace = sys.argv[6:10] if canvas_lines == ART_LINES else ('', '', '', '')
     output_fd = 4 if separate else 0
     streams = [0, 4] if separate else [0]
     pending = {fd: b'' for fd in streams}
@@ -1029,6 +1178,8 @@ def main():
     finished = False
     canvas_open = False
     card_drawn = False
+    # What the canvas shows, by line, so a frame redraws only what changed.
+    shown = {}
 
     def write(data):
         sys.stdout.buffer.write(data)
@@ -1042,6 +1193,7 @@ def main():
             write(unplace.encode() + up + b'\r\033[K\n' * canvas_lines + up + b'\r')
             canvas_open = False
             card_drawn = False
+            shown.clear()
 
     def pass_output():
         nonlocal passthrough
@@ -1063,18 +1215,41 @@ def main():
                     'Setting up VOCO.', detail[:width], '',
                     '────────────────────────────────────────────────────────'[:width],
                     stages, '']
-        drawn = lambda lines: ''.join('\r\033[K  ' + line + '\n' for line in lines)
+        lines = {}
+        first = 0
         if canvas_lines == ART_LINES:
             if card_drawn and not shining(now):
                 # A card at rest stays on screen; only the progress lines change.
-                text, up = drawn(progress), len(progress)
+                first = canvas_lines - len(progress)
             else:
-                shine = int((now - start) * 1000) if shining(now) else -1
-                text, up = drawn(card_lines(version, mic, shine)) + place + drawn(progress), canvas_lines
-                card_drawn = shine < 0
+                shine_ms = int((now - start) * 1000) if shining(now) else -1
+                lines = dict(enumerate(card_rows(card, shine, shine_ms)))
+                card_drawn = shine_ms < 0
         else:
-            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'The voice layer for Linux. Today: private dictation.']
-            text, up = drawn(heading + progress), canvas_lines
+            lines = {0: BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version,
+                     1: 'The voice layer for Linux. Today: private dictation.'}
+        lines.update(enumerate(progress, canvas_lines - len(progress)))
+        text, redrawn = '', False
+        for index in range(first, canvas_lines):
+            line = lines[index]
+            if isinstance(line, tuple):
+                left, right = line
+                if shown.get(index, ('',))[0] != left or index not in shown:
+                    text += '\r\033[K  ' + left + right + '\033[0m\n'
+                    redrawn = True
+                elif shown[index][1] != right:
+                    # Column 19 is the card's column 16, after the microphone.
+                    text += '\033[19G' + right + '\033[0m\033[K\n'
+                else:
+                    text += '\n'
+            elif shown.get(index) != line:
+                text += '\r\033[K  ' + line + ('\033[0m' if canvas_lines == ART_LINES and index in (0, CARD_ROWS + 1) else '') + '\n'
+            else:
+                text += '\n'
+            shown[index] = line
+            if index == CARD_ROWS + 1 and redrawn:
+                text += place
+        up = canvas_lines - first
         write((f'\033[{up}A' + text).encode())
         last_frame = now
         dirty = False

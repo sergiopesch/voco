@@ -6,6 +6,7 @@ separate descriptor after sudo; package-script stdout/stderr stay intact. Unknow
 output and non-newline prompts suspend presentation and remain visible.
 """
 import contextlib
+import itertools
 import os
 import re
 import select
@@ -14,12 +15,7 @@ import sys
 import time
 
 # BEGIN GENERATED INSTALLER BRAND
-BRAND_ROWS = [['██    ██', ' ██████ ', ' ██████ ', ' ██████ '], ['██    ██', '██    ██', '██      ', '██    ██'], [' ██  ██ ', '██    ██', '██      ', '██    ██'], ['  ████  ', '██    ██', '██      ', '██    ██'], ['   ██   ', ' ██████ ', ' ██████ ', ' ██████ ']]
 BRAND_COLORS = {'silver': '\x1b[38;2;199;204;212m', 'muted': '\x1b[38;2;122;128;138m', 'complete': '\x1b[38;2;165;217;178m', 'active': '\x1b[38;2;239;206;131m'}
-BRAND_CARD = '17;19;24'
-BRAND_WORDMARK = ['244;246;249', '233;236;240', '222;225;230', '210;214;221', '199;204;212', '188;193;202', '177;182;192', '165;172;181', '154;161;171', '143;150;161']
-BRAND_WORDMARK_SHINE = ['255;255;255', '238;241;245']
-BRAND_TEXT = {'brand': '199;204;212', 'today': '174;181;191', 'version': '140;146;156'}
 # END GENERATED INSTALLER BRAND
 
 ROUTINE = re.compile(
@@ -32,51 +28,41 @@ ROUTINE = re.compile(
     r'debconf: delaying package configuration, since apt-utils is not installed$)'
 )
 STATUS = re.compile(r'^(pmstatus|dlstatus):([^:]*):([0-9]+(?:\.[0-9]+)?):(.*)$')
-# install-ui.sh's art canvas: the card's size and layout, and its shine.
-CARD_WIDTH = 58
+# install-ui.sh's art canvas: the card's size, and its shine.
 CARD_ROWS = 11
-ART_RIGHT = 19
 SHINE_MS = 280
 ART_LINES = CARD_ROWS + 2 + 8
 
 
-def card_lines(version, mic, shine_ms=-1):
-    """The card at rest, exactly as install-ui.sh draws it: with the microphone
-    rows install-ui.sh passes in, and the shine shine_ms milliseconds in, or
-    none when negative."""
-    card = f'\033[48;2;{BRAND_CARD}m '
-    edge = f'\033[38;2;{BRAND_CARD};49m'
-    band = -100 if shine_ms < 0 else -8 + shine_ms * 51 // SHINE_MS
-    lines = [edge + '▗' + (edge + '▄') * (CARD_WIDTH - 2) + edge + '▖']
-    for r in range(CARD_ROWS):
-        row = [card] * CARD_WIDTH
-        # The microphone's fourteen cells, as one string.
-        if len(mic) == CARD_ROWS:
-            row[2:16] = [mic[r]] + [''] * 13
+def runs(kinds, graphite, lit, glow):
+    """A wordmark row's right part from its kinds, as install-ui.sh's
+    voco_ui_runs writes it: one SGR for each run of graphite (0), lit (1) or
+    shining (2) cells."""
+    out = []
+    for kind, group in itertools.groupby(kinds):
+        count = len(list(group))
+        out.append(graphite + ' ' * count if kind == '0' else (lit if kind == '1' else glow) + '▀' * count)
+    return ''.join(out)
 
-        def text(value, color, start):
-            for i, char in enumerate(value):
-                row[start + i] = f'\033[38;2;{color};48;2;{BRAND_CARD}m{char}'
-        if r == 0:
-            label = 'v' + version
-            text(label, BRAND_TEXT['version'], ART_RIGHT + 37 - len(label))
-        elif 2 <= r <= 6:
-            glyph_row = r - 2
-            for letter, glyph in enumerate(BRAND_ROWS[glyph_row]):
-                for column, char in enumerate(glyph):
-                    x = ART_RIGHT + letter * 9 + column
-                    if char != '█' or x >= CARD_WIDTH - 2:
-                        continue
-                    lit = (BRAND_WORDMARK_SHINE if band + 4 - glyph_row <= x - ART_RIGHT < band + 7 - glyph_row
-                           else BRAND_WORDMARK[2 * glyph_row:2 * glyph_row + 2])
-                    row[x] = f'\033[38;2;{lit[0]};48;2;{lit[1]}m▀'
-        elif r == 8:
-            text('The voice layer for Linux.', BRAND_TEXT['brand'], ART_RIGHT)
-        elif r == 9:
-            text('Today: private dictation.', BRAND_TEXT['today'], ART_RIGHT)
-        lines.append(''.join(row))
-    lines.append(edge + '▝' + (edge + '▀') * (CARD_WIDTH - 2) + edge + '▘')
-    return [line + '\033[0m' for line in lines]
+
+def card_rows(card, shine, shine_ms=-1):
+    """The card's 13 lines as install-ui.sh passes them: the edges whole and each
+    row as its left and right parts, with the wordmark's right parts drawn again
+    for the shine shine_ms milliseconds in, when that isn't negative."""
+    lines = card.split('\n')
+    rows = [lines[0]] + [tuple(line.split('\t', 1)) for line in lines[1:CARD_ROWS + 1]] + [lines[CARD_ROWS + 1]]
+    if shine_ms >= 0:
+        graphite, glow, *wordmark = shine.split('\n')
+        band = -8 + shine_ms * 51 // SHINE_MS
+        for row, spec in enumerate(wordmark[:5]):
+            lit, kinds = spec.split('\t')
+            kinds = list(kinds)
+            # The same slanted band, three columns wide, as voco_ui_card_at's.
+            for cell in range(max(0, band + 7 - row), min(len(kinds), band + 10 - row)):
+                if kinds[cell] == '1':
+                    kinds[cell] = '2'
+            rows[row + 3] = (rows[row + 3][0], runs(kinds, graphite, lit, glow))
+    return rows
 
 
 def main():
@@ -84,12 +70,10 @@ def main():
     separate = len(sys.argv) > 3 and sys.argv[3] == 'separate'
     version = sys.argv[4] if len(sys.argv) > 4 else ''
     # The installer passes its canvas height, so both renderers agree on it, then
-    # the card's microphone rows and the commands that place its image after the
-    # card and take it away.
-    canvas_lines = ART_LINES if len(sys.argv) > 5 and sys.argv[5] == str(ART_LINES) else 10
-    mic = sys.argv[6].split('\n')[:CARD_ROWS] if len(sys.argv) > 6 else []
-    place = sys.argv[7] if len(sys.argv) > 7 else ''
-    unplace = sys.argv[8] if len(sys.argv) > 8 else ''
+    # its card at rest, what the shine needs, and the commands that place the
+    # image after the card and take it away.
+    canvas_lines = ART_LINES if len(sys.argv) > 9 and sys.argv[5] == str(ART_LINES) else 10
+    card, shine, place, unplace = sys.argv[6:10] if canvas_lines == ART_LINES else ('', '', '', '')
     output_fd = 4 if separate else 0
     streams = [0, 4] if separate else [0]
     pending = {fd: b'' for fd in streams}
@@ -103,6 +87,8 @@ def main():
     finished = False
     canvas_open = False
     card_drawn = False
+    # What the canvas shows, by line, so a frame redraws only what changed.
+    shown = {}
 
     def write(data):
         sys.stdout.buffer.write(data)
@@ -116,6 +102,7 @@ def main():
             write(unplace.encode() + up + b'\r\033[K\n' * canvas_lines + up + b'\r')
             canvas_open = False
             card_drawn = False
+            shown.clear()
 
     def pass_output():
         nonlocal passthrough
@@ -137,18 +124,41 @@ def main():
                     'Setting up VOCO.', detail[:width], '',
                     '────────────────────────────────────────────────────────'[:width],
                     stages, '']
-        drawn = lambda lines: ''.join('\r\033[K  ' + line + '\n' for line in lines)
+        lines = {}
+        first = 0
         if canvas_lines == ART_LINES:
             if card_drawn and not shining(now):
                 # A card at rest stays on screen; only the progress lines change.
-                text, up = drawn(progress), len(progress)
+                first = canvas_lines - len(progress)
             else:
-                shine = int((now - start) * 1000) if shining(now) else -1
-                text, up = drawn(card_lines(version, mic, shine)) + place + drawn(progress), canvas_lines
-                card_drawn = shine < 0
+                shine_ms = int((now - start) * 1000) if shining(now) else -1
+                lines = dict(enumerate(card_rows(card, shine, shine_ms)))
+                card_drawn = shine_ms < 0
         else:
-            heading = [BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version, 'The voice layer for Linux. Today: private dictation.']
-            text, up = drawn(heading + progress), canvas_lines
+            lines = {0: BRAND_COLORS['silver'] + 'V O C O' + reset + '  v' + version,
+                     1: 'The voice layer for Linux. Today: private dictation.'}
+        lines.update(enumerate(progress, canvas_lines - len(progress)))
+        text, redrawn = '', False
+        for index in range(first, canvas_lines):
+            line = lines[index]
+            if isinstance(line, tuple):
+                left, right = line
+                if shown.get(index, ('',))[0] != left or index not in shown:
+                    text += '\r\033[K  ' + left + right + '\033[0m\n'
+                    redrawn = True
+                elif shown[index][1] != right:
+                    # Column 19 is the card's column 16, after the microphone.
+                    text += '\033[19G' + right + '\033[0m\033[K\n'
+                else:
+                    text += '\n'
+            elif shown.get(index) != line:
+                text += '\r\033[K  ' + line + ('\033[0m' if canvas_lines == ART_LINES and index in (0, CARD_ROWS + 1) else '') + '\n'
+            else:
+                text += '\n'
+            shown[index] = line
+            if index == CARD_ROWS + 1 and redrawn:
+                text += place
+        up = canvas_lines - first
         write((f'\033[{up}A' + text).encode())
         last_frame = now
         dirty = False

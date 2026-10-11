@@ -77,18 +77,18 @@ def brand_sources():
     shell += ('# The microphone, from ' + brand['art']['source'] + ' by generate-installer-art.py: its\n'
               '# palette, a mosaic of block symbols for each kind of terminal, and its image.\n')
     shell += 'VOCO_UI_PALETTE=(' + ' '.join(f"'{rgb}'" for rgb in mic_palette) + ')\n'
+    # A cell is a block symbol and four hex digits, which need no quotes; only
+    # the blank symbol, a space, does.
     for kind, lines in mosaics.items():
         shell += f'VOCO_UI_MOSAIC_{kind.upper()}=(\n' + ''.join(
-            '  ' + ' '.join(shlex.quote(cell) for cell in line) + '\n' for line in lines) + ')\n'
+            '  ' + ' '.join(shlex.quote(cell) if cell[0] == ' ' else cell for cell in line) + '\n'
+            for line in lines) + ')\n'
     shell += f"VOCO_UI_IMAGE_SIZE=({image['width']} {image['height']})\n"
     shell += 'VOCO_UI_IMAGE_MIC=(' + ' '.join(map(str, image['mic'])) + ')\n'
     shell += f"VOCO_UI_IMAGE_PNG='{image['png']}'\n"
-    python = 'BRAND_ROWS = ' + repr(rows) + '\n'
-    python += 'BRAND_COLORS = ' + repr({name: '\033[38;2;' + ';'.join(map(str, rgb)) + 'm' for name, rgb in palette.items()}) + '\n'
-    python += 'BRAND_CARD = ' + repr(triple(brand['card'])) + '\n'
-    python += 'BRAND_WORDMARK = ' + repr([triple(rgb) for rgb in gradient]) + '\n'
-    python += 'BRAND_WORDMARK_SHINE = ' + repr([triple(rgb) for rgb in shine]) + '\n'
-    python += 'BRAND_TEXT = ' + repr({name: triple(rgb) for name, rgb in text.items()}) + '\n'
+    # The APT display draws the card install-ui.sh passes it, so it keeps only
+    # the progress palette.
+    python = 'BRAND_COLORS = ' + repr({name: '\033[38;2;' + ';'.join(map(str, rgb)) + 'm' for name, rgb in palette.items()}) + '\n'
     return shell, python
 
 
