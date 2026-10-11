@@ -171,14 +171,19 @@ Debian package, `voco_latest_rpm_checksums.txt` only the RPM, and
 ## First launch
 
 VOCO first asks which English you write, then runs a short voice test that uses
-your default microphone. The test only shows your words in the VOCO window.
+your default microphone, then offers to check your name. The test and the check
+only show your words in the VOCO window.
 
 1. Choose **British English** or **American English**, then **Continue**.
    British is preselected.
 2. Choose **Start test** and say a sentence. Your words appear as you speak, in
    your spelling.
-3. Choose **Finish test**.
-4. Choose **Done**. If the button says **Check desktop setup**, fix what VOCO
+3. Choose **Finish test**, then **Continue**.
+4. VOCO shows the name on your account. Change it if you like, choose
+   **Say it** and say your name. If VOCO heard it wrong, choose **Teach VOCO**.
+   Add any other word VOCO should know, then choose **Continue**, or
+   **Skip for now**. See [Say it](everyday-use.md#say-it).
+5. Choose **Done**. If the button says **Check desktop setup**, fix what VOCO
    shows, then choose it again.
 
 To dictate, click where you want the text, press `Alt+D` and speak. Press

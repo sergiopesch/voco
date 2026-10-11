@@ -306,7 +306,7 @@ lesson(
     [
         (
             "No microphone chosen yet",
-            "VOCO still counts as ready when the system default is a microphone it can record from: the tray reads \"VOCO — Ready · microphone checks on first use\", and Start dictation chooses that default. Without such a default it reads \"VOCO — Microphone setup required\". VOCO opens no microphone until a recording or a voice test starts.",
+            "VOCO still counts as ready when the system default is a microphone it can record from: the tray reads \"VOCO — Ready · microphone checks on first use\", and Start dictation chooses that default. Without such a default it reads \"VOCO — Microphone setup required\". VOCO opens no microphone until a recording, a voice test or a Say it check starts.",
         ),
         (
             "No default microphone",
@@ -466,7 +466,7 @@ lesson(
         ),
         (
             "Your words",
-            "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. A push holds back any tail that later text could still turn into a listed term, and spelling never converts a listed word.",
+            "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. The start carries the taught versions too, what the recognizer wrote when you said a word, up to five for each: the worker writes the word wherever it hears one, and never boosts them. A push holds back any tail that later text could still turn into a listed term or a taught version, and spelling never converts a listed word.",
         ),
         (
             "No network for the worker",
@@ -492,7 +492,7 @@ lesson(
         (R + "worker_main.py", "Checks every request and answers one line at a time."),
         (R + "streaming.py", "Checks audio packets and runs the silence gate."),
         (R + "spelling.py", "British or American spelling, emitted only once it can't change."),
-        (R + "mywords.py", "My words: the list rules, the boosted phrases and each listed occurrence written as listed."),
+        (R + "mywords.py", "My words: the list rules, the boosted phrases, the taught versions and each listed occurrence written as listed."),
         (R + "test_worker_protocol.py", "Tests for the rulebook."),
         (R + "test_cpu_threads.py", "Tests for the thread rule."),
     ],
@@ -840,8 +840,8 @@ lesson(
     ],
     [
         (
-            "Eight fields",
-            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; and installChannel.",
+            "Nine fields",
+            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; myWordsHeard, the versions VOCO learned when you said a word; and installChannel.",
         ),
         (
             "Update checks",
@@ -973,7 +973,7 @@ lesson(
         "Logs are off by default. When you turn them on, they hold metadata such as lengths and timings, never your words or audio.",
     ],
     [
-        ("Microphone", "VOCO opens the microphone only for a recording or a voice test."),
+        ("Microphone", "VOCO opens the microphone only for a recording, a voice test or a Say it check."),
         ("Worker", "Audio and text travel to the worker through its standard input and output."),
         (
             "Sockets",

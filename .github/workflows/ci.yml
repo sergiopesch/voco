@@ -100,6 +100,12 @@ jobs:
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/varcon.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/varcon/varcon.txt
           python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"
 
+      - name: Everyday words match pinned 12dicts
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/2of12full.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12full.txt
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/2of12id.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12id.txt
+          python3 scripts/generate-everyday-words.py --check "$RUNNER_TEMP/2of12full.txt" "$RUNNER_TEMP/2of12id.txt"
+
       - name: Dependency security audit
         run: npm run verify:security
 
@@ -141,6 +147,11 @@ jobs:
         run: npm run test:my-words-renderer
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-my-words-renderer
+
+      - name: Setup words and Say it regression
+        run: npm run test:setup-words-renderer
+        env:
+          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-setup-words-renderer
 
       - name: Update checks off switch regression
         run: npm run test:update-checks-renderer
@@ -209,6 +220,7 @@ jobs:
             ${{ runner.temp }}/voco-dictation-renderer/
             ${{ runner.temp }}/voco-english-spelling-renderer/
             ${{ runner.temp }}/voco-my-words-renderer/
+            ${{ runner.temp }}/voco-setup-words-renderer/
             ${{ runner.temp }}/voco-update-checks-renderer/
             ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
             ${{ runner.temp }}/voco-native-capture-renderer/

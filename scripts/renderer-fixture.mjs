@@ -219,6 +219,7 @@ export const installRendererMocks = (page, { worklet = false } = {}) => page.add
         // A saved choice skips setup's spelling question, which its own suite covers.
         englishSpelling: 'british',
         myWords: [],
+        myWordsHeard: [],
     };
     window.nativeHandlers = {};
     window.nativeCall = async (name, args) => {

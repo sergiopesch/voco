@@ -194,6 +194,12 @@ try {
           return calls.filter(c=>c[0]==='window:show'||c[0]==='window:setFocus');
         }),[],'Done must not present or focus an extra window');
       };
+      // A passed test continues to setup's words step; skipping it reaches Done.
+      const finishSetup = async () => {
+        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.getByRole('button',{name:'Skip for now',exact:true}).click();
+        await page.getByRole('button',{name:'Done',exact:true}).click();
+      };
       const noOutput = async () => {
         const calls = await page.evaluate(() => window.calls.map(c=>c[0]));
         assert.ok(!calls.includes('pasteDesktopText'));
@@ -262,6 +268,10 @@ try {
         if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.waitForFunction(()=>window.store.getState().status==='idle');
         assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false,problem+' must block completion');
+        // The words step comes first; the last screen checks desktop setup before Done.
+        await page.getByText('Your voice test worked. Desktop setup needs one more step.',{exact:true}).waitFor();
+        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.getByRole('button',{name:'Skip for now',exact:true}).click();
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).waitFor();
         assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
         assert.equal(await page.getByText('VOCO stays in your tray.',{exact:true}).count(),0);
@@ -274,8 +284,6 @@ try {
         await noOutput();
         await page.evaluate(()=>{window.setupRepaired=true;});
         await page.getByRole('button',{name:'Check desktop setup',exact:true}).click();
-        await page.getByRole('button',{name:'Done',exact:true}).waitFor();
-        if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
         await page.getByRole('button',{name:'Done',exact:true}).click();
         await assertOnboardingHidden();
         await noOutput();
@@ -306,7 +314,7 @@ try {
       results.push({case:'change-microphone-return-to-setup-preserves-explicit-selection',passed:true});
       await loadTest();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
-      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:/^(Continue|Done)$/}).count(),0);
       assert.equal(await page.getByRole('button',{name:'Test speaker',exact:true}).count(),0);
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       await page.evaluate(()=>{window.source={...window.source,selectionToken:'previous-device'};window.store.getState().setNativeCaptureSource(window.source);});
@@ -325,11 +333,11 @@ try {
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       assert.equal(await page.evaluate(()=>window.config.onboardingCompleted),false);
       await noOutput();
-      await captureStyledPanel('onboarding-complete-test',page.getByRole('button',{name:'Done'}),{width:1100,height:800});
+      await captureStyledPanel('onboarding-complete-test',page.getByRole('button',{name:'Continue',exact:true}),{width:1100,height:800});
       await page.setViewportSize({width:760,height:560});
-      await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Done'}),{width:760,height:560});
+      await captureStyledPanel('onboarding-minimum-window',page.getByRole('button',{name:'Continue',exact:true}),{width:760,height:560});
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
-        await page.getByRole('button',{name:'Done',exact:true}).click();
+        await finishSetup();
       await assertOnboardingHidden();
       results.push({case:'default-microphone-live-meter-transcript-stop-finish-no-external-output',passed:true});
       await page.evaluate(()=>{window.activationPending=true;window.listeners['voco:activate']({payload:null});});
@@ -372,7 +380,7 @@ try {
       await page.waitForFunction(()=>window.ack===4);
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().status==='idle');
-      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:/^(Continue|Done)$/}).count(),0);
       await page.getByText('No speech detected.',{exact:false}).waitFor();
       await noOutput();
       results.push({case:'silence-does-not-complete-onboarding',passed:true});
@@ -381,7 +389,7 @@ try {
       await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.getByText('Microphone permission denied',{exact:true}).waitFor();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
-      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:/^(Continue|Done)$/}).count(),0);
       results.push({case:'denied-access-does-not-record-or-complete',passed:true});
       await page.evaluate(()=>window.selectError=null);
       await page.getByRole('button',{name:'Test again',exact:true}).click();
@@ -393,7 +401,7 @@ try {
       await page.evaluate(()=>window.recognitionError=true);
       await page.getByRole('button',{name:'Start test',exact:true}).click();
       await page.getByText('Finish the test, then try again.',{exact:true}).waitFor();
-      assert.equal(await page.getByRole('button',{name:'Done',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:/^(Continue|Done)$/}).count(),0);
       assert.ok(!(await page.locator('body').innerText()).includes('[object Object]'));
       await page.getByRole('button',{name:'Finish test',exact:true}).click();
       await page.waitForFunction(()=>window.store.getState().status==='error');
@@ -402,7 +410,7 @@ try {
       await page.getByRole('button',{name:'Test again',exact:true}).click();
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
-        await page.getByRole('button',{name:'Done',exact:true}).click();
+        await finishSetup();
       await assertOnboardingHidden();
       assert.equal(await page.evaluate(()=>window.stopped&&window.ack===4),true);
       await noOutput();
@@ -432,7 +440,7 @@ try {
       await page.getByRole('region',{name:'Test transcript'}).getByText('This is my voice test',{exact:true}).waitFor();
       assert.ok(Number(await page.getByRole('meter',{name:'Microphone signal'}).getAttribute('aria-valuenow'))>0);
       if (await page.getByRole('button',{name:'Finish test',exact:true}).count()) { await page.getByRole('button',{name:'Finish test',exact:true}).click(); await page.waitForFunction(()=>window.store.getState().onboardingTestPassed); }
-        await page.getByRole('button',{name:'Done',exact:true}).click();
+        await finishSetup();
       await assertOnboardingHidden();
       assert.equal(await page.evaluate(()=>window.nativeCommands.some(c=>c.name==='native_capture_begin')),false);
       assert.equal(await page.evaluate(()=>window.tracks.every(t=>t.readyState==='ended')),true);

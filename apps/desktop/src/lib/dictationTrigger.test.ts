@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admitsDictationTrigger, canStopOnboardingTest, cancelsPendingStart } from "./dictationTrigger";
+import { admitsDictationTrigger, canStopOnboardingTest, cancelsPendingStart, isLocalTrigger } from "./dictationTrigger";
 
 describe("directed browser recording triggers", () => {
   it("never treats a second start as a stop", () => {
@@ -17,6 +17,18 @@ describe("directed browser recording triggers", () => {
     for (const phase of ["idle", "error", "stopping"] as const) {
       expect(admitsDictationTrigger(phase, "browser:a", "browser:a", "stop")).toBe(false);
     }
+  });
+  it("keeps a Say it check's Start and Stop bound to it", () => {
+    expect(isLocalTrigger("words:check")).toBe(true);
+    expect(isLocalTrigger("onboarding:test")).toBe(true);
+    expect(isLocalTrigger("browser:a")).toBe(false);
+    expect(isLocalTrigger(undefined)).toBe(false);
+    expect(admitsDictationTrigger("idle", undefined, "words:check", "start")).toBe(true);
+    expect(admitsDictationTrigger("error", undefined, "words:check", "start")).toBe(true);
+    expect(admitsDictationTrigger("recording", "words:check", "words:check", "start")).toBe(false);
+    expect(admitsDictationTrigger("recording", "words:check", "words:check", "stop")).toBe(true);
+    expect(admitsDictationTrigger("recording", "onboarding:test", "words:check", "stop")).toBe(false);
+    expect(admitsDictationTrigger("recording", "words:check", "tray:stop", "stop")).toBe(true);
   });
   it("keeps onboarding Start and Stop bound to their own test", () => {
     expect(admitsDictationTrigger("idle", undefined, "onboarding:test", "start")).toBe(true);

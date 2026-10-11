@@ -15,6 +15,10 @@ Source: https://github.com/tauri-apps/global-hotkey
 Local change: event-driven X11 shortcut actor.
 Full licenses and provenance: vendor/global-hotkey/LICENSE-MIT, LICENSE-APACHE, VOCO-UPSTREAM.json, VOCO-PATCH.md.
 
+Everyday words modified from 12dicts 2020.12.07, public domain and permissive notices
+Source: https://github.com/en-wl/wordlist, tag rel-2020.12.07, alt12dicts/2of12full.txt (SHA-256 76dc8ed76ada4d4d0a67ffc2b81499a5c8a25f3f741df2f3a3d9bb438bf6eaf2) and alt12dicts/2of12id.txt (SHA-256 3e433be47fa0fbb79acd785a65e49b9ebbe9521a2da0bd1631f89658c5a99421)
+Local change: apps/desktop/src/lib/everyday-words.txt keeps the lower-case words that at least ten of 12dicts' twelve dictionaries list, with their inflections and British spellings; scripts/generate-everyday-words.py generates it. 2of12full.txt has been placed in the public domain by Alan Beale; 2of12id.txt is under the copyright of AGID (Copyright 2000-2014 by Kevin Atkinson, permission to use, copy, modify, distribute and sell granted without fee), and is indirectly derived from WordNet 1.6 (Copyright 1997 by Princeton University; permission to use, copy, modify and distribute granted) and the public-domain Moby lexicon. The list repeats these notices in full.
+
 Spelling data modified from VarCon 2020.12.07, permissive notices below
 Source: https://github.com/en-wl/wordlist, tag rel-2020.12.07, varcon/varcon.txt (SHA-256 340858b990255ec409adcf7faaf2b992aa2a76a16f30b4b9e2663863191dba33)
 Local change: the speech runtime's spelling-varcon.tsv keeps only VarCon's unambiguous American and British forms; scripts/generate-spelling-table.py generates it. The table repeats these notices.

@@ -8,6 +8,19 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Added
+
+- Say it checks a word on the My words page: say it, and VOCO shows what it
+  heard, in its own window only. When VOCO heard it wrong, Teach VOCO saves that
+  version, and dictation writes your word wherever the recognizer writes it, or
+  the one word of a longer entry it misheard. VOCO keeps up to five versions of
+  each word and warns before teaching one made only of everyday words. Taught
+  versions are never boosted, so recognition doesn't change.
+- Setup offers My words after the voice test, with the name on your account
+  as the first word to check. Anything else is yours to add, and if you skip
+  it, setup says where to find My words later. Four marks beside Setup show the
+  step you're on.
+
 ### Fixed
 
 - On Ubuntu 26.04 the guided installer stopped at "Package setup" and never

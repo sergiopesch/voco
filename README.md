@@ -25,7 +25,8 @@ appear where you are typing, while you speak.
   permission prompt: it may [read your words as keys](docs/everyday-use.md#where-your-words-go).
 - **One shortcut.** Press `Alt+D` to start and again to finish.
 - **Writes your words your way.** List names and terms on the **My words** page,
-  and VOCO writes them as you typed them, with their capitals and accents.
+  and VOCO writes them as you typed them, with their capitals and accents. Say a
+  word to check it, and if VOCO hears it wrong, teach VOCO how you say it.
 - **Stays out of the way** in the system tray, or in the GNOME top bar with live
   microphone bars.
 - **Keeps your words.** If a paste fails, VOCO copies the rest of your words to
@@ -48,15 +49,18 @@ For manual installation, verification and removal, see
 
 ## Your first dictation
 
-VOCO asks which English you write, then runs a short voice test.
+VOCO asks which English you write, runs a short voice test, then offers to
+check that it writes your name right.
 
 1. Choose **British English** or **American English**, then **Continue**.
    British is preselected.
 2. Choose **Start test** and say a sentence. Your words appear in the window, in
    your spelling.
-3. Choose **Finish test**.
-4. Choose **Done**. If the button says **Check desktop setup**, choose it first
-   and follow any instructions VOCO shows.
+3. Choose **Finish test**, then **Continue**.
+4. Choose **Say it** and say your name, or **Skip for now**. If VOCO heard it
+   wrong, choose **Teach VOCO**. Then choose **Continue** and **Done**. If the
+   button says **Check desktop setup**, choose it first and follow any
+   instructions VOCO shows.
 5. Click where you want the text in another app, press `Alt+D` and speak. Press
    `Alt+D` again to finish.
 

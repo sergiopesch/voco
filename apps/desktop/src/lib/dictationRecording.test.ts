@@ -15,6 +15,7 @@ import {
   type DictationRecordingEnv,
 } from "@/lib/dictationRecording";
 import type { NativeCaptureSession } from "@/lib/nativeCapture";
+import type { DictationPurpose } from "@/store/useStore";
 
 // Commands that reject in the current test; every other command succeeds.
 const failing = new Set<string>();
@@ -47,8 +48,8 @@ function harness() {
     setSurface: vi.fn(),
     setRecovery: vi.fn((value: unknown) => { state.recovery = value; }),
     selectedDeviceId: null as string | null,
-    dictationPurpose: "cursor" as "cursor" | "onboarding",
-    setDictationPurpose: vi.fn((purpose: "cursor" | "onboarding") => { state.dictationPurpose = purpose; }),
+    dictationPurpose: "cursor" as DictationPurpose,
+    setDictationPurpose: vi.fn((purpose: DictationPurpose) => { state.dictationPurpose = purpose; }),
     setOnboardingTestPassed: vi.fn(),
   };
   const status = { detail: "Desktop input is ready.", enabled: true, available: true, streamingEnabled: true };
@@ -549,6 +550,49 @@ it("onboarding retains its successful test text and does not create a cursor res
   h.finalizeIdleState();
   expect(h.state.transcript).toBe("Voice test fixture.");
   expect(h.state.setOnboardingTestPassed).toHaveBeenCalledWith(true);
+});
+
+it("a Say it check records for VOCO's window only, as recognized", async () => {
+  const h = harness();
+  h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
+  vi.mocked(h.env.beginNativeCapture).mockResolvedValue({
+    descriptor: {}, cancel: vi.fn(async () => {}), startDelivery: vi.fn(),
+  } as unknown as NativeCaptureSession);
+  await h.startRecording("words:check");
+  expect(h.current.current.phase).toBe("recording");
+  expect(h.state.dictationPurpose).toBe("words");
+  // No paste prerequisites, crash journal or setup test result belong to a check.
+  expect(h.pasteStatus).not.toHaveBeenCalled();
+  expect(journalCalls("begin_crash_journal")).toEqual([]);
+  expect(h.state.setOnboardingTestPassed).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(ipc.mock.calls.some(([command, args]) => command === "speech_stream"
+    && (args as { request: { op: string; words_check?: boolean } }).request.op === "start")).toBe(true));
+  const start = ipc.mock.calls.map(([, args]) => (args as { request?: { op: string; words_check?: boolean } })?.request)
+    .find(request => request?.op === "start");
+  expect(start?.words_check).toBe(true);
+  // Its words stay for the check to read.
+  h.state.transcript = "Shivon.";
+  h.finalizeIdleState();
+  expect(h.state.transcript).toBe("Shivon.");
+  expect(h.env.pasteDesktopText).not.toHaveBeenCalled();
+  expect(h.copy).not.toHaveBeenCalled();
+});
+
+it("an interrupted check fails where it was asked, without a notification or Review", async () => {
+  const h = harness();
+  h.state.dictationPurpose = "words";
+  h.recordingWith(async () => { throw new Error("Recognition stopped responding."); });
+  h.pasteSession.current = false;
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.1]));
+  await h.stopRecording();
+  expect(h.current.current.phase).toBe("error");
+  expect(h.env.setStatus).toHaveBeenLastCalledWith("error");
+  expect(h.setError).toHaveBeenLastCalledWith("Recognition stopped responding.");
+  expect(h.state.setSurface).not.toHaveBeenCalled();
+  expect(h.state.recovery).toBeNull();
+  expect(h.notify).not.toHaveBeenCalled();
+  expect(h.copy).not.toHaveBeenCalled();
+  expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
 });
 
 it("handled unmount resets cursor store content and state", () => {

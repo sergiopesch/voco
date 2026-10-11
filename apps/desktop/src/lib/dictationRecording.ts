@@ -22,7 +22,7 @@ import {
   startSession,
   type DictationSessionState,
 } from "@/lib/dictationSession";
-import { isBrowserTrigger } from "@/lib/dictationTrigger";
+import { isBrowserTrigger, isLocalTrigger } from "@/lib/dictationTrigger";
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
 import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
@@ -205,7 +205,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
     const current = useStore.getState();
-    if (current.dictationPurpose !== "onboarding") {
+    if (current.dictationPurpose === "cursor") {
       // A live notification already covered the Stop it asked for. The error
       // slot keeps the reason.
       const alreadyNotified = interruptionNotifiedSession === sessionRef.current.sessionId;
@@ -234,6 +234,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       if (body) void showNotification("Dictation interrupted", body).catch(() => {});
       return;
     }
+    if (current.dictationPurpose === "words") {
+      // Say it records anew each time, and says what went wrong where it was
+      // asked, in setup or Settings.
+      clearCapturedAudio();
+      sessionRef.current = failSession(sessionRef.current);
+      setStatus("error");
+      setError(reason);
+      return;
+    }
     traceDictationEvent("dictation_recovery_retained", {
       trackSampleRate: recordingSampleRate(),
       durationMs: Math.round(audioBufferRef.current.sampleCount / (recordingSampleRate()) * 1000),
@@ -253,7 +262,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     const completed = useStore.getState();
     if (completed.dictationPurpose === "onboarding") {
       completed.setOnboardingTestPassed(!completed.recovery && Boolean(completed.transcript.trim()) && completed.transcript !== "(no speech detected)");
-    } else {
+    } else if (completed.dictationPurpose !== "words") {
+      // A check's words stay until it has read them.
       clearTranscript();
     }
     releaseRecordingOrigin();
@@ -280,9 +290,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
     useStore.getState().setRecovery(null);
     const onboardingTest = triggerId === "onboarding:test";
+    // The voice test and Say it show their words in VOCO's window only.
+    const localTest = isLocalTrigger(triggerId);
     // A notice from an earlier attempt must not outlive the next start.
-    if (!onboardingTest) useStore.getState().setCaptureNotice(null);
-    useStore.getState().setDictationPurpose(onboardingTest ? "onboarding" : "cursor");
+    if (!localTest) useStore.getState().setCaptureNotice(null);
+    useStore.getState().setDictationPurpose(onboardingTest ? "onboarding" : localTest ? "words" : "cursor");
     if (onboardingTest) useStore.getState().setOnboardingTestPassed(false);
     activeTriggerIdRef.current = triggerId;
     desktopPasteSessionRef.current = false;
@@ -314,7 +326,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // never blocks a new dictation.
       await finishJournal().catch(() => { journal = null; });
       assertOutputAllowed(startingSessionId);
-      if (!onboardingTest && !isBrowserTrigger(triggerId) && useStore.getState().config) {
+      if (!localTest && !isBrowserTrigger(triggerId) && useStore.getState().config) {
         const paste = await getDesktopPasteStatus();
         assertOutputAllowed(startingSessionId);
         // The only desktop prerequisites; each paste goes to whatever has focus.
@@ -335,7 +347,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         desktopPasteSessionRef.current = true;
         traceDictationEvent("dictation_desktop_paste_session_started").catch(() => {});
       }
-      if (!onboardingTest && !isBrowserTrigger(triggerId) && !desktopPasteSessionRef.current) {
+      if (!localTest && !isBrowserTrigger(triggerId) && !desktopPasteSessionRef.current) {
         destinationSetupFailure = true;
         throw new Error("Desktop dictation is unavailable. Complete desktop input setup before recording.");
       }
@@ -364,7 +376,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         assertOutputAllowed(startingSessionId);
         setCursorDelivery("owned");
       }
-      if (!onboardingTest) {
+      if (!localTest) {
         const owned = new CrashJournal(crypto.randomUUID());
         journal = owned;
         const opened = await owned.begin().then(() => true, () => false);
@@ -467,7 +479,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         captureAdmission = workletOk ? "automatic" : "manual-review";
         if (!workletOk) {
           // The popover cannot open during dictation, so notify instead.
-          if (!onboardingTest) {
+          if (!localTest) {
             interruptionNotifiedSession = startingSessionId;
             void showNotification("Dictation won't be typed", "VOCO can't confirm it is receiving all of your audio, so it won't type this recording. Stop and try again.").catch(() => {});
           }
@@ -496,8 +508,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         let firstPhraseDispatched = false;
         dictationStreamRef.current = new DictationStream(async (text, correlation) => {
           assertOutputAllowed(startingSessionId);
-          // Onboarding exercises recognition without owning or mutating another app.
-          if (onboardingTest) return;
+          // Setup and Say it exercise recognition without owning or mutating another app.
+          if (localTest) return;
           const browser = browserDeliveryRef.current;
           if (browser) {
             await browser.append(text);
@@ -524,6 +536,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current) return;
           traceDictationEvent("dictation_desktop_stream_failed").catch(() => {});
           if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
+          else if (localTest) setError(`VOCO couldn't check that: ${sentence(error.message)}`);
           else if (sessionRef.current.phase === "recording") {
             // A delivery failure stops typing; healthy recognition runs through Stop.
             if (kind === "recognition") interruptionNotifiedSession = startingSessionId;
@@ -532,12 +545,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
               : showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.")).catch(() => {});
           }
         }, (event, durationMs) => {
-          if (!isCurrentSession(startingSessionId) || cancelledRef.current || onboardingTest) return;
+          if (!isCurrentSession(startingSessionId) || cancelledRef.current || localTest) return;
           const name = event === "appended" ? "dictation_desktop_live_prefix_dispatched"
             : event === "deferred" ? "dictation_desktop_paste_deferred"
             : `dictation_desktop_snapshot_${event}`;
           traceDictationEvent(name, durationMs === undefined ? null : { durationMs }).catch(() => {});
-        }, startingSessionId, !onboardingTest && performanceLogMayBeOn());
+        }, startingSessionId, !localTest && performanceLogMayBeOn(), localTest && !onboardingTest);
         // Audio can arrive while the worklet is starting. Keep planner offsets
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);
@@ -593,10 +606,13 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       setStatus("error");
       sessionRef.current = failSession(sessionRef.current);
-      showNotification(
-        startFailureTitle,
-        errorMessage(err),
-      ).catch(() => {});
+      // A Say it check says why where it was asked.
+      if (!localTest || onboardingTest) {
+        showNotification(
+          startFailureTitle,
+          errorMessage(err),
+        ).catch(() => {});
+      }
 
       if (err instanceof DOMException) {
         if (err.name === "NotAllowedError") {

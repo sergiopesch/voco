@@ -111,10 +111,11 @@ dictation.
 
 ## My words
 
-On the **My words** page, list the names and terms you want VOCO to write your
-way: people, products, places. Add each one as you want it written, with its
-capitals and accents. The list holds up to 100 entries of up to four words each,
-and a change applies from your next dictation.
+On the **My words** page, list the names and words you want VOCO to write your
+way. Add each one as you want it written, with its capitals and accents. The
+list holds up to 100 entries of up to four words each, and a change applies from
+your next dictation. Setup offers the full name on your account as the first
+one, after the voice test; you can change it, add more, or skip it.
 
 - VOCO listens out for the words on your list and writes each one as listed,
   whether it hears "git hub", "Github" or "GitHub". It joins letters you spell
@@ -129,6 +130,28 @@ and a change applies from your next dictation.
   so with New Zealand on your list, "New" appears once the next word does.
 - The list stays in your settings file on this computer. VOCO never logs it or
   sends it anywhere.
+
+### Say it
+
+Choose **Say it** beside a word and say it the way you usually do. VOCO stops
+listening when you stop speaking, or when you choose **Done** or press your
+shortcut, and shows what it heard. It shows it only in its own window: nothing
+is typed or copied, and your spelling choice doesn't apply.
+
+- **VOCO writes** with your word means dictation writes it as listed.
+- If VOCO heard something else, choose **Teach VOCO**. From then on VOCO writes
+  your word wherever it hears that version. When only one word of a longer entry
+  came out wrong, VOCO learns that word, so it's fixed when you say it on its
+  own too. Say it again to check: VOCO may hear a word differently another time,
+  and you can teach it each version.
+- If what VOCO heard is made only of everyday words, such as "tiger" for Tadhg,
+  VOCO asks you to say it again first: teaching it would change those words every
+  time you say them. **Teach anyway** teaches it.
+- VOCO keeps up to five versions of each word, under **Heard as**. Choose ×
+  beside one to forget it. Removing a word removes its versions.
+- VOCO can't learn a version that is one of your other words, or another
+  word's version.
+- The versions VOCO learns stay in your settings file with the list.
 
 ## Shortcut
 

@@ -160,16 +160,28 @@ fn request_metadata(request: &Value) -> Value {
 
 /// Settings own the spelling and My words: every session start carries the
 /// saved choices, so desktop and Chromium exact-field dictation write alike, and
-/// a start from the webview can't name others.
+/// a start from the webview can't name others. A Say it check asks only for
+/// the words as recognized, so it shows what the recognizer heard.
 fn with_configured_settings(
     mut request: Value,
     spelling: impl FnOnce() -> crate::config::EnglishSpelling,
-    words: impl FnOnce() -> Vec<String>,
+    words: impl FnOnce() -> (Vec<String>, Vec<crate::config::HeardVersion>),
 ) -> Value {
     if request["op"] == "start" {
         if let Some(fields) = request.as_object_mut() {
-            fields.insert("spelling".into(), spelling().protocol_name().into());
-            fields.insert("words".into(), words().into());
+            let check = fields.remove("words_check") == Some(Value::Bool(true));
+            let spelling = if check {
+                crate::config::EnglishSpelling::AsRecognised
+            } else {
+                spelling()
+            };
+            let (words, heard) = words();
+            fields.insert("spelling".into(), spelling.protocol_name().into());
+            fields.insert("words".into(), words.into());
+            fields.insert(
+                "heard".into(),
+                serde_json::to_value(heard).unwrap_or_else(|_| Value::Array(Vec::new())),
+            );
         }
     }
     request
@@ -346,30 +358,63 @@ mod tests {
 
     #[test]
     fn only_a_session_start_carries_the_configured_settings() {
-        use crate::config::EnglishSpelling;
+        use crate::config::{EnglishSpelling, HeardVersion};
+        let saved = || {
+            (
+                vec!["GitHub".into(), "New Zealand".into()],
+                vec![HeardVersion {
+                    heard: "get hub".into(),
+                    writes: "GitHub".into(),
+                }],
+            )
+        };
         let start = with_configured_settings(
             serde_json::json!({"op":"start", "session":"fixture", "seq":0, "spelling":"klingon",
-                "words":["Injected"]}),
+                "words":["Injected"], "heard":[{"heard":"x", "writes":"Injected"}]}),
             || EnglishSpelling::American,
-            || vec!["GitHub".into(), "New Zealand".into()],
+            saved,
         );
         assert_eq!(start["spelling"], "american");
         assert_eq!(start["words"], serde_json::json!(["GitHub", "New Zealand"]));
+        assert_eq!(
+            start["heard"],
+            serde_json::json!([{"heard": "get hub", "writes": "GitHub"}])
+        );
         assert_eq!(start["session"], "fixture");
         let start = with_configured_settings(
             serde_json::json!({"op":"start", "session":"fixture", "seq":0}),
             EnglishSpelling::default,
-            Vec::new,
+            Default::default,
         );
         assert_eq!(start["spelling"], "british");
         assert_eq!(start["words"], serde_json::json!([]));
+        assert_eq!(start["heard"], serde_json::json!([]));
+        // A Say it check keeps the list but not the spelling.
+        let check = with_configured_settings(
+            serde_json::json!({"op":"start", "session":"fixture", "seq":0, "words_check": true}),
+            || panic!("a check must not read the spelling"),
+            saved,
+        );
+        assert_eq!(check["spelling"], "as-recognised");
+        assert_eq!(check["words"], serde_json::json!(["GitHub", "New Zealand"]));
+        assert!(check.get("words_check").is_none());
+        let not_a_check = with_configured_settings(
+            serde_json::json!({"op":"start", "session":"fixture", "seq":0, "words_check": "yes"}),
+            || EnglishSpelling::American,
+            saved,
+        );
+        assert_eq!(not_a_check["spelling"], "american");
         for op in ["push", "finish", "cancel", "warmup"] {
             let request = with_configured_settings(
                 serde_json::json!({"op":op, "session":"fixture", "seq":1}),
                 || panic!("{op} must not read settings"),
                 || panic!("{op} must not read settings"),
             );
-            assert!(request.get("spelling").is_none() && request.get("words").is_none());
+            assert!(
+                request.get("spelling").is_none()
+                    && request.get("words").is_none()
+                    && request.get("heard").is_none()
+            );
         }
         let invalid = with_configured_settings(
             serde_json::json!("start"),

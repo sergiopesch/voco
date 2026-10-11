@@ -45,18 +45,26 @@ def run(output, fixtures=ROOT.parents[1]/'tests/fixtures/speech'):
                 # A public LibriSpeech clip in which the model writes "etcetera":
                 # the list's spelling comes back, and the pinned model carries
                 # the tokenizer the recognizer needs to boost listed phrases.
-                fixture=fixtures/'1462-170138-0000.wav'
-                audio=np.frombuffer(fixture.read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
-                def dictate(session,**start):
+                load=lambda name:np.frombuffer((fixtures/name).read_bytes()[44:],dtype='<i2').astype(np.float32)/32768
+                audio=load('1462-170138-0000.wav')
+                def dictate(session,clip=audio,**start):
                     exchange('start',session,0,**start)
-                    for seq,offset in enumerate(range(0,len(audio),1600),start=1):
-                        response=exchange('push',session,seq,audio=audio[offset:offset+1600].tolist(),rate=16000)
+                    for seq,offset in enumerate(range(0,len(clip),1600),start=1):
+                        response=exchange('push',session,seq,audio=clip[offset:offset+1600].tolist(),rate=16000)
                         assert 'error' not in response,response
                     return exchange('finish',session,seq+1)['text']
                 plain=dictate('six')
                 listed=dictate('seven',words=['Dowson','et cetera'])
                 check('listed words written as listed','et cetera' in listed and 'etcetera' not in listed and 'Dowson' in listed)
                 check('an empty list changes nothing',dictate('eight',words=[])==plain)
+                # In another public clip the model writes "lotable" for "laudable",
+                # even with the word listed. Taught that version, the worker
+                # writes the word, and recognition is otherwise the same.
+                clip=load('1673-143396-0000.wav')
+                listed=dictate('nine',clip,words=['laudable'])
+                taught=dictate('ten',clip,words=['laudable'],heard=[{'heard':'lotable','writes':'laudable'}])
+                check('a taught version writes its word','A laudable regard' in taught and 'lotable' not in taught)
+                check('a taught version changes nothing else',taught==listed.replace('lotable','laudable'))
                 child.stdin.close();child.wait(timeout=10)
                 check('EOF exits and reaps',child.returncode==0)
                 logs=[json.loads(x) for x in (Path(state)/'voco/stream-performance/worker.jsonl').read_text().splitlines()]
@@ -66,7 +74,7 @@ def run(output, fixtures=ROOT.parents[1]/'tests/fixtures/speech'):
                       and row['model_sha256']==identity['model_sha256'] and type(row['cpu_threads']) is int
                       and 1<=row['cpu_threads']<=16 for row in logs))
                 check('content-free logs',all(not ({'audio','text','transcript','app_name','words','phrases'} & x.keys()) for x in logs))
-                check('logs never name listed words','Dowson' not in json.dumps(logs))
+                check('logs never name listed words or taught versions',all(word not in json.dumps(logs) for word in ('Dowson','laudable','lotable')))
                 errors.flush()
                 check('the model carries the tokenizer for boosting','no phrases could be tokenized' not in (output/'worker-protocol.stderr').read_text())
                 # The adapter hands phrases to the decoder: at the runtime's

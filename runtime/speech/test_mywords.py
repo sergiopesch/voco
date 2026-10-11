@@ -2,7 +2,7 @@
 import random
 import unittest
 
-from mywords import MAX_CHARS, MAX_TERMS, Words, accepted
+from mywords import MAX_CHARS, MAX_HEARD, MAX_TERMS, Words, accepted
 from spelling import Spelling
 
 LIST = ['GitHub', 'PipeWire', 'GTK', 'Zoë', 'Málaga', 'New Zealand', 'Siobhán', 'router', 'Kubernetes']
@@ -80,6 +80,118 @@ class RestoreTests(unittest.TestCase):
         self.assertEqual(words.phrases(), [])
 
 
+class TaughtTests(unittest.TestCase):
+    """Versions the user taught VOCO: what the recognizer wrote for an entry."""
+    SHIVON = [{'heard': 'Shivon', 'writes': 'Siobhán'}]
+
+    def test_a_taught_version_writes_its_entry_wherever_the_recognizer_writes_it(self):
+        words = Words(['Siobhán', 'GitHub'], self.SHIVON)
+        cases = {
+            'Shivon said hello': 'Siobhán said hello',
+            'I told shivon.': 'I told Siobhán.',
+            'ask Shi von': 'ask Siobhán',
+            'Shi-von wrote': 'Siobhán wrote',
+            "Shivon's notes": "Siobhán's notes",
+            'Shivonne and shivons': 'Shivonne and shivons',
+            'git hub and Shivon': 'GitHub and Siobhán',
+            'Shi. Von': 'Shi. Von',
+        }
+        for heard, expected in cases.items():
+            with self.subTest(heard=heard):
+                self.assertEqual(written(words, heard), expected)
+
+    def test_a_taught_version_can_write_one_word_of_an_entry(self):
+        words = Words(['Siobhán Kelly'], self.SHIVON)
+        cases = {
+            'Shivon Kelly called': 'Siobhán Kelly called',
+            'Shivon called': 'Siobhán called',
+            'siobhan kelly called': 'Siobhán Kelly called',
+        }
+        for heard, expected in cases.items():
+            with self.subTest(heard=heard):
+                self.assertEqual(written(words, heard), expected)
+
+    def test_a_version_of_one_word_writes_the_whole_entry_said_in_full(self):
+        words = Words(['José García', 'Dr. Siobhán Kelly'], [{'heard': 'Hosay', 'writes': 'José'},
+                                                            {'heard': 'Shivon', 'writes': 'Siobhán'}])
+        cases = {
+            'Hosay Garcia said': 'José García said',
+            'hosay garcía': 'José García',
+            "Hosay Garcia's car": "José García's car",
+            'Hosay said': 'José said',
+            'Garcia said': 'Garcia said',
+            'I met Dr. Shivon Kelly': 'I met Dr. Siobhán Kelly',
+            'I met Dr Shivon Kelly': 'I met Dr. Siobhán Kelly',
+            'I met Shivon': 'I met Siobhán',
+        }
+        for heard, expected in cases.items():
+            with self.subTest(heard=heard):
+                self.assertEqual(written(words, heard), expected)
+        restored, _, settled = words.restore('Hosay Garcia', final=False)
+        self.assertEqual(restored[:settled], '', 'The open entry waits for its last word')
+
+    def test_a_version_of_a_word_stands_for_it_in_every_entry_with_it(self):
+        words = Words(['José', 'José García'], [{'heard': 'Hosay', 'writes': 'José'}])
+        self.assertEqual(written(words, 'Hosay Garcia and Hosay'), 'José García and José')
+
+    def test_a_version_belongs_to_the_entry_it_writes_whole(self):
+        # "Siobhán" is a word of the first entry, but the version was taught for the second.
+        versions = [{'heard': f'version{index}', 'writes': 'Siobhán'} for index in range(MAX_HEARD)]
+        words = Words(['Siobhán Kelly', 'Siobhán'], versions + [{'heard': 'Kellie', 'writes': 'Kelly'}])
+        self.assertEqual(written(words, 'version4 and Kellie'), 'Siobhán and Kelly')
+
+    def test_taught_versions_are_never_boosted_and_are_protected_from_spelling(self):
+        words = Words(['Colour Labs'], [{'heard': 'collar labs', 'writes': 'Colour Labs'}])
+        self.assertEqual(words.phrases(), ['Colour Labs'])
+        restored, listed, _ = words.restore('the collar labs color', final=True)
+        self.assertEqual(Spelling().converter('american').final(restored, listed), 'the Colour Labs color')
+
+    def test_without_taught_versions_restore_is_unchanged(self):
+        rng = random.Random(64)
+        vocabulary = ['git', 'hub', 'zoe', 'new', 'zealand', 'siobhan', 'router', 'shivon', 'the', "can't"]
+        plain, empty = Words(LIST), Words(LIST, [])
+        for _ in range(300):
+            text = ' '.join(rng.choice(vocabulary) + rng.choice(['', ',', '.']) for _ in range(rng.randint(1, 8)))
+            for final in (False, True):
+                self.assertEqual(plain.restore(text, final), empty.restore(text, final))
+
+    def test_a_tail_that_could_become_a_taught_version_waits(self):
+        words = Words(['Siobhán'], [{'heard': 'Shi von', 'writes': 'Siobhán'}])
+        for hypothesis, settled_text in (('I met Shi', 'I met '), ('I met shi von', 'I met '),
+                                         ('I met Shi von today', 'I met Siobhán today'), ('I met Shirley', 'I met Shirley')):
+            with self.subTest(hypothesis=hypothesis):
+                restored, _, settled = words.restore(hypothesis, final=False)
+                self.assertEqual(restored[:settled], settled_text)
+
+    def test_unusable_versions_are_skipped(self):
+        unusable = [
+            {'heard': 'Nobody', 'writes': 'Somebody'},
+            {'heard': 'Shi. Von', 'writes': 'Siobhán'},
+            {'heard': 'Shi, von', 'writes': 'Siobhán'},
+            {'heard': '', 'writes': 'Siobhán'},
+            {'heard': 'x' * (MAX_CHARS + 1), 'writes': 'Siobhán'},
+            {'heard': 'one two three four five', 'writes': 'Siobhán'},
+            {'heard': 'git hub', 'writes': 'Siobhán'},
+            {'heard': 'SIOBHAN', 'writes': 'Siobhán'},
+            {'heard': 'Shivon', 'writes': 'siobhán'},
+        ]
+        words = Words(['Siobhán', 'GitHub'], unusable)
+        self.assertEqual(written(words, 'Nobody, Shi. Von, Shi, von, git hub, Shivon'),
+                         'Nobody, Shi. Von, Shi, von, GitHub, Shivon')
+        # Of two versions that match alike, the first is written.
+        words = Words(['Siobhán', 'Shauna'], [{'heard': 'Shivon', 'writes': 'Siobhán'},
+                                              {'heard': 'shi von', 'writes': 'Shauna'}])
+        self.assertEqual(written(words, 'Shivon'), 'Siobhán')
+        versions = [{'heard': f'version{index}', 'writes': 'Siobhán'} for index in range(MAX_HEARD + 1)]
+        words = Words(['Siobhán'], versions)
+        self.assertEqual(written(words, f'version{MAX_HEARD - 1} version{MAX_HEARD}'), f'Siobhán version{MAX_HEARD}')
+
+    def test_malformed_versions_reject_the_start(self):
+        for heard in ('Shivon', None, ['Shivon'], [{'heard': 'Shivon'}], [{'heard': 3, 'writes': 'Siobhán'}]):
+            with self.subTest(heard=heard), self.assertRaises(ValueError):
+                Words(['Siobhán'], heard)
+
+
 class StabilityTests(unittest.TestCase):
     words = Words(LIST)
 
@@ -107,7 +219,9 @@ class StabilityTests(unittest.TestCase):
                       'zealand', 'Zealand', 'siobhan', 'router', 'the', 'a', 'and', 'st', 'St', 'ives', 'acme', 'inc']
         punctuation = ['', '', '', ',', '.', '?']
         vocabulary += ["can't", "github's", "can"]
-        for words in (self.words, Words(LIST + ['St. Ives', 'Acme Inc.', 'can'])):
+        vocabulary += ['shi', 'von', 'Shivon']
+        taught = [{'heard': 'Shi von', 'writes': 'Siobhán'}, {'heard': 'new zeal', 'writes': 'New Zealand'}]
+        for words in (self.words, Words(LIST + ['St. Ives', 'Acme Inc.', 'can']), Words(LIST, taught)):
             for _ in range(400):
                 final = ' '.join(rng.choice(vocabulary) + rng.choice(punctuation) for _ in range(rng.randint(1, 9)))
                 done = written(words, final)

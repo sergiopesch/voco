@@ -32,6 +32,21 @@ pub struct AppConfig {
     /// (`runtime/speech/mywords.py`). Empty until the user adds one.
     #[serde(default)]
     pub my_words: Vec<String>,
+    /// The versions of My words entries the user taught VOCO, the way the
+    /// recognizer heard them. A separate key, so an earlier VOCO still reads
+    /// this config.
+    #[serde(default)]
+    pub my_words_heard: Vec<HeardVersion>,
+}
+
+/// What the recognizer wrote when the user said a My words entry, and the
+/// entry, or the one word of it, that dictation writes instead. Like the
+/// config itself, it ignores fields it doesn't know, so a hand edit or a later
+/// VOCO's field can't make the file unreadable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeardVersion {
+    pub heard: String,
+    pub writes: String,
 }
 
 /// A field-level configuration update sent by the frontend.
@@ -59,6 +74,10 @@ pub struct AppConfigPatch {
     /// The whole list, replacing the saved one; `validate_my_words` checks it.
     #[serde(default)]
     pub my_words: PatchField<Vec<String>>,
+    /// Every taught version, replacing the saved ones;
+    /// `validate_my_words_heard` checks them against the list.
+    #[serde(default)]
+    pub my_words_heard: PatchField<Vec<HeardVersion>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -112,6 +131,9 @@ impl AppConfigPatch {
         }
         if let PatchField::Set(value) = self.my_words {
             config.my_words = value;
+        }
+        if let PatchField::Set(value) = self.my_words_heard {
+            config.my_words_heard = value;
         }
     }
 }
@@ -214,6 +236,7 @@ impl Default for AppConfig {
             install_channel: InstallChannel::default(),
             english_spelling: None,
             my_words: Vec::new(),
+            my_words_heard: Vec::new(),
         }
     }
 }
@@ -293,9 +316,9 @@ impl AppConfig {
             .unwrap_or_default()
     }
 
-    /// The My words list a new dictation uses, read the same way as its
-    /// spelling. A file VOCO can't read gives an empty list.
-    pub fn my_words_for_dictation() -> Vec<String> {
+    /// The My words list and its taught versions a new dictation uses, read
+    /// the same way as its spelling. A file VOCO can't read gives neither.
+    pub fn my_words_for_dictation() -> (Vec<String>, Vec<HeardVersion>) {
         Self::config_dir_without_migration()
             .map(|directory| my_words_at(&directory.join("config.json")))
             .unwrap_or_default()
@@ -307,6 +330,8 @@ impl AppConfig {
 pub const MY_WORDS_MAX_TERMS: usize = 100;
 pub const MY_WORDS_MAX_WORDS: usize = 4;
 pub const MY_WORDS_MAX_CHARS: usize = 40;
+/// The most taught versions an entry keeps.
+pub const MY_WORDS_MAX_HEARD: usize = 5;
 
 /// Checks a My words list before it is saved. The worker skips an entry
 /// that breaks these rules rather than failing dictation, so a hand-edited
@@ -336,6 +361,135 @@ pub fn validate_my_words(words: &[String]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Checks the taught versions against the list they belong to before they are
+/// saved, by the rules the worker reads them with: each writes an entry, or one
+/// word of it, that it doesn't already match, matches no entry or other
+/// version, and an entry keeps at most `MY_WORDS_MAX_HEARD`.
+pub fn validate_my_words_heard(words: &[String], heard: &[HeardVersion]) -> Result<(), String> {
+    let mut taken: std::collections::HashSet<String> =
+        words.iter().map(|term| my_words_key(term)).collect();
+    let mut counts = std::collections::HashMap::new();
+    for version in heard {
+        if !heard_listable(&version.heard) {
+            return Err(format!(
+                "VOCO can't learn \u{201c}{}\u{201d}: a version is up to {MY_WORDS_MAX_WORDS} words \
+                 and {MY_WORDS_MAX_CHARS} characters, of letters, digits, apostrophes, single \
+                 spaces and hyphens.",
+                version.heard
+            ));
+        }
+        // A version belongs to the entry it writes whole, or else to the first
+        // entry with that word, as the worker reads it.
+        let entry = words
+            .iter()
+            .position(|term| *term == version.writes)
+            .or_else(|| {
+                words
+                    .iter()
+                    .position(|term| term_words(term).any(|word| word == version.writes))
+            })
+            .ok_or_else(|| format!("\u{201c}{}\u{201d} isn't in My words.", version.writes))?;
+        let key = my_words_key(&version.heard);
+        if key == my_words_key(&version.writes) {
+            return Err(format!(
+                "VOCO already writes \u{201c}{}\u{201d} for it.",
+                version.writes
+            ));
+        }
+        if !taken.insert(key) {
+            return Err(format!(
+                "\u{201c}{}\u{201d} already writes one of your words.",
+                version.heard
+            ));
+        }
+        let count = counts.entry(entry).or_insert(0);
+        *count += 1;
+        if *count > MY_WORDS_MAX_HEARD {
+            return Err(format!(
+                "VOCO keeps up to {MY_WORDS_MAX_HEARD} versions of \u{201c}{}\u{201d}.",
+                words[entry]
+            ));
+        }
+    }
+    // A version of one word also stands for it inside each entry with that
+    // word. Such a match may repeat one that writes the same entry, but must
+    // not clash with one that writes anything else.
+    let mut writes: std::collections::HashMap<String, &str> = words
+        .iter()
+        .map(|term| (my_words_key(term), term.as_str()))
+        .collect();
+    for version in heard {
+        writes.insert(my_words_key(&version.heard), version.writes.as_str());
+    }
+    for version in heard {
+        let heard_key = my_words_key(&version.heard);
+        for term in words.iter().filter(|term| {
+            **term != version.writes && term_words(term).any(|word| word == version.writes)
+        }) {
+            let whole = key_with(term, &version.writes, &heard_key);
+            if *writes.entry(whole).or_insert(term.as_str()) != term.as_str() {
+                return Err(format!(
+                    "\u{201c}{}\u{201d} would make another of your words write differently.",
+                    version.heard
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A term's key with the first of its words that is `word` heard as `heard_key`.
+fn key_with(term: &str, word: &str, heard_key: &str) -> String {
+    let mut swapped = false;
+    term_words(term)
+        .map(|each| {
+            if !swapped && each == word {
+                swapped = true;
+                heard_key.to_string()
+            } else {
+                my_words_key(each)
+            }
+        })
+        .collect()
+}
+
+/// An account's full name as a My words entry: None when GLib had none to
+/// give ("Unknown"), it is only the login name, or it isn't listable. A name
+/// written all in lower case gets capitals, or the worker would keep it in
+/// lower case mid-sentence like an ordinary word.
+pub fn account_name_entry(name: &str, login: &str) -> Option<String> {
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    if name.is_empty() || name == "Unknown" || name.eq_ignore_ascii_case(login) || !listable(&name)
+    {
+        return None;
+    }
+    if name.chars().any(char::is_uppercase) {
+        return Some(name);
+    }
+    let capitalised: Vec<String> = name
+        .split(' ')
+        .map(|word| {
+            let mut letters = word.chars();
+            letters
+                .next()
+                .map(|first| first.to_uppercase().chain(letters).collect())
+                .unwrap_or_default()
+        })
+        .collect();
+    Some(capitalised.join(" "))
+}
+
+/// A term's words, as the worker splits them.
+fn term_words(term: &str) -> impl Iterator<Item = &str> {
+    term.split(|c: char| !(c.is_alphanumeric() || matches!(c, '\'' | '\u{2019}')))
+        .filter(|word| !word.is_empty())
+}
+
+/// A taught version is listable like a term, but full stops never join its words.
+fn heard_listable(heard: &str) -> bool {
+    !heard.contains('.') && listable(heard)
 }
 
 fn listable(term: &str) -> bool {
@@ -421,19 +575,31 @@ fn english_spelling_at(path: &std::path::Path) -> EnglishSpelling {
     read().ok().flatten().unwrap_or_default()
 }
 
-fn my_words_at(path: &std::path::Path) -> Vec<String> {
-    let read = || -> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn my_words_at(path: &std::path::Path) -> (Vec<String>, Vec<HeardVersion>) {
+    let read = || -> Result<AppConfig, Box<dyn std::error::Error>> {
         secure_private_regular_file(path)?;
-        Ok(serde_json::from_str::<AppConfig>(&fs::read_to_string(path)?)?.my_words)
+        Ok(serde_json::from_str::<AppConfig>(&fs::read_to_string(
+            path,
+        )?)?)
     };
-    // A hand-edited config can't send the worker more, or longer, entries
-    // than Settings can save.
-    read()
-        .unwrap_or_default()
+    let Ok(config) = read() else {
+        return Default::default();
+    };
+    // A hand-edited config can't send the worker more, or longer, entries or
+    // versions than Settings can save; the worker checks the rest.
+    let words = config
+        .my_words
         .into_iter()
         .filter(|term| listable(term))
         .take(MY_WORDS_MAX_TERMS)
-        .collect()
+        .collect();
+    let heard = config
+        .my_words_heard
+        .into_iter()
+        .filter(|version| heard_listable(&version.heard) && listable(&version.writes))
+        .take(MY_WORDS_MAX_TERMS * MY_WORDS_MAX_HEARD)
+        .collect();
+    (words, heard)
 }
 
 fn reset_config_file(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::error::Error>> {
@@ -1042,6 +1208,7 @@ mod tests {
                 "installChannel": "github-release",
                 "englishSpelling": null,
                 "myWords": [],
+                "myWordsHeard": [],
             })
         );
     }
@@ -1113,6 +1280,161 @@ mod tests {
     }
 
     #[test]
+    fn taught_versions_round_trip_in_their_own_key() {
+        let mut config: AppConfig =
+            serde_json::from_str(r#"{"hotkey":"Alt+D","myWords":["Siobhán"]}"#).unwrap();
+        assert!(config.my_words_heard.is_empty());
+        let patch: AppConfigPatch = serde_json::from_value(serde_json::json!({
+            "myWordsHeard": [{"heard": "Shivon", "writes": "Siobhán"}]}))
+        .unwrap();
+        patch.apply_to(&mut config);
+        let saved = serde_json::to_value(&config).unwrap();
+        assert_eq!(saved["myWords"], serde_json::json!(["Siobhán"]));
+        assert_eq!(
+            saved["myWordsHeard"],
+            serde_json::json!([{"heard": "Shivon", "writes": "Siobhán"}])
+        );
+        let loaded: AppConfig = serde_json::from_value(saved).unwrap();
+        assert_eq!(loaded.my_words_heard, config.my_words_heard);
+        for rejected in [
+            r#"{"myWordsHeard":null}"#,
+            r#"{"myWordsHeard":["Shivon"]}"#,
+            r#"{"myWordsHeard":[{"heard":"Shivon"}]}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<AppConfigPatch>(rejected).is_err(),
+                "{rejected}"
+            );
+        }
+        // A field VOCO doesn't know is dropped, never kept or fatal.
+        let extra: AppConfig = serde_json::from_str(
+            r#"{"myWords":["Siobhán"],"myWordsHeard":[{"heard":"Shivon","writes":"Siobhán","later":1}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&extra.my_words_heard).unwrap(),
+            serde_json::json!([{"heard": "Shivon", "writes": "Siobhán"}])
+        );
+    }
+
+    #[test]
+    fn an_account_name_is_offered_only_when_it_could_be_an_entry() {
+        assert_eq!(
+            account_name_entry("Siobhán  Kelly", "skelly").as_deref(),
+            Some("Siobhán Kelly")
+        );
+        assert_eq!(
+            account_name_entry("Jean-Luc O'Neill", "jl").as_deref(),
+            Some("Jean-Luc O'Neill")
+        );
+        assert_eq!(
+            account_name_entry("siobhán kelly", "sk").as_deref(),
+            Some("Siobhán Kelly")
+        );
+        assert_eq!(
+            account_name_entry("Siobhán de Kelly", "sk").as_deref(),
+            Some("Siobhán de Kelly")
+        );
+        for unusable in [
+            "",
+            "Unknown",
+            "skelly",
+            "SKelly",
+            "Ops (on call)",
+            "a b c d e",
+            &"x".repeat(41),
+        ] {
+            assert_eq!(account_name_entry(unusable, "skelly"), None, "{unusable:?}");
+        }
+    }
+
+    #[test]
+    fn taught_version_validation_matches_the_worker_rules() {
+        let version = |heard: &str, writes: &str| HeardVersion {
+            heard: heard.into(),
+            writes: writes.into(),
+        };
+        let words: Vec<String> = ["Siobhán Kelly", "GitHub", "Jean-Luc"]
+            .map(String::from)
+            .to_vec();
+        let valid = [
+            version("Shivon Kelly", "Siobhán Kelly"),
+            version("Shivon", "Siobhán"),
+            version("get hub", "GitHub"),
+            version("Shaun-Luke", "Jean-Luc"),
+            version("Luke", "Luc"),
+            version("o'neill's", "GitHub"),
+        ];
+        assert_eq!(validate_my_words_heard(&words, &valid), Ok(()));
+        assert_eq!(validate_my_words_heard(&words, &[]), Ok(()));
+        for invalid in [
+            version("Shi. Von", "Siobhán"),
+            version("Shi, von", "Siobhán"),
+            version("", "Siobhán"),
+            version("one two three four five", "Siobhán"),
+            version(&"x".repeat(MY_WORDS_MAX_CHARS + 1), "Siobhán"),
+            version("Shivon", "Nobody"),
+            version("Shivon", "siobhán"),
+            version("git hub", "Siobhán"),
+            version("SIOBHÁN", "Siobhán"),
+        ] {
+            assert!(
+                validate_my_words_heard(&words, std::slice::from_ref(&invalid)).is_err(),
+                "{invalid:?}"
+            );
+        }
+        assert!(validate_my_words_heard(
+            &words,
+            &[version("Shivon", "Siobhán"), version("shi von", "Kelly")]
+        )
+        .is_err());
+        let five: Vec<HeardVersion> = (0..MY_WORDS_MAX_HEARD)
+            .map(|index| version(&format!("version{index}"), "Siobhán"))
+            .collect();
+        assert_eq!(validate_my_words_heard(&words, &five), Ok(()));
+        let mut six = five.clone();
+        six.push(version("Shivonne", "Kelly"));
+        assert!(validate_my_words_heard(&words, &six).is_err());
+        // A version of one word mustn't make another entry, said in full,
+        // match two ways. (Accents compare in Settings and the worker.)
+        let names: Vec<String> = ["Foo", "José Garcia", "José Kelly"]
+            .map(String::from)
+            .to_vec();
+        assert!(validate_my_words_heard(
+            &names,
+            &[version("Hosay Garcia", "Foo"), version("Hosay", "José")]
+        )
+        .is_err());
+        assert!(validate_my_words_heard(
+            &names,
+            &[version("Hosay", "José"), version("Hosay Garcia", "Foo")]
+        )
+        .is_err());
+        assert_eq!(
+            validate_my_words_heard(&names, &[version("Hosay", "José")]),
+            Ok(())
+        );
+        let clash: Vec<String> = ["José Garcia", "Hosay Garcia"].map(String::from).to_vec();
+        assert!(validate_my_words_heard(&clash, &[version("Hosay", "José")]).is_err());
+        // A match that writes the same entry another way is no clash.
+        assert_eq!(
+            validate_my_words_heard(
+                &["Siobhán Kelly".into()],
+                &[
+                    version("Shivon Kelly", "Siobhán Kelly"),
+                    version("Shivon", "Siobhán")
+                ]
+            ),
+            Ok(())
+        );
+        // A version belongs to the entry it writes whole, so it counts there.
+        let both: Vec<String> = ["Siobhán Kelly", "Siobhán"].map(String::from).to_vec();
+        let mut whole = five.clone();
+        whole.push(version("Kellie", "Kelly"));
+        assert_eq!(validate_my_words_heard(&both, &whole), Ok(()));
+    }
+
+    #[test]
     fn my_words_validation_matches_the_worker_rules() {
         let valid: Vec<String> = [
             "GitHub",
@@ -1176,22 +1498,38 @@ mod tests {
         ));
         fs::create_dir_all(&test_dir).unwrap();
         let path = test_dir.join("config.json");
-        assert!(my_words_at(&path).is_empty());
+        assert_eq!(my_words_at(&path), (Vec::new(), Vec::new()));
         let edited = serde_json::json!({"hotkey": "Alt+D", "myWords": [
-            "GitHub", "C++", "github", "x".repeat(5000), "New Zealand"]});
+            "GitHub", "C++", "github", "x".repeat(5000), "New Zealand"],
+            "myWordsHeard": [{"heard": "get hub", "writes": "GitHub"},
+                {"heard": "St. Hub", "writes": "GitHub"}, {"heard": "x".repeat(5000), "writes": "GitHub"}]});
         atomic_write(&path, &edited.to_string()).unwrap();
-        assert_eq!(my_words_at(&path), ["GitHub", "github", "New Zealand"]);
+        let (words, heard) = my_words_at(&path);
+        assert_eq!(words, ["GitHub", "github", "New Zealand"]);
+        assert_eq!(
+            heard,
+            [HeardVersion {
+                heard: "get hub".into(),
+                writes: "GitHub".into()
+            }]
+        );
         let many: Vec<String> = (0..MY_WORDS_MAX_TERMS + 20)
             .map(|index| format!("term{index}"))
             .collect();
+        let versions: Vec<serde_json::Value> = (0..MY_WORDS_MAX_TERMS * MY_WORDS_MAX_HEARD + 20)
+            .map(|index| serde_json::json!({"heard": format!("v{index}"), "writes": "term0"}))
+            .collect();
         atomic_write(
             &path,
-            &serde_json::json!({"hotkey": "Alt+D", "myWords": many}).to_string(),
+            &serde_json::json!({"hotkey": "Alt+D", "myWords": many, "myWordsHeard": versions})
+                .to_string(),
         )
         .unwrap();
-        assert_eq!(my_words_at(&path).len(), MY_WORDS_MAX_TERMS);
+        let (words, heard) = my_words_at(&path);
+        assert_eq!(words.len(), MY_WORDS_MAX_TERMS);
+        assert_eq!(heard.len(), MY_WORDS_MAX_TERMS * MY_WORDS_MAX_HEARD);
         atomic_write(&path, "{not valid json").unwrap();
-        assert!(my_words_at(&path).is_empty());
+        assert_eq!(my_words_at(&path), (Vec::new(), Vec::new()));
 
         let _ = fs::remove_dir_all(&test_dir);
     }

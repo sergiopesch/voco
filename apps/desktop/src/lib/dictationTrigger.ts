@@ -15,8 +15,14 @@ export function cancelsPendingStart(
   return action !== "start" && (!isBrowserTrigger(triggerId) || triggerId === pendingTriggerId);
 }
 
+/** A browser's Stop never ends setup's voice test or a Say it check. */
 export function canStopOnboardingTest(triggerId?: string): boolean {
   return !isBrowserTrigger(triggerId);
+}
+
+/** The voice test and Say it record for VOCO's own window only. */
+export function isLocalTrigger(triggerId?: string): boolean {
+  return triggerId === "onboarding:test" || triggerId === "words:check";
 }
 
 /** Browser stop messages belong to their original recording, even after focus loss. */
@@ -33,7 +39,7 @@ export function admitsDictationTrigger(
   if (triggerId === "tray:stop" || triggerId === "session:locked") {
     return action === "stop" && (phase === "starting" || phase === "recording");
   }
-  if (triggerId !== "onboarding:test" && !isBrowserTrigger(triggerId)) return false;
+  if (!isLocalTrigger(triggerId) && !isBrowserTrigger(triggerId)) return false;
   if (action === "start") return phase === "idle" || phase === "error";
   return triggerId === activeTriggerId && (phase === "starting" || phase === "recording");
 }

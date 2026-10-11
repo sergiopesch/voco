@@ -10,6 +10,8 @@ import type {
   UpdateCheckState,
 } from "@/types";
 
+export type DictationPurpose = "cursor" | "onboarding" | "words";
+
 export function deriveSurfaceForConfig(
   currentSurface: AppSurface,
   previousConfig: AppConfig | null,
@@ -39,13 +41,21 @@ interface AppState {
   setCaptureBackendMode: (mode: CaptureBackendMode) => void;
   setNativeCaptureSource: (source: NativeCaptureSource | null) => void;
   loseNativeCaptureSource: () => void;
-  dictationPurpose: "cursor" | "onboarding";
+  /** Who a recording's words are for: the focused app, setup's voice test, or
+   * a Say it check of My words. Only the first pastes. */
+  dictationPurpose: DictationPurpose;
   onboardingTestPassed: boolean;
   /** Setup asks which English to write until this is set; a saved choice
    * skips the question, and Run setup again asks it again. */
   onboardingSpellingConfirmed: boolean;
   confirmOnboardingSpelling: () => void;
-  setDictationPurpose: (purpose: "cursor" | "onboarding") => void;
+  /** Setup offers My words after the voice test until this is set, every time it runs. */
+  onboardingWordsConfirmed: boolean;
+  /** Whether the person said a word in that step; Done reminds them of My
+   * words if they didn't. */
+  onboardingWordsChecked: boolean;
+  confirmOnboardingWords: (checked: boolean) => void;
+  setDictationPurpose: (purpose: DictationPurpose) => void;
   setOnboardingTestPassed: (passed: boolean) => void;
   status: DictationStatus;
   transcript: string;
@@ -100,6 +110,9 @@ export const useStore = create<AppState>((set) => ({
   onboardingTestPassed: false,
   onboardingSpellingConfirmed: false,
   confirmOnboardingSpelling: () => set({ onboardingSpellingConfirmed: true }),
+  onboardingWordsConfirmed: false,
+  onboardingWordsChecked: false,
+  confirmOnboardingWords: (onboardingWordsChecked) => set({ onboardingWordsConfirmed: true, onboardingWordsChecked }),
   setDictationPurpose: (dictationPurpose) => set({ dictationPurpose }),
   setOnboardingTestPassed: (onboardingTestPassed) => set({ onboardingTestPassed }),
   status: "idle",
@@ -137,6 +150,8 @@ export const useStore = create<AppState>((set) => ({
         onboardingTestPassed: setupRestarted ? false : state.onboardingTestPassed,
         onboardingSpellingConfirmed: setupRestarted ? false
           : state.config ? state.onboardingSpellingConfirmed : config.englishSpelling !== null,
+        onboardingWordsConfirmed: setupRestarted ? false : state.onboardingWordsConfirmed,
+        onboardingWordsChecked: setupRestarted ? false : state.onboardingWordsChecked,
         surface: deriveSurfaceForConfig(state.surface, state.config, config),
       };
     }),

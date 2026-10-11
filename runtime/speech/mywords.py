@@ -6,6 +6,14 @@ case or accents and joins words the recognizer split, so "git hub" becomes
 GitHub, "G T K" GTK and "zoe" Zoë. A sentence start keeps its capital, and a
 possessive 's stays.
 
+A taught version is what the recognizer wrote when the user said an entry,
+taught in Settings or setup. The worker writes the entry, or the one word of
+it the recognizer misheard, wherever the recognizer writes that version, so
+"Shivon" can become Siobhán. A version taught for one word also stands for that
+word within each entry that has it, so an entry said in full is written whole:
+"Shivon Garcia" becomes Siobhán García. Taught versions match the way entries do, but
+are never boosted, and full stops never join their words.
+
 Delivery is append-only, so a push holds back a tail that later text could
 still turn into a listed term: "New" waits for "Zealand", and the open last
 word waits while it could grow into one. Full stops join words only into a
@@ -19,6 +27,8 @@ import unicodedata
 MAX_TERMS = 100
 MAX_WORDS = 4
 MAX_CHARS = 40
+# Taught versions for each entry.
+MAX_HEARD = 5
 # The recognizer's boost for listed phrases: on development data the strongest
 # that added no wrong words or capitals, and the one the My words gates passed.
 BOOST = 0.5
@@ -26,6 +36,8 @@ BOOST = 0.5
 SPELLED = re.compile(r"[^\W_]+(?:['’][^\W_]+)*")
 # A listed term: words separated by single spaces, hyphens or full stops.
 TERM = re.compile(r"[^\W_]+(?:['’][^\W_]+)*(?:(?:[ -]|\. ?)[^\W_]+(?:['’][^\W_]+)*)*\.?")
+# A taught version: words separated by single spaces or hyphens.
+HEARD = re.compile(r"[^\W_]+(?:['’][^\W_]+)*(?:[ -][^\W_]+(?:['’][^\W_]+)*)*")
 JOINABLE = re.compile(r'[ \t-]+')
 # A full stop between words joins them only into a term listed with one.
 DOTTED = re.compile(r'\.[ \t]*')
@@ -65,22 +77,86 @@ def accepted(terms):
             and len(SPELLED.findall(term)) <= MAX_WORDS][:MAX_TERMS]
 
 
+def taught(versions, terms):
+    """The usable taught versions of the accepted terms, in order: (key, spelling, term).
+
+    Settings checks the same rules when saving; a version that slips past them
+    is skipped. It must write a term, or one word of a term, that it doesn't
+    already match, and match no term or earlier version. It belongs to the term
+    it writes whole, or else to the first term with that word.
+    """
+    if not isinstance(versions, list) or not all(
+            isinstance(version, dict) and isinstance(version.get('heard'), str)
+            and isinstance(version.get('writes'), str) for version in versions):
+        raise ValueError('words')
+    entries = {}
+    for term in terms:
+        entries.setdefault(term, term)
+    for term in terms:
+        for spelling in SPELLED.findall(term):
+            entries.setdefault(spelling, term)
+    taken = {key(term) for term in terms}
+    counts, usable = {}, []
+    for version in versions:
+        heard = unicodedata.normalize('NFC', version['heard'])
+        spelling = unicodedata.normalize('NFC', version['writes'])
+        term = entries.get(spelling)
+        if (term is None or not 1 <= len(heard) <= MAX_CHARS or not HEARD.fullmatch(heard)
+                or len(SPELLED.findall(heard)) > MAX_WORDS or counts.get(term, 0) >= MAX_HEARD):
+            continue
+        heard_key = key(heard)
+        if heard_key in taken or heard_key == key(spelling):
+            continue
+        taken.add(heard_key)
+        counts[term] = counts.get(term, 0) + 1
+        usable.append((heard_key, spelling, term))
+    return usable
+
+
+def within(term, word, heard_key):
+    """A term's key with one of its words heard another way, and where full
+    stops join its words in that key."""
+    whole, places, words, swapped = '', set(), list(SPELLED.finditer(term)), False
+    for index, match in enumerate(words):
+        if not swapped and match[0] == word:
+            whole, swapped = whole + heard_key, True
+        else:
+            whole += plain(match[0])
+        if index + 1 < len(words) and '.' in term[match.end():words[index + 1].start()]:
+            places.add(len(whole))
+    return whole, places
+
+
 class Words:
-    def __init__(self, terms):
+    def __init__(self, terms, heard=()):
         self.terms = accepted(terms)
         # Settings saves no two entries that match alike; in a hand-edited
         # list, the first one's spelling is written.
         self.spellings = {}
         for term in self.terms:
             self.spellings.setdefault(key(term), term)
-        # Where, in each term's key, a full stop joins two of its words.
+        # Where, in each term's key, a full stop joins two of its words; none
+        # joins a taught version's.
         self.stops = {k: stops(term) for k, term in self.spellings.items()}
+        versions = taught(list(heard) if isinstance(heard, tuple) else heard, self.terms)
+        for heard_key, spelling, _ in versions:
+            self.spellings[heard_key] = spelling
+            self.stops[heard_key] = set()
+        # A version of a word also stands for that word in each entry with it,
+        # unless an entry or a version already matches that way.
+        for heard_key, spelling, _ in versions:
+            for term in self.terms:
+                if term != spelling and spelling in SPELLED.findall(term):
+                    whole, places = within(term, spelling, heard_key)
+                    if whole not in self.spellings:
+                        self.spellings[whole] = term
+                        self.stops[whole] = places
         self.dotted = any('.' in term for term in self.terms)
         self.prefixes = {k[:end] for k in self.spellings for end in range(1, len(k) + 1)}
         self.longest = max(map(len, self.spellings), default=0)
 
     def phrases(self):
-        """What the recognizer boosts: each term as listed."""
+        """What the recognizer boosts: each term as listed, never a taught version."""
         return list(self.terms)
 
     def restore(self, text, final):
