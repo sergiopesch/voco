@@ -1074,7 +1074,7 @@ export function App() {
     };
     const cleanup = cleanupDeferredListener(getCurrentWindow().listen("voco:activate", () => {
       void activate();
-    }).then(unlisten => { if (alive) void activate(); return unlisten; }), "launcher activation listener");
+    }), "launcher activation listener");
     return () => { alive = false; cleanup(); };
   }, [dictationInProgress, initComplete, setSurface]);
 
