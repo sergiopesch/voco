@@ -85,6 +85,8 @@
 .voco-setup__details p { overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
 .voco-setup__handoff p { margin: 0 0 12px; line-height: 1.7; }
 .voco-setup__handoff p:last-child { font-size: 13px; }
+/* The shortcut note leads the step, above the dictation instruction. */
+.voco-setup__handoff > .voco-panel-setup:first-child { margin-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .voco-setup__microphone, .voco-setup__handoff { animation: none; }
 }

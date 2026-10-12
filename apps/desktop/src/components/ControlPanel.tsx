@@ -819,6 +819,7 @@ export function ControlPanel({
             saving={saving}
             blocked={!onStartTest || nativeMicrophone?.mode === "pending"}
             desktopReady={inputReadiness?.available === true}
+            shortcutNote={desktopInput?.available && desktopInput.setupArea === "panel" ? desktopInput.detail : null}
             microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
               ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />
               : <div className="voco-preferences__form"><DeviceSelect label="Microphone" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy || testPreparing}

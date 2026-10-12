@@ -184,7 +184,9 @@ only show your words in the VOCO window.
    Add any other word VOCO should know, then choose **Continue**, or
    **Skip for now**. See [Say it](everyday-use.md#say-it).
 5. Choose **Done**. If the button says **Check desktop setup**, fix what VOCO
-   shows, then choose it again.
+   shows, then choose it again. If the step says `Alt+D` also reaches the app
+   you are dictating into, do what it says before you dictate. After a fresh
+   install on GNOME, that's signing out and back in to load the panel.
 
 To dictate, click where you want the text, press `Alt+D` and speak. Press
 `Alt+D` again to finish. See [Everyday use](everyday-use.md).

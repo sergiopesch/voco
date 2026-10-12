@@ -160,8 +160,10 @@ voice pill, then "Anything else VOCO should know?" with a field and Add, and
 Continue with Skip for now. What VOCO heard appears under the word it checked, a
 silver mark for a note and a red one only when a check couldn't finish, with the
 misheard part highlighted like the spelling sample. Last, "Your voice, ready.",
-the shortcut and Done; when desktop input needs work, "One more step." and
-Check desktop setup come first, and only verified readiness shows Done. Four short marks beside Setup show the step, the current
+the shortcut and Done; while the focused app also gets the shortcut, VOCO's note
+saying so and its fix come before the shortcut. When desktop input needs work,
+"One more step." and Check desktop setup come first, and only verified readiness
+shows Done. Four short marks beside Setup show the step, the current
 one longest. Each later phase moves keyboard focus to its main action.
 
 ## Status

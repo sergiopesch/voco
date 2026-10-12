@@ -66,11 +66,16 @@ try {
             }
         };
     });
-    const load = async ({ config = {}, name = 'Siobhán Kelly', passedShot = null } = {}) => {
+    const load = async ({ config = {}, name = 'Siobhán Kelly', passedShot = null, desktopInput = null, panel = null } = {}) => {
         const query = new URLSearchParams({ config: JSON.stringify({ onboardingCompleted: false, englishSpelling: 'british', myWords: [], ...config }) });
         if (name !== null) query.set('name', name);
         await page.goto(origin + '/app-microphone-check?' + query);
         await page.waitForFunction(() => window.store?.getState().config);
+        // Setup checks desktop input once the voice test passes.
+        if (desktopInput) await page.evaluate(([input, status]) => {
+            window.nativeHandlers.getDesktopInputStatus = () => input;
+            window.nativeHandlers.getPanelSetupStatus = () => status;
+        }, [desktopInput, panel]);
         // The voice test has its own suites; here it has passed, and moves on to the words step.
         await page.evaluate(() => window.store.getState().setOnboardingTestPassed(true));
         await page.getByRole('heading', { name: 'VOCO heard you.' }).waitFor();
@@ -226,6 +231,27 @@ try {
     assert.deepEqual(await saves(), []);
     await shot('setup-ready-skipped');
     results.push({ case: 'skip-saves-nothing-and-says-where-to-come-back', passed: true });
+
+    // A fresh install's panel loads at the next login. Until then the focused
+    // app also gets the shortcut, so the last screen leads with that and the fix.
+    const signOut = 'Panel enabled. Sign out and back in to load it; saving your work first is recommended.';
+    const leak = `Alt+D also reaches the app you are dictating into: browsers move the cursor to the address bar, so your words land there, and terminals delete a word. ${signOut}`;
+    await load({ desktopInput: { available: true, detail: leak, setupArea: 'panel' }, panel: { status: 'restart', detail: signOut, canEnable: false } });
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
+    const handoff = page.locator('.voco-setup__handoff');
+    await handoff.getByText(leak, { exact: true }).waitFor();
+    const handoffText = await handoff.innerText();
+    assert.ok(handoffText.indexOf(leak) < handoffText.indexOf('Then click where you want the text'), handoffText);
+    assert.equal(handoffText.split('Sign out and back in').length, 2, 'The fix reads once');
+    await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
+    await shot('setup-ready-shortcut-note');
+    // The longer step still keeps Done on screen in the smallest window.
+    await page.setViewportSize({ width: 760, height: 560 });
+    const doneBox = await page.getByRole('button', { name: 'Done', exact: true }).boundingBox();
+    assert.ok(doneBox && doneBox.y + doneBox.height <= 560, `Done is visible: ${JSON.stringify(doneBox)}`);
+    await shot('setup-ready-shortcut-note-minimum-window', { width: 760, height: 560 });
+    results.push({ case: 'the-last-screen-leads-with-the-shortcut-fix', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();
