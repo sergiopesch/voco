@@ -12,8 +12,10 @@ need. [Install VOCO](../install.md) covers installation, and
 | --- | --- | --- | --- | --- |
 | Ubuntu 24.04 LTS | GNOME 46 | Wayland, X11 | `voco_<version>_amd64.deb`, with APT | Tray icon, through Ubuntu's AppIndicator extension |
 | Ubuntu 26.04 LTS | GNOME 50 | Wayland | `voco_<version>_amd64.deb`, with APT | Tray icon, through Ubuntu's AppIndicator extension |
-| Debian 13 | GNOME 48 | Wayland, X11 | `voco_<version>_amd64.deb`, with APT | No top-bar icon unless you add an AppIndicator extension |
-| Fedora 44 Workstation | GNOME 50 | Wayland | `voco-<version>-1.x86_64.rpm`, with DNF | No top-bar icon unless you add an AppIndicator extension |
+| Debian 13 † | GNOME 48 | Wayland, X11 | `voco_<version>_amd64.deb`, with APT | No top-bar icon unless you add an AppIndicator extension |
+| Fedora 44 Workstation † | GNOME 50 | Wayland | `voco-<version>-1.x86_64.rpm`, with DNF | No top-bar icon unless you add an AppIndicator extension |
+
+† Not tested on a real desktop
 
 The [GNOME panel](../install.md#gnome-panel) works on all four, and the guided
 installer turns it on; after you sign out and back in, it replaces the tray icon
