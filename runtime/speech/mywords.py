@@ -68,7 +68,8 @@ def accepted(terms):
 
     The desktop checks the same rules when saving. An entry that slips past
     them, a hand-edited config for example, is skipped rather than failing
-    dictation, and so is anything beyond MAX_TERMS.
+    dictation, and so is anything beyond MAX_TERMS. Normalizes to NFC so NFD
+    and NFC behave the same.
     """
     if not isinstance(terms, list) or not all(isinstance(term, str) for term in terms):
         raise ValueError('words')
@@ -83,7 +84,8 @@ def taught(versions, terms):
     Settings checks the same rules when saving; a version that slips past them
     is skipped. It must write a term, or one word of a term, that it doesn't
     already match, and match no term or earlier version. It belongs to the term
-    it writes whole, or else to the first term with that word.
+    it writes whole, or else to the first term with that word. Normalizes to
+    NFC like accepted().
     """
     if not isinstance(versions, list) or not all(
             isinstance(version, dict) and isinstance(version.get('heard'), str)

@@ -4069,6 +4069,7 @@ dependencies = [
  "evdev",
  "glib",
  "global-hotkey",
+ "icu_normalizer",
  "image",
  "inotify",
  "libc",

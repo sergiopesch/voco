@@ -120,10 +120,21 @@ def copy_vendored_notices(source_root, doc):
 
 
 # Every file the speech worker needs from runtime/speech, besides lib/ and
-# models/. test-speech-package.py checks that it names every worker module.
+# models/. test-speech-package.py checks that it names every worker module, and
+# CI runs the worker protocol test from these files alone.
 WORKER_FILES = ("stream_worker.py", "worker_main.py", "streaming.py", "adapters.py", "spelling.py",
                 "spelling-varcon.tsv", "mywords.py", "MODEL-IDENTITY.json", "NATIVE-BUILD.json",
                 "libbench_nemo_pool.so")
+
+
+def stage_worker(speech):
+    """Copy the speech worker into `speech` as packages ship it."""
+    speech.mkdir(parents=True)
+    source = ROOT / "runtime/speech"
+    for name in WORKER_FILES:
+        shutil.copy2(source / name, speech / name)
+    for name in ("lib", "models"):
+        shutil.copytree(source / name, speech / name, symlinks=True)
 
 
 def stage_payload(base, stage, version, package_version):
@@ -133,12 +144,7 @@ def stage_payload(base, stage, version, package_version):
     validate_base_executables(stage)
     subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
     speech = stage / "usr/lib/voco/speech"
-    speech.mkdir(parents=True)
-    source = ROOT / "runtime/speech"
-    for name in WORKER_FILES:
-        shutil.copy2(source / name, speech / name)
-    for name in ("lib", "models"):
-        shutil.copytree(source / name, speech / name, symlinks=True)
+    stage_worker(speech)
     model = speech / "models/nemotron-speech-streaming-en-0.6b.q8_0.gguf"
     expected = json.loads((speech / "MODEL-IDENTITY.json").read_text())["model_sha256"]
     if digest(model) != expected:
