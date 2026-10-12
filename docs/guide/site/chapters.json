@@ -1646,6 +1646,10 @@
       {
         "title": "The guide checks itself",
         "text": "The Code Guide job runs this guide's own tests: chapters, catalog and server safety."
+      },
+      {
+        "title": "Measured on demand",
+        "text": "Two commands measure what CI doesn't. check-privacy.sh runs a release build offline and online and records what it reaches on the network and when the microphone is open. check-speech.sh replays the public clips through the real worker for word error rate, latency and My words, and fails when a My words gate does. With --against voco.2026.0.62 it measures that release beside this checkout."
       }
     ],
     "files": [
@@ -1688,6 +1692,10 @@
       {
         "path": "scripts/stage-speech-worker.py",
         "why": "Copies the speech worker as packages ship it, for CI to run."
+      },
+      {
+        "path": "scripts/check-speech.sh",
+        "why": "Measures word error rate, latency and the My words gates through the real worker."
       },
       {
         "path": "apps/desktop/src/lib/dictationStream.test.ts",
