@@ -83,6 +83,8 @@ describe("My words rules", () => {
     expect(termWords(`${ADESOLA} Okafor`)).toEqual([ADESOLA, "Okafor"]);
     expect(entryOf([`${ADESOLA} Okafor`], ADESOLA)).toBe(0);
     expect(heardVersion(`${ADESOLA}.`)?.text).toBe(ADESOLA);
+    // The worker's key drops every mark the same way.
+    expect(myWordsKey("\u0905\u0902\u091c\u0932\u093f")).toBe(myWordsKey("\u0905\u091c\u0932"));
   });
 });
 

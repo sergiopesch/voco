@@ -140,6 +140,10 @@ class TaughtTests(unittest.TestCase):
         self.assertEqual(written(words, 'Shola called'), f'{ADESOLA} called')
         heard_with_marks = Words(['Sola'], [{'heard': ADESOLA, 'writes': 'Sola'}])
         self.assertEqual(written(heard_with_marks, f'{ADESOLA} called'), 'Sola called')
+        # Every mark goes from the key, as Settings compares words, including
+        # vowel signs that NFKD doesn't decompose.
+        anjali = Words(['\u0905\u0902\u091c\u0932\u093f'])
+        self.assertEqual(written(anjali, '\u0905\u091c\u0932 called'), '\u0905\u0902\u091c\u0932\u093f called')
 
     def test_a_version_of_a_word_stands_for_it_in_every_entry_with_it(self):
         words = Words(['José', 'José García'], [{'heard': 'Hosay', 'writes': 'José'}])
