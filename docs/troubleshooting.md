@@ -85,6 +85,7 @@ it, before DNF started. After a manual install, the checks in
 | What you see | What to do |
 | --- | --- |
 | **Desktop setup needed**, or a **Dictation setup incomplete** notification | VOCO doesn't record when it can't paste. Run `voco --check-desktop-input` and fix what it names. |
+| **VOCO can't find a desktop session.** | VOCO was started somewhere it can't see your desktop, such as a text console, an SSH session or a script with no desktop variables set. Open VOCO from your desktop. If you start a Wayland desktop such as Sway from a text console, check that `WAYLAND_DISPLAY` is set in the environment VOCO starts from. |
 | **VOCO hidden** | A VOCO window was open. Click where you want the text, then press the shortcut again. |
 | **Dictation could not start** or **Microphone could not start** | Read the reason in the notification. For microphone reasons, see [Microphone problems](#microphone-problems). |
 | **Microphone access is blocked** | Allow microphone access in your desktop's privacy settings, then choose **Retry microphone access** on the **Settings** page. |
@@ -235,7 +236,9 @@ may ask you to open VOCO.
 - **Reset to defaults**, then **Confirm reset**, renames the file to
   `config.recovery-backup-<numbers>.json` in the same folder and writes default
   settings. Your shortcut returns to `Alt+D`, and VOCO runs the voice test
-  again. VOCO keeps these backups until you delete them.
+  again. VOCO keeps that backup until you delete it or reset again. A reset
+  also deletes `config.json.last`, VOCO's copy of your settings, and the
+  backups of earlier resets.
 
 ## Chromium extension problems
 

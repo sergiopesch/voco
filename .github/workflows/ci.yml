@@ -318,6 +318,16 @@ jobs:
           npm run test:speech-baseline -- --report "${{ runner.temp }}/voco-speech-baseline.json"
           /usr/bin/python3 runtime/speech/test_worker_protocol.py --output-dir "${{ runner.temp }}/voco-worker-protocol"
 
+      # The worker as packages ship it, without the rest of the checkout beside
+      # it, as release assembly runs it from the built package.
+      - name: Speech worker from the files a package ships
+        timeout-minutes: 5
+        run: |
+          python3 scripts/stage-speech-worker.py "$RUNNER_TEMP/packaged-speech"
+          cp runtime/speech/test_worker_protocol.py "$RUNNER_TEMP/packaged-speech/"
+          /usr/bin/python3 "$RUNNER_TEMP/packaged-speech/test_worker_protocol.py" \
+            --output-dir "$RUNNER_TEMP/voco-packaged-worker" --fixtures tests/fixtures/speech
+
       - name: Retain speech regression results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -327,6 +337,7 @@ jobs:
             ${{ runner.temp }}/voco-glib-regression/result.json
             ${{ runner.temp }}/voco-native-pulse-latency/
             ${{ runner.temp }}/voco-worker-protocol/*.json
+            ${{ runner.temp }}/voco-packaged-worker/
             ${{ runner.temp }}/voco-speech-*.json
           if-no-files-found: ignore
           retention-days: 7

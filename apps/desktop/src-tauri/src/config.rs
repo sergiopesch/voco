@@ -272,35 +272,11 @@ impl AppConfig {
     }
 
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
-        let path = Self::config_path()?;
-        if path.exists() {
-            secure_private_regular_file(&path)?;
-            let content = fs::read_to_string(&path)?;
-            let config: Self = serde_json::from_str(&content)?;
-            // Retired settings are ignored on read and dropped by this save;
-            // the microphone, shortcut and other current settings are kept.
-            if serde_json::to_value(&config)?
-                != serde_json::from_str::<serde_json::Value>(&content)?
-            {
-                if let Err(error) = config.save() {
-                    warn!(
-                        "Loaded VOCO settings, but could not save them in the current format: {error}"
-                    );
-                }
-            }
-            Ok(config)
-        } else {
-            let config = Self::default();
-            config.save()?;
-            Ok(config)
-        }
+        load_at(&Self::config_path()?)
     }
 
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let path = Self::config_path()?;
-        let content = serde_json::to_string_pretty(self)?;
-        atomic_write(&path, &content)?;
-        Ok(())
+        save_at(self, &Self::config_path()?)
     }
 
     pub fn reset_to_defaults() -> Result<Self, Box<dyn std::error::Error>> {
@@ -665,6 +641,148 @@ fn my_words_at(path: &std::path::Path) -> (Vec<String>, Vec<HeardVersion>) {
     (words, heard)
 }
 
+/// The copy of `config.json` that VOCO keeps beside it, with any settings a
+/// later VOCO left there. An earlier VOCO rewrites `config.json` without the
+/// settings it doesn't know, and the next load takes them back from this copy.
+const SAVED_COPY: &str = "config.json.last";
+const RECOVERY_BACKUP: &str = "config.recovery-backup-";
+
+fn load_at(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::error::Error>> {
+    if path.exists() {
+        secure_private_regular_file(path)?;
+        let content = fs::read_to_string(path)?;
+        let mut config: AppConfig = serde_json::from_str(&content)?;
+        let read = serde_json::from_str::<serde_json::Value>(&content)?;
+        // Retired settings are ignored on read and dropped by this save;
+        // the microphone, shortcut and other current settings are kept, and
+        // those an earlier VOCO dropped come back.
+        if serde_json::to_value(&config)? != read {
+            if let Some(restored) = restore_dropped_settings(path, &read) {
+                config = restored;
+            }
+            if let Err(error) = save_at(&config, path) {
+                warn!(
+                    "Loaded VOCO settings, but could not save them in the current format: {error}"
+                );
+            }
+        } else if copy_is_stale(path) {
+            // Settings VOCO didn't save, or whose copy is gone or older, as a
+            // failed copy write or a crash between the two writes leaves it.
+            if let Err(error) = keep_copy(&config, path) {
+                warn!("Loaded VOCO settings, but could not keep their copy: {error}");
+            }
+        }
+        Ok(config)
+    } else {
+        let config = AppConfig::default();
+        save_at(&config, path)?;
+        Ok(config)
+    }
+}
+
+fn save_at(config: &AppConfig, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    atomic_write(path, &serde_json::to_string_pretty(config)?)?;
+    if let Err(error) = keep_copy(config, path) {
+        warn!("Saved VOCO settings, but could not keep their copy: {error}");
+    }
+    Ok(())
+}
+
+/// Whether the saved copy is missing or older than `config.json`.
+fn copy_is_stale(path: &std::path::Path) -> bool {
+    let modified = |path: &std::path::Path| fs::symlink_metadata(path)?.modified();
+    match (modified(path), modified(&path.with_file_name(SAVED_COPY))) {
+        (Ok(settings), Ok(copy)) => copy < settings,
+        _ => true,
+    }
+}
+
+/// Writes the saved copy of `config`, keeping the settings a later VOCO left
+/// in it, which this one doesn't know, for when the later one returns.
+fn keep_copy(config: &AppConfig, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    let copy = path.with_file_name(SAVED_COPY);
+    let mut settings = serde_json::to_value(config)?;
+    if let (Some(current), Some(earlier)) = (settings.as_object_mut(), read_copy(&copy)) {
+        for (key, value) in earlier {
+            current.entry(key).or_insert(value);
+        }
+    }
+    atomic_write(&copy, &serde_json::to_string_pretty(&settings)?)?;
+    Ok(())
+}
+
+/// The saved copy's settings, when it is a private regular file VOCO can read.
+fn read_copy(copy: &std::path::Path) -> Option<serde_json::Map<String, serde_json::Value>> {
+    secure_private_regular_file(copy).ok()?;
+    match serde_json::from_str(&fs::read_to_string(copy).ok()?).ok()? {
+        serde_json::Value::Object(saved) => Some(saved),
+        _ => None,
+    }
+}
+
+/// The settings read from `config.json`, with those it lacks taken from the
+/// saved copy, or None without a usable copy. A Reset since the copy was
+/// saved, by this VOCO or an earlier one, keeps what it cleared.
+fn restore_dropped_settings(path: &std::path::Path, read: &serde_json::Value) -> Option<AppConfig> {
+    let copy = path.with_file_name(SAVED_COPY);
+    let modified = fs::symlink_metadata(&copy).ok()?.modified().ok()?;
+    let saved_at = modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    if recovery_backups(path)
+        .iter()
+        .any(|(_, reset_at)| *reset_at >= saved_at)
+    {
+        // The copy predates that reset, so the next save starts a new one.
+        let _ = fs::remove_file(&copy);
+        return None;
+    }
+    let saved = read_copy(&copy)?;
+    let mut settings = read.as_object()?.clone();
+    let versions_restored = !settings.contains_key("myWordsHeard");
+    for (key, value) in saved {
+        settings.entry(key).or_insert(value);
+    }
+    let mut config: AppConfig = serde_json::from_value(serde_json::Value::Object(settings)).ok()?;
+    if versions_restored {
+        // The earlier VOCO may have changed the list. Keep each version that
+        // it still allows alongside the ones kept before it.
+        let versions = std::mem::take(&mut config.my_words_heard);
+        let total = versions.len();
+        for version in versions {
+            config.my_words_heard.push(version);
+            if validate_my_words_heard(&config.my_words, &config.my_words_heard).is_err() {
+                config.my_words_heard.pop();
+            }
+        }
+        let dropped = total - config.my_words_heard.len();
+        if dropped > 0 {
+            warn!(
+                "Restored the settings an earlier VOCO dropped, except {dropped} taught version(s) that clash with My words"
+            );
+        }
+    }
+    Some(config)
+}
+
+/// The backups that resets left beside the settings, each with the time of its
+/// reset: every VOCO names one
+/// `config.recovery-backup-<process>-<nanoseconds since 1970>.json`.
+fn recovery_backups(path: &std::path::Path) -> Vec<(PathBuf, u128)> {
+    let directory = path
+        .parent()
+        .and_then(|directory| fs::read_dir(directory).ok());
+    let entries = directory.into_iter().flatten().flatten();
+    entries
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let name = name.strip_prefix(RECOVERY_BACKUP)?.strip_suffix(".json")?;
+            Some((entry.path(), name.rsplit('-').next()?.parse().ok()?))
+        })
+        .collect()
+}
+
 fn reset_config_file(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::error::Error>> {
     let existing = match fs::symlink_metadata(path) {
         Ok(_) => {
@@ -673,7 +791,7 @@ fn reset_config_file(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::e
                 .unwrap_or_default()
                 .as_nanos();
             let backup = path.with_file_name(format!(
-                "config.recovery-backup-{}-{suffix}.json",
+                "{RECOVERY_BACKUP}{}-{suffix}.json",
                 std::process::id()
             ));
             fs::rename(path, &backup)?;
@@ -695,6 +813,15 @@ fn reset_config_file(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::e
             }
         }
         return Err(error.into());
+    }
+
+    // The saved copy and the backups of earlier resets hold old settings too,
+    // so a reset forgets them. This reset's backup stays for manual recovery.
+    let _ = fs::remove_file(path.with_file_name(SAVED_COPY));
+    for (backup, _) in recovery_backups(path) {
+        if existing.as_ref() != Some(&backup) {
+            let _ = fs::remove_file(backup);
+        }
     }
 
     if let Some(backup) = existing {
@@ -957,9 +1084,13 @@ mod tests {
         fs::create_dir_all(&test_dir).unwrap();
         let path = test_dir.join("config.json");
         fs::write(&path, "{not valid json").unwrap();
+        // Older settings that the reset forgets.
+        fs::write(test_dir.join(SAVED_COPY), "{}").unwrap();
+        fs::write(test_dir.join(format!("{RECOVERY_BACKUP}1-1.json")), "{}").unwrap();
 
         let recovered = reset_config_file(&path).unwrap();
 
+        assert!(!test_dir.join(SAVED_COPY).exists());
         assert_eq!(recovered.hotkey, "Alt+D");
         let persisted: AppConfig =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
@@ -981,6 +1112,275 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    fn test_directory(name: &str) -> PathBuf {
+        let directory = std::env::temp_dir().join(format!(
+            "voco-config-{name}-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        directory
+    }
+
+    /// Settings that 0.61 and 0.62 don't all know.
+    fn settings_with_my_words() -> AppConfig {
+        AppConfig {
+            hotkey: "Super+D".to_string(),
+            onboarding_completed: true,
+            automatic_update_checks: false,
+            english_spelling: Some(EnglishSpelling::American),
+            my_words: vec!["Siobhán Kelly".to_string(), "Niamh".to_string()],
+            my_words_heard: vec![
+                HeardVersion {
+                    heard: "Shivon".to_string(),
+                    writes: "Siobhán".to_string(),
+                },
+                HeardVersion {
+                    heard: "Neeve".to_string(),
+                    writes: "Niamh".to_string(),
+                },
+            ],
+            ..AppConfig::default()
+        }
+    }
+
+    /// What 0.61 drops when it first starts; 0.62 drops only the taught versions.
+    const UNKNOWN_TO_0_61: [&str; 4] = [
+        "automaticUpdateChecks",
+        "englishSpelling",
+        "myWords",
+        "myWordsHeard",
+    ];
+
+    /// The settings as an earlier VOCO saves them, without the keys it doesn't know.
+    fn saved_by_earlier_voco(settings: &AppConfig, unknown: &[&str]) -> String {
+        let mut saved = serde_json::to_value(settings).unwrap();
+        for key in unknown {
+            saved.as_object_mut().unwrap().remove(*key);
+        }
+        saved.to_string()
+    }
+
+    fn read_json(path: &std::path::Path) -> serde_json::Value {
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    /// What `run` logs on this thread, after what it returns.
+    fn logged<T>(run: impl FnOnce() -> T) -> (T, Vec<String>) {
+        struct Capture;
+        thread_local! {
+            static MESSAGES: std::cell::RefCell<Option<Vec<String>>> =
+                const { std::cell::RefCell::new(None) };
+        }
+        impl log::Log for Capture {
+            fn enabled(&self, _: &log::Metadata) -> bool {
+                true
+            }
+            fn log(&self, record: &log::Record) {
+                MESSAGES.with_borrow_mut(|messages| {
+                    if let Some(messages) = messages {
+                        messages.push(record.args().to_string());
+                    }
+                });
+            }
+            fn flush(&self) {}
+        }
+        static CAPTURE: Capture = Capture;
+        let _ = log::set_logger(&CAPTURE);
+        log::set_max_level(log::LevelFilter::Warn);
+        MESSAGES.set(Some(Vec::new()));
+        let result = run();
+        (result, MESSAGES.take().unwrap_or_default())
+    }
+
+    #[test]
+    fn settings_an_earlier_voco_drops_come_back() {
+        let directory = test_directory("earlier-voco");
+        let path = directory.join("config.json");
+        // A reset long before the last save doesn't stop them, and loading
+        // never deletes its backup.
+        let earlier_reset = directory.join(format!("{RECOVERY_BACKUP}1-1.json"));
+        fs::write(&earlier_reset, "{not valid json").unwrap();
+        let settings = settings_with_my_words();
+        save_at(&settings, &path).unwrap();
+        let expected = serde_json::to_value(&settings).unwrap();
+        assert_eq!(read_json(&directory.join(SAVED_COPY)), expected);
+
+        atomic_write(&path, &saved_by_earlier_voco(&settings, &UNKNOWN_TO_0_61)).unwrap();
+        let loaded = load_at(&path).unwrap();
+
+        assert_eq!(serde_json::to_value(&loaded).unwrap(), expected);
+        assert_eq!(read_json(&path), expected);
+        assert!(earlier_reset.exists());
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_reset_by_an_earlier_voco_is_not_undone() {
+        let directory = test_directory("earlier-reset");
+        let path = directory.join("config.json");
+        save_at(&settings_with_my_words(), &path).unwrap();
+        // The copy also holds a setting from a later VOCO; the reset clears it too.
+        let copy = directory.join(SAVED_COPY);
+        let mut saved = read_json(&copy);
+        saved["laterSetting"] = serde_json::json!("from a later VOCO");
+        atomic_write(&copy, &saved.to_string()).unwrap();
+        // 0.61's Reset renames the file the same way, then writes its defaults.
+        let reset_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let backup = directory.join(format!("{RECOVERY_BACKUP}1-{reset_at}.json"));
+        fs::rename(&path, backup).unwrap();
+        let defaults = AppConfig::default();
+        atomic_write(&path, &saved_by_earlier_voco(&defaults, &UNKNOWN_TO_0_61)).unwrap();
+
+        let loaded = load_at(&path).unwrap();
+
+        let defaults = serde_json::to_value(defaults).unwrap();
+        assert_eq!(serde_json::to_value(loaded).unwrap(), defaults);
+        assert_eq!(read_json(&copy), defaults);
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn settings_voco_did_not_save_get_their_copy_at_start() {
+        let directory = test_directory("copyless");
+        let path = directory.join("config.json");
+        let settings = serde_json::to_value(settings_with_my_words()).unwrap();
+        atomic_write(&path, &settings.to_string()).unwrap();
+
+        load_at(&path).unwrap();
+
+        assert_eq!(read_json(&directory.join(SAVED_COPY)), settings);
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_older_than_the_settings_is_brought_up_to_date() {
+        let directory = test_directory("stale-copy");
+        let path = directory.join("config.json");
+        let mut settings = settings_with_my_words();
+        save_at(&settings, &path).unwrap();
+        // A save whose copy write failed leaves the copy older than the settings.
+        let copy = directory.join(SAVED_COPY);
+        let earlier =
+            fs::metadata(&copy).unwrap().modified().unwrap() - std::time::Duration::from_secs(60);
+        fs::File::options()
+            .write(true)
+            .open(&copy)
+            .unwrap()
+            .set_modified(earlier)
+            .unwrap();
+        settings.english_spelling = Some(EnglishSpelling::British);
+        atomic_write(&path, &serde_json::to_string(&settings).unwrap()).unwrap();
+
+        load_at(&path).unwrap();
+
+        assert_eq!(read_json(&copy), serde_json::to_value(&settings).unwrap());
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn settings_a_later_voco_saved_stay_in_the_copy() {
+        let directory = test_directory("later-voco");
+        let path = directory.join("config.json");
+        // A later VOCO saved a setting this one doesn't know.
+        let mut later = serde_json::to_value(settings_with_my_words()).unwrap();
+        later["laterSetting"] = serde_json::json!("kept");
+        atomic_write(&path, &later.to_string()).unwrap();
+        atomic_write(&directory.join(SAVED_COPY), &later.to_string()).unwrap();
+
+        // This VOCO drops it from config.json, as it drops any key it doesn't
+        // know, and saves again later.
+        load_at(&path).unwrap();
+        save_at(&AppConfig::default(), &path).unwrap();
+
+        assert!(read_json(&path).get("laterSetting").is_none());
+        assert_eq!(
+            read_json(&directory.join(SAVED_COPY))["laterSetting"],
+            "kept"
+        );
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn an_unreadable_config_is_never_replaced_by_its_copy() {
+        let directory = test_directory("unreadable-copy");
+        let path = directory.join("config.json");
+        save_at(&settings_with_my_words(), &path).unwrap();
+        fs::write(&path, "{not valid json").unwrap();
+
+        assert!(load_at(&path).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{not valid json");
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn restored_taught_versions_that_clash_are_dropped_and_only_counted() {
+        let directory = test_directory("clashing-versions");
+        let path = directory.join("config.json");
+        let mut settings = settings_with_my_words();
+        save_at(&settings, &path).unwrap();
+        // On 0.62, which keeps My words but not its taught versions, Niamh
+        // became Neeve: the version taught for Niamh now writes nothing listed.
+        settings.my_words[1] = "Neeve".to_string();
+        atomic_write(&path, &saved_by_earlier_voco(&settings, &["myWordsHeard"])).unwrap();
+
+        let (loaded, logged) = logged(|| load_at(&path).unwrap());
+
+        assert_eq!(loaded.my_words, ["Siobhán Kelly", "Neeve"]);
+        assert_eq!(loaded.my_words_heard, settings.my_words_heard[..1]);
+        // Only the count: the words stay in the owner-only config.
+        assert_eq!(
+            logged,
+            ["Restored the settings an earlier VOCO dropped, except 1 taught version(s) that clash with My words"]
+        );
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn taught_versions_the_file_kept_are_left_as_they_are() {
+        let directory = test_directory("kept-versions");
+        let path = directory.join("config.json");
+        let mut settings = settings_with_my_words();
+        save_at(&settings, &path).unwrap();
+        // Only the spelling is missing, and a hand edit removed Niamh: the
+        // version for Niamh isn't restored, so it isn't checked either.
+        settings.my_words.pop();
+        atomic_write(
+            &path,
+            &saved_by_earlier_voco(&settings, &["englishSpelling"]),
+        )
+        .unwrap();
+
+        let loaded = load_at(&path).unwrap();
+
+        assert_eq!(loaded.english_spelling, Some(EnglishSpelling::American));
+        assert_eq!(loaded.my_words_heard, settings.my_words_heard);
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_linked_copy_is_never_read() {
+        let directory = test_directory("linked-copy");
+        let path = directory.join("config.json");
+        let settings = settings_with_my_words();
+        let elsewhere = directory.join("elsewhere.json");
+        atomic_write(&elsewhere, &serde_json::to_string(&settings).unwrap()).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, directory.join(SAVED_COPY)).unwrap();
+        atomic_write(&path, &saved_by_earlier_voco(&settings, &UNKNOWN_TO_0_61)).unwrap();
+
+        let loaded = load_at(&path).unwrap();
+
+        assert!(loaded.my_words.is_empty());
+        let _ = fs::remove_dir_all(&directory);
     }
 
     #[cfg(unix)]

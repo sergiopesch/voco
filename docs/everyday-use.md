@@ -210,7 +210,7 @@ until you discard them.
 
 | Location | Contents |
 | --- | --- |
-| `~/.config/voco/` | Settings, the last update check, and a backup of old settings if you reset them |
+| `~/.config/voco/` | Settings and a copy of them, the last update check, and a backup of old settings if you reset them |
 | `~/.local/state/voco/crash-recovery/` | A copy of the text while you dictate, deleted when the dictation ends normally, and Review entries |
 | `~/.local/state/voco/` | Diagnostic logs, only if you turn them on (see [Performance logs](troubleshooting.md#performance-logs)) |
 | `~/.local/share/com.sergiopesch.voco/` | Data and cache for VOCO's window |
