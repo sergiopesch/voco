@@ -57,6 +57,17 @@ def fixtures(split):
     return result
 
 
+def start_fields(path):
+    """The My words a --words file gives every session start: none without one."""
+    if path is None:
+        return {}
+    chosen = json.loads(path.read_text())
+    if (not isinstance(chosen, dict) or not set(chosen) <= {'words', 'heard'}
+            or not isinstance(chosen.get('words', []), list) or not isinstance(chosen.get('heard', []), list)):
+        raise ValueError('--words takes an object with a "words" list and an optional "heard" list')
+    return chosen
+
+
 def exchange(child, reader, session, seq, op, **fields):
     child.stdin.write((json.dumps(dict(session=session, seq=seq, op=op, **fields)) + '\n').encode())
     child.stdin.flush()
@@ -68,10 +79,10 @@ def exchange(child, reader, session, seq, op, **fields):
     return response
 
 
-def replay(child, reader, item, trial, packet_ms, paced):
+def replay(child, reader, item, trial, packet_ms, paced, start):
     session = f"evaluation-{item['id']}-{trial}"
     begin = time.monotonic()
-    exchange(child, reader, session, 0, 'start')
+    exchange(child, reader, session, 0, 'start', **start)
     started = time.monotonic()
     rate, audio = item['rate'], item['audio']
     packet = round(rate * packet_ms / 1000)
@@ -124,8 +135,11 @@ def main():
     parser.add_argument('--repeats', type=int, choices=range(1, 11), default=1)
     parser.add_argument('--split', choices=['development', 'held-out', 'all'], default='development')
     parser.add_argument('--paced', action='store_true')
+    parser.add_argument('--words', type=Path,
+                        help='JSON with the "words" list, and optionally "heard", that every start carries')
     args = parser.parse_args()
     os.umask(0o077)
+    start = start_fields(args.words)
     items = fixtures(args.split)
     args.output.mkdir(parents=True, exist_ok=False)
     runtime = args.runtime.resolve()
@@ -137,7 +151,8 @@ def main():
                 harnessSha256=digest(Path(__file__)), runtimeHashes=identity,
                 host=dict(system=platform.platform(), machine=platform.machine(), cpuCount=os.cpu_count()),
                 config=dict(context=args.context, threads=args.threads, packetMs=args.packet_ms,
-                            gate='zero', paced=args.paced, repeats=args.repeats, split=args.split),
+                            gate='zero', paced=args.paced, repeats=args.repeats, split=args.split,
+                            words=start or None),
                 fixtures=[{k: v for k, v in x.items() if k != 'audio'} for x in items])
     write(args.output / 'plan.json', plan)
     env = {**os.environ, 'VOCO_NEMOTRON_CONTEXT': str(args.context),
@@ -165,7 +180,7 @@ def main():
                     random.Random(20260919+trial).shuffle(order)
                     for item in order:
                         try:
-                            row = replay(child, reader, item, trial, args.packet_ms, args.paced)
+                            row = replay(child, reader, item, trial, args.packet_ms, args.paced, start)
                         except Exception as error:
                             row = dict(id=item['id'], trial=trial, split=item['split'],
                                        status='error', errorType=type(error).__name__)

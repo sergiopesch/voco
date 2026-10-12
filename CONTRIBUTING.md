@@ -113,6 +113,14 @@ runtime.
 [Testing](docs/testing/README.md) lists each suite, what it needs and which CI job
 runs it.
 
+Two commands measure VOCO end to end on Linux, and each writes an evidence folder
+to keep out of the repository:
+
+| Command | What it measures | Run it after a change to |
+| --- | --- | --- |
+| `scripts/check-privacy.sh` | A release build, offline and online: what it reaches on the network, and when a microphone stream is open. Needs podman or docker and the provisioned speech runtime. | the network, update checks, the worker sandbox or capture |
+| `scripts/check-speech.sh` | Recognition through the real worker: the accuracy gate, word error rate and latency, and the My words gates. `--against voco.2026.0.62` measures a release beside it. Needs the provisioned speech runtime, Python's psutil and Node. | the speech worker, My words or the speech payload |
+
 ## Style
 
 `.editorconfig` sets UTF-8, LF line endings, a final newline and no trailing

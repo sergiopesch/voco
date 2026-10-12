@@ -158,11 +158,11 @@ change.
   from the pinned 12dicts files, and keep its notices and those in
   `vendor/THIRD-PARTY-NOTICES.txt`.
 - Before a change to the boost, the phrases sent to the recognizer or the list
-  limits ships, rerun the My words gates on public audio. An empty list must give
-  identical output. Listed words must gain. Wrong words, wrong capitals and
-  invented terms must stay within the pinned bar. Taught versions never change
-  what the recognizer hears, and a list without them gives the output it gave
-  before.
+  limits ships, rerun the My words gates on public audio with
+  `scripts/check-speech.sh`. An empty list must give identical output. Listed
+  words must gain. Wrong words, wrong capitals and invented terms must stay within
+  the pinned bar. Taught versions never change what the recognizer hears, and a
+  list without them gives the output it gave before.
 - Select the default microphone automatically only on an explicit Start test,
   Say it or recording when no microphone is chosen. No idle recording, and no silent device
   switching during capture.
@@ -447,6 +447,16 @@ reached and the speech worker reaches nothing. In both, a microphone stream exis
 only while dictation runs. Run it after a change that could touch the network, the
 update check, the worker sandbox or capture, and keep its evidence folder out of
 the repository.
+
+`scripts/check-speech.sh` measures recognition through the real worker after
+`scripts/provision-ci-speech.sh`: the accuracy gate, word error rate and latency on
+the 12 public clips, and My words in six conditions from
+`tests/fixtures/mywords/benchmark.json`. With `--against voco.2026.0.62` it measures
+that release's worker beside this one. It fails when this checkout misses a My
+words gate above, against the bar pinned in that fixture. Recognition is
+deterministic here, so any changed word is real. Run it after a change to the
+worker, My words or the speech payload, and keep its evidence folder out of the
+repository.
 
 - Use isolated audio, input, clipboard and desktop fixtures. Never inject test
   speech into a live user session.
