@@ -550,7 +550,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
             : event === "deferred" ? "dictation_desktop_paste_deferred"
             : `dictation_desktop_snapshot_${event}`;
           traceDictationEvent(name, durationMs === undefined ? null : { durationMs }).catch(() => {});
-        }, startingSessionId, !localTest && performanceLogMayBeOn(), localTest && !onboardingTest);
+        }, startingSessionId, !localTest && performanceLogMayBeOn(), localTest && !onboardingTest, !localTest && !browserDeliveryRef.current);
         // Audio can arrive while the worklet is starting. Keep planner offsets
         // aligned with the complete retained source, including that prefix.
         const prefix = collectAudioSamplesRange(audioBufferRef.current, 0, audioBufferRef.current.sampleCount);

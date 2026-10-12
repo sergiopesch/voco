@@ -334,7 +334,7 @@ def run_cursor(root, app, pump, native_windows, activate):
             trial['passed'] = True
         assert not bridged('error'), ('The uinput bridge rejected or lost paste keys', bridged('error'))
         events = dispatches()
-        # A joining space travels inside the paste; VOCO's keyboard never sends Space.
+        # A joining space is pasted on its own; VOCO's keyboard never sends Space.
         assert all('space' not in event['keys'] for event in events), 'A paste dispatch sent a Space key'
         assert all(not event['input']['windowMenuOpen'] for event in events)
         assert all((event['input']['modifiers'] & (1 | 4 | 8 | 64 | 128)) == 0 for event in events), \

@@ -126,9 +126,10 @@ can't create it at startup, it tries again before each paste. X11 sessions use
 `xdotool` instead.
 
 Each paste is Shift+Insert, sent as separate key events 12 ms apart. When a
-phrase continues the previous one, its joining space is part of the pasted
-text. Passive evdev ignores
-VOCO's keyboard, so its keys never count as your shortcut or a held modifier.
+phrase continues the previous one, its joining space is pasted on its own first,
+because Chromium's address bar strips the spaces around pasted text but keeps a
+paste of only whitespace. Passive evdev ignores VOCO's keyboard, so its keys
+never count as your shortcut or a held modifier.
 
 No daemon, service, socket or group is involved. VOCO needs only read and write
 access to `/dev/uinput`, which the package gives the user of the active local
@@ -240,8 +241,6 @@ polling, and keeps watching when none is readable at startup.
 - While the screen is locked, VOCO sends no keys and its shortcut doesn't start
   dictation, and locking the screen stops a dictation. VOCO knows about the lock
   only when the desktop reports it to logind, as GNOME does.
-- Chromium's address bar trims the leading space of a pasted phrase, so a phrase
-  that continues the previous one joins its last word there.
 - On GNOME, apps that inhibit system shortcuts, such as virtual machines and
   remote desktops, receive the companion's chord. In Shell menus and dialogs it
   does nothing.

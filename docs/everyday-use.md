@@ -248,5 +248,3 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
   shortcut also needs a desktop binding.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.
-- In Chromium's address bar, a phrase that continues the previous one joins its
-  last word, because the address bar trims the pasted space.
