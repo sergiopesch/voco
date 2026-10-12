@@ -571,9 +571,10 @@ jobs:
       matrix:
         include:
           - name: Debian 13
-            # Docker's official image, from its ECR Public mirror: Docker Hub
-            # rate-limits pulls from hosted runners.
-            image: public.ecr.aws/docker/library/debian:13@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
+            # Docker's official image, from Microsoft's mirror of it, with the
+            # same digest. Docker Hub rate-limits hosted runners, and ECR Public
+            # refuses them once its anonymous data limit is spent.
+            image: mcr.microsoft.com/mirror/docker/library/debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
             tools: apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 nodejs dpkg
           - name: Fedora 44
             image: registry.fedoraproject.org/fedora:44@sha256:8ade22c0f76f6b2f0892290b1fb39fa1bda1566ba6e276a2ed427f45589c159b

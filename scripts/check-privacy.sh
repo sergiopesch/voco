@@ -24,8 +24,9 @@ while [[ $# -gt 0 ]]; do
     *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
   esac
 done
-# Ubuntu 26.04 from Docker's official images on ECR Public, pinned by digest.
-BASE=public.ecr.aws/docker/library/ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
+# Ubuntu 26.04 (resolute) from Microsoft's mirror of Docker's official images,
+# pinned by digest.
+BASE=mcr.microsoft.com/mirror/docker/library/ubuntu:resolute@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
 ENGINE=$(command -v podman || command -v docker || true)
 fail() { echo "check-privacy: $*" >&2; exit 2; }
 [[ -n $ENGINE ]] || fail "needs podman or docker"
