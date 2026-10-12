@@ -39,9 +39,12 @@ MAX_MARKS = 3
 # assigns them only in planes 0, 1 and 14.
 MARKS = [code for code in (*range(0x20000), *range(0xE0000, 0xF0000))
          if unicodedata.category(chr(code))[0] == 'M']
-LETTER = f"[^\\W_][{''.join(map(chr, MARKS))}]{{0,{MAX_MARKS}}}"
+MARK = f"[{''.join(map(chr, MARKS))}]{{1,{MAX_MARKS}}}"
+# Letters and digits, each with up to MAX_MARKS marks: runs of them between the
+# marks, so text without any keeps re's fast path.
+LETTERS = f"[^\\W_]+(?:{MARK}[^\\W_]+)*(?:{MARK})?"
 # A word: letters and digits, with apostrophes inside it.
-WORD = f"(?:{LETTER})+(?:['’](?:{LETTER})+)*"
+WORD = f"{LETTERS}(?:['’]{LETTERS})*"
 SPELLED = re.compile(WORD)
 # A listed term: words separated by single spaces, hyphens or full stops.
 TERM = re.compile(rf"{WORD}(?:(?:[ -]|\. ?){WORD})*\.?")
