@@ -292,8 +292,9 @@ until someone chooses, which spells British), `myWords`, the My words list,
 empty until the user adds one, and `myWordsHeard`, its taught versions, each a
 `heard` version and the entry or word it `writes`. A save checks the list
 against the worker's rules: at most 100 entries of at most four words and 40
-characters, letters and digits with single spaces, hyphens, apostrophes and full
-stops, and no two that match alike. It checks the versions too: each writes an
+characters, letters and digits, each with up to three combining marks, with
+single spaces, hyphens, apostrophes and full stops, and no two that match
+alike. It checks the versions too: each writes an
 entry or one of its words, has the same limits without full stops, matches no
 entry or other version, and an entry keeps at most five. The versions have their
 own key, so an earlier VOCO still reads the file. Fields that older

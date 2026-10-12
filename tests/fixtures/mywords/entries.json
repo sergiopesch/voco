@@ -14,6 +14,60 @@
   {
     "label": "Yoruba Adéṣọ̀lá (no precomposed ọ̀)",
     "input": "Adé\u1e63\u1ecd\u0300lá",
+    "expectedVerdict": "accept",
+    "expectedWordCount": 1
+  },
+  {
+    "label": "Yoruba Adéṣọ̀lá Adébáyọ̀, a mark ending the entry",
+    "input": "Adé\u1e63\u1ecd\u0300lá Adébáyọ\u0300",
+    "expectedVerdict": "accept",
+    "expectedWordCount": 2
+  },
+  {
+    "label": "Hindi अंजलि, with a vowel sign and an anusvara",
+    "input": "\u0905\u0902\u091c\u0932\u093f",
+    "expectedVerdict": "accept",
+    "expectedWordCount": 1
+  },
+  {
+    "label": "Three marks on one letter",
+    "input": "Saq\u0301\u0302\u0303",
+    "expectedVerdict": "accept",
+    "expectedWordCount": 1
+  },
+  {
+    "label": "Four marks on one letter rejected",
+    "input": "Saq\u0301\u0302\u0303\u0304",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "A mark starting the entry rejected",
+    "input": "\u0301Ana",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "A mark after a space rejected",
+    "input": "Ana \u0301Lu",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "A mark after an apostrophe rejected",
+    "input": "O'\u0301Neill",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "A circled letter, a symbol Rust once read as a letter, rejected",
+    "input": "\u24b6na",
+    "expectedVerdict": "reject",
+    "expectedWordCount": null
+  },
+  {
+    "label": "Zero-width joiner rejected",
+    "input": "Ana\u200dLu",
     "expectedVerdict": "reject",
     "expectedWordCount": null
   },

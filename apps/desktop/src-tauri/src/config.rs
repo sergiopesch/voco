@@ -1,3 +1,4 @@
+use icu_properties::props::{GeneralCategory, GeneralCategoryGroup};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -459,8 +460,49 @@ pub fn account_name_entry(name: &str, login: &str) -> Option<String> {
 
 /// A term's words, as the worker splits them.
 fn term_words(term: &str) -> impl Iterator<Item = &str> {
-    term.split(|c: char| !(c.is_alphanumeric() || matches!(c, '\'' | '\u{2019}')))
+    term.split(|c: char| !(in_word(c) || matches!(c, '\'' | '\u{2019}')))
         .filter(|word| !word.is_empty())
+}
+
+/// The most combining marks on a letter or digit: the accents NFC can't join
+/// to it, such as the grave on Yoruba's ọ̀, and vowel signs.
+const MY_WORDS_MAX_MARKS: usize = 3;
+
+/// A letter or digit as the worker and Settings read one: in Unicode's letter
+/// or number categories. Rust's alphabetic also takes some marks and symbols.
+fn letter_or_digit(c: char) -> bool {
+    let category = general_category(c);
+    GeneralCategoryGroup::Letter.contains(category)
+        || GeneralCategoryGroup::Number.contains(category)
+}
+
+fn combining_mark(c: char) -> bool {
+    GeneralCategoryGroup::Mark.contains(general_category(c))
+}
+
+fn general_category(c: char) -> GeneralCategory {
+    icu_properties::CodePointMapData::<GeneralCategory>::new().get(c)
+}
+
+/// A letter, digit or combining mark: what a word is made of.
+fn in_word(c: char) -> bool {
+    letter_or_digit(c) || combining_mark(c)
+}
+
+/// Where the letters and digits from `index` end, each with up to
+/// `MY_WORDS_MAX_MARKS` combining marks after it.
+fn letters_end(chars: &[char], mut index: usize) -> usize {
+    while index < chars.len() && letter_or_digit(chars[index]) {
+        index += 1;
+        let base = index;
+        while index < chars.len()
+            && index - base < MY_WORDS_MAX_MARKS
+            && combining_mark(chars[index])
+        {
+            index += 1;
+        }
+    }
+    index
 }
 
 /// A taught version is listable like a term, but full stops never join its words.
@@ -480,7 +522,7 @@ fn my_words_key(term: &str) -> String {
     let mut key = String::new();
     let letters = term
         .chars()
-        .filter(|c| c.is_alphanumeric() || matches!(c, '\'' | '\u{2019}'))
+        .filter(|c| in_word(*c) || matches!(c, '\'' | '\u{2019}'))
         .flat_map(char::to_lowercase);
     for letter in letters {
         match letter {
@@ -526,28 +568,23 @@ pub(crate) fn normalize_my_words(config: &mut AppConfig) {
 }
 
 /// The number of words in a listable term, or None when it isn't one: words
-/// of letters and digits, perhaps joined by apostrophes, separated by one
-/// space, one hyphen, or a full stop and at most one space, with an optional
-/// final full stop.
+/// of letters and digits, each with up to three combining marks, perhaps joined
+/// by apostrophes, separated by one space, one hyphen, or a full stop and at
+/// most one space, with an optional final full stop.
 fn listable_word_count(term: &str) -> Option<usize> {
     let chars: Vec<char> = term.chars().collect();
     let (mut index, mut words) = (0, 0);
     loop {
         let start = index;
-        while index < chars.len() && chars[index].is_alphanumeric() {
-            index += 1;
-        }
+        index = letters_end(&chars, index);
         if index == start {
             return None;
         }
         while index + 1 < chars.len()
             && matches!(chars[index], '\'' | '\u{2019}')
-            && chars[index + 1].is_alphanumeric()
+            && letter_or_digit(chars[index + 1])
         {
-            index += 1;
-            while index < chars.len() && chars[index].is_alphanumeric() {
-                index += 1;
-            }
+            index = letters_end(&chars, index + 1);
         }
         words += 1;
         match chars.get(index) {
@@ -1980,6 +2017,31 @@ mod tests {
         }
 
         let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn an_accent_with_no_precomposed_letter_stays_in_its_word() {
+        // Unicode has no single ọ̀, so the grave stays a combining mark after NFC.
+        let adesola = "Adé\u{1e63}\u{1ecd}\u{300}lá";
+        let words = vec![format!("{adesola} Okafor"), "Sola".to_string()];
+        assert_eq!(
+            term_words(&words[0]).collect::<Vec<_>>(),
+            [adesola, "Okafor"]
+        );
+        // Rust's key keeps accents, combining ones too; Settings compares without them.
+        assert_eq!(my_words_key(adesola), "adé\u{1e63}\u{1ecd}\u{300}lá");
+        let versions = [
+            HeardVersion {
+                heard: "Shola".to_string(),
+                writes: adesola.to_string(),
+            },
+            HeardVersion {
+                heard: adesola.to_string(),
+                writes: "Sola".to_string(),
+            },
+        ];
+        assert_eq!(validate_my_words(&words), Ok(()));
+        assert_eq!(validate_my_words_heard(&words, &versions), Ok(()));
     }
 
     #[test]

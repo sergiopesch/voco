@@ -112,9 +112,9 @@ dictation.
 ## My words
 
 On the **My words** page, list the names and words you want VOCO to write your
-way. Add each one as you want it written, with its capitals and accents. The
-list holds up to 100 entries of up to four words each, and a change applies from
-your next dictation. Setup offers the full name on your account as the first
+way. Add each one as you want it written, with its capitals and accents, up to
+three on a letter. The list holds up to 100 entries of up to four words each,
+and a change applies from your next dictation. Setup offers the full name on your account as the first
 one, after the voice test; you can change it, add more, or skip it.
 
 - VOCO listens out for the words on your list and writes each one as listed,
