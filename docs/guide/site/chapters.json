@@ -589,7 +589,7 @@
       },
       {
         "title": "Your words",
-        "text": "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. The start carries the taught versions too, what the recognizer wrote when you said a word, up to five for each: the worker writes the word wherever it hears one, and never boosts them. A push holds back any tail that later text could still turn into a listed term or a taught version, and spelling never converts a listed word."
+        "text": "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters, and at most three combining marks on a letter or digit. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. The start carries the taught versions too, what the recognizer wrote when you said a word, up to five for each: the worker writes the word wherever it hears one, and never boosts them. A push holds back any tail that later text could still turn into a listed term or a taught version, and spelling never converts a listed word."
       },
       {
         "title": "No network for the worker",
@@ -817,7 +817,7 @@
       },
       {
         "title": "Checking the originating session",
-        "text": "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys."
+        "text": "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. That is a graphical login, or the text console a compositor such as Sway was started from, which logind calls tty. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys."
       },
       {
         "title": "Nothing while the screen is locked",
@@ -1040,6 +1040,10 @@
         "text": "Quit VOCO, SIGINT and SIGTERM delete the active entry, because those exits are chosen, not crashes."
       },
       {
+        "title": "When the window crashes",
+        "text": "WebKit runs VOCO's window in a process of its own. If that process crashes, VOCO loads the window again, its unfinished entry moves to Review, and VOCO shows \"Dictation interrupted\" if you were dictating. If it crashes again after three reloads in five minutes, VOCO leaves it closed and shows \"VOCO stopped working\"."
+      },
+      {
         "title": "Review is explicit",
         "text": "Each entry is \"Kept until you discard it.\" VOCO never opens, pastes or retries recovered text for you."
       },
@@ -1052,6 +1056,10 @@
       {
         "path": "apps/desktop/src-tauri/src/crash_recovery.rs",
         "why": "The owner-only journal, its size bound and Review's five entries."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/lib.rs",
+        "why": "Loads the window again when its web process crashes, at most three times in five minutes."
       },
       {
         "path": "apps/desktop/src/lib/crashRecovery.ts",
@@ -1092,14 +1100,14 @@
     "title": "A small interface, clear ownership.",
     "intro": "VOCO has few settings, and one part owns them. That keeps the file simple and safe.",
     "story": [
-      "VOCO stores five settings in one file, and Rust owns it. The window sends small changes, called patches, and Rust refuses fields it doesn't know and null values.",
+      "VOCO keeps its settings in one file, and Rust owns it. The window sends small changes, called patches, and Rust refuses fields it doesn't know and null values.",
       "Fields from older versions are ignored and dropped at the next save. If VOCO can't read the file, it never overwrites it. Dictation pauses, and a recovery panel offers three ways out.",
-      "Only Reset keeps a backup of the old file."
+      "Each save leaves a copy beside the file, so settings an earlier VOCO drops come back at the next start, unless a reset happened in between. Only Reset keeps a backup of the old file."
     ],
     "steps": [
       {
         "label": "Load",
-        "detail": "Rust reads $XDG_CONFIG_HOME/voco/config.json."
+        "detail": "Rust reads $XDG_CONFIG_HOME/voco/config.json and takes any setting it lacks from config.json.last, unless a reset renamed the file since that copy was saved."
       },
       {
         "label": "Migrate",
@@ -1111,7 +1119,7 @@
       },
       {
         "label": "Save",
-        "detail": "Rust writes the file atomically. The folder is 0700 and the file 0600, so only you can read them."
+        "detail": "Rust writes the file atomically, then the same settings to config.json.last, keeping any that a later VOCO left there. The folder is 0700 and the files 0600, so only you can read them."
       },
       {
         "label": "Recover",
@@ -1141,13 +1149,17 @@
       },
       {
         "title": "Reset is confirmed",
-        "text": "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file."
+        "text": "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file. It keeps the old file as a recovery backup and deletes config.json.last and the backups of earlier resets."
+      },
+      {
+        "title": "Back from an earlier version",
+        "text": "An earlier VOCO rewrites the file without the settings it doesn't know. The next start takes them back from config.json.last, keeping what you changed in the earlier version. A reset in between wins: every VOCO names its backup with the time of the reset, and a backup newer than the copy means nothing comes back. A restored taught version that clashes with the list is dropped, and the log gives only how many."
       }
     ],
     "files": [
       {
         "path": "apps/desktop/src-tauri/src/config.rs",
-        "why": "Loads, patches and saves the five settings."
+        "why": "Loads, patches and saves the settings and their copy, and restores what an earlier VOCO dropped."
       },
       {
         "path": "apps/desktop/src/components/ControlPanel.tsx",
@@ -1378,6 +1390,10 @@
       {
         "title": "Same user, not same program",
         "text": "The sockets keep out other users. They are not a boundary against a compromised program that runs as you."
+      },
+      {
+        "title": "Measured, not only promised",
+        "text": "check-privacy.sh runs a release build twice in a container and dictates a public clip each time. With update checks off and no network, no process may connect, send or bind to an internet address, or ask DNS anything. With them on, only api.github.com may be resolved and reached, and the speech worker reaches nothing. In both, a microphone stream exists only while dictation runs."
       }
     ],
     "files": [
@@ -1428,6 +1444,14 @@
       {
         "path": "apps/desktop/src-tauri/src/worker_sandbox.rs",
         "why": "Keeps the speech worker off the network."
+      },
+      {
+        "path": "scripts/check-privacy.sh",
+        "why": "Runs a release build offline and online and records every network call and DNS query."
+      },
+      {
+        "path": "scripts/privacy/analyze.py",
+        "why": "Judges a run: no internet offline, only api.github.com online, the microphone only while dictating."
       },
       {
         "path": "apps/desktop/src-tauri/src/desktop_session.rs",
@@ -1579,7 +1603,7 @@
       },
       {
         "label": "Speech checks",
-        "detail": "CI reuses the native speech runtime from a released package, checked against a fixed checksum, then runs the speech baseline and the worker protocol tests, on Ubuntu 24.04 and in the Debian 13 and Fedora 44 containers."
+        "detail": "CI reuses the native speech runtime from a released package, checked against a fixed checksum, then runs the speech baseline and the worker protocol tests, on Ubuntu 24.04 and in the Debian 13 and Fedora 44 containers. Rust Check & Test runs the protocol tests once more from only the worker files a package ships, staged by stage-speech-worker.py."
       },
       {
         "label": "Application checks",
@@ -1660,6 +1684,10 @@
       {
         "path": "runtime/speech/test_worker_protocol.py",
         "why": "The worker rulebook tests."
+      },
+      {
+        "path": "scripts/stage-speech-worker.py",
+        "why": "Copies the speech worker as packages ship it, for CI to run."
       },
       {
         "path": "apps/desktop/src/lib/dictationStream.test.ts",

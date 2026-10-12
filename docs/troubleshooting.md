@@ -91,7 +91,7 @@ it, before DNF started. After a manual install, the checks in
 | **Microphone access is blocked** | Allow microphone access in your desktop's privacy settings, then choose **Retry microphone access** on the **Settings** page. |
 | **Choose a microphone in Microphone settings.** | Choose a microphone on the **Settings** page. |
 | **Streaming dictation is disabled in the desktop environment.** | VOCO started with `VOCO_DESKTOP_STREAM=0`. Quit VOCO and start it without that variable. |
-| **VOCO stopped working**: its window keeps closing | VOCO's window crashed three times in five minutes, so VOCO stopped loading it. Quit VOCO from its menu and open it again. If it happens again, [report a bug](#report-a-bug) with the [debug log](#debug-log). |
+| **VOCO stopped working**: its window keeps closing | VOCO's window crashed again after VOCO had loaded it three times in five minutes, so VOCO stopped loading it. Quit VOCO from its menu and open it again. If it happens again, [report a bug](#report-a-bug) with the [debug log](#debug-log). |
 
 ## The shortcut does nothing
 

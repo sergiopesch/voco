@@ -466,7 +466,7 @@ lesson(
         ),
         (
             "Your words",
-            "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. The start carries the taught versions too, what the recognizer wrote when you said a word, up to five for each: the worker writes the word wherever it hears one, and never boosts them. A push holds back any tail that later text could still turn into a listed term or a taught version, and spelling never converts a listed word.",
+            "Each start also carries the My words list. mywords.py skips any entry that breaks the list rules: at most 100, each at most four words and 40 characters, and at most three combining marks on a letter or digit. adapters.py hands the rest to NeMo-Speech.cpp as one speech context at a boost of 0.5, and the worker writes each listed occurrence as listed, ignoring case, accents and the spaces inside it. The start carries the taught versions too, what the recognizer wrote when you said a word, up to five for each: the worker writes the word wherever it hears one, and never boosts them. A push holds back any tail that later text could still turn into a listed term or a taught version, and spelling never converts a listed word.",
         ),
         (
             "No network for the worker",
@@ -631,7 +631,7 @@ lesson(
         ),
         (
             "Checking the originating session",
-            "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys.",
+            "A virtual keyboard types into whichever login owns the screen. On Wayland VOCO checks the desktop session it started in before the copy and again just before the keys. That is a graphical login, or the text console a compositor such as Sway was started from, which logind calls tty. When logind reports that session as not active, as after switching to another user, VOCO reports \"This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.\" If logind can't answer, VOCO doesn't block. These checks don't lock the session: switching after the last check can still redirect keys.",
         ),
         (
             "Nothing while the screen is locked",
@@ -786,6 +786,10 @@ lesson(
             "Quit VOCO, SIGINT and SIGTERM delete the active entry, because those exits are chosen, not crashes.",
         ),
         (
+            "When the window crashes",
+            "WebKit runs VOCO's window in a process of its own. If that process crashes, VOCO loads the window again, its unfinished entry moves to Review, and VOCO shows \"Dictation interrupted\" if you were dictating. If it crashes again after three reloads in five minutes, VOCO leaves it closed and shows \"VOCO stopped working\".",
+        ),
+        (
             "Review is explicit",
             "Each entry is \"Kept until you discard it.\" VOCO never opens, pastes or retries recovered text for you.",
         ),
@@ -796,6 +800,7 @@ lesson(
     ],
     [
         (B + "crash_recovery.rs", "The owner-only journal, its size bound and Review's five entries."),
+        (B + "lib.rs", "Loads the window again when its web process crashes, at most three times in five minutes."),
         (F + "lib/crashRecovery.ts", "The window's side of the journal."),
         (F + "components/CrashReview.tsx", "The Review screen: copy or discard."),
         (F + "lib/dictationRecording.ts", "Writes and finishes the journal during a recording."),
@@ -818,12 +823,15 @@ lesson(
     "A small interface, clear ownership.",
     "VOCO has few settings, and one part owns them. That keeps the file simple and safe.",
     [
-        "VOCO stores five settings in one file, and Rust owns it. The window sends small changes, called patches, and Rust refuses fields it doesn't know and null values.",
+        "VOCO keeps its settings in one file, and Rust owns it. The window sends small changes, called patches, and Rust refuses fields it doesn't know and null values.",
         "Fields from older versions are ignored and dropped at the next save. If VOCO can't read the file, it never overwrites it. Dictation pauses, and a recovery panel offers three ways out.",
-        "Only Reset keeps a backup of the old file.",
+        "Each save leaves a copy beside the file, so settings an earlier VOCO drops come back at the next start, unless a reset happened in between. Only Reset keeps a backup of the old file.",
     ],
     [
-        ("Load", "Rust reads $XDG_CONFIG_HOME/voco/config.json."),
+        (
+            "Load",
+            "Rust reads $XDG_CONFIG_HOME/voco/config.json and takes any setting it lacks from config.json.last, unless a reset renamed the file since that copy was saved.",
+        ),
         (
             "Migrate",
             "If that file doesn't exist, VOCO copies $XDG_CONFIG_HOME/voice/config.json when present.",
@@ -831,7 +839,7 @@ lesson(
         ("Patch", "The window sends only the fields that changed. Unknown fields and null values are refused."),
         (
             "Save",
-            "Rust writes the file atomically. The folder is 0700 and the file 0600, so only you can read them.",
+            "Rust writes the file atomically, then the same settings to config.json.last, keeping any that a later VOCO left there. The folder is 0700 and the files 0600, so only you can read them.",
         ),
         (
             "Recover",
@@ -858,11 +866,15 @@ lesson(
         ("Installation method", "installChannel only chooses which update instructions VOCO shows."),
         (
             "Reset is confirmed",
-            "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file.",
+            "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file. It keeps the old file as a recovery backup and deletes config.json.last and the backups of earlier resets.",
+        ),
+        (
+            "Back from an earlier version",
+            "An earlier VOCO rewrites the file without the settings it doesn't know. The next start takes them back from config.json.last, keeping what you changed in the earlier version. A reset in between wins: every VOCO names its backup with the time of the reset, and a backup newer than the copy means nothing comes back. A restored taught version that clashes with the list is dropped, and the log gives only how many.",
         ),
     ],
     [
-        (B + "config.rs", "Loads, patches and saves the five settings."),
+        (B + "config.rs", "Loads, patches and saves the settings and their copy, and restores what an earlier VOCO dropped."),
         (F + "components/ControlPanel.tsx", "The settings window, including the update channel."),
         (F + "components/ConfigRecoveryPanel.tsx", "The three ways out when settings can't load."),
         (F + "lib/updates.ts", "Asks GitHub for releases and filters them by channel."),
@@ -1011,6 +1023,10 @@ lesson(
             "Same user, not same program",
             "The sockets keep out other users. They are not a boundary against a compromised program that runs as you.",
         ),
+        (
+            "Measured, not only promised",
+            "check-privacy.sh runs a release build twice in a container and dictates a public clip each time. With update checks off and no network, no process may connect, send or bind to an internet address, or ask DNS anything. With them on, only api.github.com may be resolved and reached, and the speech worker reaches nothing. In both, a microphone stream exists only while dictation runs.",
+        ),
     ],
     [
         (B + "performance.rs", "The opt-in metadata log and its fixed fields."),
@@ -1025,6 +1041,8 @@ lesson(
         (B + "native_capture/private_bundle.rs", "Writes the owner-only debug bundle."),
         (B + "virtual_keyboard.rs", "Creates a keyboard with only Shift and Insert."),
         (B + "worker_sandbox.rs", "Keeps the speech worker off the network."),
+        ("scripts/check-privacy.sh", "Runs a release build offline and online and records every network call and DNS query."),
+        ("scripts/privacy/analyze.py", "Judges a run: no internet offline, only api.github.com online, the microphone only while dictating."),
         (B + "desktop_session.rs", "Checks the originating session and its screen lock, allowing pastes when logind cannot answer."),
         ("packaging/udev/70-voco-uinput.rules", "Who may create input devices."),
         ("integrations/chromium/content.js", "The field rules inside web pages."),
@@ -1130,7 +1148,7 @@ lesson(
         ("Rust checks", "cargo fmt, clippy with warnings treated as errors, and cargo test."),
         (
             "Speech checks",
-            "CI reuses the native speech runtime from a released package, checked against a fixed checksum, then runs the speech baseline and the worker protocol tests, on Ubuntu 24.04 and in the Debian 13 and Fedora 44 containers.",
+            "CI reuses the native speech runtime from a released package, checked against a fixed checksum, then runs the speech baseline and the worker protocol tests, on Ubuntu 24.04 and in the Debian 13 and Fedora 44 containers. Rust Check & Test runs the protocol tests once more from only the worker files a package ships, staged by stage-speech-worker.py.",
         ),
         (
             "Application checks",
@@ -1188,6 +1206,7 @@ lesson(
         ("scripts/test-gnome-panel.py", "Runs GNOME Shell nested, or headless from GNOME 50."),
         ("scripts/test-gnome-panel-container.sh", "Runs the companion suite on a Fedora image's GNOME Shell in rootless Podman."),
         (R + "test_worker_protocol.py", "The worker rulebook tests."),
+        ("scripts/stage-speech-worker.py", "Copies the speech worker as packages ship it, for CI to run."),
         (F + "lib/dictationStream.test.ts", "Queue and delivery tests."),
         ("package.json", "npm test and the other test scripts."),
     ],

@@ -7,8 +7,8 @@ answers tcpdump saw), streams.jsonl (microphone streams as PipeWire reported
 them) and marks.jsonl (when dictation started and stopped). Prints the verdict as
 JSON and exits 1 when a rule fails.
 
-offline: update checks off and no network. No process may open an internet
-         socket or ask DNS anything, idle or dictating.
+offline: update checks off and no network. No process may connect, send or bind
+         to an internet address, or ask DNS anything, idle or dictating.
 online:  update checks on, with a network. Only api.github.com may be resolved
          and reached, and the speech worker reaches nothing.
 Both:    a microphone stream exists only while dictation runs, and the speech
