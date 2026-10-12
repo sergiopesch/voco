@@ -557,64 +557,53 @@ fn runtime_diagnostics_with<F>(
 where
     F: Fn(&str) -> bool + Copy,
 {
-    let (type_simulation, clipboard) = match session {
+    // One paste path: the clipboard helper copies, then the keys go out as
+    // Shift+Insert, through VOCO's own virtual keyboard on Wayland.
+    let (session_name, keys): (&str, &[&str]) = match session {
         SessionKind::NoDesktop => {
-            let no_desktop_support = InsertionSupport {
-                available: false,
-                required_commands: Vec::new(),
-                missing_commands: Vec::new(),
-                detail: NO_DESKTOP_SESSION_DETAIL.to_string(),
-            };
-            (no_desktop_support.clone(), no_desktop_support)
-        }
-        SessionKind::Wayland => {
-            let requires = |missing: &[String]| {
-                format!("Pasting on Wayland requires: {}.", missing.join(", "))
-            };
-            let mut type_simulation = build_support(
-                &[],
-                "Paste keys are ready. VOCO pastes into whichever app has keyboard focus.",
-                requires,
-                command_is_available,
-            );
-            let mut clipboard = build_support(
-                &[clipboard_program],
-                "Clipboard paste replaces the clipboard and primary selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.",
-                requires,
-                command_is_available,
-            );
-            if let Err(detail) = keyboard {
-                for support in [&mut type_simulation, &mut clipboard] {
-                    support.available = false;
-                    if support.missing_commands.is_empty() {
-                        support.detail = detail.clone();
-                    }
+            return {
+                let no_desktop_support = InsertionSupport {
+                    available: false,
+                    required_commands: Vec::new(),
+                    missing_commands: Vec::new(),
+                    detail: NO_DESKTOP_SESSION_DETAIL.to_string(),
+                };
+                RuntimeDiagnostics {
+                    session_type: session_type_label(session).to_string(),
+                    type_simulation: no_desktop_support.clone(),
+                    clipboard: no_desktop_support,
                 }
             }
-            (type_simulation, clipboard)
         }
-        SessionKind::X11OrOther => {
-            let requires = |missing: &[String]| {
-                format!(
-                    "Pasting on X11-like sessions requires: {}.",
-                    missing.join(", ")
-                )
-            };
-            let type_simulation = build_support(
-                &["xdotool"],
-                "Paste keys are ready. VOCO pastes into whichever app has keyboard focus.",
-                requires,
-                command_is_available,
-            );
-            let clipboard = build_support(
-                &[clipboard_program, "xdotool"],
-                "Clipboard paste replaces the clipboard and primary selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.",
-                requires,
-                command_is_available,
-            );
-            (type_simulation, clipboard)
-        }
+        SessionKind::Wayland => ("Wayland", &[]),
+        SessionKind::X11OrOther => ("X11-like sessions", &["xdotool"]),
     };
+    let requires = |missing: &[String]| {
+        format!(
+            "Pasting on {session_name} requires: {}.",
+            missing.join(", ")
+        )
+    };
+    let mut type_simulation = build_support(
+        keys,
+        "Paste keys are ready. VOCO pastes into whichever app has keyboard focus.",
+        requires,
+        command_is_available,
+    );
+    let mut clipboard = build_support(
+        &[&[clipboard_program], keys].concat(),
+        "Clipboard paste replaces the clipboard and primary selection with the transcript and leaves it there. Automatic restoration is unavailable because these helpers cannot verify ownership or preserve all formats.",
+        requires,
+        command_is_available,
+    );
+    if let (SessionKind::Wayland, Err(detail)) = (session, keyboard) {
+        for support in [&mut type_simulation, &mut clipboard] {
+            support.available = false;
+            if support.missing_commands.is_empty() {
+                support.detail = detail.clone();
+            }
+        }
+    }
 
     RuntimeDiagnostics {
         session_type: session_type_label(session).to_string(),
