@@ -34,16 +34,16 @@ appear where you are typing, while you speak.
 
 ## Get started
 
-Install VOCO 2026.0.61 from a terminal in your desktop session:
+Install VOCO 2026.0.62 from a terminal in your desktop session:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.61/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.62/install && bash voco-install
 ```
 
 The installer checks the release signature and package checksum, installs the
 Debian package with APT on Ubuntu and Debian or the RPM with DNF on Fedora,
 checks desktop input, turns on the GNOME panel and opens VOCO. To upgrade from an
-earlier version, follow the [upgrade steps](docs/releases/2026.0.61.md#upgrade).
+earlier version, follow the [upgrade steps](docs/releases/2026.0.62.md#upgrade).
 For manual installation, verification and removal, see
 [Install VOCO](docs/install.md).
 
