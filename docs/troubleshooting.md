@@ -235,7 +235,9 @@ may ask you to open VOCO.
 - **Reset to defaults**, then **Confirm reset**, renames the file to
   `config.recovery-backup-<numbers>.json` in the same folder and writes default
   settings. Your shortcut returns to `Alt+D`, and VOCO runs the voice test
-  again. VOCO keeps these backups until you delete them.
+  again. VOCO keeps that backup until you delete it or reset again. A reset
+  also deletes `config.json.last`, VOCO's copy of your settings, and the
+  backups of earlier resets.
 
 ## Chromium extension problems
 
