@@ -437,7 +437,7 @@ release rehearsal.
 
 ## Release
 
-- Source version: **2026.0.62**. Latest published release: **2026.0.61**.
+- Source version: **2026.0.62**. Latest published release: **2026.0.62**.
   GitHub Releases is authoritative for publication and the package manager for the
   installed version; a version in source proves neither.
 - `packaging/published-release.json` records the published version. Keep the README
@@ -448,7 +448,10 @@ release rehearsal.
   checksums and release notes.
 - CI's `application` job tests the release build of both executables in isolated
   desktops, but hosted CI never packages the NVIDIA runtime or signs anything;
-  `check-devops.sh` enforces this. On the maintainer's Linux machine,
+  `check-devops.sh` enforces this. CI's Rust job also runs the worker protocol
+  test from only the worker files packages ship
+  (`scripts/stage-speech-worker.py`), as release assembly runs the packaged
+  worker. On the maintainer's Linux machine,
   `scripts/assemble-release.sh` builds, verifies and signs a signed tag's release.
   The assets go to a draft release, which is published only after the downloaded
   assets verify. See the [release process](docs/release-process.md).
