@@ -82,8 +82,15 @@ time.sleep(15)
                 runtime.chmod(0o755)
             if case == 'missing-app':
                 app.unlink()
-            if case == 'tty-session':
+            if case.startswith('tty-'):
+                # A compositor started from a text console, such as Sway, reports tty.
                 env['XDG_SESSION_TYPE'] = 'tty'
+            if case == 'tty-x11':
+                env.pop('WAYLAND_DISPLAY')
+                env['GDK_BACKEND'] = 'x11'
+            if case == 'tty-no-display':
+                for key in ('DISPLAY', 'WAYLAND_DISPLAY'):
+                    env.pop(key)
             sockets = []
             for path in (runtime / 'wayland-fixture', x11 / 'X97'):
                 channel = socket.socket(socket.AF_UNIX)
@@ -108,7 +115,7 @@ time.sleep(15)
                                         env=env, capture_output=True, text=True, timeout=4, **identity)
                 elapsed = time.monotonic() - started
                 expected = 2 if case in ('root', 'ssh', 'headless', 'remote-x11', 'runtime-permissions',
-                                         'tty-session', 'missing-display') else 1 if case in (
+                                         'tty-no-display', 'missing-display') else 1 if case in (
                                              'exit-failure', 'missing-app') else 0
                 self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
                 self.assertLess(elapsed, 2, 'Installer waited for the application lifetime')
@@ -158,7 +165,13 @@ time.sleep(15)
                 self.run_launch(case)
 
     def test_root_remote_headless_and_untrusted_contexts_never_launch(self):
-        for case in ('root', 'ssh', 'headless', 'remote-x11', 'runtime-permissions', 'tty-session', 'missing-display'):
+        for case in ('root', 'ssh', 'headless', 'remote-x11', 'runtime-permissions', 'tty-no-display',
+                     'missing-display'):
+            with self.subTest(case=case):
+                self.run_launch(case)
+
+    def test_a_compositor_started_from_a_text_console_launches_on_its_display(self):
+        for case in ('tty-wayland', 'tty-x11'):
             with self.subTest(case=case):
                 self.run_launch(case)
 
