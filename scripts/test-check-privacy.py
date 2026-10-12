@@ -29,7 +29,7 @@ class PrivacyVerdictTests(unittest.TestCase):
             (run / "worker-performance.jsonl").write_text(
                 "".join(json.dumps({"event": e}) + "\n" for e in ("worker_ready", *recognized, "worker_closed")))
             if captured:
-                (run / "capture.pcap").write_bytes(b"")
+                (run / "sentinel.txt").write_text("IP 127.0.0.1.40000 > 127.0.0.1.9: UDP, length 21\nvoco-privacy-sentinel\n")
             (run / "marks.jsonl").write_text("".join(json.dumps({"t": t, "mark": m}) + "\n"
                                                      for m, t in (("toggle_on", 100.0), ("toggle_off", 120.0))))
             if streams is None:
@@ -91,6 +91,26 @@ class PrivacyVerdictTests(unittest.TestCase):
         self.assertEqual(self.run_case("offline", ready=False)["result"], "FAIL")
         self.assertEqual(self.run_case("offline", recognized=())["result"], "FAIL")
         self.assertEqual(self.run_case("offline", captured=False)["result"], "FAIL")
+
+    def test_a_capture_that_stopped_early_proves_nothing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            run = Path(folder)
+            for name in ("strace.txt", "dns.txt", "streams.jsonl"):
+                (run / name).write_text("")
+            (run / "app.log").write_text("Bundled Nemotron streaming model ready\n")
+            (run / "marks.jsonl").write_text('{"t": 1, "mark": "toggle_on"}\n{"t": 2, "mark": "toggle_off"}\n')
+            (run / "worker-performance.jsonl").write_text('{"event": "first_hypothesis"}\n')
+            # tcpdump died before the end: the sentinel isn't in the capture.
+            (run / "sentinel.txt").write_text("")
+            self.assertIn("the packet capture didn't run to the end, so DNS may have gone unseen",
+                          analyze.analyze("offline", run)["failures"])
+
+    def test_every_dns_query_type_counts(self):
+        txt = ["    10.0.2.100.40000 > 169.254.1.1.53: [udp sum ok] 4242+ TXT? example.com. (29)"]
+        self.assertEqual(self.run_case("offline", dns=txt)["result"], "FAIL")
+        ptr = ["    10.0.2.100.40000 > 169.254.1.1.53: [udp sum ok] 4243+ PTR? 34.216.184.93.in-addr.arpa. (44)"]
+        verdict = self.run_case("online", trace=[DNS, CONNECT.replace("{address}", "140.82.112.6")], dns=self.github() + ptr)
+        self.assertEqual(verdict["result"], "FAIL")
 
 
 if __name__ == "__main__":

@@ -44,7 +44,8 @@ mkdir -p "$OUTPUT"
 status=0
 for case in offline online; do
   folder=$OUTPUT/$case
-  mkdir -p "$folder"
+  # Never judge files an earlier run left.
+  rm -rf "$folder"; mkdir -p "$folder"
   network=(--network none)
   if [[ $case == online ]]; then network=(); [[ $ENGINE == *podman ]] && network=(--network pasta); fi
   echo "Running the $case case (about three minutes)"

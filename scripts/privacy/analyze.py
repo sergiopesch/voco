@@ -91,7 +91,8 @@ def analyze(case, folder):
                              "port": int(port.group(1)) if port else None,
                              "address": address.group(1) if address else None})
     dns = lines(folder / "dns.txt")
-    asked = sorted({name.rstrip(".") for name in re.findall(r"\b(?:A|AAAA|HTTPS|SVCB)\? (\S+) ", "\n".join(dns))})
+    # Every query type, as tcpdump prints it: "A? name.", "TXT? name.", "PTR? name." and so on.
+    asked = sorted({name.rstrip(".") for name in re.findall(r"\b[A-Z][A-Z0-9]*\? (\S+) ", "\n".join(dns))})
     answers = {}
     for name, address in re.findall(r"(\S+)\. (?:A|AAAA) ([0-9a-f:.]+)", "\n".join(dns)):
         answers.setdefault(address, name)
@@ -105,8 +106,10 @@ def analyze(case, folder):
         failures.append("the run never started and stopped a dictation")
     elif not any(event.get("event") == "first_hypothesis" for event in records(folder / "worker-performance.jsonl")):
         failures.append("the speech worker recognized nothing, so it never ran while traced")
-    if not (folder / "capture.pcap").is_file():
-        failures.append("the packet capture didn't run, so DNS went unseen")
+    # inner.sh sends a sentinel on loopback after VOCO stops; capturing it shows
+    # tcpdump ran to the end.
+    if "voco-privacy-sentinel" not in "\n".join(lines(folder / "sentinel.txt")):
+        failures.append("the packet capture didn't run to the end, so DNS may have gone unseen")
     if worker_calls:
         failures.append(f"the speech worker made {len(worker_calls)} network calls")
     reached = [call for call in internet if call["port"] != 53]

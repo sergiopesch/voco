@@ -43,5 +43,13 @@ kill -TERM "$(pgrep -f "^/opt/voco$")" 2>/dev/null; sleep 3; kill "$TRACER" "$LO
 # Timings and counters only, never words: proof the worker recognized speech.
 cp "$XDG_STATE_HOME/voco/stream-performance/worker.jsonl" "$EV/worker-performance.jsonl" 2>/dev/null
 '
-kill "$TCPDUMP" 2>/dev/null; sleep 1
+# A sentinel on loopback, sent after VOCO stopped: finding it in the capture
+# shows tcpdump captured to the end. With no traffic tcpdump waits for a packet
+# before it acts on a signal, so a second one lets it stop.
+sentinel() { python3 -c 'import socket, sys; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(sys.argv[1].encode(), ("127.0.0.1", 9))' "$1"; }
+sentinel voco-privacy-sentinel; sleep 1
+kill "$TCPDUMP" 2>/dev/null; sentinel stop
+for _ in $(seq 50); do kill -0 "$TCPDUMP" 2>/dev/null || break; sleep .1; done
+kill -KILL "$TCPDUMP" 2>/dev/null
 tcpdump -r "$EV/capture.pcap" -nn -v port 53 > "$EV/dns.txt" 2> "$EV/dns.err"
+tcpdump -r "$EV/capture.pcap" -nn -A udp port 9 > "$EV/sentinel.txt" 2>> "$EV/dns.err"
