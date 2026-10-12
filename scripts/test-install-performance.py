@@ -1005,19 +1005,25 @@ class InstallerArtTests(unittest.TestCase):
             os.setsid()
             fcntl.ioctl(0, termios.TIOCSCTTY, 0)
         with tempfile.TemporaryDirectory() as folder:
-            body = '(sleep .08; kill -INT $$) &\nVOCO_TERMINAL_COLUMNS=80\nVOCO_TERMINAL_ROWS=24\nvoco_ui_configure\nprintf "NOT REACHED\\n"\n'
+            # The probe waits longer than the test runs, so an interrupt sent once
+            # the query is out always arrives while it waits for an answer.
+            body = 'VOCO_UI_PROBE_MS=60000\nVOCO_TERMINAL_COLUMNS=80\nVOCO_TERMINAL_ROWS=24\nvoco_ui_configure\nprintf "NOT REACHED\\n"\n'
             process = subprocess.Popen(['bash', '-c', PREFIX + body], stdin=slave, stdout=slave, stderr=slave,
                                        env=art_env(folder), preexec_fn=own_terminal)
             output = bytearray()
             try:
                 deadline = time.monotonic() + 5
+                while QUERY not in output and process.poll() is None and time.monotonic() < deadline:
+                    if select.select([master], [], [], .02)[0]:
+                        output += os.read(master, 65536)
+                self.assertIn(QUERY, output)
+                process.send_signal(signal.SIGINT)
                 while process.poll() is None and time.monotonic() < deadline:
                     if select.select([master], [], [], .02)[0]:
                         output += os.read(master, 65536)
                 self.assertEqual(process.wait(timeout=2), 130, output)
                 flags = termios.tcgetattr(slave)[3]
                 self.assertTrue(flags & termios.ECHO and flags & termios.ICANON)
-                self.assertIn(QUERY, output)
                 self.assertNotIn(b'NOT REACHED', output)
             finally:
                 if process.poll() is None:
