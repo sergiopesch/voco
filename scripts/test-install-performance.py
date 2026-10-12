@@ -1006,8 +1006,8 @@ class InstallerArtTests(unittest.TestCase):
             fcntl.ioctl(0, termios.TIOCSCTTY, 0)
         with tempfile.TemporaryDirectory() as folder:
             # The probe waits two seconds, so an interrupt sent once the query is
-            # out arrives while it waits for an answer. One that lands just before
-            # the read starts runs its trap when the read times out.
+            # out arrives while it waits for an answer. On a busy runner one took
+            # effect only when the read timed out, so the wait stays short.
             body = 'VOCO_UI_PROBE_MS=2000\nVOCO_TERMINAL_COLUMNS=80\nVOCO_TERMINAL_ROWS=24\nvoco_ui_configure\nprintf "NOT REACHED\\n"\n'
             process = subprocess.Popen(['bash', '-c', PREFIX + body], stdin=slave, stdout=slave, stderr=slave,
                                        env=art_env(folder), preexec_fn=own_terminal)
