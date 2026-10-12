@@ -31,6 +31,11 @@ The [release process](docs/release-process.md) describes how a release is made.
   nothing from the terminal, so the installer keeps its display: debconf takes
   its defaults and dpkg keeps a configuration file someone changed. If APT
   fails, it runs again on the terminal, where it can ask.
+- Sway and other compositors started from a text console report their session
+  as tty, and VOCO took the X11 route there, asking for xclip and xdotool. It now
+  takes the Wayland route and types into that console's login, and the guided
+  installer opens VOCO afterwards. With no desktop session at all, VOCO says so
+  instead of asking for the X11 helpers.
 - The installer's display no longer gives way to the routine messages of
   update-alternatives and needrestart. They go to the installation log; their
   warnings, a pending kernel or services to restart, still show.
