@@ -40,13 +40,15 @@ interface OnboardingProps {
   wordsChecked?: boolean;
   /** Leaves the passed voice test for the words step. */
   onContinue?: () => void;
+  /** While the focused app also gets the shortcut: what that does, and the fix. */
+  shortcutNote?: string | null;
 }
 
 export function Onboarding({ microphone, status, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
   onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
   checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide, spelling = "british", focusPrimary = false,
-  wordsDone = true, wordsChecked = true, onContinue }: OnboardingProps) {
+  wordsDone = true, wordsChecked = true, onContinue, shortcutNote = null }: OnboardingProps) {
   // Only this view shows recognition text, so only it re-renders per hypothesis.
   const transcript = useStore((state) => state.dictationPurpose === "onboarding" ? state.transcript : "");
   const [changingMicrophone, setChangingMicrophone] = useState(false);
@@ -102,9 +104,11 @@ export function Onboarding({ microphone, status, passed,
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “{suggestion}”</span>}
     </div> : null}
     {handoff ? <div className="voco-setup__handoff">
-      <p>Click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
+      {/* While the focused app also acts on the shortcut, as before a fresh install's panel loads at the next login, the fix comes first. */}
+      {shortcutNote ? <PanelSetup disabled={busy || blocked} note={shortcutNote} /> : null}
+      <p>{shortcutNote ? "Then click" : "Click"} where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
       <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
-      <PanelSetup disabled={busy || blocked} />
+      {shortcutNote ? null : <PanelSetup disabled={busy || blocked} />}
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}
     </div> : testing ? <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p> : null}
     <div className="voco-setup__actions">

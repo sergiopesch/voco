@@ -93,3 +93,25 @@ it("reaches the words step before desktop setup is ready, and checks it before D
   expect(last).not.toContain("Test transcript");
   expect(last).not.toContain("Test again");
 });
+
+it("leads the handoff with the fix while the shortcut also reaches the focused app", () => {
+  const props = {
+    microphone: "System default", status: "idle" as const, passed: true, failed: false, attempted: true,
+    setupError: null, desktopSetupError: null, checkingDesktopSetup: false, preparing: false, saving: false,
+    blocked: false, hotkey: "Alt+D", desktopReady: true, onStart: vi.fn(), onStop: vi.fn(), onFinish: vi.fn(async () => {}),
+    wordsDone: true, wordsChecked: true,
+  };
+  // VOCO's own words for a panel that loads at the next login.
+  const note = "Alt+D also reaches the app you are dictating into: browsers move the cursor to the address bar, so your words land there, and terminals delete a word. Panel enabled. Sign out and back in to load it; saving your work first is recommended.";
+  const leaky = renderToStaticMarkup(<Onboarding {...props} shortcutNote={note} />);
+  expect(leaky.split(note)).toHaveLength(2);
+  expect(leaky.indexOf(note)).toBeLessThan(leaky.indexOf("where you want the text"));
+  expect(leaky).toContain("Then click where you want the text");
+  // The note replaces the panel's own status line, so the step reads once.
+  expect(leaky).not.toContain("Checking your panel");
+  expect(leaky).toContain(">Done</button>");
+  const ready = renderToStaticMarkup(<Onboarding {...props} shortcutNote={null} />);
+  expect(ready).toContain("Click where you want the text");
+  expect(ready).not.toContain("Then click");
+  expect(ready).toContain("Checking your panel");
+});

@@ -5,7 +5,8 @@ import type { PanelSetupStatus } from "@/lib/tauri";
 const unavailable: PanelSetupStatus = { status: "unavailable", canEnable: false,
   detail: "Panel status is unavailable. Use the VOCO tray menu for status and Stop." };
 
-export function PanelSetup({ disabled = false }: { disabled?: boolean }) {
+/** `note` stands in for the panel's own status line. */
+export function PanelSetup({ disabled = false, note = null }: { disabled?: boolean; note?: string | null }) {
   const [status, setStatus] = useState<PanelSetupStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -31,7 +32,7 @@ export function PanelSetup({ disabled = false }: { disabled?: boolean }) {
     finally { pending.current = false; if (mounted.current) setBusy(false); }
   }
   return <div className="voco-panel-setup" role="group" aria-label="Panel setup">
-    <p role="status">{status?.detail ?? "Checking your panel…"}</p>
+    <p role="status">{note ?? status?.detail ?? "Checking your panel…"}</p>
     {status && !["active", "other-desktop", "unsupported"].includes(status.status) ?
       <button className="voco-button voco-button--ghost" disabled={disabled}
         onClick={() => void check(status.canEnable)}>
