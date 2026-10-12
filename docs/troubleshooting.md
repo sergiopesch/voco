@@ -91,6 +91,7 @@ it, before DNF started. After a manual install, the checks in
 | **Microphone access is blocked** | Allow microphone access in your desktop's privacy settings, then choose **Retry microphone access** on the **Settings** page. |
 | **Choose a microphone in Microphone settings.** | Choose a microphone on the **Settings** page. |
 | **Streaming dictation is disabled in the desktop environment.** | VOCO started with `VOCO_DESKTOP_STREAM=0`. Quit VOCO and start it without that variable. |
+| **VOCO stopped working**: its window keeps closing | VOCO's window crashed three times in five minutes, so VOCO stopped loading it. Quit VOCO from its menu and open it again. If it happens again, [report a bug](#report-a-bug) with the [debug log](#debug-log). |
 
 ## The shortcut does nothing
 
@@ -173,6 +174,7 @@ the rest of the recording:
 | The microphone disconnected, stopped sending audio or was muted by the system | Check the connection and your sound settings. |
 | Recognition fell more than three seconds behind | Close busy programs. Recognition uses up to four processor threads. |
 | Recognition revised words it had already given | Start again. |
+| VOCO's window stopped unexpectedly and has restarted | Start again. What VOCO heard is in [Review](everyday-use.md#review). |
 
 The words VOCO already typed stay in your app. Words it hadn't typed yet aren't
 kept, so check the end of your text before you continue.
@@ -180,8 +182,8 @@ kept, so check the end of your text before you continue.
 On X11, **Dictation won't be typed** means VOCO can't confirm it receives all of
 your audio. Stop and try again. If it happens again, quit and reopen VOCO.
 
-If VOCO closed during a dictation, or couldn't paste or copy the rest, the text
-is in [Review](everyday-use.md#review).
+If VOCO or its window closed during a dictation, or VOCO couldn't paste or copy
+the rest, the text is in [Review](everyday-use.md#review).
 
 ## Microphone problems
 
