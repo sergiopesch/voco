@@ -243,13 +243,15 @@ class ListRuleTests(unittest.TestCase):
     def test_shared_fixture_validates_nfc_and_nfd_alike(self):
         """Shared fixture tests NFC/NFD normalization and validation rules."""
         import json
-        with open('tests/fixtures/mywords/entries.json') as f:
+        from pathlib import Path
+        fixture_path = Path(__file__).parent.parent.parent / 'tests' / 'fixtures' / 'mywords' / 'entries.json'
+        with open(fixture_path) as f:
             cases = json.load(f)
         for case in cases:
             result = accepted([case['input']])
             if case['expectedVerdict'] == 'accept':
                 self.assertEqual(len(result), 1, f"{case['label']}: expected accept")
-                # Note: Python counts words by splitting on spaces, not by the worker's rules,
+                # Python counts words by split(), not by the worker's hyphen/space/period rules,
                 # so we don't validate word count here. Rust and TypeScript match the worker.
             else:
                 self.assertEqual(len(result), 0, f"{case['label']}: expected reject")
