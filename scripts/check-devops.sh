@@ -82,6 +82,7 @@ PY
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
 import json
 import os
+import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -141,6 +142,13 @@ if not os.access(launcher, os.X_OK):
 config = json.loads(Path("apps/desktop/src-tauri/tauri.conf.json").read_text())
 if config["bundle"].get("targets") != ["deb"]:
     raise SystemExit("Default Tauri bundle targets must remain Debian-only")
+# VOCO builds only for Linux, so the icons folder holds just the bundle's PNGs.
+icons = {Path(path).name for path in subprocess.run(
+    ["git", "ls-files", "apps/desktop/src-tauri/icons"], capture_output=True, text=True, check=True).stdout.split()}
+bundled = {Path(path).name for path in config["bundle"].get("icon", [])}
+if icons != bundled:
+    raise SystemExit(f"apps/desktop/src-tauri/icons must hold only the bundle's icons: "
+                     f"unused {sorted(icons - bundled)}, missing {sorted(bundled - icons)}")
 linux_bundle = config["bundle"]["linux"]
 deb = linux_bundle["deb"]
 if set(linux_bundle) != {"deb"}:
