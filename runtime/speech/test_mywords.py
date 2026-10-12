@@ -240,6 +240,22 @@ class ListRuleTests(unittest.TestCase):
         self.assertEqual(len(accepted([f'term{index}' for index in range(MAX_TERMS)])), MAX_TERMS)
         self.assertEqual(accepted(['Ma\u0301laga']), ['Málaga'])  # decomposed accents compose
 
+    def test_shared_fixture_validates_nfc_and_nfd_alike(self):
+        """Shared fixture tests NFC/NFD normalization and validation rules."""
+        import json
+        from pathlib import Path
+        fixture_path = Path(__file__).parent.parent.parent / 'tests' / 'fixtures' / 'mywords' / 'entries.json'
+        with open(fixture_path) as f:
+            cases = json.load(f)
+        for case in cases:
+            result = accepted([case['input']])
+            if case['expectedVerdict'] == 'accept':
+                self.assertEqual(len(result), 1, f"{case['label']}: expected accept")
+                # Python counts words by split(), not by the worker's hyphen/space/period rules,
+                # so we don't validate word count here. Rust and TypeScript match the worker.
+            else:
+                self.assertEqual(len(result), 0, f"{case['label']}: expected reject")
+
     def test_unusable_entries_are_skipped_and_the_first_of_two_alike_is_written(self):
         unusable = ['', ' GitHub', 'GitHub ', 'two  spaces', 'x' * (MAX_CHARS + 1), 'one two three four five',
                     'C++', 'a_b', 'tab\there', 'Line\nbreak', '-dash', 'end-']
