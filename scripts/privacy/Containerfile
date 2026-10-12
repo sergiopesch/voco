@@ -1,0 +1,12 @@
+# The privacy check's image: Ubuntu 26.04 with VOCO's own package dependencies
+# (scripts/distro-dependencies.py debian, passed as PACKAGES) and the tools the
+# check uses. Nothing of VOCO is copied in: the build, the speech runtime and
+# the fixtures are mounted read-only when it runs.
+FROM UBUNTU_2604
+ARG PACKAGES
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ${PACKAGES} \
+      ca-certificates dbus dbus-x11 pipewire pipewire-bin pipewire-pulse procps \
+      psmisc strace tcpdump wireplumber xvfb \
+ && rm -rf /var/lib/apt/lists/*

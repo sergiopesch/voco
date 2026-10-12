@@ -419,6 +419,16 @@ npm run build
 model or desktop session. `verify:devops` checks the CI gates, installer sync and a
 release rehearsal.
 
+`scripts/check-privacy.sh` measures the network and microphone claims end to end,
+on Linux with podman or docker, a release build and the provisioned speech runtime.
+It runs the build twice in a pinned Ubuntu 26.04 image and dictates a public clip
+each time: offline with update checks off, where no process may reach the internet
+or DNS, and online with them on, where only `api.github.com` may be resolved and
+reached and the speech worker reaches nothing. In both, a microphone stream exists
+only while dictation runs. Run it after a change that could touch the network, the
+update check, the worker sandbox or capture, and keep its evidence folder out of
+the repository.
+
 - Use isolated audio, input, clipboard and desktop fixtures. Never inject test
   speech into a live user session.
 - Use public or synthetic fixtures only; keep personal audio, transcripts and
