@@ -266,6 +266,8 @@ if 'python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"
     raise SystemExit(f"{workflow_path} must check the spelling table against the pinned VarCon file")
 if 'python3 scripts/generate-everyday-words.py --check "$RUNNER_TEMP/2of12full.txt" "$RUNNER_TEMP/2of12id.txt"' not in commands:
     raise SystemExit(f"{workflow_path} must check the everyday words against the pinned 12dicts files")
+if commands.count('python3 scripts/stage-speech-worker.py "$RUNNER_TEMP/packaged-speech"') != 1:
+    raise SystemExit(f"{workflow_path} must run the speech worker from the files a package ships, once")
 if commands.count("run: npm run test:chromium-exact-field") != 1:
     raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
 # A stalled package mirror fails its step in minutes instead of holding the runner.
