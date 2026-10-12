@@ -270,6 +270,15 @@ if commands.count('python3 scripts/stage-speech-worker.py "$RUNNER_TEMP/packaged
     raise SystemExit(f"{workflow_path} must run the speech worker from the files a package ships, once")
 if commands.count("run: npm run test:chromium-exact-field") != 1:
     raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
+# Downloads ride out a short outage: every curl in CI and its provisioning
+# retries for at least a minute, which curl's default backoff after three
+# tries (about 7 s) doesn't.
+for source in (workflow, Path("scripts/provision-ci-speech.sh").read_text()):
+    # A curl invocation, with its options; "curl" in a package list is not one.
+    for call in re.findall(r"\bcurl\s+-[^\n]*(?:\\\n[^\n]*)*", source):
+        tries, delay = re.search(r"--retry (\d+)", call), re.search(r"--retry-delay (\d+)", call)
+        if not tries or not delay or int(tries[1]) * int(delay[1]) < 60:
+            raise SystemExit(f"curl must retry for at least a minute: {call.splitlines()[0].strip()}")
 # A stalled package mirror fails its step in minutes instead of holding the runner.
 for step in re.split(r"\n(?=      - |  \S)", steps):
     # Playwright's --with-deps installs the browser's packages with apt.
