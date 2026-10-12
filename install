@@ -1524,7 +1524,10 @@ try:
     session = os.environ.get("XDG_SESSION_TYPE", "")
     wayland = os.environ.get("WAYLAND_DISPLAY", "")
     display = os.environ.get("DISPLAY", "")
-    if session == "wayland" or (not session and wayland):
+    # A compositor started from a text console, such as Sway, reports tty.
+    # Then, as with no type, the display variables choose, as VOCO does.
+    console = session in ("", "tty")
+    if session == "wayland" or (console and wayland):
         if not wayland:
             skip("Open VOCO from your Wayland desktop.")
         address = Path(wayland)
@@ -1535,7 +1538,7 @@ try:
         info = address.lstat()
         if not stat.S_ISSOCK(info.st_mode) or info.st_uid != owner:
             skip("Open VOCO from your Wayland desktop.")
-    elif session == "x11" or (not session and display):
+    elif session == "x11" or (console and display):
         local = re.fullmatch(r"(?:unix)?:([0-9]+)(?:\.[0-9]+)?", display)
         if not local:
             skip("Open VOCO from your local X11 desktop.")
