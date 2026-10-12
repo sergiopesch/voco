@@ -131,6 +131,11 @@ change.
   extends every push. Generate `spelling-varcon.tsv` only with
   `scripts/generate-spelling-table.py` from the pinned VarCon file, and keep its
   notices and those in `vendor/THIRD-PARTY-NOTICES.txt`.
+- The My words rules exist three times: `config.rs` checks a save,
+  `runtime/speech/mywords.py` decides what the worker uses, and `myWords.ts`
+  checks what the user types. Keep them one rule, Unicode's letters and digits
+  with up to three combining marks each, and change all three with
+  `tests/fixtures/mywords/entries.json`, which each suite runs.
 - My words never breaks append-only delivery either. `speech_stream.rs` adds the
   saved list and its taught versions to each session start, and a start without
   them is as recognized. The worker boosts the listed phrases in the recognizer

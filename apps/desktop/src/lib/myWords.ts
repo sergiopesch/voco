@@ -7,10 +7,16 @@ export const MY_WORDS_MAX_WORDS = 4;
 export const MY_WORDS_MAX_CHARS = 40;
 /** Taught versions an entry keeps. */
 export const MY_WORDS_MAX_HEARD = 5;
-const TERM = /^[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*(?:(?:[ -]|\. ?)[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*)*\.?$/u;
+// The most combining marks on a letter or digit: the accents NFC can't join to
+// it, such as the grave on Yoruba's ọ̀, and vowel signs.
+const MY_WORDS_MAX_MARKS = 3;
+const LETTER = String.raw`[\p{L}\p{N}]\p{M}{0,${MY_WORDS_MAX_MARKS}}`;
+// A word: letters and digits, with apostrophes inside it.
+const SPELLED = String.raw`(?:${LETTER})+(?:['’](?:${LETTER})+)*`;
+const TERM = new RegExp(String.raw`^${SPELLED}(?:(?:[ -]|\. ?)${SPELLED})*\.?$`, "u");
 // A taught version: words separated by single spaces or hyphens, never full stops.
-const HEARD = /^[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*(?:[ -][\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*)*$/u;
-const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
+const HEARD = new RegExp(String.raw`^${SPELLED}(?:[ -]${SPELLED})*$`, "u");
+const WORD = new RegExp(SPELLED, "gu");
 
 // After accents go and case is lowered, the few letters Python's casefold
 // still folds further, so two entries match here exactly when they do there.
@@ -102,7 +108,7 @@ export function writesEntry(transcript: string, entry: string): boolean {
   const first = entry.charAt(0);
   const pattern = entry === entry.toLowerCase() && first.toUpperCase() !== first
     ? `[${first}${first.toUpperCase()}]${escaped.slice(1)}` : escaped;
-  return new RegExp(`(?<![\\p{L}\\p{N}'’])${pattern}(?![\\p{L}\\p{N}])`, "u").test(transcript.normalize("NFC"));
+  return new RegExp(`(?<![\\p{L}\\p{N}\\p{M}'’])${pattern}(?![\\p{L}\\p{N}\\p{M}])`, "u").test(transcript.normalize("NFC"));
 }
 
 export interface Teaching extends HeardVersion {

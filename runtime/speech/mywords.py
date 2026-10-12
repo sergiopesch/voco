@@ -32,12 +32,21 @@ MAX_HEARD = 5
 # The recognizer's boost for listed phrases: on development data the strongest
 # that added no wrong words or capitals, and the one the My words gates passed.
 BOOST = 0.5
+# The most combining marks on a letter or digit: the accents NFC can't join to
+# it, such as the grave on Yoruba's ọ̀, and vowel signs.
+MAX_MARKS = 3
+# re can't name Unicode's combining marks, so they come from unicodedata, which
+# assigns them only in planes 0, 1 and 14.
+MARKS = [code for code in (*range(0x20000), *range(0xE0000, 0xF0000))
+         if unicodedata.category(chr(code))[0] == 'M']
+LETTER = f"[^\\W_][{''.join(map(chr, MARKS))}]{{0,{MAX_MARKS}}}"
 # A word: letters and digits, with apostrophes inside it.
-SPELLED = re.compile(r"[^\W_]+(?:['’][^\W_]+)*")
+WORD = f"(?:{LETTER})+(?:['’](?:{LETTER})+)*"
+SPELLED = re.compile(WORD)
 # A listed term: words separated by single spaces, hyphens or full stops.
-TERM = re.compile(r"[^\W_]+(?:['’][^\W_]+)*(?:(?:[ -]|\. ?)[^\W_]+(?:['’][^\W_]+)*)*\.?")
+TERM = re.compile(rf"{WORD}(?:(?:[ -]|\. ?){WORD})*\.?")
 # A taught version: words separated by single spaces or hyphens.
-HEARD = re.compile(r"[^\W_]+(?:['’][^\W_]+)*(?:[ -][^\W_]+(?:['’][^\W_]+)*)*")
+HEARD = re.compile(f"{WORD}(?:[ -]{WORD})*")
 JOINABLE = re.compile(r'[ \t-]+')
 # A full stop between words joins them only into a term listed with one.
 DOTTED = re.compile(r'\.[ \t]*')

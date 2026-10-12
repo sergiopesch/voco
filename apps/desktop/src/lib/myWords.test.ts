@@ -6,6 +6,9 @@ import {
 import type { HeardVersion } from "@/types";
 import cases from "../../../../tests/fixtures/mywords/entries.json";
 
+// Unicode has no single ọ̀, so the grave stays a combining mark after NFC.
+const ADESOLA = "Adé\u1e63\u1ecd\u0300lá";
+
 interface FixtureCase {
   label: string;
   input: string;
@@ -54,8 +57,7 @@ describe("My words rules", () => {
     expect(myWordProblem(tidyMyWord(nfc_zoe), [])).toBeNull();
     expect(myWordsKey(nfd_zoe)).toBe(myWordsKey(nfc_zoe));
     
-    const yoruba = "Adé\u1e63\u1ecd\u0300lá";
-    expect(myWordProblem(tidyMyWord(yoruba), [])).not.toBeNull();
+    expect(myWordProblem(tidyMyWord(ADESOLA), [])).toBeNull();
   });
 
   it("shared fixture validates NFC and NFD alike", () => {
@@ -76,6 +78,12 @@ describe("My words rules", () => {
       }
     }
   });
+
+  it("keeps an accent with no precomposed letter in its word", () => {
+    expect(termWords(`${ADESOLA} Okafor`)).toEqual([ADESOLA, "Okafor"]);
+    expect(entryOf([`${ADESOLA} Okafor`], ADESOLA)).toBe(0);
+    expect(heardVersion(`${ADESOLA}.`)?.text).toBe(ADESOLA);
+  });
 });
 
 describe("Say it", () => {
@@ -90,6 +98,9 @@ describe("Say it", () => {
     // A lower-case entry starts a sentence with a capital.
     expect(judge("Router.", ["router"])).toEqual({ kind: "right" });
     expect(judge("Siobhánne", ["Siobhán"]).kind).toBe("teach");
+    // A combining mark belongs to its word, so an entry isn't found inside it.
+    expect(judge(`${ADESOLA} called`, ["Adé\u1e63\u1ecd"]).kind).not.toBe("right");
+    expect(judge(`${ADESOLA} called`, ["lá"]).kind).not.toBe("right");
   });
 
   it("proposes the version VOCO heard, without the punctuation around it", () => {

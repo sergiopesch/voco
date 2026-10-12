@@ -1,11 +1,15 @@
 """My words: listed spellings, the list rules and append-only pushes."""
 import random
+import sys
+import unicodedata
 import unittest
 
-from mywords import MAX_CHARS, MAX_HEARD, MAX_TERMS, Words, accepted
+from mywords import MARKS, MAX_CHARS, MAX_HEARD, MAX_TERMS, SPELLED, Words, accepted
 from spelling import Spelling
 
 LIST = ['GitHub', 'PipeWire', 'GTK', 'Zoë', 'Málaga', 'New Zealand', 'Siobhán', 'router', 'Kubernetes']
+# Unicode has no single ọ̀, so the grave stays a combining mark after NFC.
+ADESOLA = 'Adé\u1e63\u1ecd\u0300lá'
 
 
 def written(words, text):
@@ -130,6 +134,13 @@ class TaughtTests(unittest.TestCase):
         restored, _, settled = words.restore('Hosay Garcia', final=False)
         self.assertEqual(restored[:settled], '', 'The open entry waits for its last word')
 
+    def test_an_accent_with_no_precomposed_letter_is_written_as_listed(self):
+        words = Words([f'{ADESOLA} Okafor'], [{'heard': 'Shola', 'writes': ADESOLA}])
+        self.assertEqual(written(words, 'adesola okafor called'), f'{ADESOLA} Okafor called')
+        self.assertEqual(written(words, 'Shola called'), f'{ADESOLA} called')
+        heard_with_marks = Words(['Sola'], [{'heard': ADESOLA, 'writes': 'Sola'}])
+        self.assertEqual(written(heard_with_marks, f'{ADESOLA} called'), 'Sola called')
+
     def test_a_version_of_a_word_stands_for_it_in_every_entry_with_it(self):
         words = Words(['José', 'José García'], [{'heard': 'Hosay', 'writes': 'José'}])
         self.assertEqual(written(words, 'Hosay Garcia and Hosay'), 'José García and José')
@@ -251,8 +262,7 @@ class ListRuleTests(unittest.TestCase):
             result = accepted([case['input']])
             if case['expectedVerdict'] == 'accept':
                 self.assertEqual(len(result), 1, f"{case['label']}: expected accept")
-                # Python counts words by split(), not by the worker's hyphen/space/period rules,
-                # so we don't validate word count here. Rust and TypeScript match the worker.
+                self.assertEqual(len(SPELLED.findall(result[0])), case['expectedWordCount'], case['label'])
             else:
                 self.assertEqual(len(result), 0, f"{case['label']}: expected reject")
 
@@ -264,6 +274,10 @@ class ListRuleTests(unittest.TestCase):
         self.assertEqual(words.terms, alike)
         self.assertEqual(written(words, 'zoe and github and strasse'), 'Zoë and Git Hub and Straße')
         self.assertEqual(len(Words([f'term{index}' for index in range(MAX_TERMS + 5)]).terms), MAX_TERMS)
+
+    def test_the_marks_are_every_combining_mark_unicode_has(self):
+        self.assertEqual(MARKS, [code for code in range(sys.maxunicode + 1)
+                                 if unicodedata.category(chr(code))[0] == 'M'])
 
     def test_a_malformed_list_rejects_the_start(self):
         for terms in ('GitHub', None, {'GitHub': 1}, ['GitHub', 3]):

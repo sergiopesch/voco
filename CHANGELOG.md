@@ -23,6 +23,9 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- My words accepts a name with accents that have no letter of their own, such
+  as the Yoruba Adéṣọ̀lá, with up to three on a letter. Settings, VOCO and the
+  speech worker now also agree on which characters are letters.
 - On Ubuntu 26.04 the guided installer stopped at "Package setup" and never
   finished. Ubuntu 26.04's sudo, sudo-rs, runs a command whose output feeds a
   pipe in the background of its own terminal and passes it no input. APT reads
