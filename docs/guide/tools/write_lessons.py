@@ -1192,6 +1192,10 @@ lesson(
             "The guide checks itself",
             "The Code Guide job runs this guide's own tests: chapters, catalog and server safety.",
         ),
+        (
+            "Measured on demand",
+            "Two commands measure what CI doesn't. check-privacy.sh runs a release build offline and online and records what it reaches on the network and when the microphone is open. check-speech.sh replays the public clips through the real worker for word error rate, latency and My words, and fails when a My words gate does. With --against voco.2026.0.62 it measures that release beside this checkout.",
+        ),
     ],
     [
         ("scripts/test-unit.sh", "The fast checks behind npm test."),
@@ -1207,6 +1211,8 @@ lesson(
         ("scripts/test-gnome-panel-container.sh", "Runs the companion suite on a Fedora image's GNOME Shell in rootless Podman."),
         (R + "test_worker_protocol.py", "The worker rulebook tests."),
         ("scripts/stage-speech-worker.py", "Copies the speech worker as packages ship it, for CI to run."),
+        ("scripts/check-privacy.sh", "Runs a release build offline and online and records its network calls, DNS and microphone streams."),
+        ("scripts/check-speech.sh", "Measures word error rate, latency and the My words gates through the real worker."),
         (F + "lib/dictationStream.test.ts", "Queue and delivery tests."),
         ("package.json", "npm test and the other test scripts."),
     ],
