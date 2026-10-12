@@ -628,8 +628,9 @@ fn load_at(path: &std::path::Path) -> Result<AppConfig, Box<dyn std::error::Erro
                     "Loaded VOCO settings, but could not save them in the current format: {error}"
                 );
             }
-        } else if fs::symlink_metadata(path.with_file_name(SAVED_COPY)).is_err() {
-            // Settings VOCO didn't save, or whose copy is gone, get one now.
+        } else if copy_is_stale(path) {
+            // Settings VOCO didn't save, or whose copy is gone or older, as a
+            // failed copy write or a crash between the two writes leaves it.
             if let Err(error) = keep_copy(&config, path) {
                 warn!("Loaded VOCO settings, but could not keep their copy: {error}");
             }
@@ -648,6 +649,15 @@ fn save_at(config: &AppConfig, path: &std::path::Path) -> Result<(), Box<dyn std
         warn!("Saved VOCO settings, but could not keep their copy: {error}");
     }
     Ok(())
+}
+
+/// Whether the saved copy is missing or older than `config.json`.
+fn copy_is_stale(path: &std::path::Path) -> bool {
+    let modified = |path: &std::path::Path| fs::symlink_metadata(path)?.modified();
+    match (modified(path), modified(&path.with_file_name(SAVED_COPY))) {
+        (Ok(settings), Ok(copy)) => copy < settings,
+        _ => true,
+    }
 }
 
 /// Writes the saved copy of `config`, keeping the settings a later VOCO left
@@ -1211,6 +1221,31 @@ mod tests {
         load_at(&path).unwrap();
 
         assert_eq!(read_json(&directory.join(SAVED_COPY)), settings);
+        let _ = fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn a_copy_older_than_the_settings_is_brought_up_to_date() {
+        let directory = test_directory("stale-copy");
+        let path = directory.join("config.json");
+        let mut settings = settings_with_my_words();
+        save_at(&settings, &path).unwrap();
+        // A save whose copy write failed leaves the copy older than the settings.
+        let copy = directory.join(SAVED_COPY);
+        let earlier =
+            fs::metadata(&copy).unwrap().modified().unwrap() - std::time::Duration::from_secs(60);
+        fs::File::options()
+            .write(true)
+            .open(&copy)
+            .unwrap()
+            .set_modified(earlier)
+            .unwrap();
+        settings.english_spelling = Some(EnglishSpelling::British);
+        atomic_write(&path, &serde_json::to_string(&settings).unwrap()).unwrap();
+
+        load_at(&path).unwrap();
+
+        assert_eq!(read_json(&copy), serde_json::to_value(&settings).unwrap());
         let _ = fs::remove_dir_all(&directory);
     }
 

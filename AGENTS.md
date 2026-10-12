@@ -87,8 +87,8 @@ taught versions (empty until the user adds one), onboarding state,
 the update channel, the startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
 package channels read as GitHub Release. Each save also writes `config.json.last`,
-keeping the keys a later VOCO left in it, and a start writes it when it is
-missing. An earlier VOCO rewrites the config without the keys it doesn't know, so
+keeping the keys a later VOCO left in it, and a start rewrites it when it is
+missing or older than the config. An earlier VOCO rewrites the config without the keys it doesn't know, so
 a load restores them from that copy, unless a Reset by any version renamed the
 config after the copy was saved (a backup's name carries the time of its reset);
 that copy is then deleted.
