@@ -148,10 +148,18 @@ fn hotkey_trace_path() -> std::path::PathBuf {
 /// The trace and performance logs' session label. RuntimeDiagnostics reports
 /// insertion.rs's "wayland" or "x11-or-other" instead.
 fn trace_session_label() -> &'static str {
-    match std::env::var("XDG_SESSION_TYPE") {
-        Ok(value) if value.eq_ignore_ascii_case("wayland") => "Wayland",
-        Ok(value) if value.eq_ignore_ascii_case("x11") => "X11",
-        _ => "unknown",
+    let xdg_session_type = std::env::var("XDG_SESSION_TYPE").ok();
+    let wayland_display = std::env::var("WAYLAND_DISPLAY").ok();
+    let display = std::env::var("DISPLAY").ok();
+
+    match determine_session_type(
+        xdg_session_type.as_deref(),
+        wayland_display.as_deref(),
+        display.as_deref(),
+    ) {
+        Some(true) => "Wayland",
+        Some(false) => "X11",
+        None => "unknown",
     }
 }
 
@@ -433,10 +441,62 @@ fn evdev_preset() -> Option<Preset> {
     Preset::decode(EVDEV_PRESET.load(Ordering::SeqCst))
 }
 
+/// Determines the desktop session type from environment variables.
+/// Returns Some(true) for Wayland, Some(false) for X11, None for no desktop session.
+///
+/// Logic:
+/// - XDG_SESSION_TYPE=wayland -> Wayland
+/// - XDG_SESSION_TYPE=x11 -> X11 (even if WAYLAND_DISPLAY is set)
+/// - XDG_SESSION_TYPE is tty/unset/empty:
+///   - WAYLAND_DISPLAY set -> Wayland
+///   - Only DISPLAY set -> X11
+///   - Neither set -> None (no desktop session)
+/// - Any other XDG_SESSION_TYPE value -> X11 (current behavior preserved)
+fn determine_session_type(
+    xdg_session_type: Option<&str>,
+    wayland_display: Option<&str>,
+    display: Option<&str>,
+) -> Option<bool> {
+    match xdg_session_type {
+        Some(value) if value.eq_ignore_ascii_case("wayland") => Some(true),
+        Some(value) if value.eq_ignore_ascii_case("x11") => Some(false),
+        Some(value) if value.eq_ignore_ascii_case("tty") | value.is_empty() => {
+            if wayland_display.is_some_and(|v| !v.is_empty()) {
+                Some(true)
+            } else if display.is_some_and(|v| !v.is_empty()) {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        None => {
+            if wayland_display.is_some_and(|v| !v.is_empty()) {
+                Some(true)
+            } else if display.is_some_and(|v| !v.is_empty()) {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        Some(_) => Some(false), // Any other value: X11-like (current behavior)
+    }
+}
+
+/// Returns Some(true) for Wayland, Some(false) for X11, None for no desktop session.
+pub fn session_type_from_environment() -> Option<bool> {
+    let xdg_session_type = std::env::var("XDG_SESSION_TYPE").ok();
+    let wayland_display = std::env::var("WAYLAND_DISPLAY").ok();
+    let display = std::env::var("DISPLAY").ok();
+
+    determine_session_type(
+        xdg_session_type.as_deref(),
+        wayland_display.as_deref(),
+        display.as_deref(),
+    )
+}
+
 fn is_wayland_session() -> bool {
-    std::env::var("XDG_SESSION_TYPE")
-        .map(|value| value.eq_ignore_ascii_case("wayland"))
-        .unwrap_or(false)
+    session_type_from_environment().unwrap_or(false)
 }
 
 fn current_desktop() -> String {
@@ -2724,5 +2784,127 @@ mod tests {
         let result = apply_and_validate_patch(&previous, patch).expect("should validate");
         assert_eq!(result.my_words, vec![nfc_expected]);
         assert_eq!(result.my_words_heard[0].writes, nfc_version_expected);
+    }
+
+    #[test]
+    fn session_type_detection_from_environment_variables() {
+        // XDG_SESSION_TYPE=wayland -> Wayland
+        assert_eq!(
+            determine_session_type(Some("wayland"), None, None),
+            Some(true)
+        );
+        assert_eq!(
+            determine_session_type(Some("Wayland"), None, None),
+            Some(true)
+        );
+        assert_eq!(
+            determine_session_type(Some("WAYLAND"), Some("wayland-0"), Some(":0")),
+            Some(true)
+        );
+
+        // XDG_SESSION_TYPE=x11 -> X11 (even if WAYLAND_DISPLAY is set)
+        assert_eq!(determine_session_type(Some("x11"), None, None), Some(false));
+        assert_eq!(determine_session_type(Some("X11"), None, None), Some(false));
+        assert_eq!(
+            determine_session_type(Some("x11"), Some("wayland-0"), Some(":0")),
+            Some(false)
+        );
+
+        // XDG_SESSION_TYPE=tty with WAYLAND_DISPLAY -> Wayland
+        assert_eq!(
+            determine_session_type(Some("tty"), Some("wayland-0"), None),
+            Some(true)
+        );
+        assert_eq!(
+            determine_session_type(Some("tty"), Some("wayland-0"), Some(":0")),
+            Some(true)
+        );
+
+        // XDG_SESSION_TYPE=tty with only DISPLAY -> X11
+        assert_eq!(
+            determine_session_type(Some("tty"), None, Some(":0")),
+            Some(false)
+        );
+
+        // XDG_SESSION_TYPE=tty with neither -> None
+        assert_eq!(determine_session_type(Some("tty"), None, None), None);
+
+        // XDG_SESSION_TYPE unset with WAYLAND_DISPLAY -> Wayland
+        assert_eq!(
+            determine_session_type(None, Some("wayland-0"), None),
+            Some(true)
+        );
+        assert_eq!(
+            determine_session_type(None, Some("wayland-0"), Some(":0")),
+            Some(true)
+        );
+
+        // XDG_SESSION_TYPE unset with only DISPLAY -> X11
+        assert_eq!(determine_session_type(None, None, Some(":0")), Some(false));
+
+        // XDG_SESSION_TYPE unset with neither -> None
+        assert_eq!(determine_session_type(None, None, None), None);
+
+        // XDG_SESSION_TYPE empty with WAYLAND_DISPLAY -> Wayland
+        assert_eq!(
+            determine_session_type(Some(""), Some("wayland-0"), None),
+            Some(true)
+        );
+
+        // XDG_SESSION_TYPE empty with only DISPLAY -> X11
+        assert_eq!(
+            determine_session_type(Some(""), None, Some(":0")),
+            Some(false)
+        );
+
+        // XDG_SESSION_TYPE empty with neither -> None
+        assert_eq!(determine_session_type(Some(""), None, None), None);
+
+        // Other XDG_SESSION_TYPE values -> X11-like (current behavior)
+        assert_eq!(determine_session_type(Some("mir"), None, None), Some(false));
+        assert_eq!(
+            determine_session_type(Some("unknown"), None, None),
+            Some(false)
+        );
+        assert_eq!(
+            determine_session_type(Some("other"), Some("wayland-0"), Some(":0")),
+            Some(false)
+        );
+
+        // Empty WAYLAND_DISPLAY/DISPLAY should be treated as unset
+        assert_eq!(determine_session_type(Some("tty"), Some(""), None), None);
+        assert_eq!(determine_session_type(Some("tty"), None, Some("")), None);
+        assert_eq!(determine_session_type(None, Some(""), Some("")), None);
+    }
+
+    #[test]
+    fn trace_session_label_uses_same_detection_logic() {
+        // This ensures trace_session_label uses determine_session_type consistently
+        std::env::set_var("XDG_SESSION_TYPE", "wayland");
+        std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::remove_var("DISPLAY");
+        assert_eq!(trace_session_label(), "Wayland");
+
+        std::env::set_var("XDG_SESSION_TYPE", "x11");
+        assert_eq!(trace_session_label(), "X11");
+
+        std::env::set_var("XDG_SESSION_TYPE", "tty");
+        std::env::set_var("WAYLAND_DISPLAY", "wayland-0");
+        assert_eq!(trace_session_label(), "Wayland");
+
+        std::env::set_var("XDG_SESSION_TYPE", "tty");
+        std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::set_var("DISPLAY", ":0");
+        assert_eq!(trace_session_label(), "X11");
+
+        std::env::set_var("XDG_SESSION_TYPE", "tty");
+        std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::remove_var("DISPLAY");
+        assert_eq!(trace_session_label(), "unknown");
+
+        // Clean up
+        std::env::remove_var("XDG_SESSION_TYPE");
+        std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::remove_var("DISPLAY");
     }
 }
