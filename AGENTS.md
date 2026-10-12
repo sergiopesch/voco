@@ -179,11 +179,13 @@ change.
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
-- Keys reach seat0's active session. Bind the originating local graphical login
-  at startup through process membership, a validated session ID, or a unique
-  graphical user session for apps launched by the user manager. Never select
-  logind's elected user Display or whichever login is active. Retain that identity
-  for the process; a departed, ambiguous, foreign or wrong-seat origin rejects.
+- Keys reach seat0's active session. Bind the originating local login at startup
+  through process membership or a validated session ID, where it is graphical or
+  the text console a compositor such as Sway was started from (logind types that
+  `tty`), or else a unique graphical user session for apps launched by the user
+  manager. Never select logind's elected user Display or whichever login is
+  active. Retain that identity for the process; a departed, ambiguous, foreign or
+  wrong-seat origin rejects.
   Check before the clipboard copy (`no-mutation`) and again just before keys.
   Resolution has a 16-session cap and a 750 ms logind lookup budget. Genuine
   unavailable logind state retains the existing fail-open policy.

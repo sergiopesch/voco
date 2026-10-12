@@ -48,8 +48,16 @@ impl Session {
         matches!(self.kind.as_str(), "wayland" | "x11") && self.class == "user"
     }
 
+    /// Keys may reach this login when it is the user's, local and on the
+    /// keyboard's seat, and graphical, or the text console a compositor such as
+    /// Sway was started from, which logind types tty. Only process membership or
+    /// a session ID binds a console; the fallback for user services binds only a
+    /// graphical login.
     fn eligible(&self, uid: u32) -> bool {
-        self.uid == uid && self.graphical_user() && !self.remote && self.seat == KEYBOARD_SEAT
+        self.uid == uid
+            && (self.graphical_user() || (self.kind == "tty" && self.class == "user"))
+            && !self.remote
+            && self.seat == KEYBOARD_SEAT
     }
 }
 
@@ -847,7 +855,7 @@ mod tests {
     fn known_wrong_owner_type_class_remote_or_seat_is_refused() {
         let changes: [fn(&mut Session); 6] = [
             |s| s.uid = 1001,
-            |s| s.kind = "tty".into(),
+            |s| s.kind = "unspecified".into(),
             |s| s.class = "greeter".into(),
             |s| s.remote = true,
             |s| s.seat = "seat1".into(),
@@ -860,6 +868,29 @@ mod tests {
             f.process = Ok(path);
             assert!(!Binding::Unresolved.check(&f, 1000, None));
         }
+    }
+
+    #[test]
+    fn the_console_a_compositor_runs_in_binds_only_as_the_process_origin() {
+        // Sway started from a text console runs in that console's login, which
+        // logind types tty: process membership or a session ID binds it.
+        let mut f = Fixture::new();
+        let console = f.add("console", true);
+        f.change(&console, |s| s.kind = "tty".into());
+        f.process = Ok(console.clone());
+        let mut binding = Binding::Unresolved;
+        assert!(binding.check(&f, 1000, None));
+        assert!(matches!(binding, Binding::Bound(_)));
+        // Bound, it is checked like any origin.
+        f.change(&console, |s| s.active = false);
+        assert!(!binding.check(&f, 1000, None));
+        f.change(&console, |s| s.active = true);
+        f.process = Err(LookupError::Missing);
+        assert!(Binding::Unresolved.check(&f, 1000, Some("console")));
+        // The fallback for user services never binds one.
+        let mut fallback = Binding::Unresolved;
+        fallback.check(&f, 1000, None);
+        assert_eq!(fallback, Binding::Unresolved);
     }
 
     #[test]
