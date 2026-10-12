@@ -98,13 +98,13 @@ jobs:
 
       - name: Spelling table matches pinned VarCon
         run: |
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/varcon.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/varcon/varcon.txt
+          curl -fsSL --retry 6 --retry-delay 10 -o "$RUNNER_TEMP/varcon.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/varcon/varcon.txt
           python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"
 
       - name: Everyday words match pinned 12dicts
         run: |
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/2of12full.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12full.txt
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/2of12id.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12id.txt
+          curl -fsSL --retry 6 --retry-delay 10 -o "$RUNNER_TEMP/2of12full.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12full.txt
+          curl -fsSL --retry 6 --retry-delay 10 -o "$RUNNER_TEMP/2of12id.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12id.txt
           python3 scripts/generate-everyday-words.py --check "$RUNNER_TEMP/2of12full.txt" "$RUNNER_TEMP/2of12id.txt"
 
       - name: Dependency security audit
