@@ -2220,14 +2220,14 @@
     "title": "Each desktop, its own helpers.",
     "intro": "Linux desktops differ in how programs may read keys and send them. VOCO picks a helper for each job from the session it runs in.",
     "story": [
-      "VOCO reads XDG_SESSION_TYPE. If it says wayland, VOCO takes the Wayland path; anything else takes the X11 path.",
+      "VOCO reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY. If XDG_SESSION_TYPE says wayland, VOCO takes the Wayland path. If it says x11, VOCO takes X11 even when WAYLAND_DISPLAY is set. When XDG_SESSION_TYPE is tty, unset or empty, WAYLAND_DISPLAY chooses Wayland and DISPLAY alone chooses X11; neither variable means no desktop session.",
       "On Wayland, keys go through VOCO's own virtual keyboard, a uinput device named VOCO virtual keyboard. On GNOME with an X display, xclip sets the clipboard through XWayland: GNOME lacks the wlroots data-control protocol, wl-copy's temporary focus surface can stall, and XWayland bridges the clipboard without taking focus. Other Wayland desktops use wl-copy.",
       "On X11, xdotool sends the keys and xclip sets the clipboard. The table below shows each combination."
     ],
     "steps": [
       {
         "label": "Detect",
-        "detail": "XDG_SESSION_TYPE=wayland selects the Wayland path. Any other value, or none, selects X11."
+        "detail": "XDG_SESSION_TYPE=wayland selects Wayland. XDG_SESSION_TYPE=x11 selects X11 even when WAYLAND_DISPLAY is set. When XDG_SESSION_TYPE is tty, unset or empty, WAYLAND_DISPLAY chooses Wayland and DISPLAY alone chooses X11."
       },
       {
         "label": "Shortcut",
@@ -2360,7 +2360,7 @@
           "Unchanged: the session's helper"
         ]
       ],
-      "scope": "Code paths at the commit this guide records. A session whose XDG_SESSION_TYPE isn't wayland takes the X11 path.",
+      "scope": "Code paths at the commit this guide records. Session detection reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY as the table describes.",
       "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing."
     },
     "sourceNote": "The table follows insertion.rs (helpers and keys), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."

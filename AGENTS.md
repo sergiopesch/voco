@@ -187,11 +187,13 @@ change.
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
-- Keys reach seat0's active session. Bind the originating local graphical login
-  at startup through process membership, a validated session ID, or a unique
-  graphical user session for apps launched by the user manager. Never select
-  logind's elected user Display or whichever login is active. Retain that identity
-  for the process; a departed, ambiguous, foreign or wrong-seat origin rejects.
+- Keys reach seat0's active session. Bind the originating local login at startup
+  through process membership or a validated session ID, where it is graphical or
+  the text console a compositor such as Sway was started from (logind types that
+  `tty`), or else a unique graphical user session for apps launched by the user
+  manager. Never select logind's elected user Display or whichever login is
+  active. Retain that identity for the process; a departed, ambiguous, foreign or
+  wrong-seat origin rejects.
   Check before the clipboard copy (`no-mutation`) and again just before keys.
   Resolution has a 16-session cap and a 750 ms logind lookup budget. Genuine
   unavailable logind state retains the existing fail-open policy.
@@ -443,7 +445,7 @@ release rehearsal.
 
 ## Release
 
-- Source version: **2026.0.62**. Latest published release: **2026.0.61**.
+- Source version: **2026.0.62**. Latest published release: **2026.0.62**.
   GitHub Releases is authoritative for publication and the package manager for the
   installed version; a version in source proves neither.
 - `packaging/published-release.json` records the published version. Keep the README
@@ -454,7 +456,10 @@ release rehearsal.
   checksums and release notes.
 - CI's `application` job tests the release build of both executables in isolated
   desktops, but hosted CI never packages the NVIDIA runtime or signs anything;
-  `check-devops.sh` enforces this. On the maintainer's Linux machine,
+  `check-devops.sh` enforces this. CI's Rust job also runs the worker protocol
+  test from only the worker files packages ship
+  (`scripts/stage-speech-worker.py`), as release assembly runs the packaged
+  worker. On the maintainer's Linux machine,
   `scripts/assemble-release.sh` builds, verifies and signs a signed tag's release.
   The assets go to a draft release, which is published only after the downloaded
   assets verify. See the [release process](docs/release-process.md).

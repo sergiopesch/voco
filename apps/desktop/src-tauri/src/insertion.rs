@@ -415,24 +415,17 @@ fn paste_text(text: &str) -> String {
         .collect()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SessionKind {
-    Wayland,
-    X11OrOther,
-}
+type SessionKind = crate::SessionType;
 
 fn session_kind() -> SessionKind {
-    if crate::is_wayland_session() {
-        SessionKind::Wayland
-    } else {
-        SessionKind::X11OrOther
-    }
+    crate::session_type_from_environment()
 }
 
 fn session_type_label(session: SessionKind) -> &'static str {
     match session {
         SessionKind::Wayland => "wayland",
         SessionKind::X11OrOther => "x11-or-other",
+        SessionKind::NoDesktop => "no-desktop",
     }
 }
 
@@ -552,6 +545,9 @@ fn build_support(
     }
 }
 
+const NO_DESKTOP_SESSION_DETAIL: &str =
+    "VOCO can't find a desktop session. Open VOCO from your desktop, not from a text console or over SSH.";
+
 fn runtime_diagnostics_with<F>(
     session: SessionKind,
     clipboard_program: &str,
@@ -564,6 +560,21 @@ where
     // One paste path: the clipboard helper copies, then the keys go out as
     // Shift+Insert, through VOCO's own virtual keyboard on Wayland.
     let (session_name, keys): (&str, &[&str]) = match session {
+        SessionKind::NoDesktop => {
+            return {
+                let no_desktop_support = InsertionSupport {
+                    available: false,
+                    required_commands: Vec::new(),
+                    missing_commands: Vec::new(),
+                    detail: NO_DESKTOP_SESSION_DETAIL.to_string(),
+                };
+                RuntimeDiagnostics {
+                    session_type: session_type_label(session).to_string(),
+                    type_simulation: no_desktop_support.clone(),
+                    clipboard: no_desktop_support,
+                }
+            }
+        }
         SessionKind::Wayland => ("Wayland", &[]),
         SessionKind::X11OrOther => ("X11-like sessions", &["xdotool"]),
     };
@@ -655,7 +666,7 @@ fn input_preflight_with(
     // Sample keyboard access once for this operation and again on the next one.
     let keyboard = match session {
         SessionKind::Wayland => probe_keyboard(),
-        SessionKind::X11OrOther => Ok(()),
+        SessionKind::X11OrOther | SessionKind::NoDesktop => Ok(()),
     };
     let diagnostics = runtime_diagnostics_with(session, clipboard_helper, available, &keyboard);
     InputPreflight {
@@ -1153,6 +1164,22 @@ mod tests {
             diagnostics.clipboard.missing_commands,
             vec!["xclip".to_string()]
         );
+    }
+
+    #[test]
+    fn no_desktop_session_produces_clear_error_message() {
+        let diagnostics =
+            runtime_diagnostics_with(SessionKind::NoDesktop, "xclip", |_| true, &Ok(()));
+        assert!(!diagnostics.clipboard.available);
+        assert!(!diagnostics.type_simulation.available);
+        assert_eq!(diagnostics.clipboard.detail, NO_DESKTOP_SESSION_DETAIL);
+        assert_eq!(
+            diagnostics.type_simulation.detail,
+            NO_DESKTOP_SESSION_DETAIL
+        );
+        assert!(diagnostics.clipboard.required_commands.is_empty());
+        assert!(diagnostics.clipboard.missing_commands.is_empty());
+        assert_eq!(diagnostics.session_type, "no-desktop");
     }
 
     /// Application-delivery fixtures run this production paste against real

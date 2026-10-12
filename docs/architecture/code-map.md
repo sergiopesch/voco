@@ -258,6 +258,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `rpm_package.py` — Renders the RPM spec for the staged tree and runs rpmbuild, and holds the RPM checks: scriptlets, folder ownership, requirements, and file and dependency parity with the Debian package.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
+- `stage-speech-worker.py` — Copies the speech worker as packages ship it, from `package-nvidia.py`'s list, so CI runs the worker protocol test from that copy alone.
 - `graft-model-tokenizer.py` — Adds NVIDIA's SentencePiece tokenizer to NVIDIA's GGUF, giving the pinned model; `provision-ci-speech.sh` runs it.
 - `generate-spelling-table.py` — Generates, or with `--check` verifies, `runtime/speech/spelling-varcon.tsv` from the pinned VarCon file.
 - `generate-everyday-words.py` — Generates, or with `--check` verifies, `apps/desktop/src/lib/everyday-words.txt` from the pinned 12dicts files.
