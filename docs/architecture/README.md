@@ -286,9 +286,9 @@ WebKit runs the window in a separate web process. If that process crashes,
 VOCO loads the window again. Like any new page, the new renderer gets a new
 epoch, the unfinished entry moves to Review, native capture is cancelled, the
 Chromium exact-field session ends, and shortcuts wait until the renderer says it
-is ready. If a dictation was running, VOCO notifies you. After three reloads in
-five minutes it leaves the window closed, ends all of that itself, and asks you
-to quit and open VOCO again.
+is ready. If a dictation was running, VOCO notifies you. If the window crashes
+again after three reloads in five minutes, VOCO leaves it closed, ends all of
+that itself, and asks you to quit and open VOCO again.
 
 ## Configuration
 

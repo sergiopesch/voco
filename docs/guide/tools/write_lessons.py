@@ -787,7 +787,7 @@ lesson(
         ),
         (
             "When the window crashes",
-            "WebKit runs VOCO's window in a process of its own. If that process crashes, VOCO loads the window again, its unfinished entry moves to Review, and VOCO shows \"Dictation interrupted\" if you were dictating. After three reloads in five minutes it leaves the window closed and shows \"VOCO stopped working\".",
+            "WebKit runs VOCO's window in a process of its own. If that process crashes, VOCO loads the window again, its unfinished entry moves to Review, and VOCO shows \"Dictation interrupted\" if you were dictating. If it crashes again after three reloads in five minutes, VOCO leaves it closed and shows \"VOCO stopped working\".",
         ),
         (
             "Review is explicit",
@@ -839,7 +839,7 @@ lesson(
         ("Patch", "The window sends only the fields that changed. Unknown fields and null values are refused."),
         (
             "Save",
-            "Rust writes the file atomically, then the same settings to config.json.last. The folder is 0700 and the files 0600, so only you can read them.",
+            "Rust writes the file atomically, then the same settings to config.json.last, keeping any that a later VOCO left there. The folder is 0700 and the files 0600, so only you can read them.",
         ),
         (
             "Recover",
@@ -1025,7 +1025,7 @@ lesson(
         ),
         (
             "Measured, not only promised",
-            "check-privacy.sh runs a release build twice in a container and dictates a public clip each time. With update checks off and no network, no process may open an internet socket or ask DNS anything. With them on, only api.github.com may be resolved and reached, and the speech worker reaches nothing. In both, a microphone stream exists only while dictation runs.",
+            "check-privacy.sh runs a release build twice in a container and dictates a public clip each time. With update checks off and no network, no process may connect, send or bind to an internet address, or ask DNS anything. With them on, only api.github.com may be resolved and reached, and the speech worker reaches nothing. In both, a microphone stream exists only while dictation runs.",
         ),
     ],
     [

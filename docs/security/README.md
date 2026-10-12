@@ -155,8 +155,8 @@ To make no request unless you ask, open **Update settings** on the **Updates**
 page and set **Update checks** to **Only when I choose**.
 
 `scripts/check-privacy.sh` checks this on a release build. With update checks
-off and no network, no VOCO process opens an internet socket or asks DNS
-anything, idle or dictating. With them on, the only host resolved and reached is
+off and no network, no VOCO process connects, sends or binds to an internet
+address, or asks DNS anything, idle or dictating. With them on, the only host resolved and reached is
 `api.github.com`, and the speech worker reaches nothing. In both runs a
 microphone stream exists only while dictation runs. It runs in a container on
 Linux, with no desktop, so it shows what VOCO itself contacts, not what a desktop
