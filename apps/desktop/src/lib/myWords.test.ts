@@ -4,6 +4,14 @@ import {
   termWords, tidyMyWord, versionsOf, withoutEntry,
 } from "@/lib/myWords";
 import type { HeardVersion } from "@/types";
+import cases from "../../../../tests/fixtures/mywords/entries.json";
+
+interface FixtureCase {
+  label: string;
+  input: string;
+  expectedVerdict: "accept" | "reject";
+  expectedWordCount: number | null;
+}
 
 describe("My words rules", () => {
   it("matches entries the way the worker does: without case, accents or separators", () => {
@@ -50,15 +58,11 @@ describe("My words rules", () => {
     expect(myWordProblem(tidyMyWord(yoruba), [])).not.toBeNull();
   });
 
-  it("shared fixture validates NFC and NFD alike", async () => {
-    const { readFileSync } = await import("fs");
-    const { resolve } = await import("path");
-    const fixturePath = resolve(process.cwd(), "../../tests/fixtures/mywords/entries.json");
-    const cases = JSON.parse(readFileSync(fixturePath, "utf8"));
+  it("shared fixture validates NFC and NFD alike", () => {
     // TypeScript validation goes through tidyMyWord, which trims and normalizes.
     // Skip cases that tidyMyWord is designed to fix (leading/trailing space, double space).
     const skipLabels = ["Leading space rejected", "Trailing space rejected", "Double space rejected"];
-    for (const testCase of cases) {
+    for (const testCase of cases as FixtureCase[]) {
       if (skipLabels.includes(testCase.label)) continue;
       const tidied = tidyMyWord(testCase.input);
       const result = myWordProblem(tidied, []);
