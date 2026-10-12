@@ -2832,10 +2832,7 @@ mod tests {
         );
 
         // XDG_SESSION_TYPE unset with only DISPLAY -> X11
-        assert_eq!(
-            determine_session_type(None, None, Some(":0")),
-            X11OrOther
-        );
+        assert_eq!(determine_session_type(None, None, Some(":0")), X11OrOther);
 
         // XDG_SESSION_TYPE unset with neither -> NoDesktop
         assert_eq!(determine_session_type(None, None, None), NoDesktop);
@@ -2856,10 +2853,7 @@ mod tests {
         assert_eq!(determine_session_type(Some(""), None, None), NoDesktop);
 
         // Other XDG_SESSION_TYPE values -> X11 (current behavior)
-        assert_eq!(
-            determine_session_type(Some("mir"), None, None),
-            X11OrOther
-        );
+        assert_eq!(determine_session_type(Some("mir"), None, None), X11OrOther);
         assert_eq!(
             determine_session_type(Some("unknown"), None, None),
             X11OrOther
@@ -2870,8 +2864,14 @@ mod tests {
         );
 
         // Empty WAYLAND_DISPLAY/DISPLAY treated as unset
-        assert_eq!(determine_session_type(Some("tty"), Some(""), None), NoDesktop);
-        assert_eq!(determine_session_type(Some("tty"), None, Some("")), NoDesktop);
+        assert_eq!(
+            determine_session_type(Some("tty"), Some(""), None),
+            NoDesktop
+        );
+        assert_eq!(
+            determine_session_type(Some("tty"), None, Some("")),
+            NoDesktop
+        );
         assert_eq!(determine_session_type(None, Some(""), Some("")), NoDesktop);
     }
 }

@@ -600,7 +600,7 @@ where
                     missing.join(", ")
                 )
             };
-            let mut type_simulation = build_support(
+            let type_simulation = build_support(
                 &["xdotool"],
                 "Paste keys are ready. VOCO pastes into whichever app has keyboard focus.",
                 requires,
