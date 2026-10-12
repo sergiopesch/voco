@@ -112,9 +112,9 @@ dictation.
 ## My words
 
 On the **My words** page, list the names and words you want VOCO to write your
-way. Add each one as you want it written, with its capitals and accents. The
-list holds up to 100 entries of up to four words each, and a change applies from
-your next dictation. Setup offers the full name on your account as the first
+way. Add each one as you want it written, with its capitals and accents, up to
+three on a letter. The list holds up to 100 entries of up to four words each,
+and a change applies from your next dictation. Setup offers the full name on your account as the first
 one, after the voice test; you can change it, add more, or skip it.
 
 - VOCO listens out for the words on your list and writes each one as listed,
@@ -210,7 +210,7 @@ until you discard them.
 
 | Location | Contents |
 | --- | --- |
-| `~/.config/voco/` | Settings, the last update check, and a backup of old settings if you reset them |
+| `~/.config/voco/` | Settings and a copy of them, the last update check, and a backup of old settings if you reset them |
 | `~/.local/state/voco/crash-recovery/` | A copy of the text while you dictate, deleted when the dictation ends normally, and Review entries |
 | `~/.local/state/voco/` | Diagnostic logs, only if you turn them on (see [Performance logs](troubleshooting.md#performance-logs)) |
 | `~/.local/share/com.sergiopesch.voco/` | Data and cache for VOCO's window |
@@ -238,7 +238,8 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - VOCO recognizes English only.
 - A dictation stops after 10 minutes, or sooner if your microphone records
   above about 56 kHz.
-- VOCO can't tell a password field from other fields. Don't dictate into one.
+- When it pastes, VOCO can't tell a password field from other fields, so don't
+  dictate into one. The Chromium extension refuses password fields.
 - VOCO only adds text. It can't correct words after it pastes them.
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.

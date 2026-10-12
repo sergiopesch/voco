@@ -23,6 +23,8 @@ request is the [release check](#release-check).
 | Data | Location | Kept until |
 | --- | --- | --- |
 | Settings | `$XDG_CONFIG_HOME/voco/config.json` | You change or reset them |
+| Copy of the settings | `$XDG_CONFIG_HOME/voco/config.json.last` | The next save replaces it, or a reset deletes it |
+| Settings before a reset | `$XDG_CONFIG_HOME/voco/config.recovery-backup-*.json` | The next reset deletes it, or you do |
 | Release check | `$XDG_CONFIG_HOME/voco/update-cache.json` | The next check replaces it |
 | Crash journal | `$XDG_STATE_HOME/voco/crash-recovery/active.json` | The recording finishes |
 | Review | `$XDG_STATE_HOME/voco/crash-recovery/recovered.json` | You discard the entry, or five newer entries push it out |

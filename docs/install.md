@@ -293,8 +293,10 @@ VOCO checks GitHub for new releases but never installs them. To upgrade:
    quit item, so with the panel, or without a tray icon, run `pkill -x voco`.
 3. Run the installer for the new release, or repeat the manual install.
 
-Your settings are kept. If panel setup asks you to, save your work and sign out
-and back in.
+Your settings are kept. An earlier release that you go back to removes the
+settings it doesn't know, such as My words in 2026.0.61, and upgrading again
+brings them back, unless you reset the settings in between. If panel setup
+asks you to, save your work and sign out and back in.
 
 ## Remove
 

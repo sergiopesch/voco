@@ -23,6 +23,9 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- My words accepts a name with accents that have no letter of their own, such
+  as the Yoruba Adéṣọ̀lá, with up to three on a letter. Settings, VOCO and the
+  speech worker now also agree on which characters are letters.
 - On Ubuntu 26.04 the guided installer stopped at "Package setup" and never
   finished. Ubuntu 26.04's sudo, sudo-rs, runs a command whose output feeds a
   pipe in the background of its own terminal and passes it no input. APT reads
@@ -31,9 +34,21 @@ The [release process](docs/release-process.md) describes how a release is made.
   nothing from the terminal, so the installer keeps its display: debconf takes
   its defaults and dpkg keeps a configuration file someone changed. If APT
   fails, it runs again on the terminal, where it can ask.
+- Sway and other compositors started from a text console report their session
+  as tty, and VOCO took the X11 route there, asking for xclip and xdotool. It now
+  takes the Wayland route and types into that console's login, and the guided
+  installer opens VOCO afterwards. With no desktop session at all, VOCO says so
+  instead of asking for the X11 helpers.
 - The installer's display no longer gives way to the routine messages of
   update-alternatives and needrestart. They go to the installation log; their
   warnings, a pending kernel or services to restart, still show.
+- Going back to an earlier release and upgrading again no longer loses
+  settings. An earlier release removes the settings it doesn't know: 2026.0.62
+  the taught versions, and 2026.0.61 also My words, the spelling and the update
+  check choice, so update checks came back on. VOCO now keeps a copy of its
+  settings, `config.json.last`, and brings them back from it, unless you reset
+  the settings in between. A taught version that no longer fits the list is
+  left out. Reset now also deletes that copy and the backups of earlier resets.
 
 ## [2026.0.62] - 2026-10-11
 
