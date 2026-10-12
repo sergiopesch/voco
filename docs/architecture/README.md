@@ -292,16 +292,25 @@ until someone chooses, which spells British), `myWords`, the My words list,
 empty until the user adds one, and `myWordsHeard`, its taught versions, each a
 `heard` version and the entry or word it `writes`. A save checks the list
 against the worker's rules: at most 100 entries of at most four words and 40
-characters, letters and digits with single spaces, hyphens, apostrophes and full
-stops, and no two that match alike. It checks the versions too: each writes an
+characters, letters and digits, each with up to three combining marks, with
+single spaces, hyphens, apostrophes and full stops, and no two that match
+alike. It checks the versions too: each writes an
 entry or one of its words, has the same limits without full stops, matches no
 entry or other version, and an entry keeps at most five. The versions have their
 own key, so an earlier VOCO still reads the file. Fields that older
 files carry are ignored and dropped at the next save, while a settings update
 that names an unknown field is refused. The directory is 0700 and the file
-0600, written atomically. If the file doesn't exist, VOCO copies
-`$XDG_CONFIG_HOME/voice/config.json` when present. When the file can't be read,
-the recovery panel offers Retry, Open and Reset; only Reset keeps a backup copy.
+0600, written atomically. Each save writes the same settings to
+`config.json.last`, keeping any that a later VOCO left there, and a start
+rewrites it when it is missing or older than `config.json`. An earlier VOCO rewrites `config.json` without the fields
+it doesn't know, so a load takes them back from that copy, unless a Reset, by
+this VOCO or an earlier one, renamed the file after the copy was saved; that copy
+is then deleted. Restored
+taught versions that clash with the list are dropped. If the file doesn't
+exist, VOCO copies `$XDG_CONFIG_HOME/voice/config.json` when present. When the
+file can't be read, the recovery panel offers Retry, Open and Reset, and the
+copy never replaces it. Only Reset keeps a backup copy, and it deletes
+`config.json.last` and the backups of earlier resets.
 
 ## Update checks
 

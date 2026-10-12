@@ -86,9 +86,17 @@ The config (`config.rs`) holds the shortcut, the microphone, English spelling
 taught versions (empty until the user adds one), onboarding state,
 the update channel, the startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
-package channels read as GitHub Release. VOCO never overwrites a config it cannot
-read: Settings shows a recovery panel, and only Reset renames the file to a
-`config.recovery-backup-*` copy before writing defaults.
+package channels read as GitHub Release. Each save also writes `config.json.last`,
+keeping the keys a later VOCO left in it, and a start rewrites it when it is
+missing or older than the config. An earlier VOCO rewrites the config without the keys it doesn't know, so
+a load restores them from that copy, unless a Reset by any version renamed the
+config after the copy was saved (a backup's name carries the time of its reset);
+that copy is then deleted.
+Restored taught versions that clash with the list are dropped, and only their
+count is logged. VOCO never overwrites a config it cannot read, nor repairs one
+from the copy: Settings shows a recovery panel, and only Reset renames the file
+to a `config.recovery-backup-*` copy before writing defaults. Reset also deletes
+`config.json.last` and the backups of earlier resets.
 
 VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
 with the exact upstream RUSTSEC-2024-0429 fix ([backport](vendor/glib/VOCO-PATCH.md)),
@@ -131,6 +139,11 @@ change.
   extends every push. Generate `spelling-varcon.tsv` only with
   `scripts/generate-spelling-table.py` from the pinned VarCon file, and keep its
   notices and those in `vendor/THIRD-PARTY-NOTICES.txt`.
+- The My words rules exist three times: `config.rs` checks a save,
+  `runtime/speech/mywords.py` decides what the worker uses, and `myWords.ts`
+  checks what the user types. Keep them one rule, Unicode's letters and digits
+  with up to three combining marks each, and change all three with
+  `tests/fixtures/mywords/entries.json`, which each suite runs.
 - My words never breaks append-only delivery either. `speech_stream.rs` adds the
   saved list and its taught versions to each session start, and a start without
   them is as recognized. The worker boosts the listed phrases in the recognizer
@@ -179,11 +192,13 @@ change.
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
-- Keys reach seat0's active session. Bind the originating local graphical login
-  at startup through process membership, a validated session ID, or a unique
-  graphical user session for apps launched by the user manager. Never select
-  logind's elected user Display or whichever login is active. Retain that identity
-  for the process; a departed, ambiguous, foreign or wrong-seat origin rejects.
+- Keys reach seat0's active session. Bind the originating local login at startup
+  through process membership or a validated session ID, where it is graphical or
+  the text console a compositor such as Sway was started from (logind types that
+  `tty`), or else a unique graphical user session for apps launched by the user
+  manager. Never select logind's elected user Display or whichever login is
+  active. Retain that identity for the process; a departed, ambiguous, foreign or
+  wrong-seat origin rejects.
   Check before the clipboard copy (`no-mutation`) and again just before keys.
   Resolution has a 16-session cap and a 750 ms logind lookup budget. Genuine
   unavailable logind state retains the existing fail-open policy.
@@ -435,7 +450,7 @@ release rehearsal.
 
 ## Release
 
-- Source version: **2026.0.62**. Latest published release: **2026.0.61**.
+- Source version: **2026.0.62**. Latest published release: **2026.0.62**.
   GitHub Releases is authoritative for publication and the package manager for the
   installed version; a version in source proves neither.
 - `packaging/published-release.json` records the published version. Keep the README
