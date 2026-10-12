@@ -18,6 +18,7 @@ npm run test:speech-report
 npm run test:speech-package
 npm run test:speech-runtime
 python3 scripts/test-report-performance.py
+python3 scripts/test-check-privacy.py
 
 # Capture and desktop integration.
 python3 scripts/test-panel-setup.py
