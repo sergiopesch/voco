@@ -300,9 +300,11 @@ own key, so an earlier VOCO still reads the file. Fields that older
 files carry are ignored and dropped at the next save, while a settings update
 that names an unknown field is refused. The directory is 0700 and the file
 0600, written atomically. Each save writes the same settings to
-`config.json.last`. An earlier VOCO rewrites `config.json` without the fields it
-doesn't know, so a load takes them back from that copy, unless a Reset, by this
-VOCO or an earlier one, renamed the file after the copy was saved. Restored
+`config.json.last`, keeping any that a later VOCO left there, and a start writes
+it when it is missing. An earlier VOCO rewrites `config.json` without the fields
+it doesn't know, so a load takes them back from that copy, unless a Reset, by
+this VOCO or an earlier one, renamed the file after the copy was saved; that copy
+is then deleted. Restored
 taught versions that clash with the list are dropped. If the file doesn't
 exist, VOCO copies `$XDG_CONFIG_HOME/voice/config.json` when present. When the
 file can't be read, the recovery panel offers Retry, Open and Reset, and the
