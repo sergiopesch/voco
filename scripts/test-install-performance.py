@@ -1005,9 +1005,10 @@ class InstallerArtTests(unittest.TestCase):
             os.setsid()
             fcntl.ioctl(0, termios.TIOCSCTTY, 0)
         with tempfile.TemporaryDirectory() as folder:
-            # The probe waits longer than the test runs, so an interrupt sent once
-            # the query is out always arrives while it waits for an answer.
-            body = 'VOCO_UI_PROBE_MS=60000\nVOCO_TERMINAL_COLUMNS=80\nVOCO_TERMINAL_ROWS=24\nvoco_ui_configure\nprintf "NOT REACHED\\n"\n'
+            # The probe waits two seconds, so an interrupt sent once the query is
+            # out arrives while it waits for an answer. One that lands just before
+            # the read starts runs its trap when the read times out.
+            body = 'VOCO_UI_PROBE_MS=2000\nVOCO_TERMINAL_COLUMNS=80\nVOCO_TERMINAL_ROWS=24\nvoco_ui_configure\nprintf "NOT REACHED\\n"\n'
             process = subprocess.Popen(['bash', '-c', PREFIX + body], stdin=slave, stdout=slave, stderr=slave,
                                        env=art_env(folder), preexec_fn=own_terminal)
             output = bytearray()
@@ -1018,6 +1019,7 @@ class InstallerArtTests(unittest.TestCase):
                         output += os.read(master, 65536)
                 self.assertIn(QUERY, output)
                 process.send_signal(signal.SIGINT)
+                deadline = time.monotonic() + 5
                 while process.poll() is None and time.monotonic() < deadline:
                     if select.select([master], [], [], .02)[0]:
                         output += os.read(master, 65536)
