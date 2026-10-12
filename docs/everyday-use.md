@@ -238,7 +238,8 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - VOCO recognizes English only.
 - A dictation stops after 10 minutes, or sooner if your microphone records
   above about 56 kHz.
-- VOCO can't tell a password field from other fields. Don't dictate into one.
+- When it pastes, VOCO can't tell a password field from other fields, so don't
+  dictate into one. The Chromium extension refuses password fields.
 - VOCO only adds text. It can't correct words after it pastes them.
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
