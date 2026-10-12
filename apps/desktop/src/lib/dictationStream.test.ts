@@ -21,6 +21,23 @@ describe('append-only dictation stream',()=>{
   expect(paste.mock.calls.map(c=>c[0]).join('')).toBe('Every elevation.');
   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Every elevat','ion','.']);
  });
+ it('pastes a joining space alone for desktop paste, which an address bar keeps',async()=>{
+  // Chromium's address bar strips the spaces around pasted text but keeps a
+  // paste of only whitespace as one space.
+  const hypotheses=()=>{let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Hello linux.':['Hello','Hello linux'][n++]}));};
+  hypotheses();const field=vi.fn(async(_s:string)=>{});const exact=new DictationStream(field,vi.fn(),vi.fn(),vi.fn(),undefined,false);
+  exact.pushAudio(new Float32Array(3200),16000);exact.enqueue();await exact.finish();
+  // A browser field takes the words exactly, so its appends keep the space.
+  expect(field.mock.calls.map(c=>c[0])).toEqual(['Hello',' linux','.']);
+  hypotheses();transport.mockClear();const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();await queue.finish();
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello',' ','linux','.']);
+  const requested=quality().filter(e=>e.event==='delivery_requested');
+  expect(requested.map(e=>[e.hypothesis_seq,e.joining_space,e.committed_utf8_bytes,e.suffix_utf8_bytes,e.target_utf8_bytes]))
+   .toEqual([[1,false,0,5,5],[2,true,5,1,6],[2,false,6,5,11],[3,false,11,1,12]]);
+  expect(quality().filter(e=>e.event==='delivery_dispatched').map(e=>e.committed_utf8_bytes)).toEqual([5,6,11,12]);
+ });
  it('retains a revision and refuses to paste it',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));
   const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');

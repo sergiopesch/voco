@@ -23,6 +23,10 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- In Chromium's address bar, in Chrome, Brave, Edge and the like, words you
+  said after a pause ran into the previous word, because the address bar strips
+  the spaces around pasted text. VOCO now pastes the joining space on its own,
+  which the address bar keeps.
 - If VOCO's window crashed (WebKit runs it in a process of its own), VOCO
   stayed at Listening and the shortcut did nothing until VOCO was restarted.
   VOCO now loads the window again within a second, says so if you were

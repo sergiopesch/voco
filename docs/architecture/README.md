@@ -172,10 +172,10 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
    `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
 
-When a suffix starts with VOCO's single joining space, the space is part of the
-pasted text; VOCO never types it as a key. Chromium's address bar strips pasted
-leading whitespace, so there a continuing phrase joins the previous word. VOCO
-never restores the previous clipboard.
+When a suffix starts with VOCO's joining space, the stream pastes the space on
+its own first, then the words; VOCO never types it as a key. Chromium's address
+bar strips the spaces around pasted text but keeps a paste of only whitespace as
+one space. VOCO never restores the previous clipboard.
 
 `desktop_session.rs` follows the screen lock of the session VOCO started in,
 through logind's `LockedHint`: it subscribes to the session's changes, then

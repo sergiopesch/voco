@@ -125,6 +125,9 @@ export class DictationStream {
     private recordDeliveryQuality = true,
     /** A Say it check, which Rust starts as recognized, without spelling. */
     private wordsCheck = false,
+    /** For desktop paste: Chromium's address bar strips the spaces around
+     * pasted text but keeps a paste of only whitespace as one space. */
+    private joiningSpaceAlone = false,
   ) {
     this.schedule("start");
   }
@@ -217,8 +220,11 @@ export class DictationStream {
       let pendingSince: number | null = null;
       try {
         while (!this.cancelled && !this.failure && !this.deliveryFailure && this.latest !== this.committed) {
-          const target = this.latest;
-          const suffix = appendOnlySuffix(this.committed, target);
+          const suffix = appendOnlySuffix(this.committed, this.latest);
+          // A joining space goes alone, ahead of the words it joins.
+          const joiningSpace = this.joiningSpaceAlone ? /^\s+(?=\S)/.exec(suffix)?.[0] : undefined;
+          const chunk = joiningSpace ?? suffix;
+          const target = this.committed + chunk;
           const hypothesisSeq = this.latestSeq;
           const hypothesisCount = this.hypothesisCount;
           const deliverySeq = ++this.deliverySeq;
@@ -229,13 +235,13 @@ export class DictationStream {
             committed_hypothesis_seq: this.committedSeq,
             coalesced_hypotheses: Math.max(0, hypothesisCount - this.committedHypothesisCount - 1),
             pending_age_ms: started - (this.pendingSince ?? started),
-            latest_age_ms: started - this.latestAt,
+            latest_age_ms: started - this.latestAt, joining_space: joiningSpace !== undefined,
             ...textLengths(this.committed, "committed"), ...textLengths(target, "target"),
-            ...textLengths(suffix, "suffix"),
+            ...textLengths(chunk, "suffix"),
           }));
           pendingSince = this.pendingSince;
           this.pendingSince = null;
-          await this.paste(suffix, {
+          await this.paste(chunk, {
             session: this.session, dictationSessionId: this.dictationSessionId,
             deliverySeq, hypothesisSeq,
           });

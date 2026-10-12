@@ -298,8 +298,9 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
     }
     let routed = paste_text(text);
-    // A joining space travels inside the paste, never as a Space key: on a
-    // focused button, checkbox or terminal prompt a Space key would act.
+    // A joining space is pasted, never sent as a Space key: on a focused
+    // button, checkbox or terminal prompt a Space key would act. The stream
+    // pastes it on its own (dictationStream.ts).
     let payload = routed.as_str();
     let (mut clipboard, mut primary) = copy_commands();
     let preflight_ms = elapsed_ms(started);
@@ -713,8 +714,7 @@ fn run_helper(
     Ok(())
 }
 
-/// One Shift+Insert. Chromium's address bar trims a pasted chunk's leading
-/// space, the price of never sending a Space key.
+/// One Shift+Insert.
 const X11_PASTE_ARGUMENTS: [&str; 3] = ["key", "--clearmodifiers", "shift+Insert"];
 
 /// GUI toolkits paste CLIPBOARD on Shift+Insert and terminals paste PRIMARY.

@@ -256,6 +256,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         "finish_responded",
         "accepted_equals_dispatched",
         "clipboard_changed",
+        "joining_space",
     ] {
         if let Some(value) = request[key].as_bool() {
             safe[key] = json!(value);
@@ -647,6 +648,15 @@ mod tests {
             speech_quality_payload(&json!({"event":"terminal", "session":"private words"}))
                 .is_none()
         );
+    }
+
+    #[test]
+    fn a_joining_space_delivery_keeps_its_flag() {
+        let request = json!({"event":"delivery_requested", "session":"12345678-1234-1234-1234-123456789abc",
+            "delivery_seq":2, "joining_space":true, "suffix_utf8_bytes":1});
+        let safe = speech_quality_payload(&request).unwrap();
+        assert_eq!(safe["joining_space"], true);
+        assert_eq!(safe["suffix_utf8_bytes"], 1);
     }
 
     #[test]

@@ -21,7 +21,7 @@ NUMBERS |= {f'{prefix}_{unit}' for prefix in ('recognized', 'previous', 'committ
             for unit in ('utf8_bytes', 'unicode_scalars', 'utf16_units')}
 DURATIONS = {'duration_ms', 'queue_age_ms', 'max_queue_age_ms', 'pending_age_ms', 'latest_age_ms',
              'settle_ms', 'modifier_wait_ms'}
-BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'clipboard_changed'}
+BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'clipboard_changed', 'joining_space'}
 OUTCOMES = {'finished', 'incomplete', 'cancelled', 'failed', 'dispatched', 'rejected', 'no-mutation', 'uncertain'}
 
 
@@ -104,12 +104,15 @@ def stream_summary(events, envelope_incomplete):
             reasons.add('hypothesis_correlation_incomplete')
         if native_event.get('outcome') != 'dispatched':
             reasons.add('native_dispatch_not_successful')
+        # A joining space goes alone, so its delivery reaches only part of the hypothesis.
+        joining = request.get('joining_space') is True
         for unit in ('utf8_bytes', 'unicode_scalars', 'utf16_units'):
             hypothesis_length = hypotheses.get(seq, {}).get(f'recognized_{unit}')
             target = request.get(f'target_{unit}')
             committed = request.get(f'committed_{unit}')
             suffix = request.get(f'suffix_{unit}')
-            if None in (hypothesis_length, target, committed, suffix) or target != hypothesis_length or committed + suffix != target or dispatch.get(f'committed_{unit}') != target:
+            if None in (hypothesis_length, target, committed, suffix) or not (target == hypothesis_length or joining and target < hypothesis_length) \
+                    or committed + suffix != target or dispatch.get(f'committed_{unit}') != target:
                 reasons.add('hypothesis_target_lengths_mismatch_or_unavailable')
             values = request.get(f'suffix_{unit}'), native_event.get(f'input_{unit}')
             if None in values or values[0] != values[1]:

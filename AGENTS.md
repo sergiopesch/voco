@@ -174,9 +174,9 @@ change.
   setup checks the paste prerequisites, never a caret or an app.
 - Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
   Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
-  joining space travels inside the paste, never as a key, so Chromium's address
-  bar, which trims pasted leading whitespace, joins it to the previous word: a
-  known limit. ASCII controls become spaces. Never send Enter and never restore
+  joining space is pasted on its own, never typed as a key: Chromium's address
+  bar strips the spaces around pasted text but keeps a paste of only whitespace
+  as one space. ASCII controls become spaces. Never send Enter and never restore
   the previous clipboard.
 - Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
