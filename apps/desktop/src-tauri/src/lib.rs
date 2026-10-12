@@ -1121,6 +1121,12 @@ fn reload_when_web_process_stops(app: &tauri::App) {
                         error!(
                             "VOCO's window stopped ({reason:?}) again after {WEB_PROCESS_RELOADS} reloads in five minutes, so it stays closed"
                         );
+                        // No page load follows to end what the window held.
+                        renderer_replaced(&handle);
+                        handle.state::<ibus_shortcut::IbusShortcutService>().shutdown();
+                        if let Err(error) = tray::begin_runtime_status_session(&handle) {
+                            warn!("{error}");
+                        }
                         send_notification(
                             "VOCO stopped working",
                             "Its window keeps closing. Quit VOCO from its menu and open it again.",
@@ -1168,6 +1174,22 @@ fn renderer_not_ready() {
     FRONTEND_HOTKEY_HANDLER_READY.store(false, Ordering::SeqCst);
     SHORTCUT_RENDERER_HEARTBEAT_MS.store(-1, Ordering::SeqCst);
     SHORTCUT_OBSERVATIONS.clear_poll();
+}
+
+/// The page that ran dictation is gone: its unfinished entry moves to Review,
+/// and its capture and Chromium exact-field session end.
+fn renderer_replaced(app: &tauri::AppHandle) {
+    renderer_not_ready();
+    // Journal writes from the previous renderer become stale.
+    let epoch = RENDERER_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+    if let Err(error) = crash_recovery::renderer_restarted(epoch) {
+        log::warn!("Renderer crash recovery could not be prepared: {error}");
+    }
+    native_capture_commands::reset_renderer();
+    let browser = app.try_state::<BrowserIntegration>();
+    if let Some(broker) = browser.as_ref().and_then(|browser| browser.0.as_ref()) {
+        broker.renderer_replaced();
+    }
 }
 
 #[tauri::command]
@@ -2219,13 +2241,7 @@ pub fn run() -> Result<(), String> {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
-                    renderer_not_ready();
-                    // Journal writes from the previous renderer become stale.
-                    let epoch = RENDERER_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
-                    if let Err(error) = crash_recovery::renderer_restarted(epoch) {
-                        log::warn!("Renderer crash recovery could not be prepared: {error}");
-                    }
-                    native_capture_commands::reset_renderer();
+                    renderer_replaced(webview.app_handle());
                 }
                 // Close the private channel first, so the engine drops a
                 // shortcut armed or triggered for the previous renderer
