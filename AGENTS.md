@@ -338,8 +338,14 @@ change.
 
 - Normal completion and handled failures clear text and audio and delete the
   active checkpoint; they never expose a saved transcript.
-- Only an earlier unexpected exit, or a Stop that could neither paste nor copy its
-  remainder, puts text into Review. Review never opens, pastes or retries by itself.
+- Only an earlier unexpected exit, a replaced renderer, or a Stop that could neither
+  paste nor copy its remainder, puts text into Review. Review never opens, pastes
+  or retries by itself.
+- When WebKit's web process crashes, VOCO reloads the window, at most three times
+  in five minutes. `renderer_replaced` runs on every main page load and on a
+  refused reload: toggles wait for the next renderer, the active entry moves to
+  Review, and native capture and the Chromium exact-field session end. The
+  full-app `web-process` case covers it.
 - The journal is owner-only, bounded, local and text only, never audio. Keep
   earlier entries until the user discards them: at most five, the oldest evicted
   by a sixth. Without a checkpoint dictation continues and notifies.

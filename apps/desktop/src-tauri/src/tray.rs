@@ -129,6 +129,15 @@ fn dictation_is_active(status: DictationStatus) -> bool {
     )
 }
 
+/// Whether the renderer last reported a dictation under way.
+pub fn dictation_active(app: &tauri::AppHandle) -> bool {
+    app.try_state::<TrayMutex>().is_some_and(|state| {
+        state
+            .lock()
+            .is_ok_and(|state| dictation_is_active(state.runtime.dictation_status))
+    })
+}
+
 /// Desktop-input diagnostics arrive after the runtime initializes. Until then an
 /// empty setup state is unknown, not missing setup, so the launch presentation
 /// holds instead of flashing a setup warning. It never gates Start.

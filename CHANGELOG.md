@@ -23,6 +23,12 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- If VOCO's window crashed (WebKit runs it in a process of its own), VOCO
+  stayed at Listening and the shortcut did nothing until VOCO was restarted.
+  VOCO now loads the window again within a second, says so if you were
+  dictating, and keeps what it heard in Review. If the window keeps crashing,
+  three times in five minutes, VOCO leaves it closed and asks you to open VOCO
+  again.
 - My words accepts a name with accents that have no letter of their own, such
   as the Yoruba Adéṣọ̀lá, with up to three on a letter. Settings, VOCO and the
   speech worker now also agree on which characters are letters.

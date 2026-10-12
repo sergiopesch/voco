@@ -1059,6 +1059,85 @@ fn grant_webview_permissions(app: &tauri::App) {
     }
 }
 
+// WebKit runs the window's page in a process of its own. When that process
+// crashes, the renderer that runs dictation is gone while VOCO keeps running,
+// so the window loads again, and the page load resets what the old renderer
+// held. A page that crashes as it loads would do so for ever, so the reloads
+// stop after a few.
+const WEB_PROCESS_RELOADS: usize = 3;
+const WEB_PROCESS_RELOAD_WINDOW: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Whether the window may load again now, given when it last did.
+fn web_process_reload_allowed(
+    reloads: &mut std::collections::VecDeque<Instant>,
+    now: Instant,
+) -> bool {
+    while reloads
+        .front()
+        .is_some_and(|reload| now.duration_since(*reload) >= WEB_PROCESS_RELOAD_WINDOW)
+    {
+        reloads.pop_front();
+    }
+    if reloads.len() >= WEB_PROCESS_RELOADS {
+        return false;
+    }
+    reloads.push_back(now);
+    true
+}
+
+#[cfg(target_os = "linux")]
+fn reload_when_web_process_stops(app: &tauri::App) {
+    use glib::object::Cast;
+    use webkit2gtk::{WebProcessTerminationReason, WebViewExt};
+
+    let handle = app.handle().clone();
+    if let Some(window) = app.get_webview_window("main") {
+        window
+            .with_webview(move |wv| {
+                let Ok(webview) = wv.inner().clone().downcast::<webkit2gtk::WebView>() else {
+                    warn!("Failed to downcast webview for web process recovery");
+                    return;
+                };
+                let reloads = std::cell::RefCell::new(std::collections::VecDeque::new());
+                webview.connect_web_process_terminated(move |webview, reason| {
+                    // A process ended through WebKit's API was ended on purpose.
+                    if matches!(reason, WebProcessTerminationReason::TerminatedByApi) {
+                        return;
+                    }
+                    let interrupted = tray::dictation_active(&handle);
+                    renderer_not_ready();
+                    if web_process_reload_allowed(&mut reloads.borrow_mut(), Instant::now()) {
+                        warn!("VOCO's window stopped ({reason:?}), so it loads again");
+                        trace_hotkey_event("web_process_reloaded", None);
+                        webview.reload();
+                        // The renderer that would say so is gone.
+                        if interrupted {
+                            send_notification(
+                                "Dictation interrupted",
+                                "VOCO's window stopped unexpectedly and has restarted. Check your text field before you start again.",
+                            );
+                        }
+                    } else {
+                        error!(
+                            "VOCO's window stopped ({reason:?}) again after {WEB_PROCESS_RELOADS} reloads in five minutes, so it stays closed"
+                        );
+                        // No page load follows to end what the window held.
+                        renderer_replaced(&handle);
+                        handle.state::<ibus_shortcut::IbusShortcutService>().shutdown();
+                        if let Err(error) = tray::begin_runtime_status_session(&handle) {
+                            warn!("{error}");
+                        }
+                        send_notification(
+                            "VOCO stopped working",
+                            "Its window keeps closing. Quit VOCO from its menu and open it again.",
+                        );
+                    }
+                });
+            })
+            .ok();
+    }
+}
+
 // --- Bundled speech-runtime readiness ---
 
 /// Help's desktop setup link. The renderer and the installer carry the same URL,
@@ -1089,16 +1168,37 @@ fn shortcut_heartbeat_is_current(last: i64, now: i64) -> bool {
     last >= 0 && now >= last && now.saturating_sub(last) < 3000
 }
 
+/// Until a renderer says its handler is ready, toggles wait for it instead of
+/// reaching a page that is gone or still loading.
+fn renderer_not_ready() {
+    FRONTEND_HOTKEY_HANDLER_READY.store(false, Ordering::SeqCst);
+    SHORTCUT_RENDERER_HEARTBEAT_MS.store(-1, Ordering::SeqCst);
+    SHORTCUT_OBSERVATIONS.clear_poll();
+}
+
+/// The page that ran dictation is gone: its unfinished entry moves to Review,
+/// and its capture and Chromium exact-field session end.
+fn renderer_replaced(app: &tauri::AppHandle) {
+    renderer_not_ready();
+    // Journal writes from the previous renderer become stale.
+    let epoch = RENDERER_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+    if let Err(error) = crash_recovery::renderer_restarted(epoch) {
+        log::warn!("Renderer crash recovery could not be prepared: {error}");
+    }
+    native_capture_commands::reset_renderer();
+    let browser = app.try_state::<BrowserIntegration>();
+    if let Some(broker) = browser.as_ref().and_then(|browser| browser.0.as_ref()) {
+        broker.renderer_replaced();
+    }
+}
+
 #[tauri::command]
 fn refresh_shortcut_heartbeat(app: tauri::AppHandle, ready: bool) {
-    FRONTEND_HOTKEY_HANDLER_READY.store(ready, Ordering::SeqCst);
-    SHORTCUT_RENDERER_HEARTBEAT_MS.store(
-        if ready { shortcut_monotonic_ms() } else { -1 },
-        Ordering::SeqCst,
-    );
     if !ready {
-        SHORTCUT_OBSERVATIONS.clear_poll();
+        renderer_not_ready();
     } else {
+        FRONTEND_HOTKEY_HANDLER_READY.store(true, Ordering::SeqCst);
+        SHORTCUT_RENDERER_HEARTBEAT_MS.store(shortcut_monotonic_ms(), Ordering::SeqCst);
         replay_pending_browser_stops(&app);
     }
 }
@@ -2141,12 +2241,7 @@ pub fn run() -> Result<(), String> {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if webview.label() == "main" {
-                    // Journal writes from the previous renderer become stale.
-                    let epoch = RENDERER_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
-                    if let Err(error) = crash_recovery::renderer_restarted(epoch) {
-                        log::warn!("Renderer crash recovery could not be prepared: {error}");
-                    }
-                    native_capture_commands::reset_renderer();
+                    renderer_replaced(webview.app_handle());
                 }
                 // Close the private channel first, so the engine drops a
                 // shortcut armed or triggered for the previous renderer
@@ -2270,6 +2365,8 @@ pub fn run() -> Result<(), String> {
 
             #[cfg(target_os = "linux")]
             grant_webview_permissions(app);
+            #[cfg(target_os = "linux")]
+            reload_when_web_process_stops(app);
 
             // Force WebView to load eagerly (required for Wayland)
             if let Some(window) = app.get_webview_window("main") {
@@ -2366,6 +2463,21 @@ mod tests {
             Some("evdev")
         );
         assert_eq!(take_pending_toggle(&pending, false), None);
+    }
+
+    #[test]
+    fn a_window_that_keeps_crashing_loads_again_three_times_in_five_minutes() {
+        let mut reloads = std::collections::VecDeque::new();
+        let first = Instant::now();
+        let at = |seconds| first + std::time::Duration::from_secs(seconds);
+        assert!(web_process_reload_allowed(&mut reloads, at(0)));
+        assert!(web_process_reload_allowed(&mut reloads, at(1)));
+        assert!(web_process_reload_allowed(&mut reloads, at(2)));
+        assert!(!web_process_reload_allowed(&mut reloads, at(3)));
+        assert!(!web_process_reload_allowed(&mut reloads, at(299)));
+        // Five minutes after the first reload, one more may follow.
+        assert!(web_process_reload_allowed(&mut reloads, at(300)));
+        assert!(!web_process_reload_allowed(&mut reloads, at(300)));
     }
 
     #[test]

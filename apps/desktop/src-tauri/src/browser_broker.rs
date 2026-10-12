@@ -224,6 +224,33 @@ impl BrowserBroker {
         self.shared.changed.notify_all();
         Ok(())
     }
+    /// A replaced renderer can't release its recording, so this ends its
+    /// session and the trigger it was given, as a release would.
+    pub fn renderer_replaced(&self) {
+        let Ok(mut state) = self.shared.state.lock() else {
+            return;
+        };
+        let mut tokens: Vec<String> = [
+            state
+                .session
+                .as_ref()
+                .filter(|s| s.valid)
+                .map(|s| s.token.clone()),
+            state
+                .last_trigger
+                .as_ref()
+                .filter(|(_, _, stopped)| !stopped)
+                .map(|(token, _, _)| token.clone()),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        tokens.dedup();
+        for token in tokens {
+            release_token(&mut state, &format!("browser:{token}"));
+        }
+        self.shared.changed.notify_all();
+    }
     pub fn cancel(&self, session_id: u64) -> Result<BrowserStatus, String> {
         let mut state = self
             .shared
@@ -798,6 +825,21 @@ mod tests {
             );
             assert!(broker.append(1, "", "safe").is_err());
         }
+    }
+    #[test]
+    fn a_replaced_renderer_ends_its_session_so_the_next_can_start() {
+        let (broker, mut browser, rx) = fixture();
+        let id = trigger(&mut browser, &rx);
+        claim(&broker, &mut browser, id);
+        broker.renderer_replaced();
+        let cancel = read(&mut browser);
+        assert_eq!(cancel["type"], "cancel");
+        assert_eq!(cancel["token"], "a".repeat(48));
+        assert!(!broker.get_status().ready);
+        send(&mut browser, &json!({"protocol":protocol::PROTOCOL,"type":"trigger","token":"c".repeat(48),"documentId":"b".repeat(48),"mode":"dictation"})).unwrap();
+        let next = rx.recv_timeout(Duration::from_secs(1)).unwrap().trigger_id;
+        claim(&broker, &mut browser, next);
+        assert!(broker.get_status().ready);
     }
     #[test]
     fn invalidated_target_never_reclaims_same_token_and_stop_is_explicit() {
