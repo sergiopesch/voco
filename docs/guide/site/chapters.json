@@ -1694,6 +1694,10 @@
         "why": "Copies the speech worker as packages ship it, for CI to run."
       },
       {
+        "path": "scripts/check-privacy.sh",
+        "why": "Runs a release build offline and online and records its network calls, DNS and microphone streams."
+      },
+      {
         "path": "scripts/check-speech.sh",
         "why": "Measures word error rate, latency and the My words gates through the real worker."
       },
