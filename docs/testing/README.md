@@ -213,7 +213,24 @@ logs without audio or text. Without `--output-dir` it writes into `runtime/speec
 
 `scripts/evaluate-dictation-worker.py` replays the development or held-out clips
 into the worker to compare changes, as [TypeSafe evaluation](typesafe-evaluation.md)
-describes. Neither `npm test` nor CI runs it.
+describes. `--words FILE` sends a My words list, and optionally taught versions,
+with every session start. Neither `npm test` nor CI runs it.
+
+`scripts/check-speech.sh` runs the speech evidence in one command, after
+`scripts/provision-ci-speech.sh`, with Python's psutil and Node:
+
+- the accuracy gate, `test-speech-baseline.mjs`;
+- word error rate and latency on all 12 clips, unpaced and fed in real time;
+- My words in six conditions: no list, an empty list, the listed terms, terms no
+  clip says, and the listed terms with taught versions the recognizer never
+  writes and with ones it does. The terms are in
+  `tests/fixtures/mywords/benchmark.json`.
+
+`--against REF`, such as `--against voco.2026.0.62`, also measures that commit's
+speech worker with this checkout's harness and payload, which it must pin too.
+`summary.md` sets the two side by side. The evidence goes to a new folder in
+`$TMPDIR`, or `--output DIR`, and holds the fixtures' transcripts, so keep it out
+of the repository.
 
 The [engine benchmark](../../research/engine-benchmark-2026-10/README.md) compares Nemotron
 English with Parakeet TDT, Whisper large-v3-turbo and Nemotron 3.5 on 311 public

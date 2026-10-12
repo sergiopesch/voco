@@ -448,6 +448,14 @@ only while dictation runs. Run it after a change that could touch the network, t
 update check, the worker sandbox or capture, and keep its evidence folder out of
 the repository.
 
+`scripts/check-speech.sh` measures recognition through the real worker after
+`scripts/provision-ci-speech.sh`: the accuracy gate, word error rate and latency on
+the 12 public clips, and My words in six conditions from
+`tests/fixtures/mywords/benchmark.json`. With `--against voco.2026.0.62` it measures
+that release's worker beside this one. Recognition is deterministic here, so any
+changed word is real. Run it after a change to the worker, My words or the speech
+payload, and keep its evidence folder out of the repository.
+
 - Use isolated audio, input, clipboard and desktop fixtures. Never inject test
   speech into a live user session.
 - Use public or synthetic fixtures only; keep personal audio, transcripts and
