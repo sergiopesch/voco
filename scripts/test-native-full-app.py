@@ -16,7 +16,7 @@ lock: a fake logind on a private system bus serves this session, locked when VOC
 so its first read must see the lock and the shortcut starts nothing. After unlocking, a
 lock stops a running dictation, the fixture then reaches no field, and the shortcut again
 starts nothing; a dictation after unlocking delivers as in delivery.
-web-process: WebKit's web process, which runs the renderer that drives dictation, aborts
+web-process: WebKit's web process, which runs the renderer that drives dictation, dies
 while a dictation runs, as one did on CI. VOCO must load its window again: a new web
 process starts, a second renderer reports ready, the tray returns to Ready, one
 notification says the dictation was interrupted, and a dictation afterwards delivers
@@ -417,7 +417,9 @@ try:
         # Sent or refused, each notification is traced; the harness runs no notification service.
         notifications = lambda: sum(n for event, n in counts().items() if event.startswith('desktop_notification_'))
         notified = notifications()
-        os.kill(crashed[0], signal.SIGABRT)
+        # Not SIGABRT: an aborting process lives on while its core is dumped, which
+        # took 20 s here, and WebKit sees it gone only then. It reports both as a crash.
+        os.kill(crashed[0], signal.SIGKILL)
         wait_for(lambda: counts()['frontend_hotkey_handler_ready'] > 1, 'a new renderer after the crash', timeout=30)
         assert counts()['web_process_reloaded'] == 1, 'VOCO did not load its window again exactly once'
         assert web_processes() and crashed[0] not in web_processes(), 'WebKit started no new web process'
@@ -528,7 +530,7 @@ finally:
                     'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
                     'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']
         if case == 'web-process':
-            boundary.insert(1, 'a WebKit web process aborted mid-dictation and loaded again')
+            boundary.insert(1, 'a WebKit web process killed mid-dictation and loaded again')
     report = dict(passed=passed, failure=failure, expectedOutcome=LAUNCH.get(case, 'pasted-into-focused-field'), case=case,
                   buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
                   callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=[] if case in LAUNCH else expected,
