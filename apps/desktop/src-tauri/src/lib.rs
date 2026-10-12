@@ -578,15 +578,15 @@ fn open_config_directory() -> Result<(), String> {
     Ok(())
 }
 
-fn persist_config_patch(
-    app: &tauri::AppHandle,
+/// Applies patch, normalizes My words to NFC, validates, and returns config to save.
+fn apply_and_validate_patch(
+    previous: &AppConfig,
     patch: AppConfigPatch,
-    notify_hotkey_change: bool,
-) -> Result<ConfigSnapshot, String> {
-    let _guard = config_writer()?;
-    let previous = AppConfig::load().map_err(|error| error.to_string())?;
+) -> Result<AppConfig, String> {
     let mut config = previous.clone();
     patch.apply_to(&mut config);
+    // Normalize to NFC at the boundary where config enters Rust
+    config::normalize_my_words(&mut config);
     if previous.my_words != config.my_words {
         config::validate_my_words(&config.my_words)?;
     }
@@ -595,6 +595,17 @@ fn persist_config_patch(
     if previous.my_words != config.my_words || previous.my_words_heard != config.my_words_heard {
         config::validate_my_words_heard(&config.my_words, &config.my_words_heard)?;
     }
+    Ok(config)
+}
+
+fn persist_config_patch(
+    app: &tauri::AppHandle,
+    patch: AppConfigPatch,
+    notify_hotkey_change: bool,
+) -> Result<ConfigSnapshot, String> {
+    let _guard = config_writer()?;
+    let previous = AppConfig::load().map_err(|error| error.to_string())?;
+    let config = apply_and_validate_patch(&previous, patch)?;
     let hotkey_changed = previous.hotkey != config.hotkey;
     let rebind = |hotkey: &str| apply_hotkey_runtime_state(app, hotkey);
 
@@ -2285,6 +2296,7 @@ pub fn run() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use config::PatchField;
 
     #[test]
     fn a_lock_drops_the_toggle_that_waited_for_the_renderer() {
@@ -2690,5 +2702,27 @@ mod tests {
         assert!(!is_ignored_evdev_device_name(
             "AT Translated Set 2 keyboard"
         ));
+    }
+
+    #[test]
+    fn apply_and_validate_patch_normalizes_nfd_my_words() {
+        let previous = AppConfig::default();
+        let nfd_entry = "Siobha\u{301}n Kelly"; // NFD: decomposed combining acute
+        let nfc_expected = "Siobhán Kelly"; // NFC: precomposed
+        let nfd_version = config::HeardVersion {
+            heard: "Shivon Kellie".to_string(),
+            writes: "Siobha\u{301}n".to_string(), // NFD
+        };
+        let nfc_version_expected = "Siobhán"; // NFC
+
+        let patch = AppConfigPatch {
+            my_words: PatchField::Set(vec![nfd_entry.to_string()]),
+            my_words_heard: PatchField::Set(vec![nfd_version.clone()]),
+            ..AppConfigPatch::default()
+        };
+
+        let result = apply_and_validate_patch(&previous, patch).expect("should validate");
+        assert_eq!(result.my_words, vec![nfc_expected]);
+        assert_eq!(result.my_words_heard[0].writes, nfc_version_expected);
     }
 }

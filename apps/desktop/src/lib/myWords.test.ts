@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   MY_WORDS_MAX_HEARD, MY_WORDS_MAX_TERMS, entryOf, heardVersion, judgeCheck, keptVersions, myWordProblem, myWordsKey,
-  tidyMyWord, versionsOf, withoutEntry,
+  termWords, tidyMyWord, versionsOf, withoutEntry,
 } from "@/lib/myWords";
 import type { HeardVersion } from "@/types";
+import cases from "../../../../tests/fixtures/mywords/entries.json";
+
+interface FixtureCase {
+  label: string;
+  input: string;
+  expectedVerdict: "accept" | "reject";
+  expectedWordCount: number | null;
+}
 
 describe("My words rules", () => {
   it("matches entries the way the worker does: without case, accents or separators", () => {
@@ -30,6 +38,43 @@ describe("My words rules", () => {
     expect(myWordProblem("strasse", ["Straße"])).toBe("“Straße” is already in My words.");
     const full = Array.from({ length: MY_WORDS_MAX_TERMS }, (_, index) => `term${index}`);
     expect(myWordProblem("Kubernetes", full)).toMatch(/^My words holds up to 100 entries/);
+  });
+
+  it("handles NFD and NFC accents alike after normalization", () => {
+    const nfd_siobhan = "Siobha\u0301n Kelly";
+    const nfc_siobhan = "Siobhán Kelly";
+    // Production code goes through tidyMyWord, which normalizes
+    expect(myWordProblem(tidyMyWord(nfd_siobhan), [])).toBeNull();
+    expect(myWordProblem(tidyMyWord(nfc_siobhan), [])).toBeNull();
+    expect(myWordsKey(nfd_siobhan)).toBe(myWordsKey(nfc_siobhan));
+    
+    const nfd_zoe = "Zoe\u0308";
+    const nfc_zoe = "Zoë";
+    expect(myWordProblem(tidyMyWord(nfd_zoe), [])).toBeNull();
+    expect(myWordProblem(tidyMyWord(nfc_zoe), [])).toBeNull();
+    expect(myWordsKey(nfd_zoe)).toBe(myWordsKey(nfc_zoe));
+    
+    const yoruba = "Adé\u1e63\u1ecd\u0300lá";
+    expect(myWordProblem(tidyMyWord(yoruba), [])).not.toBeNull();
+  });
+
+  it("shared fixture validates NFC and NFD alike", () => {
+    // TypeScript validation goes through tidyMyWord, which trims and normalizes.
+    // Skip cases that tidyMyWord is designed to fix (leading/trailing space, double space).
+    const skipLabels = ["Leading space rejected", "Trailing space rejected", "Double space rejected"];
+    for (const testCase of cases as FixtureCase[]) {
+      if (skipLabels.includes(testCase.label)) continue;
+      const tidied = tidyMyWord(testCase.input);
+      const result = myWordProblem(tidied, []);
+      if (testCase.expectedVerdict === "accept") {
+        expect(result, `${testCase.label} should accept`).toBeNull();
+        if (testCase.expectedWordCount !== null) {
+          expect(termWords(tidied).length, `${testCase.label} word count`).toBe(testCase.expectedWordCount);
+        }
+      } else {
+        expect(result, `${testCase.label} should reject`).not.toBeNull();
+      }
+    }
   });
 });
 
