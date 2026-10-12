@@ -119,7 +119,7 @@ to keep out of the repository:
 | Command | What it measures | Run it after a change to |
 | --- | --- | --- |
 | `scripts/check-privacy.sh` | A release build, offline and online: what it reaches on the network, and when a microphone stream is open. Needs podman or docker and the provisioned speech runtime. | the network, update checks, the worker sandbox or capture |
-| `scripts/check-speech.sh` | Recognition through the real worker: the accuracy gate, word error rate and latency, and My words. `--against voco.2026.0.62` measures a release beside it. Needs the provisioned speech runtime, Python's psutil and Node. | the speech worker, My words or the speech payload |
+| `scripts/check-speech.sh` | Recognition through the real worker: the accuracy gate, word error rate and latency, and the My words gates. `--against voco.2026.0.62` measures a release beside it. Needs the provisioned speech runtime, Python's psutil and Node. | the speech worker, My words or the speech payload |
 
 ## Style
 

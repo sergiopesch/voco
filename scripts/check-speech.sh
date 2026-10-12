@@ -10,8 +10,9 @@
 # as voco.2026.0.62, with this checkout's harness and speech payload, and the
 # summary sets the two side by side. Needs runtime/speech provisioned by
 # scripts/provision-ci-speech.sh, Python 3 with psutil, and Node. Exit 0 when
-# every run completed and the gate passed, 1 when a check failed, 2 when it
-# couldn't run.
+# every run completed and this checkout passed the accuracy gate and AGENTS.md's
+# My words gates against the fixture's pinned bar, 1 when a check failed, 2 when
+# it couldn't run.
 set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 AGAINST="" OUT=""
@@ -19,7 +20,7 @@ while (($#)); do
   case $1 in
     --against) AGAINST=${2:?}; shift 2 ;;
     --output) OUT=${2:?}; shift 2 ;;
-    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
   esac
 done
 fail() { echo "check-speech: $*" >&2; exit 2; }
@@ -89,7 +90,9 @@ if [[ -n $AGAINST ]]; then
   printf '{"label":"against","ref":"%s","commit":"%s"}\n' "$AGAINST" "$commit" > "$OUT/against/target.json"
   measure against "$worktree/runtime/speech"
 fi
-step summary node "$ROOT/scripts/speech-check-summary.mjs" "$OUT" && cat "$OUT/summary.md"
+# The summary fails when the My words gates do, and still lists every run.
+step summary node "$ROOT/scripts/speech-check-summary.mjs" "$OUT"
+if [[ -f $OUT/summary.md ]]; then cat "$OUT/summary.md"; fi
 # The gate's own verdict, which a crashed baseline never writes.
 if ! grep -q '"passed": true' "$OUT/baseline.json" 2>/dev/null; then status=1; fi
 echo "check-speech: evidence in $OUT"

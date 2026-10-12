@@ -48,27 +48,74 @@ test('identical counts clips whose final words match', () => {
   assert.deepEqual(identical([trial('a', 'X', 'one'), trial('b', 'Y', 'two')], [trial('a', 'X', 'one'), trial('b', 'Y', 'too')]), { same: 1, of: 2 });
 });
 
-test('the summary sets two speech workers side by side', () => {
+const BAR = { invented: 0, capitalChanges: 0, addedErrors: 0 };
+const GOOD = { none: 'shakespeare wrote', empty: 'shakespeare wrote', listed: 'Shakespeare wrote.', distractors: 'shakespeare wrote',
+  'listed-unused-taught': 'Shakespeare wrote.', 'listed-used-taught': 'Shakespeare wrote.' };
+
+// An evidence folder as check-speech.sh leaves it, from each condition's final words.
+function evidence(targets, { skip = [] } = {}) {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'voco-speech-check-'));
-  const write = (name, value) => { fs.mkdirSync(path.dirname(path.join(folder, name)), { recursive: true }); fs.writeFileSync(path.join(folder, name), JSON.stringify(value)); };
+  const write = (name, value) => {
+    fs.mkdirSync(path.dirname(path.join(folder, name)), { recursive: true });
+    fs.writeFileSync(path.join(folder, name), JSON.stringify(value));
+  };
   const distribution = median => ({ n: 1, median, p95: median, max: median });
-  write('words/benchmark.json', fixture);
+  write('words/benchmark.json', { ...fixture, bar: BAR });
   write('baseline.json', { passed: true, aggregateWer: 0.025, maxAggregateWer: 0.08 });
-  for (const [label, extra, hypothesis] of [['this', {}, 'Shakespeare wrote.'], ['against', { ref: 'voco.2026.0.62' }, 'shakespeare wrote']]) {
+  for (const [label, extra, said] of targets) {
     write(`${label}/target.json`, { label, commit: 'abcdef0123456789', ...extra });
-    for (const name of ['unpaced', 'paced', ...CONDITIONS.slice(1).map(condition => `words-${condition}`)]) {
-      write(`${label}/${name}/run.json`, { runtimeHashes: { 'stream_worker.py': '0' }, trials: [trial('a', 'SHAKESPEARE WROTE', hypothesis)] });
-      write(`${label}/${name}/score.json`, { coldReadyMs: 1170, summary: { wer: label === 'this' ? 0 : 0.5, errors: label === 'this' ? 0 : 1, referenceWords: 2,
-        completed: 1, failed: 0, serviceRtf: distribution(0.22), firstHypothesisMs: distribution(1234), finishAckMs: distribution(64),
-        startAckMs: distribution(0.1), maxSampledWorkerRssBytes: 1 } });
+    for (const condition of CONDITIONS) {
+      const name = condition === 'none' ? 'unpaced' : `words-${condition}`;
+      for (const run of condition === 'none' ? [name, 'paced'] : [name]) {
+        if (skip.includes(run)) continue;
+        const hypothesis = said[condition];
+        const errors = hypothesis.toLowerCase().includes('wrote') ? 0 : 1;
+        write(`${label}/${run}/run.json`, { runtimeHashes: { 'stream_worker.py': '0' }, trials: [trial('a', 'SHAKESPEARE WROTE', hypothesis)] });
+        write(`${label}/${run}/score.json`, { coldReadyMs: 1170, summary: { wer: errors / 2, errors, referenceWords: 2, attempted: 1,
+          completed: 1, failed: 0, serviceRtf: distribution(0.22), firstHypothesisMs: distribution(1234),
+          finishAckMs: distribution(64), startAckMs: distribution(0.1), maxSampledWorkerRssBytes: 1 } });
+      }
     }
   }
-  const summary = summarize(folder);
+  return folder;
+}
+
+test('the summary sets two speech workers side by side and judges this one', () => {
+  const older = { ...GOOD, 'listed-used-taught': 'shakespeare wrote' };
+  const summary = summarize(evidence([['this', {}, GOOD], ['against', { ref: 'voco.2026.0.62' }, older]]));
   assert.deepEqual(summary.targets.map(t => t.label), ['this', 'against']);
-  assert.equal(summary.targets[0].myWords.listed.listedWrittenAsListed, 1);
-  assert.equal(summary.targets[1].myWords.listed.listedWrittenAsListed, 0);
+  assert.equal(summary.targets[0].myWords['listed-used-taught'].listedWrittenAsListed, 1);
+  assert.equal(summary.targets[1].myWords['listed-used-taught'].listedWrittenAsListed, 0);
   assert.deepEqual(summary.targets[0].myWords.empty.sameAs, { condition: 'none', same: 1, of: 1 });
+  assert.deepEqual(summary.myWordsGates, { passed: true, bar: BAR, failures: [] });
   const text = markdown(summary);
-  assert.match(text, /\| Word error rate, 12 clips \| 0\.00% \(0\/2\) \| 50\.00% \(1\/2\) \|/u);
+  assert.match(text, /\| Word error rate, 12 clips \| 0\.00% \(0\/2\) \| 0\.00% \(0\/2\) \|/u);
   assert.match(text, /voco\.2026\.0\.62 \(abcdef0\)/u);
+  assert.match(text, /My words gates for this checkout, .*: passed\./u);
+});
+
+test('each My words gate fails on its own regression', () => {
+  const cases = {
+    'Empty list: changed the words of 1 clips': { empty: 'Shakespeare wrote.' },
+    'Listed terms gained nothing': { listed: 'shakespeare wrote', 'listed-unused-taught': 'shakespeare wrote' },
+    'Terms no clip says: 1 invented terms': { distractors: 'Kubernetes wrote' },
+    'Terms no clip says: 1 more wrong words than no list': { distractors: 'shakespeare rote' },
+    'Listed, taught versions it never hears: changed the words of 1 clips': { 'listed-unused-taught': 'Shakespeare wrote' },
+    'Empty list: 1 changed capitals': { empty: 'Shakespeare Wrote' },
+  };
+  for (const [expected, change] of Object.entries(cases)) {
+    const { myWordsGates } = summarize(evidence([['this', {}, { ...GOOD, ...change }]]));
+    assert.equal(myWordsGates.passed, false, expected);
+    assert.ok(myWordsGates.failures.some(failure => failure.startsWith(expected)), `${expected}: ${myWordsGates.failures}`);
+  }
+});
+
+test('a run that crashed is unavailable, never passed, and the summary still lists the rest', () => {
+  const summary = summarize(evidence([['this', {}, GOOD]], { skip: ['words-listed'] }));
+  assert.deepEqual(summary.targets[0].myWords.listed, { unavailable: true });
+  assert.equal(summary.myWordsGates.passed, false);
+  assert.deepEqual(summary.myWordsGates.failures, ['Listed terms: unavailable']);
+  const text = markdown(summary);
+  assert.match(text, /\| Listed terms \| unavailable \|/u);
+  assert.match(text, /\| No list \| 0\.00% \/ 0 of 1 \/ 0 \/ 0 \|/u);
 });

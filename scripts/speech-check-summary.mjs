@@ -83,55 +83,98 @@ export function identical(a, b) {
 }
 
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const readIfThere = file => (fs.existsSync(file) ? read(file) : null);
 const accuracy = ({ summary }) => ({ wer: summary.wer, errors: summary.errors, referenceWords: summary.referenceWords,
-  completed: summary.completed, failed: summary.failed });
+  attempted: summary.attempted, completed: summary.completed, failed: summary.failed });
 const median = distribution => distribution?.median ?? null;
+// A run that crashed wrote no run or score, and stays unavailable, never passed.
+const UNAVAILABLE = { unavailable: true };
 
 export function summarizeTarget(folder, fixture) {
-  const run = name => ({ run: read(path.join(folder, name, 'run.json')), score: read(path.join(folder, name, 'score.json')) });
+  const run = name => {
+    const result = { run: readIfThere(path.join(folder, name, 'run.json')), score: readIfThere(path.join(folder, name, 'score.json')) };
+    return result.run && result.score ? result : null;
+  };
   const runs = { none: run('unpaced') };
   for (const condition of CONDITIONS.slice(1)) runs[condition] = run(`words-${condition}`);
   const paced = run('paced');
-  const plain = runs.none.run.trials;
+  const plain = runs.none?.run.trials ?? [];
   const conditions = {};
   for (const condition of CONDITIONS) {
+    if (!runs[condition]) { conditions[condition] = UNAVAILABLE; continue; }
     const { run: { trials }, score } = runs[condition];
     conditions[condition] = { ...accuracy(score), ...myWords(trials, fixture, condition === 'none' ? [] : plain) };
-    if (SAME_AS[condition]) conditions[condition].sameAs = { condition: SAME_AS[condition], ...identical(trials, runs[SAME_AS[condition]].run.trials) };
+    const other = runs[SAME_AS[condition]];
+    if (SAME_AS[condition]) conditions[condition].sameAs = other ? { condition: SAME_AS[condition], ...identical(trials, other.run.trials) } : UNAVAILABLE;
   }
-  const s = runs.none.score.summary, p = paced.score.summary;
+  const s = runs.none?.score.summary, p = paced?.score.summary;
   return { ...read(path.join(folder, 'target.json')),
-    runtimeHashes: runs.none.run.runtimeHashes,
-    accuracy: { unpaced: accuracy(runs.none.score), paced: accuracy(paced.score) },
-    latency: { workerTimePerAudioTime: median(s.serviceRtf), workerTimePerAudioTimeInRealTime: median(p.serviceRtf),
-      firstWordsInRealTimeMs: median(p.firstHypothesisMs), stopToFinalTextMs: median(p.finishAckMs),
-      startAckMs: median(s.startAckMs), coldReadyMs: runs.none.score.coldReadyMs ?? null,
-      maxSampledWorkerRssBytes: s.maxSampledWorkerRssBytes },
+    runtimeHashes: runs.none?.run.runtimeHashes ?? null,
+    accuracy: { unpaced: runs.none ? accuracy(runs.none.score) : UNAVAILABLE, paced: paced ? accuracy(paced.score) : UNAVAILABLE },
+    latency: { workerTimePerAudioTime: median(s?.serviceRtf), workerTimePerAudioTimeInRealTime: median(p?.serviceRtf),
+      firstWordsInRealTimeMs: median(p?.firstHypothesisMs), stopToFinalTextMs: median(p?.finishAckMs),
+      startAckMs: median(s?.startAckMs), coldReadyMs: runs.none?.score.coldReadyMs ?? null,
+      maxSampledWorkerRssBytes: s?.maxSampledWorkerRssBytes ?? null },
     myWords: conditions };
+}
+
+// AGENTS.md's My words gates, against the fixture's pinned bar: an empty list
+// changes nothing, listed terms gain, nothing is invented or recapitalized,
+// listing adds no wrong words, and taught versions it never hears change nothing.
+export function gate(target, bar) {
+  const failures = [];
+  const c = target.myWords;
+  for (const condition of CONDITIONS) {
+    if (c[condition].unavailable) failures.push(`${NAMES[condition]}: unavailable`);
+  }
+  if (target.accuracy.paced.unavailable) failures.push('The real-time run: unavailable');
+  if (failures.length) return failures;
+  for (const condition of CONDITIONS) {
+    const { invented, capitalChanges, errors, failed } = c[condition];
+    if (failed) failures.push(`${NAMES[condition]}: ${failed} clips failed`);
+    if (invented.length > bar.invented) failures.push(`${NAMES[condition]}: ${invented.length} invented terms, over the bar of ${bar.invented}`);
+    if (capitalChanges > bar.capitalChanges) failures.push(`${NAMES[condition]}: ${capitalChanges} changed capitals, over the bar of ${bar.capitalChanges}`);
+    if (condition !== 'none' && errors - c.none.errors > bar.addedErrors) {
+      failures.push(`${NAMES[condition]}: ${errors - c.none.errors} more wrong words than no list, over the bar of ${bar.addedErrors}`);
+    }
+  }
+  for (const condition of ['empty', 'listed-unused-taught']) {
+    const { same, of, unavailable } = c[condition].sameAs;
+    if (unavailable || same !== of) failures.push(`${NAMES[condition]}: changed the words of ${unavailable ? 'unknown' : of - same} clips`);
+  }
+  if (c.listed.listedWrittenAsListed <= c.none.listedWrittenAsListed) {
+    failures.push(`Listed terms gained nothing: ${c.listed.listedWrittenAsListed} of ${c.listed.listedSaid} written as listed, as without a list`);
+  }
+  return failures;
 }
 
 export function summarize(folder) {
   const fixture = read(path.join(folder, 'words', 'benchmark.json'));
-  const baseline = read(path.join(folder, 'baseline.json'));
+  const baseline = readIfThere(path.join(folder, 'baseline.json'));
   const targets = ['this', 'against'].filter(label => fs.existsSync(path.join(folder, label, 'target.json')))
     .map(label => summarizeTarget(path.join(folder, label), fixture));
-  return { schemaVersion: 1, baseline: { passed: baseline.passed, aggregateWer: baseline.aggregateWer ?? null,
-    maxAggregateWer: baseline.maxAggregateWer ?? null, error: baseline.error ?? null }, targets };
+  // Only this checkout's worker is under test; another commit's is shown beside it.
+  const failures = targets.length ? gate(targets[0], fixture.bar) : ['No run of this checkout'];
+  return { schemaVersion: 1,
+    baseline: baseline ? { passed: baseline.passed, aggregateWer: baseline.aggregateWer ?? null,
+      maxAggregateWer: baseline.maxAggregateWer ?? null, error: baseline.error ?? null } : UNAVAILABLE,
+    myWordsGates: { passed: failures.length === 0, bar: fixture.bar, failures }, targets };
 }
 
-const percent = value => (value === null || value === undefined ? 'unavailable' : `${(value * 100).toFixed(2)}%`);
+const percent = value => (value === null || value === undefined || Number.isNaN(value) ? 'unavailable' : `${(value * 100).toFixed(2)}%`);
 const ms = value => (value === null || value === undefined ? 'unavailable' : `${Math.round(value)} ms`);
 const ratio = value => (value === null || value === undefined ? 'unavailable' : value.toFixed(3));
 
 export function markdown(summary) {
-  const { targets, baseline } = summary;
+  const { targets, baseline, myWordsGates } = summary;
+  const errorsOf = a => (a.unavailable ? 'unavailable' : `${percent(a.wer)} (${a.errors}/${a.referenceWords})`);
   const head = targets.map(t => `${t.ref ?? 'this checkout'} (${t.commit.slice(0, 7)})`);
   const row = (label, cells) => `| ${label} | ${cells.join(' | ')} |`;
   const lines = ['# Speech check', '', row('', head), row('---', head.map(() => '---')),
-    row('Accuracy gate, 8 clips', [baseline.passed ? `passed, ${percent(baseline.aggregateWer)}` : `failed${baseline.error ? `: ${baseline.error}` : ''}`,
-      ...targets.slice(1).map(() => 'not run')]),
-    row('Word error rate, 12 clips', targets.map(t => `${percent(t.accuracy.unpaced.wer)} (${t.accuracy.unpaced.errors}/${t.accuracy.unpaced.referenceWords})`)),
-    row('Same, fed in real time', targets.map(t => percent(t.accuracy.paced.wer))),
+    row('Accuracy gate, 8 clips', [baseline.unavailable ? 'unavailable' : baseline.passed ? `passed, ${percent(baseline.aggregateWer)}`
+      : `failed${baseline.error ? `: ${baseline.error}` : ''}`, ...targets.slice(1).map(() => 'not run')]),
+    row('Word error rate, 12 clips', targets.map(t => errorsOf(t.accuracy.unpaced))),
+    row('Same, fed in real time', targets.map(t => (t.accuracy.paced.unavailable ? 'unavailable' : percent(t.accuracy.paced.wer)))),
     row('Worker time per audio time, median', targets.map(t => ratio(t.latency.workerTimePerAudioTime))),
     row('First words in real time, median', targets.map(t => ms(t.latency.firstWordsInRealTimeMs))),
     row('Stop to final text, median', targets.map(t => ms(t.latency.stopToFinalTextMs))),
@@ -141,10 +184,14 @@ export function markdown(summary) {
   for (const condition of CONDITIONS) {
     lines.push(row(NAMES[condition], targets.map(t => {
       const c = t.myWords[condition];
-      const same = c.sameAs ? `; same words as ${NAMES[c.sameAs.condition].toLowerCase()} for ${c.sameAs.same} of ${c.sameAs.of} clips` : '';
+      if (c.unavailable) return 'unavailable';
+      const same = c.sameAs?.unavailable ? '; comparison unavailable'
+        : c.sameAs ? `; same words as ${NAMES[c.sameAs.condition].toLowerCase()} for ${c.sameAs.same} of ${c.sameAs.of} clips` : '';
       return `${percent(c.wer)} / ${c.listedWrittenAsListed} of ${c.listedSaid} / ${c.invented.length} / ${c.capitalChanges}${same}`;
     })));
   }
+  lines.push('', `My words gates for this checkout, bar ${JSON.stringify(myWordsGates.bar)}: ${myWordsGates.passed ? 'passed' : 'failed'}.`);
+  for (const failure of myWordsGates.failures) lines.push(`- ${failure}`);
   return `${lines.join('\n')}\n`;
 }
 
@@ -156,4 +203,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const text = markdown(summary);
   fs.writeFileSync(path.join(folder, 'summary.md'), text, { flag: 'wx', mode: 0o600 });
   process.stdout.write(text);
+  process.exitCode = summary.myWordsGates.passed ? 0 : 1;
 }

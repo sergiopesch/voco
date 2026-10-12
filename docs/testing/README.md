@@ -226,6 +226,11 @@ with every session start. Neither `npm test` nor CI runs it.
   writes and with ones it does. The terms are in
   `tests/fixtures/mywords/benchmark.json`.
 
+It fails when this checkout misses a My words gate: an empty list changes the
+output, listed terms gain nothing, a taught version it never hears changes the
+output, or a condition invents a term, changes a capital or adds a wrong word past
+the fixture's `bar`. A run that crashed counts as unavailable, never passed.
+
 `--against REF`, such as `--against voco.2026.0.62`, also measures that commit's
 speech worker with this checkout's harness and payload, which it must pin too.
 `summary.md` sets the two side by side. The evidence goes to a new folder in

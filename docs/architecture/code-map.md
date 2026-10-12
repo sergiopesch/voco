@@ -294,7 +294,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `test-speech-baseline.mjs` — Accuracy and continuity gate on the public corpus.
 - `evaluate-dictation-worker.py` — Replays the public fixtures through the worker with chosen settings; `--words` sends a My words list and taught versions with every start (tested by `test-evaluate-dictation-worker.py`).
-- `check-speech.sh` and `speech-check-summary.mjs` — One command for the speech evidence: the gate, word error rate and latency unpaced and in real time, and My words in six conditions from `tests/fixtures/mywords/benchmark.json`, optionally beside another commit's worker (`--against`). The summary is tested by `speech-check-summary.test.mjs`.
+- `check-speech.sh` and `speech-check-summary.mjs` — One command for the speech evidence: the gate, word error rate and latency unpaced and in real time, and My words in six conditions from `tests/fixtures/mywords/benchmark.json`, judged by AGENTS.md's My words gates against its pinned bar, optionally beside another commit's worker (`--against`). The summary is tested by `speech-check-summary.test.mjs`.
 - `speech-score.mjs`, `speech-integrity.mjs`, `score-dictation-worker.mjs` — Word error rate and integrity scoring.
 - `dictation-quality.mjs`, `dictation-quality-cli.mjs`, `comparative-dictation.mjs` — Extra quality metrics and comparisons.
 - `test-speech-continuity.mjs`, `audio_continuity.py` — Continuity checks for lost audio.
