@@ -18,8 +18,9 @@ lock stops a running dictation, the fixture then reaches no field, and the short
 starts nothing; a dictation after unlocking delivers as in delivery.
 web-process: WebKit's web process, which runs the renderer that drives dictation, aborts
 while a dictation runs, as one did on CI. VOCO must load its window again: a new web
-process starts, a second renderer reports ready, the tray returns to Ready, and a
-dictation afterwards delivers as in delivery.
+process starts, a second renderer reports ready, the tray returns to Ready, one
+notification says the dictation was interrupted, and a dictation afterwards delivers
+as in delivery.
 Every dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -413,10 +414,16 @@ try:
         wait_for(lambda: counts()['recording_state_active'] > 0, 'capture before the crash')
         crashed = web_processes()
         assert len(crashed) == 1, 'VOCO should run one web process: %r' % crashed
+        # Sent or refused, each notification is traced; the harness runs no notification service.
+        notifications = lambda: sum(n for event, n in counts().items() if event.startswith('desktop_notification_'))
+        notified = notifications()
         os.kill(crashed[0], signal.SIGABRT)
         wait_for(lambda: counts()['frontend_hotkey_handler_ready'] > 1, 'a new renderer after the crash', timeout=30)
+        assert counts()['web_process_reloaded'] == 1, 'VOCO did not load its window again exactly once'
         assert web_processes() and crashed[0] not in web_processes(), 'WebKit started no new web process'
         wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready after the crash', timeout=15)
+        wait_for(lambda: notifications() > notified, 'VOCO to say the dictation was interrupted', timeout=5)
+        assert notifications() == notified + 1, 'VOCO sent more than one notification for the crash'
         assert field.get_text() == other.get_text() == '', 'Text reached a field from the crashed dictation'
         mutations.clear()
         # The rest is a delivery case.
