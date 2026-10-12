@@ -88,11 +88,22 @@ def screenshot(name):
     panel_code = code.replace('800,600)', '800,32)')
     subprocess.run(['/usr/bin/python3','-c',panel_code,str(evidence / ('panel-'+name+'.png'))], env={**os.environ,'DISPLAY':':77','GDK_BACKEND':'x11'}, check=True)
 def start_shell():
+    global shell
     if headless:
         # GNOME 50 has neither --nested nor --sm-disable. The virtual monitor has
         # the nested window's 800x600, so every geometry check keeps its meaning.
-        return subprocess.Popen(['gnome-shell','--headless','--virtual-monitor','800x600','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test'], stdout=log,stderr=subprocess.STDOUT)
-    return subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+        shell = subprocess.Popen(['gnome-shell','--headless','--virtual-monitor','800x600','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test'], stdout=log,stderr=subprocess.STDOUT)
+    else:
+        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+    # A busy runner has taken 16 seconds to start the Shell, so the checks'
+    # own time starts once the probe answers.
+    deadline = time.monotonic() + 60
+    while True:
+        pump(.1)
+        try: inspect(); return
+        except GLib.Error: pass
+        assert shell.poll() is None, 'The Shell exited while starting'
+        assert time.monotonic() < deadline, 'The Shell did not start'
 class RemoteInput:
     """Real compositor input through Mutter's RemoteDesktop API, the path GNOME Remote Desktop uses."""
     # Evdev key and button codes.
@@ -158,13 +169,8 @@ try:
     for schema,key,value in settings:
         subprocess.run(['gsettings','set',schema,key,value],check=True)
     log = (evidence / 'shell.log').open('w')
-    shell = start_shell()
+    start_shell()
     if installed_mode:
-        for _ in range(150):
-            pump(.1)
-            try: inspect(); break
-            except GLib.Error: pass
-        else: raise AssertionError('Shell setup probe did not load')
         missing = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
         assert missing.returncode == 2 and 'missing' in missing.stdout, missing
         before = subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True)
@@ -184,7 +190,7 @@ try:
         previous_metadata = {**current_metadata, 'version': current_metadata['version'] - 1}
         metadata_path.write_text(json.dumps(previous_metadata))
         shell.terminate(); shell.wait(timeout=10); pump(.5)
-        shell = start_shell()
+        start_shell()
         for _ in range(150):
             pump(.1)
             try:
@@ -197,7 +203,7 @@ try:
         report['freshPanelSetup']['loadedOldVersionAfterUpgrade'] = upgraded.stdout
         # Recreate the isolated shell session only, as the installer instructs.
         shell.terminate(); shell.wait(timeout=10); pump(.5)
-        shell = start_shell()
+        start_shell()
     for _ in range(150):
         pump(.1)
         try:
