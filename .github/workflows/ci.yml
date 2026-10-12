@@ -66,6 +66,7 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
+        timeout-minutes: 10
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -256,6 +257,7 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
+        timeout-minutes: 10
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -345,6 +347,7 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
+        timeout-minutes: 10
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -493,6 +496,7 @@ jobs:
           persist-credentials: false
 
       - name: Install system dependencies
+        timeout-minutes: 10
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -565,6 +569,7 @@ jobs:
       image: ${{ matrix.image }}
     steps:
       - name: Install checkout and provisioning tools
+        timeout-minutes: 10
         run: ${{ matrix.tools }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -574,6 +579,7 @@ jobs:
       # The package's dependencies by this distribution's names: a renamed or
       # missing package fails here, before a release does.
       - name: Install VOCO's package dependencies
+        timeout-minutes: 10
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           if command -v apt-get >/dev/null; then
