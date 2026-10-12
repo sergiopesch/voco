@@ -16,6 +16,10 @@ lock: a fake logind on a private system bus serves this session, locked when VOC
 so its first read must see the lock and the shortcut starts nothing. After unlocking, a
 lock stops a running dictation, the fixture then reaches no field, and the shortcut again
 starts nothing; a dictation after unlocking delivers as in delivery.
+web-process: WebKit's web process, which runs the renderer that drives dictation, aborts
+while a dictation runs, as one did on CI. VOCO must load its window again: a new web
+process starts, a second renderer reports ready, the tray returns to Ready, and a
+dictation afterwards delivers as in delivery.
 Every dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -46,7 +50,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'launcher', 'autostart'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
@@ -109,6 +113,17 @@ def app_ready():
     output = (root / 'evidence/full-app.log').read_text()
     assert 'Selected speech model startup failed' not in output, 'Speech model startup failed; see full-app.log'
     return 'Bundled Nemotron streaming model ready' in output and counts()['frontend_hotkey_handler_ready'] > 0
+
+def web_processes():
+    # The private PID namespace holds only VOCO's.
+    found = []
+    for entry in Path('/proc').iterdir():
+        try:
+            if entry.name.isdigit() and Path(os.readlink(entry / 'exe')).name == 'WebKitWebProcess':
+                found.append(int(entry.name))
+        except OSError:
+            pass # gone, or not ours to read
+    return found
 
 def play(description):
     player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
@@ -393,6 +408,18 @@ try:
         pump(.5)
         mutations.clear()
         # The rest is a delivery case.
+    if case == 'web-process':
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        wait_for(lambda: counts()['recording_state_active'] > 0, 'capture before the crash')
+        crashed = web_processes()
+        assert len(crashed) == 1, 'VOCO should run one web process: %r' % crashed
+        os.kill(crashed[0], signal.SIGABRT)
+        wait_for(lambda: counts()['frontend_hotkey_handler_ready'] > 1, 'a new renderer after the crash', timeout=30)
+        assert web_processes() and crashed[0] not in web_processes(), 'WebKit started no new web process'
+        wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready after the crash', timeout=15)
+        assert field.get_text() == other.get_text() == '', 'Text reached a field from the crashed dictation'
+        mutations.clear()
+        # The rest is a delivery case.
     note_focus('before-start')
     # The lock case already ran one recording: wait for this one's events.
     before = counts()
@@ -435,7 +462,7 @@ try:
         assert all(after.startswith(before) and len(after) > len(before) for before, after in zip(history, history[1:])), 'Field %s changed other than by appended paste' % label
     # xdotool sends one Shift+Insert per dispatched chunk, joining space included.
     assert len(changes) <= c['dictation_desktop_paste_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
-    if case in ('delivery', 'lock'):
+    if case in ('delivery', 'lock', 'web-process'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
     elif case == 'spelling':
@@ -493,6 +520,8 @@ finally:
         boundary = [{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
                     'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
                     'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']
+        if case == 'web-process':
+            boundary.insert(1, 'a WebKit web process aborted mid-dictation and loaded again')
     report = dict(passed=passed, failure=failure, expectedOutcome=LAUNCH.get(case, 'pasted-into-focused-field'), case=case,
                   buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
                   callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=[] if case in LAUNCH else expected,
