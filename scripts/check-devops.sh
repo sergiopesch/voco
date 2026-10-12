@@ -270,7 +270,8 @@ if commands.count("run: npm run test:chromium-exact-field") != 1:
     raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
 # A stalled package mirror fails its step in minutes instead of holding the runner.
 for step in re.split(r"\n(?=      - |  \S)", steps):
-    installs = re.search(r"\b(?:apt-get|dnf) install\b|\$\{\{ matrix\.tools \}\}", step)
+    # Playwright's --with-deps installs the browser's packages with apt.
+    installs = re.search(r"\b(?:apt-get|dnf) install\b|playwright install --with-deps|\$\{\{ matrix\.tools \}\}", step)
     if step.startswith("      - ") and installs and not re.search(r"^        timeout-minutes: \d+$", step, re.M):
         name = step.splitlines()[0].strip()
         raise SystemExit(f"{workflow_path} needs timeout-minutes on the step that installs packages: {name}")

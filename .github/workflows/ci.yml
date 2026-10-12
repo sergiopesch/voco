@@ -120,6 +120,7 @@ jobs:
         run: npm test
 
       - name: Install renderer test browser
+        timeout-minutes: 10
         run: npx playwright install --with-deps chromium
 
       - name: Branded interface and panel state regression
@@ -374,6 +375,7 @@ jobs:
         run: npm ci
 
       - name: Install test browser
+        timeout-minutes: 10
         run: npx playwright install --with-deps chromium
 
       - name: Build production frontend
