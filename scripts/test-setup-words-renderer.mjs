@@ -253,6 +253,27 @@ try {
     await shot('setup-ready-shortcut-note-minimum-window', { width: 760, height: 560 });
     results.push({ case: 'the-last-screen-leads-with-the-shortcut-fix', passed: true });
 
+    // Enable live panel there: within a diagnostics poll the note gives the next
+    // step, and still says what the shortcut does until then.
+    const consequence = 'Alt+D also reaches the app you are dictating into: browsers move the cursor to the address bar, so your words land there, and terminals delete a word.';
+    const enableNote = `${consequence} Enable the VOCO panel in Help, then sign out and back in.`;
+    await load({ desktopInput: { available: true, detail: enableNote, setupArea: 'panel' },
+        panel: { status: 'disabled', detail: 'Enable live microphone bars and the VOCO menu in your top panel.', canEnable: true } });
+    await page.evaluate(([note, after, restart]) => {
+        window.liveNote = note;
+        window.nativeHandlers.getRuntimeDiagnostics = () => ({ sessionType: 'wayland', typeSimulation: { available: true, missingCommands: [] },
+            clipboard: { available: true, missingCommands: [] }, ibusShortcut: { setupState: 'ready', available: true },
+            desktopInput: { available: true, detail: window.liveNote, setupArea: 'panel' } });
+        window.nativeHandlers.enableGnomePanel = () => { window.liveNote = after; return restart; };
+    }, [enableNote, `${consequence} ${signOut}`, { status: 'restart', detail: signOut, canEnable: false }]);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await handoff.getByText(enableNote, { exact: true }).waitFor();
+    await handoff.getByRole('button', { name: 'Enable live panel', exact: true }).click();
+    await handoff.getByText(`${consequence} ${signOut}`, { exact: true }).waitFor({ timeout: 5000 });
+    assert.equal(await handoff.getByText('Enable the VOCO panel in Help', { exact: false }).count(), 0);
+    assert.equal((await handoff.innerText()).split('Sign out and back in').length, 2, 'The fix reads once');
+    results.push({ case: 'enabling-the-panel-updates-the-shortcut-note', passed: true });
+
     // Continue without saying it keeps the name, edited if they changed it.
     await load();
     await nameField().fill('  Siobhán   Ní Kelly ');

@@ -227,6 +227,10 @@ export function ControlPanel({
   const previousMicrophone = useRef(nativeMicrophone?.selected?.selectionToken ?? selectedDeviceId);
   const desktopInput = isOnboarding ? inputReadiness ?? runtimeDiagnostics?.desktopInput : runtimeDiagnostics?.desktopInput;
   const desktopSetupError = desktopInput?.available === false ? desktopInput.detail : null;
+  // The once-a-second diagnostics follow a panel change, such as Enable live
+  // panel or the companion attaching, without another setup check.
+  const shortcutInput = runtimeDiagnostics?.desktopInput ?? desktopInput;
+  const shortcutNote = shortcutInput?.available && shortcutInput.setupArea === "panel" ? shortcutInput.detail : null;
   const testPassed = useStore(state => state.onboardingTestPassed);
   const testPurpose = useStore(state => state.dictationPurpose);
   const spellingConfirmed = useStore(state => state.onboardingSpellingConfirmed);
@@ -819,7 +823,7 @@ export function ControlPanel({
             saving={saving}
             blocked={!onStartTest || nativeMicrophone?.mode === "pending"}
             desktopReady={inputReadiness?.available === true}
-            shortcutNote={desktopInput?.available && desktopInput.setupArea === "panel" ? desktopInput.detail : null}
+            shortcutNote={shortcutNote}
             microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
               ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />
               : <div className="voco-preferences__form"><DeviceSelect label="Microphone" value={selectedDeviceId ?? ""} disabled={saving || dictationBusy || testPreparing}
