@@ -72,8 +72,9 @@ VOCO treats every app the same. It pastes into whichever window has keyboard
 focus, and it doesn't detect terminals, browsers or other apps to change what it
 does. There are no per-app settings.
 
-That's why VOCO can't tell a password field from any other field. Don't dictate
-into one.
+That's also why, when it pastes, VOCO can't tell a password field from any other
+field, so don't dictate into one. The optional Chromium extension, which writes
+into one field itself, refuses password fields.
 
 ### No appearance settings
 
