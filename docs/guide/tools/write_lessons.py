@@ -618,8 +618,8 @@ lesson(
     ],
     [
         (
-            "A joining space inside the paste",
-            "When new words start with VOCO's joining space, the space is part of the pasted text, never a key. Chromium's address bar strips pasted leading spaces, so there a continuing phrase joins the previous word.",
+            "A joining space pasted on its own",
+            "When new words start with VOCO's joining space, VOCO pastes the space by itself first, then the words, and never types it as a key. Chromium's address bar strips the spaces around pasted text but keeps a paste of only whitespace as one space. In the Chromium extension's field, the space stays with its words.",
         ),
         (
             "Three failure outcomes",
@@ -656,7 +656,7 @@ lesson(
         (B + "desktop_session.rs", "Tracks the originating desktop session and asks logind whether it is active and locked."),
         (F + "lib/dictationRecording.ts", "Checks paste readiness before a recording starts."),
         (F + "App.tsx", "Hides VOCO's window before dictation into another app."),
-        (F + "lib/dictationStream.ts", "Hands new words to delivery one group at a time."),
+        (F + "lib/dictationStream.ts", "Hands new words to delivery one group at a time, a joining space on its own."),
         (
             B + "process_runner.rs",
             "Runs helper programs within bounds and tells a failed start apart from a failure after the helper may have acted.",
@@ -1518,6 +1518,10 @@ lesson(
             "Without the companion, the tray shows 3 state icons and, while you dictate, animates 64 meter frames every 90 ms.",
         ),
         ("The check cache", "VOCO reuses a panel check for 20 seconds, or for 2 seconds after a failed check."),
+        (
+            "Until the next login",
+            "The Shell loads a newly installed companion at the next login, so until then the focused app also gets Alt+D. Setup's last step then leads with VOCO's note on what the shortcut does there and the fix, and the dictation instruction follows it. The note comes from the once-a-second diagnostics, so it changes when you enable the panel.",
+        ),
     ],
     [
         (
@@ -1533,6 +1537,7 @@ lesson(
         (B + "tray_icons.rs", "Writes the state icons and meter frames once."),
         (P + "voco_gnome_panel.py", "The helper behind --check-panel and --setup-panel."),
         (F + "components/PanelSetup.tsx", "The Enable live panel button in setup and Help."),
+        (F + "components/Onboarding.tsx", "Setup, whose last step leads with the shortcut note."),
         (
             "scripts/test-gnome-panel.py",
             "Runs real GNOME actors with a synthetic, transcript-free fixture.",

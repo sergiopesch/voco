@@ -804,8 +804,8 @@
     ],
     "facts": [
       {
-        "title": "A joining space inside the paste",
-        "text": "When new words start with VOCO's joining space, the space is part of the pasted text, never a key. Chromium's address bar strips pasted leading spaces, so there a continuing phrase joins the previous word."
+        "title": "A joining space pasted on its own",
+        "text": "When new words start with VOCO's joining space, VOCO pastes the space by itself first, then the words, and never types it as a key. Chromium's address bar strips the spaces around pasted text but keeps a paste of only whitespace as one space. In the Chromium extension's field, the space stays with its words."
       },
       {
         "title": "Three failure outcomes",
@@ -859,7 +859,7 @@
       },
       {
         "path": "apps/desktop/src/lib/dictationStream.ts",
-        "why": "Hands new words to delivery one group at a time."
+        "why": "Hands new words to delivery one group at a time, a joining space on its own."
       },
       {
         "path": "apps/desktop/src-tauri/src/process_runner.rs",
@@ -2182,6 +2182,10 @@
       {
         "title": "The check cache",
         "text": "VOCO reuses a panel check for 20 seconds, or for 2 seconds after a failed check."
+      },
+      {
+        "title": "Until the next login",
+        "text": "The Shell loads a newly installed companion at the next login, so until then the focused app also gets Alt+D. Setup's last step then leads with VOCO's note on what the shortcut does there and the fix, and the dictation instruction follows it. The note comes from the once-a-second diagnostics, so it changes when you enable the panel."
       }
     ],
     "files": [
@@ -2224,6 +2228,10 @@
       {
         "path": "apps/desktop/src/components/PanelSetup.tsx",
         "why": "The Enable live panel button in setup and Help."
+      },
+      {
+        "path": "apps/desktop/src/components/Onboarding.tsx",
+        "why": "Setup, whose last step leads with the shortcut note."
       },
       {
         "path": "scripts/test-gnome-panel.py",
