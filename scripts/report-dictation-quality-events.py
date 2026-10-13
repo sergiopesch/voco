@@ -21,7 +21,7 @@ NUMBERS |= {f'{prefix}_{unit}' for prefix in ('recognized', 'previous', 'committ
             for unit in ('utf8_bytes', 'unicode_scalars', 'utf16_units')}
 DURATIONS = {'duration_ms', 'queue_age_ms', 'max_queue_age_ms', 'pending_age_ms', 'latest_age_ms',
              'settle_ms', 'modifier_wait_ms'}
-BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'clipboard_changed', 'joining_space'}
+BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'clipboard_changed', 'joining_space', 'held_space'}
 OUTCOMES = {'finished', 'incomplete', 'cancelled', 'failed', 'dispatched', 'rejected', 'no-mutation', 'uncertain'}
 
 
@@ -104,8 +104,9 @@ def stream_summary(events, envelope_incomplete):
             reasons.add('hypothesis_correlation_incomplete')
         if native_event.get('outcome') != 'dispatched':
             reasons.add('native_dispatch_not_successful')
-        # A joining space goes alone, so its delivery reaches only part of the hypothesis.
-        joining = request.get('joining_space') is True
+        # A joining space goes alone, and a chunk's trailing space waits for the
+        # words it joins, so either delivery reaches only part of the hypothesis.
+        joining = request.get('joining_space') is True or request.get('held_space') is True
         for unit in ('utf8_bytes', 'unicode_scalars', 'utf16_units'):
             hypothesis_length = hypotheses.get(seq, {}).get(f'recognized_{unit}')
             target = request.get(f'target_{unit}')

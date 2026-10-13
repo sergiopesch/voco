@@ -127,8 +127,8 @@ can't create it at startup, it tries again before each paste. X11 sessions use
 
 Each paste is Shift+Insert, sent as separate key events 12 ms apart. When a
 phrase continues the previous one, its joining space is pasted on its own first,
-because Chromium's address bar strips the spaces around pasted text but keeps a
-paste of only whitespace. Passive evdev ignores VOCO's keyboard, so its keys
+and no paste ends in a space, because Chromium's address bar strips the spaces
+around pasted text but keeps a paste of only whitespace. Passive evdev ignores VOCO's keyboard, so its keys
 never count as your shortcut or a held modifier.
 
 No daemon, service, socket or group is involved. VOCO needs only read and write

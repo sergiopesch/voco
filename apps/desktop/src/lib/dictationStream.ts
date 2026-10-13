@@ -219,11 +219,18 @@ export class DictationStream {
     this.delivery = (async () => {
       let pendingSince: number | null = null;
       try {
-        while (!this.cancelled && !this.failure && !this.deliveryFailure && this.latest !== this.committed) {
+        while (!this.cancelled && !this.failure && !this.deliveryFailure && this.ready()) {
           const suffix = appendOnlySuffix(this.committed, this.latest);
-          // A joining space goes alone, ahead of the words it joins.
-          const joiningSpace = this.joiningSpaceAlone ? /^\s+(?=\S)/.exec(suffix)?.[0] : undefined;
-          const chunk = joiningSpace ?? suffix;
+          // A push can end in a space while a held-back word may still change.
+          // That space waits for the words it joins, as a chunk's trailing space
+          // is stripped by Chromium's address bar and refused by the extension in
+          // url fields; only the final text, which nothing extends, goes out whole.
+          // For desktop paste, whitespace at either end of the words goes alone,
+          // as the address bar keeps a paste of only whitespace.
+          const deliverable = this.finishResponded ? suffix : suffix.trimEnd();
+          const space = this.joiningSpaceAlone ? /^\s+/.exec(deliverable)?.[0] : undefined;
+          const chunk = space ?? (this.joiningSpaceAlone ? deliverable.trimEnd() : deliverable);
+          const heldSpace = space === undefined && chunk.length < suffix.length;
           const target = this.committed + chunk;
           const hypothesisSeq = this.latestSeq;
           const hypothesisCount = this.hypothesisCount;
@@ -235,7 +242,8 @@ export class DictationStream {
             committed_hypothesis_seq: this.committedSeq,
             coalesced_hypotheses: Math.max(0, hypothesisCount - this.committedHypothesisCount - 1),
             pending_age_ms: started - (this.pendingSince ?? started),
-            latest_age_ms: started - this.latestAt, joining_space: joiningSpace !== undefined,
+            latest_age_ms: started - this.latestAt, joining_space: space !== undefined,
+            held_space: heldSpace,
             ...textLengths(this.committed, "committed"), ...textLengths(target, "target"),
             ...textLengths(chunk, "suffix"),
           }));
@@ -276,6 +284,13 @@ export class DictationStream {
         this.delivering = false;
       }
     })();
+  }
+
+  /** Whether text is ready to deliver: trailing whitespace waits for the words
+   * it joins, except in the final text. */
+  private ready() {
+    const rest = this.latest.slice(this.committed.length);
+    return this.finishResponded ? rest.length > 0 : /\S/.test(rest);
   }
 
   pushAudio(audio: Float32Array, rate: number) {
@@ -341,7 +356,7 @@ export class DictationStream {
     await this.pending;
     await this.delivery;
     // Deferred ("no-mutation") text gets a few bounded retries at Stop.
-    for (let attempt = 0; attempt < 3 && this.latest !== this.committed
+    for (let attempt = 0; attempt < 3 && this.ready()
       && !this.cancelled && !this.failure && !this.deliveryFailure; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 250));
       this.deliver();
