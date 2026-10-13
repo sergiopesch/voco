@@ -87,7 +87,7 @@ pub fn check_access() -> Result<(), String> {
         .map_err(|_| ACCESS_HELP.to_string())
 }
 
-/// The ordered key steps of one paste: Shift+Insert. A joining space travels
+/// The ordered key steps of one paste: Shift+Insert. Every space travels
 /// inside the pasted text, never as a key.
 const PASTE_STEPS: [(KeyCode, i32); 4] = [
     (KeyCode::KEY_LEFTSHIFT, 1),

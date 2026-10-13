@@ -257,8 +257,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         "finish_responded",
         "accepted_equals_dispatched",
         "clipboard_changed",
-        "joining_space",
-        "held_space",
+        "partial",
     ] {
         if let Some(value) = request[key].as_bool() {
             safe[key] = json!(value);
@@ -675,20 +674,13 @@ mod tests {
     }
 
     #[test]
-    fn a_joining_space_delivery_keeps_its_flag() {
+    fn a_partial_delivery_keeps_its_flag_and_drops_retired_ones() {
         let request = json!({"event":"delivery_requested", "session":"12345678-1234-1234-1234-123456789abc",
-            "delivery_seq":2, "joining_space":true, "suffix_utf8_bytes":1});
+            "delivery_seq":2, "partial":true, "joining_space":true, "held_space":true, "suffix_utf8_bytes":4});
         let safe = speech_quality_payload(&request).unwrap();
-        assert_eq!(safe["joining_space"], true);
-        assert_eq!(safe["suffix_utf8_bytes"], 1);
-    }
-
-    #[test]
-    fn a_delivery_that_held_its_trailing_space_keeps_its_flag() {
-        let request = json!({"event":"delivery_requested", "session":"12345678-1234-1234-1234-123456789abc",
-            "delivery_seq":2, "joining_space":false, "held_space":true, "suffix_utf8_bytes":1});
-        let safe = speech_quality_payload(&request).unwrap();
-        assert_eq!(safe["held_space"], true);
+        assert_eq!(safe["partial"], true);
+        assert_eq!(safe["suffix_utf8_bytes"], 4);
+        assert!(safe.get("joining_space").is_none() && safe.get("held_space").is_none());
     }
 
     #[test]

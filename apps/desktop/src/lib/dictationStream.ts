@@ -19,6 +19,37 @@ export function appendOnlySuffix(committed: string, text: string): string {
   return text.slice(committed.length);
 }
 
+// A paste ends only between graphemes, so it never splits a letter from its
+// combining marks, a ZWJ sequence or a surrogate pair.
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+// Whitespace and control characters: insertion.rs pastes ASCII controls as spaces.
+const blank = /[\s\p{Cc}]/u;
+const leadingBlanks = /^[\s\p{Cc}]+(?=[^\s\p{Cc}])/u;
+const trailingBlanks = /[\s\p{Cc}]+$/u;
+
+/** The longest start of a desktop suffix that ends between two graphemes
+ * without whitespace, so every space travels inside a paste: Chromium's address
+ * bar strips the spaces around pasted text, and its rich-text fields turn a
+ * space pasted alone into a no-break space. Empty while there's no such end.
+ * The suffix starts at one, or at the worker's text, which never starts with a
+ * space. */
+export function desktopChunk(suffix: string): string {
+  let end = 0;
+  let previous = "";
+  for (const { segment, index } of graphemes.segment(suffix)) {
+    if (index > 0 && !blank.test(previous) && !blank.test(segment)) end = index;
+    previous = segment;
+  }
+  return suffix.slice(0, end);
+}
+
+/** After this much audio brings no new words, the held text goes out on its
+ * own. Recognition adds words every 0.6 s or sooner 90% of the time on public
+ * speech, so in 100 ms packets this releases after 0.8 s: a pause, not the
+ * cadence of recognition. Counted in audio, so it can't fire while the worker
+ * catches up on speech it hasn't recognized yet. */
+export const QUIET_RELEASE_S = 0.75;
+
 // Request sequence is the hypothesis identity in the worker protocol. IDs are
 // scoped by the random stream session and never contain transcript content.
 export interface PasteCorrelation {
@@ -82,6 +113,8 @@ export class DictationStream {
   private qualityInFlight = 0;
   private qualitySeq = 0;
   private qualityDropped = 0;
+  private quietSamples = 0;
+  private released = false;
 
   private quality(event: string, fields: Record<string, number | boolean | string | null> | (() => Record<string, number | boolean | string | null>) = {}) {
     if (!this.recordDeliveryQuality) return;
@@ -125,9 +158,9 @@ export class DictationStream {
     private recordDeliveryQuality = true,
     /** A Say it check, which Rust starts as recognized, without spelling. */
     private wordsCheck = false,
-    /** For desktop paste: Chromium's address bar strips the spaces around
-     * pasted text but keeps a paste of only whitespace as one space. */
-    private joiningSpaceAlone = false,
+    /** For desktop paste, which ends each live chunk inside the words
+     * (`desktopChunk`); a browser field appends exactly instead. */
+    private spacesInsidePastes = false,
   ) {
     this.schedule("start");
   }
@@ -179,6 +212,7 @@ export class DictationStream {
         }
         this.respondedSamples += audio?.length ?? 0;
         if (op === "finish") this.finishResponded = true;
+        if (op === "push" && (response.text === null || response.text === this.latest)) this.quiet(audio?.length ?? 0);
         if (response.text === null) return;
         if (typeof response.text !== "string") throw new Error("Invalid recognizer text");
         const text = response.text;
@@ -200,6 +234,8 @@ export class DictationStream {
           this.hypothesisCount++;
           this.latestAt = performance.now();
           if (this.pendingSince === null) this.pendingSince = this.latestAt;
+          this.quietSamples = 0;
+          this.released = false;
         }
         if (hypothesisRecorded) this.latestSeq = seq;
         this.latest = text;
@@ -219,18 +255,10 @@ export class DictationStream {
     this.delivery = (async () => {
       let pendingSince: number | null = null;
       try {
-        while (!this.cancelled && !this.failure && !this.deliveryFailure && this.ready()) {
+        while (!this.cancelled && !this.failure && !this.deliveryFailure) {
           const suffix = appendOnlySuffix(this.committed, this.latest);
-          // A push can end in a space while a held-back word may still change.
-          // That space waits for the words it joins, as a chunk's trailing space
-          // is stripped by Chromium's address bar and refused by the extension in
-          // url fields; only the final text, which nothing extends, goes out whole.
-          // For desktop paste, whitespace at either end of the words goes alone,
-          // as the address bar keeps a paste of only whitespace.
-          const deliverable = this.finishResponded ? suffix : suffix.trimEnd();
-          const space = this.joiningSpaceAlone ? /^\s+/.exec(deliverable)?.[0] : undefined;
-          const chunk = space ?? (this.joiningSpaceAlone ? deliverable.trimEnd() : deliverable);
-          const heldSpace = space === undefined && chunk.length < suffix.length;
+          const chunk = this.deliverable(suffix);
+          if (!chunk) break;
           const target = this.committed + chunk;
           const hypothesisSeq = this.latestSeq;
           const hypothesisCount = this.hypothesisCount;
@@ -242,8 +270,7 @@ export class DictationStream {
             committed_hypothesis_seq: this.committedSeq,
             coalesced_hypotheses: Math.max(0, hypothesisCount - this.committedHypothesisCount - 1),
             pending_age_ms: started - (this.pendingSince ?? started),
-            latest_age_ms: started - this.latestAt, joining_space: space !== undefined,
-            held_space: heldSpace,
+            latest_age_ms: started - this.latestAt, partial: chunk.length < suffix.length,
             ...textLengths(this.committed, "committed"), ...textLengths(target, "target"),
             ...textLengths(chunk, "suffix"),
           }));
@@ -286,11 +313,34 @@ export class DictationStream {
     })();
   }
 
-  /** Whether text is ready to deliver: trailing whitespace waits for the words
-   * it joins, except in the final text. */
+  /** The part of an undelivered suffix to deliver now. Until the final text,
+   * which nothing extends and so goes out whole, a desktop paste ends inside
+   * the words, unless a quiet release lets the held text go, and a browser
+   * field's exact append leaves a trailing space for the words it joins: the
+   * extension refuses a url field that ends in one. After a release, the next
+   * desktop words begin with their joining space, which goes alone, as the
+   * address bar keeps a paste of only whitespace. */
+  private deliverable(suffix: string) {
+    const space = this.spacesInsidePastes ? leadingBlanks.exec(suffix)?.[0] : undefined;
+    if (space) return space;
+    if (this.finishResponded) return suffix;
+    if (!this.spacesInsidePastes) return suffix.trimEnd();
+    return this.released ? suffix.replace(trailingBlanks, "") : desktopChunk(suffix);
+  }
+
+  /** Counts audio that brought no new words. After QUIET_RELEASE_S of it, the
+   * held text, but not its trailing space, goes out through deliver(), so it
+   * waits for a paste in flight; never after Stop or cancel. */
+  private quiet(samples: number) {
+    if (!this.spacesInsidePastes || this.ending || this.released) return;
+    this.quietSamples += samples;
+    if (this.quietSamples < this.rate * QUIET_RELEASE_S) return;
+    this.released = true;
+    this.deliver();
+  }
+
   private ready() {
-    const rest = this.latest.slice(this.committed.length);
-    return this.finishResponded ? rest.length > 0 : /\S/.test(rest);
+    return this.deliverable(this.latest.slice(this.committed.length)) !== "";
   }
 
   pushAudio(audio: Float32Array, rate: number) {

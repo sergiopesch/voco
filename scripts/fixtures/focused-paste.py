@@ -24,7 +24,7 @@ PASTE_SETTLE_S = .15
 def replica(text):
     # paste_text: ASCII controls, including line endings, become spaces.
     routed = re.sub('[\x00-\x1f\x7f]', ' ', text)
-    # A joining space is pasted text, never a key.
+    # A space is pasted text, never a key.
     payload = routed
     for selection in ('clipboard', 'primary'):
         # Without -quiet, xclip forks and serves the selection it now owns.

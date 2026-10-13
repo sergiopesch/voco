@@ -313,9 +313,10 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
     }
     let routed = paste_text(text);
-    // A joining space is pasted, never sent as a Space key: on a focused
-    // button, checkbox or terminal prompt a Space key would act. The stream
-    // pastes it on its own (dictationStream.ts).
+    // A space is pasted, never sent as a Space key: on a focused button,
+    // checkbox or terminal prompt a Space key would act. The stream ends each
+    // live paste inside the words, so every space travels inside one
+    // (dictationStream.ts).
     let payload = routed.as_str();
     let helper = desktop_clipboard_helper();
     let preflight_ms = elapsed_ms(started);
@@ -980,7 +981,7 @@ mod tests {
         assert_eq!(record["input_utf8_bytes"], 7);
         assert_eq!(record["input_unicode_scalars"], 3);
         assert_eq!(record["input_utf16_units"], 4);
-        // The joining space stays in the payload.
+        // The space stays in the payload.
         assert_eq!(record["payload_utf8_bytes"], 7);
         assert_eq!(record["payload_unicode_scalars"], 3);
         assert_eq!(record["payload_utf16_units"], 4);
@@ -988,8 +989,8 @@ mod tests {
     }
 
     #[test]
-    fn joining_space_travels_inside_the_paste_never_as_a_key() {
-        // The payload is the routed text itself, joining space included.
+    fn spaces_travel_inside_the_paste_never_as_a_key() {
+        // The payload is the routed text itself, its spaces included.
         assert_eq!(paste_text(" next words"), " next words");
         assert_eq!(paste_text("  indented"), "  indented");
         assert_eq!(

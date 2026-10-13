@@ -153,7 +153,7 @@ says which words are everyday; it loads in its own chunk on the first check.
 
 ### Delivery
 
-Each new suffix goes to `insertion.rs`, one paste at a time:
+Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
 
 1. VOCO checks that the screen isn't locked, then the clipboard helper, plus
    `xdotool` on X11 or access to `/dev/uinput` on Wayland. On Wayland it also makes sure its virtual keyboard
@@ -180,15 +180,27 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
    press is the app's, and the next paste can copy at once. A read only says
    the app asked for the text, so it never changes the paste's outcome.
 
-When a suffix starts with VOCO's joining space, the stream pastes the space on
-its own first, then the words; VOCO never types it as a key. Chromium's address
-bar strips the spaces around pasted text but keeps a paste of only whitespace as
-one space. A push can end in a space, when spelling or My words holds back the
-open word after it; that space waits and becomes the next words' joining space,
-so no chunk ends in whitespace. Only the final text, which nothing extends, goes
-out whole, with a trailing space pasted on its own. A browser field's appends
-follow the same rule, keeping each joining space with its words. VOCO never
-restores the previous clipboard.
+Spaces travel inside pastes, never at their edge, and VOCO never types them as
+keys: Chromium's address bar strips the spaces around pasted text, and its
+rich-text fields turn a space pasted alone into a no-break space. So the
+stream ends each live paste between two graphemes without whitespace and holds
+the rest, usually the last letter, for the next hypothesis: "Hello" pastes as
+"Hell", then "Hello linux" adds "o linu". One `Intl.Segmenter` finds the
+graphemes, so a paste never separates a letter from its combining marks or
+splits a ZWJ sequence. So the last letter doesn't stay hidden through a pause,
+the held text goes out on its own once 0.75 s of audio has brought no new words
+(`QUIET_RELEASE_S`); on public speech recognition adds words every 0.6 s or
+sooner 90% of the time, so in 100 ms packets this waits 0.8 s, and counting
+audio rather than time keeps it from firing while the worker is behind. The
+release goes through `deliver()`, so it waits for a paste in flight, keeps a
+trailing space for the next words and never fires after Stop or cancel. The
+next words then begin with their space, which is pasted alone, as the address
+bar keeps a paste of only whitespace; a rich-text field turns that one into a
+no-break space. The final text, which nothing extends, goes out whole after
+such a space. A browser field appends the words exactly, but a trailing space, which a
+push has when spelling or My words holds back the open word after it, waits for
+the words it joins. A delivery record marks `partial` a delivery that reached
+only part of its hypothesis. VOCO never restores the previous clipboard.
 
 `desktop_session.rs` follows the screen lock of the session VOCO started in,
 through logind's `LockedHint`: it subscribes to the session's changes, then
@@ -228,7 +240,7 @@ sends the partial packet and asks the worker to finish. The AudioWorklet must
 confirm its flush within 80 ms, or VOCO doesn't finish the recording. Then:
 
 - If every word was typed, VOCO clears the audio and deletes the journal entry.
-- If words are left, VOCO copies them, joining space included, to CLIPBOARD and
+- If words are left, VOCO copies them, what waited included, to CLIPBOARD and
   PRIMARY, and notifies "Dictation copied to clipboard" with a prompt to press
   Shift+Insert or Ctrl+V. After an uncertain paste it also warns that some
   words may already be in the app.

@@ -173,14 +173,22 @@ change.
   destination token, focus probe, terminal detection or per-app route. Desktop
   setup checks the paste prerequisites, never a caret or an app.
 - Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
-  Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
-  joining space is pasted on its own, never typed as a key: Chromium's address
-  bar strips the spaces around pasted text but keeps a paste of only whitespace
-  as one space. A push can end in a space while a held-back word may still
-  change; no chunk ends in that whitespace, which waits to join the next words
-  (and the extension refuses a url field left with trailing whitespace). Only
-  the final text goes out whole, a trailing space pasted alone. ASCII controls
-  become spaces. Never send Enter and never restore the previous clipboard.
+  Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. Spaces
+  travel inside pasted text, never as a key or at a paste's edge: Chromium's
+  address bar strips the spaces around pasted text, and its rich-text fields
+  turn a space pasted alone into a no-break space. So each live desktop paste
+  ends between two graphemes without whitespace (`desktopChunk`, with one
+  `Intl.Segmenter`, so a letter keeps its combining marks) and the rest waits
+  for the next hypothesis. After 0.75 s of audio with no new hypothesis
+  (`QUIET_RELEASE_S`, above recognition's usual gaps), the held text goes out
+  through `deliver()`, but not a trailing space and never after Stop or cancel;
+  the next words then begin with their space, pasted alone, which the address
+  bar keeps, so a rich-text field gets at most one no-break space after each
+  pause. The final text, which nothing extends, goes out whole after such a
+  space. Browser field delivery appends exactly, but a trailing space waits for
+  the words it joins: the extension refuses a url field left with one. ASCII
+  controls become spaces. Never send Enter and never restore the previous
+  clipboard.
 - Give the app time to read a paste before the next copy replaces it. On GNOME
   Wayland (`selection_owner.rs`) each copy runs xclip in the foreground with
   `-verbose`, which reports every request it answers except TARGETS, and keeps
@@ -239,10 +247,10 @@ change.
 - Start is refused while paste is unavailable, and when `VOCO_DESKTOP_PASTE=0` or
   `VOCO_DESKTOP_STREAM=0` is set.
 - Only a `no-mutation` failure, which typed nothing, keeps its text pending for the
-  next chunk or for Stop's bounded retries (three, 250 ms apart). A rejected or
+  next chunk, a quiet release, or Stop's bounded retries (three, 250 ms apart). A rejected or
   uncertain paste stops automatic delivery; recognition keeps running until Stop.
   A paste rejection keeps microphone readiness; only a capture failure clears it.
-- Stop copies the undelivered remainder, joining space included, with
+- Stop copies the undelivered remainder, what waited included, with
   `copy_desktop_text`, then notifies. It never replays that text as keys. If the
   copy fails too, `keep_crash_journal` moves the text into Review; only if the
   journal can't keep it does Stop report an interruption. A Chromium exact-field
