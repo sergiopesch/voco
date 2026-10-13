@@ -175,7 +175,12 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
 When a suffix starts with VOCO's joining space, the stream pastes the space on
 its own first, then the words; VOCO never types it as a key. Chromium's address
 bar strips the spaces around pasted text but keeps a paste of only whitespace as
-one space. VOCO never restores the previous clipboard.
+one space. A push can end in a space, when spelling or My words holds back the
+open word after it; that space waits and becomes the next words' joining space,
+so no chunk ends in whitespace. Only the final text, which nothing extends, goes
+out whole, with a trailing space pasted on its own. A browser field's appends
+follow the same rule, keeping each joining space with its words. VOCO never
+restores the previous clipboard.
 
 `desktop_session.rs` follows the screen lock of the session VOCO started in,
 through logind's `LockedHint`: it subscribes to the session's changes, then

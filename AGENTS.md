@@ -176,8 +176,11 @@ change.
   Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. A leading
   joining space is pasted on its own, never typed as a key: Chromium's address
   bar strips the spaces around pasted text but keeps a paste of only whitespace
-  as one space. ASCII controls become spaces. Never send Enter and never restore
-  the previous clipboard.
+  as one space. A push can end in a space while a held-back word may still
+  change; no chunk ends in that whitespace, which waits to join the next words
+  (and the extension refuses a url field left with trailing whitespace). Only
+  the final text goes out whole, a trailing space pasted alone. ASCII controls
+  become spaces. Never send Enter and never restore the previous clipboard.
 - Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every

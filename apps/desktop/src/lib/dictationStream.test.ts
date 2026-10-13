@@ -38,6 +38,36 @@ describe('append-only dictation stream',()=>{
    .toEqual([[1,false,0,5,5],[2,true,5,1,6],[2,false,6,5,11],[3,false,11,1,12]]);
   expect(quality().filter(e=>e.event==='delivery_dispatched').map(e=>e.committed_utf8_bytes)).toEqual([5,6,11,12]);
  });
+ it('holds a trailing space for the words it joins, which an address bar would strip',async()=>{
+  // British spelling holds back an open word starting with "e" (aesthetic), so
+  // a push can end in ", ". Chromium's address bar strips a chunk's trailing
+  // space, and the next words would then run into the comma.
+  const hypotheses=()=>{let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Ernest Dowson, etcetera.':['Ernest Dowson','Ernest Dowson, '][n++]}));};
+  hypotheses();const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();await queue.finish();
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Ernest Dowson',',',' ','etcetera.']);
+  const requested=quality().filter(e=>e.event==='delivery_requested');
+  expect(requested.map(e=>[e.hypothesis_seq,e.joining_space,e.held_space,e.target_utf8_bytes]))
+   .toEqual([[1,false,false,13],[2,false,true,14],[3,true,false,15],[3,false,false,24]]);
+  // A browser field appends the space with the words it joins.
+  hypotheses();transport.mockClear();const field=vi.fn(async(_s:string)=>{});
+  const exact=new DictationStream(field,vi.fn(),vi.fn(),vi.fn(),undefined,false);
+  exact.pushAudio(new Float32Array(3200),16000);exact.enqueue();await exact.finish();
+  expect(field.mock.calls.map(c=>c[0])).toEqual(['Ernest Dowson',',',' etcetera.']);
+ });
+ it('pastes nothing while only a space is new, and a final trailing space alone',async()=>{
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Hello ':['Hello','Hello '][n++]}));
+  const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn();
+  const queue=new DictationStream(paste,observed,vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(3200),16000);
+  await vi.waitFor(()=>expect(observed).toHaveBeenCalledTimes(2));
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello']);
+  queue.enqueue();
+  await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false});
+  // Nothing extends the final text, so it goes out whole, its trailing space alone.
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello',' ']);
+ });
  it('retains a revision and refuses to paste it',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));
   const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');

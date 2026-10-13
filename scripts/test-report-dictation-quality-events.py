@@ -119,6 +119,36 @@ class QualityEventsTest(unittest.TestCase):
         self.assertEqual(result['status'], 'incomplete')
         self.assertEqual(result['runs'][0]['streams'][0]['reasons'], ['hypothesis_target_lengths_mismatch_or_unavailable'])
 
+    def test_a_delivery_that_held_its_trailing_space_reaches_part_of_its_hypothesis(self):
+        # "Dowson", then "Dowson, " delivered as "," with its space held, then
+        # the space alone and "etc." once the next words arrive.
+        def rows(held):
+            sequence = iter(range(100))
+            def quality(stage, front=True, **fields):
+                return dict(event='speech_quality', stage=stage, stream_session_hash='a' * 64,
+                            **(dict(quality_seq=next(sequence), quality_dropped=0) if front else {}), **fields)
+            def delivery(seq, hypothesis, committed, suffix, **request):
+                return [quality('delivery_requested', delivery_seq=seq, hypothesis_seq=hypothesis, **request, **lengths('committed', committed),
+                                **lengths('suffix', suffix), **lengths('target', committed + suffix)),
+                        quality('native_dispatch', False, delivery_seq=seq, hypothesis_seq=hypothesis, outcome='dispatched', settle_ms=0,
+                                modifier_wait_ms=0, routed_utf8_bytes=suffix, **lengths('input', suffix), **lengths('payload', suffix)),
+                        quality('delivery_dispatched', delivery_seq=seq, hypothesis_seq=hypothesis, **lengths('committed', committed + suffix))]
+            body = [dict(event='run_metadata'),
+                    quality('hypothesis', hypothesis_seq=1, previous_hypothesis_seq=0, changed=True, append_only=True, **lengths('recognized', 6)),
+                    *delivery(1, 1, 0, 6),
+                    quality('hypothesis', hypothesis_seq=2, previous_hypothesis_seq=1, changed=True, append_only=True, **lengths('recognized', 8)),
+                    *delivery(2, 2, 6, 1, joining_space=False, held_space=held),
+                    quality('hypothesis', hypothesis_seq=3, previous_hypothesis_seq=2, changed=True, append_only=True, **lengths('recognized', 12)),
+                    *delivery(3, 3, 7, 1, joining_space=True, held_space=False), *delivery(4, 3, 8, 4, joining_space=False, held_space=False),
+                    quality('terminal', hypothesis_seq=3, hypothesis_count=3, delivery_count=4, dispatched_count=4, pending_delivery_count=0,
+                            outcome='finished', finish_responded=True, captured_samples=320, enqueued_samples=320, responded_samples=320,
+                            buffered_samples=0, accepted_equals_dispatched=True, **lengths('accepted', 12), **lengths('dispatched', 12))]
+            return [dict(schema=1, run_id='123456-789', seq=i, t_us=i * 1000, dropped_events=0, **row) for i, row in enumerate(body, 1)]
+        self.assertEqual(self.run_report(rows(True))['status'], 'reconciled_dispatch_metadata')
+        result = self.run_report(rows(False))
+        self.assertEqual(result['status'], 'incomplete')
+        self.assertEqual(result['runs'][0]['streams'][0]['reasons'], ['hypothesis_target_lengths_mismatch_or_unavailable'])
+
     def test_malformed_truncated_or_oversized_lines_are_explicit(self):
         for suffix in (b'not json\n', b'{}', b'x' * (reporter.MAX_LINE_BYTES + 1) + b'\n'):
             result = self.run_report(fixture(), suffix)
