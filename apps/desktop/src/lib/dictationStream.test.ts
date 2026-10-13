@@ -164,6 +164,17 @@ describe('append-only dictation stream',()=>{
    expect(texts(cancelled)).toEqual(['Hello worl']);
   });
  });
+ it('counts a control character as the space it is pasted as, never at a paste edge',async()=>{
+  // insertion.rs pastes ASCII controls as spaces, so one at an edge would be a
+  // space the address bar strips.
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Hello\u001bworld.':['Hello\u001b','Hello\u001bworld'][n++]}));
+  const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();await queue.finish();
+  const chunks=paste.mock.calls.map(c=>c[0]);
+  expect(chunks).toEqual(['Hell','o\u001bworl','d.']);
+  expect(chunks.filter(c=>/^[\s\p{Cc}]|[\s\p{Cc}]$/u.test(c))).toEqual([]);
+ });
  it('retains a revision and refuses to paste it',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));
   const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');

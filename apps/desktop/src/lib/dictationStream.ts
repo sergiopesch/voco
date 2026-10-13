@@ -22,7 +22,10 @@ export function appendOnlySuffix(committed: string, text: string): string {
 // A paste ends only between graphemes, so it never splits a letter from its
 // combining marks, a ZWJ sequence or a surrogate pair.
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-const whitespace = /\s/;
+// Whitespace and control characters: insertion.rs pastes ASCII controls as spaces.
+const blank = /[\s\p{Cc}]/u;
+const leadingBlanks = /^[\s\p{Cc}]+(?=[^\s\p{Cc}])/u;
+const trailingBlanks = /[\s\p{Cc}]+$/u;
 
 /** The longest start of a desktop suffix that ends between two graphemes
  * without whitespace, so every space travels inside a paste: Chromium's address
@@ -34,7 +37,7 @@ export function desktopChunk(suffix: string): string {
   let end = 0;
   let previous = "";
   for (const { segment, index } of graphemes.segment(suffix)) {
-    if (index > 0 && !whitespace.test(previous) && !whitespace.test(segment)) end = index;
+    if (index > 0 && !blank.test(previous) && !blank.test(segment)) end = index;
     previous = segment;
   }
   return suffix.slice(0, end);
@@ -318,11 +321,11 @@ export class DictationStream {
    * desktop words begin with their joining space, which goes alone, as the
    * address bar keeps a paste of only whitespace. */
   private deliverable(suffix: string) {
-    const space = this.spacesInsidePastes ? /^\s+(?=\S)/.exec(suffix)?.[0] : undefined;
+    const space = this.spacesInsidePastes ? leadingBlanks.exec(suffix)?.[0] : undefined;
     if (space) return space;
     if (this.finishResponded) return suffix;
     if (!this.spacesInsidePastes) return suffix.trimEnd();
-    return this.released ? suffix.trimEnd() : desktopChunk(suffix);
+    return this.released ? suffix.replace(trailingBlanks, "") : desktopChunk(suffix);
   }
 
   /** Counts audio that brought no new words. After QUIET_RELEASE_S of it, the
