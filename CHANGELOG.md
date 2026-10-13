@@ -32,11 +32,10 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 - In Chromium's address bar, in Chrome, Brave, Edge and the like, words you
   said after a pause ran into the previous word, because the address bar strips
-  the spaces around pasted text. VOCO now pastes the joining space on its own,
-  which the address bar keeps, and no longer pastes a space at the end of a
-  phrase. With British spelling, "Dowson, etcetera" came out as
-  "Dowson,etcetera", because VOCO briefly holds back a word starting with "e"
-  and pasted the comma with the space after it.
+  the spaces around pasted text. VOCO now ends each paste inside your words, so
+  every space arrives inside a paste, which the address bar and Chromium's
+  rich-text fields, such as an email body, both keep as an ordinary space.
+  While you speak, the last letter waits for the next words.
 - If VOCO's window crashed (WebKit runs it in a process of its own), VOCO
   stayed at Listening and the shortcut did nothing until VOCO was restarted.
   VOCO now loads the window again within a second, says so if you were

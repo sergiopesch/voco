@@ -21,9 +21,9 @@ describe('append-only dictation stream',()=>{
   expect(paste.mock.calls.map(c=>c[0]).join('')).toBe('Every elevation.');
   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Every elevat','ion','.']);
  });
- it('pastes a joining space alone for desktop paste, which an address bar keeps',async()=>{
-  // Chromium's address bar strips the spaces around pasted text but keeps a
-  // paste of only whitespace as one space.
+ it('ends every desktop paste inside the words, so no space is pasted alone or at an edge',async()=>{
+  // Chromium's address bar strips the spaces around pasted text, and its
+  // rich-text fields turn a space pasted alone into a no-break space.
   const hypotheses=()=>{let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Hello linux.':['Hello','Hello linux'][n++]}));};
   hypotheses();const field=vi.fn(async(_s:string)=>{});const exact=new DictationStream(field,vi.fn(),vi.fn(),vi.fn(),undefined,false);
   exact.pushAudio(new Float32Array(3200),16000);exact.enqueue();await exact.finish();
@@ -32,41 +32,71 @@ describe('append-only dictation stream',()=>{
   hypotheses();transport.mockClear();const paste=vi.fn(async(_s:string)=>{});
   const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
   queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();await queue.finish();
-  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello',' ','linux','.']);
+  // The last letter waits for the next words; the final text goes out whole.
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hell','o linu','x.']);
   const requested=quality().filter(e=>e.event==='delivery_requested');
-  expect(requested.map(e=>[e.hypothesis_seq,e.joining_space,e.committed_utf8_bytes,e.suffix_utf8_bytes,e.target_utf8_bytes]))
-   .toEqual([[1,false,0,5,5],[2,true,5,1,6],[2,false,6,5,11],[3,false,11,1,12]]);
-  expect(quality().filter(e=>e.event==='delivery_dispatched').map(e=>e.committed_utf8_bytes)).toEqual([5,6,11,12]);
+  expect(requested.map(e=>[e.hypothesis_seq,e.partial,e.committed_utf8_bytes,e.suffix_utf8_bytes,e.target_utf8_bytes]))
+   .toEqual([[1,true,0,4,4],[2,true,4,6,10],[3,false,10,2,12]]);
+  expect(quality().filter(e=>e.event==='delivery_dispatched').map(e=>e.committed_utf8_bytes)).toEqual([4,10,12]);
  });
- it('holds a trailing space for the words it joins, which an address bar would strip',async()=>{
+ it('keeps every space of real speech inside a desktop paste',async()=>{
+  // The worker's pushes for a public LibriSpeech clip (174-168635-0000).
+  const pushes=['He had',' never',' been',' father',',',' lo','ver',',',' husband',',',' friend'];
+  const final='He had never been father, lover, husband, friend.';
+  let n=0;const texts=pushes.map((_p,i)=>pushes.slice(0,i+1).join(''));
+  worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?final:texts[n++]}));
+  const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(1600*pushes.length),16000);queue.enqueue();await queue.finish();
+  const chunks=paste.mock.calls.map(c=>c[0]);
+  expect(chunks).toEqual(['He ha','d neve','r bee','n fathe','r',', l','ove','r',', husban','d',', frien','d.']);
+  expect(chunks.join('')).toBe(final);
+  expect(chunks.every(chunk=>/^\S(?:[^]*\S)?$/.test(chunk))).toBe(true);
+ });
+ it('never splits a letter from its marks, a ZWJ sequence or a surrogate pair',async()=>{
+  // Adéṣọ̀lá with every accent a combining mark: ọ̀ is o, a dot below and a grave.
+  const name='Adéṣọ̀lá';
+  const texts=['Adéṣọ̀',name+' met 👩‍💻',name+' met 👩‍💻👍'];
+  const final=name+' met 👩‍💻👍 🇬🇧!';
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?final:texts[n++]}));
+  const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(4800),16000);queue.enqueue();await queue.finish();
+  const chunks=paste.mock.calls.map(c=>c[0]);
+  expect(chunks).toEqual(['Adéṣ','ọ̀lá me','t 👩‍💻','👍 🇬🇧!']);
+  expect(chunks.join('')).toBe(final);
+  // No paste starts with a mark, a joiner or the second half of a surrogate pair.
+  expect(chunks.some(chunk=>/^[\p{M}‍\udc00-\udfff]/u.test(chunk))).toBe(false);
+ });
+ it('leaves a trailing space for the words it joins',async()=>{
   // British spelling holds back an open word starting with "e" (aesthetic), so
-  // a push can end in ", ". Chromium's address bar strips a chunk's trailing
-  // space, and the next words would then run into the comma.
+  // a push can end in ", ".
   const hypotheses=()=>{let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Ernest Dowson, etcetera.':['Ernest Dowson','Ernest Dowson, '][n++]}));};
   hypotheses();const paste=vi.fn(async(_s:string)=>{});
   const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
   queue.pushAudio(new Float32Array(3200),16000);queue.enqueue();await queue.finish();
-  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Ernest Dowson',',',' ','etcetera.']);
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Ernest Dowso','n',', etcetera.']);
   const requested=quality().filter(e=>e.event==='delivery_requested');
-  expect(requested.map(e=>[e.hypothesis_seq,e.joining_space,e.held_space,e.target_utf8_bytes]))
-   .toEqual([[1,false,false,13],[2,false,true,14],[3,true,false,15],[3,false,false,24]]);
-  // A browser field appends the space with the words it joins.
+  expect(requested.map(e=>[e.hypothesis_seq,e.partial,e.target_utf8_bytes])).toEqual([[1,true,12],[2,true,13],[3,false,24]]);
+  // A browser field appends the space with the words it joins, as the
+  // extension refuses a url field that ends in one.
   hypotheses();transport.mockClear();const field=vi.fn(async(_s:string)=>{});
-  const exact=new DictationStream(field,vi.fn(),vi.fn(),vi.fn(),undefined,false);
+  const exact=new DictationStream(field,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,false);
   exact.pushAudio(new Float32Array(3200),16000);exact.enqueue();await exact.finish();
   expect(field.mock.calls.map(c=>c[0])).toEqual(['Ernest Dowson',',',' etcetera.']);
+  expect(quality().filter(e=>e.event==='delivery_requested').map(e=>e.partial)).toEqual([false,true,false]);
  });
- it('pastes nothing while only a space is new, and a final trailing space alone',async()=>{
+ it('pastes nothing while only a space is new, and the final text whole',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?'Hello ':['Hello','Hello '][n++]}));
   const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn();
   const queue=new DictationStream(paste,observed,vi.fn(),vi.fn(),undefined,true,false,true);
   queue.pushAudio(new Float32Array(3200),16000);
   await vi.waitFor(()=>expect(observed).toHaveBeenCalledTimes(2));
-  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello']);
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hell']);
   queue.enqueue();
   await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false});
-  // Nothing extends the final text, so it goes out whole, its trailing space alone.
-  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello',' ']);
+  // Nothing extends the final text, so it goes out whole, its trailing space too.
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hell','o ']);
  });
  it('retains a revision and refuses to paste it',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));

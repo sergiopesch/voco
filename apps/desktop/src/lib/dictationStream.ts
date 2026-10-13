@@ -19,6 +19,27 @@ export function appendOnlySuffix(committed: string, text: string): string {
   return text.slice(committed.length);
 }
 
+// A paste ends only between graphemes, so it never splits a letter from its
+// combining marks, a ZWJ sequence or a surrogate pair.
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const whitespace = /\s/;
+
+/** The longest start of a desktop suffix that ends between two graphemes
+ * without whitespace, so every space travels inside a paste: Chromium's address
+ * bar strips the spaces around pasted text, and its rich-text fields turn a
+ * space pasted alone into a no-break space. Empty while there's no such end.
+ * The suffix starts at one, or at the worker's text, which never starts with a
+ * space. */
+export function desktopChunk(suffix: string): string {
+  let end = 0;
+  let previous = "";
+  for (const { segment, index } of graphemes.segment(suffix)) {
+    if (index > 0 && !whitespace.test(previous) && !whitespace.test(segment)) end = index;
+    previous = segment;
+  }
+  return suffix.slice(0, end);
+}
+
 // Request sequence is the hypothesis identity in the worker protocol. IDs are
 // scoped by the random stream session and never contain transcript content.
 export interface PasteCorrelation {
@@ -125,9 +146,9 @@ export class DictationStream {
     private recordDeliveryQuality = true,
     /** A Say it check, which Rust starts as recognized, without spelling. */
     private wordsCheck = false,
-    /** For desktop paste: Chromium's address bar strips the spaces around
-     * pasted text but keeps a paste of only whitespace as one space. */
-    private joiningSpaceAlone = false,
+    /** For desktop paste, which ends each live chunk inside the words
+     * (`desktopChunk`); a browser field appends exactly instead. */
+    private spacesInsidePastes = false,
   ) {
     this.schedule("start");
   }
@@ -219,18 +240,10 @@ export class DictationStream {
     this.delivery = (async () => {
       let pendingSince: number | null = null;
       try {
-        while (!this.cancelled && !this.failure && !this.deliveryFailure && this.ready()) {
+        while (!this.cancelled && !this.failure && !this.deliveryFailure) {
           const suffix = appendOnlySuffix(this.committed, this.latest);
-          // A push can end in a space while a held-back word may still change.
-          // That space waits for the words it joins, as a chunk's trailing space
-          // is stripped by Chromium's address bar and refused by the extension in
-          // url fields; only the final text, which nothing extends, goes out whole.
-          // For desktop paste, whitespace at either end of the words goes alone,
-          // as the address bar keeps a paste of only whitespace.
-          const deliverable = this.finishResponded ? suffix : suffix.trimEnd();
-          const space = this.joiningSpaceAlone ? /^\s+/.exec(deliverable)?.[0] : undefined;
-          const chunk = space ?? (this.joiningSpaceAlone ? deliverable.trimEnd() : deliverable);
-          const heldSpace = space === undefined && chunk.length < suffix.length;
+          const chunk = this.deliverable(suffix);
+          if (!chunk) break;
           const target = this.committed + chunk;
           const hypothesisSeq = this.latestSeq;
           const hypothesisCount = this.hypothesisCount;
@@ -242,8 +255,7 @@ export class DictationStream {
             committed_hypothesis_seq: this.committedSeq,
             coalesced_hypotheses: Math.max(0, hypothesisCount - this.committedHypothesisCount - 1),
             pending_age_ms: started - (this.pendingSince ?? started),
-            latest_age_ms: started - this.latestAt, joining_space: space !== undefined,
-            held_space: heldSpace,
+            latest_age_ms: started - this.latestAt, partial: chunk.length < suffix.length,
             ...textLengths(this.committed, "committed"), ...textLengths(target, "target"),
             ...textLengths(chunk, "suffix"),
           }));
@@ -286,11 +298,17 @@ export class DictationStream {
     })();
   }
 
-  /** Whether text is ready to deliver: trailing whitespace waits for the words
-   * it joins, except in the final text. */
+  /** The part of an undelivered suffix to deliver now. Until the final text,
+   * which nothing extends and so goes out whole, a desktop paste ends inside
+   * the words, and a browser field's exact append leaves a trailing space for the
+   * words it joins: the extension refuses a url field that ends in one. */
+  private deliverable(suffix: string) {
+    if (this.finishResponded) return suffix;
+    return this.spacesInsidePastes ? desktopChunk(suffix) : suffix.trimEnd();
+  }
+
   private ready() {
-    const rest = this.latest.slice(this.committed.length);
-    return this.finishResponded ? rest.length > 0 : /\S/.test(rest);
+    return this.deliverable(this.latest.slice(this.committed.length)) !== "";
   }
 
   pushAudio(audio: Float32Array, rate: number) {

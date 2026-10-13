@@ -27,6 +27,10 @@ phrase on the clipboard and the primary selection, then presses Shift+Insert.
 
 - Text follows focus. If you switch windows while you speak, the next phrase
   goes to the new window.
+- While you speak, the last letter waits for your next words, or for Stop.
+  Each paste ends inside your words, so every space arrives inside a paste:
+  browser address bars strip the spaces at the edges of a paste, and rich-text
+  fields would make a space pasted on its own a no-break space.
 - Dictation replaces what you copied last. The last phrase stays on the
   clipboard, and clipboard managers may keep copies.
 - VOCO never presses Enter. It turns line breaks and tabs into spaces, so a

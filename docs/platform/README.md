@@ -125,11 +125,13 @@ quits; the kernel then removes it and releases any key it still held. If VOCO
 can't create it at startup, it tries again before each paste. X11 sessions use
 `xdotool` instead.
 
-Each paste is Shift+Insert, sent as separate key events 12 ms apart. When a
-phrase continues the previous one, its joining space is pasted on its own first,
-and no paste ends in a space, because Chromium's address bar strips the spaces
-around pasted text but keeps a paste of only whitespace. Passive evdev ignores VOCO's keyboard, so its keys
-never count as your shortcut or a held modifier.
+Each paste is Shift+Insert, sent as separate key events 12 ms apart. Every
+space travels inside the pasted text, never alone or at a paste's edge, because
+Chromium's address bar strips the spaces around pasted text and its rich-text
+fields turn a space pasted alone into a no-break space. So while you speak, each
+paste ends inside your words, and the last letter waits for the next ones or for
+Stop. Passive evdev ignores VOCO's keyboard, so its keys never count as your
+shortcut or a held modifier.
 
 No daemon, service, socket or group is involved. VOCO needs only read and write
 access to `/dev/uinput`, which the package gives the user of the active local

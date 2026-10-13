@@ -113,11 +113,17 @@ try {
     await chunks([['Second', 'Second']], () => text('#other'));
     assert.equal(await text(), 'First');
   });
-  // The address bar strips the spaces around pasted text but keeps a paste of
-  // only whitespace as one space, so VOCO pastes a joining space on its own.
+  // A rich-text field turns a space pasted alone into a no-break space, and the
+  // address bar strips the spaces around pasted text, so VOCO ends each live
+  // paste inside the words and every space travels inside a paste.
+  await trial('rich-text field', async () => {
+    await setup('<div contenteditable="true" id="target"></div>');
+    await chunks([['Hell', 'Hell'], ['o linu', 'Hello linu'], ['x, here.', 'Hello linux, here.']],
+      () => page.locator('#target').evaluate(node => node.textContent));
+  });
   await trial('address bar', async () => {
     key('ctrl+l', 'BackSpace');
-    await chunks([['hello', 'hello'], [' ', 'hello '], ['linux', 'hello linux']], async () => {
+    await chunks([['hell', 'hell'], ['o linu', 'hello linu'], ['x', 'hello linux']], async () => {
       // Replace the pasted clipboard first so an empty field cannot read back as the paste.
       execFileSync('xclip', ['-selection', 'clipboard', '-in'], { input: 'nothing copied', stdio: ['pipe', 'ignore', 'ignore'], timeout: 5000 });
       key('ctrl+a', 'ctrl+c', 'End');
