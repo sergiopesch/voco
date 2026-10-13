@@ -87,6 +87,10 @@ export interface DesktopPasteMetrics {
   payloadUtf8Bytes: number;
   payloadUnicodeScalars: number;
   payloadUtf16Units: number;
+  /** The selection VOCO saw the focused app read after the keys; "none" if it
+   * didn't within the wait, "unobserved" where the helpers can't tell. */
+  selectionRead: "clipboard" | "primary" | "none" | "unobserved";
+  selectionReadMs: number | null;
 }
 
 /** Pastes into whatever has focus now; rejects with an InsertionError. */

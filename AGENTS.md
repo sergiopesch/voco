@@ -181,6 +181,16 @@ change.
   (and the extension refuses a url field left with trailing whitespace). Only
   the final text goes out whole, a trailing space pasted alone. ASCII controls
   become spaces. Never send Enter and never restore the previous clipboard.
+- Give the app time to read a paste before the next copy replaces it. On GNOME
+  Wayland (`selection_owner.rs`) each copy runs xclip in the foreground with
+  `-verbose`, which reports every request it answers except TARGETS, and keeps
+  the selection until the next copy; it ignores SIGPIPE, so it outlives VOCO
+  holding the text, as a forked xclip does. Mutter's clipboard manager reads each
+  new CLIPBOARD once, right after the copy. When that read is in before the keys,
+  the next answer after them, on either selection, is the app's read: the paste
+  ends there, or 300 ms after its keys with none. Otherwise, and with wl-copy or
+  on X11, the next copy waits until 150 ms after the keys. A read is not proof
+  of insertion, and never changes a paste's outcome.
 - Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every

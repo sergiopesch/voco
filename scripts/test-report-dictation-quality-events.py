@@ -55,6 +55,20 @@ class QualityEventsTest(unittest.TestCase):
         self.assertEqual(stream['timing_observations']['native_modifier_wait'], {'count': 1, 'p50_ms': 12, 'max_ms': 12})
         self.assertEqual(stream['timing_observations']['native_settle']['count'], 1)
 
+    def test_selection_reads_are_counted_and_timed_but_never_certify_the_destination(self):
+        rows = fixture()
+        native = next(row for row in rows if row.get('stage') == 'native_dispatch')
+        native.update(selection_read='clipboard', selection_read_ms=1.5)
+        report = self.run_report(rows)
+        stream = report['runs'][0]['streams'][0]
+        self.assertEqual(stream['status'], 'reconciled_dispatch_metadata')
+        self.assertEqual(stream['selection_reads'], {'clipboard': 1})
+        self.assertEqual(stream['timing_observations']['native_selection_read'], {'count': 1, 'p50_ms': 1.5, 'max_ms': 1.5})
+        self.assertEqual(report['destination_content_observation'], 'unavailable')
+        native['selection_read'] = 'PRIVATE_SENTINEL'
+        report = self.run_report(rows)
+        self.assertNotIn('PRIVATE_SENTINEL', json.dumps(report))
+
     def test_finished_empty_stream_reconciles_without_inventing_hypotheses(self):
         rows = fixture()
         terminal = rows[-1]

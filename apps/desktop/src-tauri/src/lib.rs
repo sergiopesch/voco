@@ -26,6 +26,7 @@ mod native_capture_commands;
 pub mod panel_setup;
 mod performance;
 mod process_runner;
+mod selection_owner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
 mod single_instance;

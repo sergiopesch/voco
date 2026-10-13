@@ -20,9 +20,11 @@ NUMBERS |= {f'{prefix}_{unit}' for prefix in ('recognized', 'previous', 'committ
             'accepted', 'dispatched', 'input', 'payload', 'routed')
             for unit in ('utf8_bytes', 'unicode_scalars', 'utf16_units')}
 DURATIONS = {'duration_ms', 'queue_age_ms', 'max_queue_age_ms', 'pending_age_ms', 'latest_age_ms',
-             'settle_ms', 'modifier_wait_ms'}
+             'settle_ms', 'modifier_wait_ms', 'selection_read_ms'}
 BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatched', 'clipboard_changed', 'joining_space', 'held_space'}
 OUTCOMES = {'finished', 'incomplete', 'cancelled', 'failed', 'dispatched', 'rejected', 'no-mutation', 'uncertain'}
+# Whether the focused app asked for a paste's selection; a read isn't proof of insertion.
+SELECTION_READS = {'clipboard', 'primary', 'none', 'unobserved'}
 
 
 def uint(value):
@@ -47,6 +49,10 @@ def safe_quality(row):
         if row['outcome'] not in OUTCOMES:
             raise ValueError('invalid outcome')
         safe['outcome'] = row['outcome']
+    if 'selection_read' in row:
+        if row['selection_read'] not in SELECTION_READS:
+            raise ValueError('invalid selection read')
+        safe['selection_read'] = row['selection_read']
     return safe
 
 
@@ -165,7 +171,11 @@ def stream_summary(events, envelope_incomplete):
                 'frontend_dispatch_duration': timing(stages['delivery_dispatched'], 'duration_ms'),
                 'native_dispatch_duration': timing(stages['native_dispatch'], 'duration_ms'),
                 'native_settle': timing(stages['native_dispatch'], 'settle_ms'),
-                'native_modifier_wait': timing(stages['native_dispatch'], 'modifier_wait_ms')},
+                'native_modifier_wait': timing(stages['native_dispatch'], 'modifier_wait_ms'),
+                'native_selection_read': timing(stages['native_dispatch'], 'selection_read_ms')},
+            # Reads after the keys; "none" means the focused app never asked within the wait.
+            'selection_reads': dict(sorted(Counter(e['selection_read'] for e in stages['native_dispatch']
+                                                   if 'selection_read' in e).items())),
             'sample_observation_scope': 'queue_ingress',
             'destination_content_observation': 'unavailable'}
 
