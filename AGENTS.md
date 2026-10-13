@@ -172,11 +172,12 @@ change.
 - Each chunk pastes into whatever has keyboard focus when it is ready. There is no
   destination token, focus probe, terminal detection or per-app route. Desktop
   setup checks the paste prerequisites, never a caret or an app.
-- Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
-  Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. Spaces
-  travel inside pasted text, never as a key or at a paste's edge: Chromium's
-  address bar strips the spaces around pasted text, and its rich-text fields
-  turn a space pasted alone into a no-break space. So each live desktop paste
+- Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns; on GNOME
+  Wayland PRIMARY goes first, as below), then send one Shift+Insert: toolkits
+  paste CLIPBOARD and terminals paste PRIMARY. Spaces travel inside pasted
+  text, never as a key or at a paste's edge: Chromium's address bar strips the
+  spaces around pasted text, and its rich-text fields turn a space pasted alone
+  into a no-break space. So each live desktop paste
   ends between two graphemes without whitespace (`desktopChunk`, with one
   `Intl.Segmenter`, so a letter keeps its combining marks) and the rest waits
   for the next hypothesis. After 0.75 s of audio with no new hypothesis
@@ -193,9 +194,17 @@ change.
   Wayland (`selection_owner.rs`) each copy runs xclip in the foreground with
   `-verbose`, which reports every request it answers except TARGETS, and keeps
   the selection until the next copy; it ignores SIGPIPE, so it outlives VOCO
-  holding the text, as a forked xclip does. The virtual keyboard reports when
-  its Insert press went out. Mutter's clipboard manager reads each new CLIPBOARD
-  once, right after the copy. When that read is in by the Insert press, the
+  holding the text, as a forked xclip does. A helper reports owning its
+  selection just before the X server gets its request, and until the server
+  has it an app pastes the previous copy. So before the keys VOCO waits up to
+  100 ms for Mutter's clipboard manager, which reads each new CLIPBOARD once
+  through the server: the new helper answering it proves the switch. Nothing
+  reads PRIMARY that way, so PRIMARY is copied first and its request is usually
+  out well before CLIPBOARD's, but that isn't proof. Without the read in time
+  the keys go anyway. A CLIPBOARD helper
+  that never starts is a `no-mutation` failure whose error says when PRIMARY
+  already holds the text. The virtual keyboard reports when its Insert press
+  went out. When Mutter's read is in by the Insert press, the
   next answer after the press, on either selection, is the app's read: the
   paste ends there, or 300 ms after the press with none. A read before it,
   during the wait for a young keyboard or the gap after Shift, never counts.

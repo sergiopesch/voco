@@ -165,7 +165,13 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
 4. It copies the text to CLIPBOARD, then PRIMARY. PRIMARY is best effort; a
    failure there only logs a warning. On GNOME Wayland the helpers are xclip in
    the foreground (`selection_owner.rs`), which report each request they answer
-   and keep their selection until the next copy.
+   and keep their selection until the next copy. There PRIMARY goes first, then
+   CLIPBOARD, and VOCO waits up to 100 ms for Mutter's clipboard manager to read
+   the new CLIPBOARD. A helper reports owning its selection just before the X
+   server gets its request, and an app pasting before the server has it gets the
+   previous copy. The manager reads through the server, so its read, answered by
+   the new helper, shows CLIPBOARD has switched; PRIMARY, which nothing reads
+   that way, has only its head start.
 5. It waits up to 1.5 seconds for the shortcut's modifier keys to be released.
    On Wayland it reads evdev, or asks the GNOME companion through
    `ModifiersClear`; unknown state doesn't block. On X11 VOCO's grab receives

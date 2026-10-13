@@ -15,6 +15,9 @@ static DELIVERY: Mutex<Option<Instant>> = Mutex::new(None);
 const PASTE_SETTLE: Duration = Duration::from_millis(150);
 // How long a GNOME paste waits after its keys for the app to read the selection.
 const READ_TIMEOUT: Duration = Duration::from_millis(300);
+// How long a GNOME paste waits before its keys for Mutter's read of the new
+// CLIPBOARD, which shows the X server has made the copy current.
+const MUTTER_READ_WAIT: Duration = Duration::from_millis(100);
 const HELPER_TIMEOUT: Duration = Duration::from_secs(5);
 const MODIFIER_RELEASE_TIMEOUT: Duration = Duration::from_millis(1500);
 const TEXT_MIME: &str = "text/plain;charset=utf-8";
@@ -874,6 +877,14 @@ fn observed_transaction(
     let transaction = paste_transaction(
         || {
             let mut owners = SelectionOwners::new();
+            // A helper reports owning its selection just before its request
+            // leaves for the X server. Mutter's read below proves only
+            // CLIPBOARD's switch, so PRIMARY goes first, for a head start.
+            // PRIMARY is best effort, as with forked helpers.
+            let primary = owners.own(program, Selection::Primary, text.as_bytes(), HELPER_TIMEOUT);
+            if let Err(error) = &primary {
+                log::warn!("Could not update the primary selection: {error}");
+            }
             owners
                 .own(
                     program,
@@ -881,13 +892,13 @@ fn observed_transaction(
                     text.as_bytes(),
                     HELPER_TIMEOUT,
                 )
-                .map_err(|error| owner_error(error, true))?;
-            // PRIMARY is best effort, as with forked helpers.
-            if let Err(error) =
-                owners.own(program, Selection::Primary, text.as_bytes(), HELPER_TIMEOUT)
-            {
-                log::warn!("Could not update the primary selection: {error}");
-            }
+                .map_err(|error| owner_error(error, primary.is_ok()))?;
+            // Until the X server has the new owner, an app pastes the previous
+            // copy; under load that can take 80 ms. Mutter's clipboard manager
+            // reads each new CLIPBOARD once, through the server, so the new
+            // helper answering it proves the switch. Without it in time the
+            // keys go anyway, and the read rule below keeps the fixed settle.
+            owners.wait_clipboard_served(MUTTER_READ_WAIT);
             Ok(owners)
         },
         before_paste,
@@ -903,17 +914,27 @@ fn observed_transaction(
     Ok((transaction.clipboard_ms, transaction.keyboard_ms, read))
 }
 
-/// A helper that never started changed nothing; one that started may have
-/// taken the selection, as run_helper treats a failed exit.
-fn owner_error(error: OwnerError, clipboard: bool) -> InsertionError {
+/// A CLIPBOARD helper that never started typed nothing, though PRIMARY may
+/// already hold the text; one that started may have taken the selection, as
+/// run_helper treats a failed exit.
+fn owner_error(error: OwnerError, primary_changed: bool) -> InsertionError {
     match error {
-        OwnerError::Spawn(message) => InsertionError::no_mutation(message),
+        OwnerError::Spawn(message) => {
+            let mut error = InsertionError::no_mutation(message);
+            if primary_changed {
+                error.clipboard_changed = true;
+                error
+                    .message
+                    .push_str(" The primary selection already holds the text.");
+            }
+            error
+        }
         OwnerError::Failed(message) => InsertionError {
             outcome: DeliveryOutcome::Uncertain,
             message: format!(
                 "{message} Text may have been partially delivered; automatic retry was stopped."
             ),
-            clipboard_changed: clipboard,
+            clipboard_changed: true,
         },
     }
 }
@@ -1355,6 +1376,22 @@ mod tests {
         }
     }
 
+    /// Removes a stand-in's folder when the test ends, by panic too: its
+    /// helpers exit once the folder is gone, so none outlives the test.
+    struct Folder(std::path::PathBuf);
+
+    impl Folder {
+        fn of(program: &Path) -> Self {
+            Self(program.parent().unwrap().to_path_buf())
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
     #[test]
     fn a_gnome_paste_ends_when_the_app_reads_it_not_after_a_fixed_settle() {
         let program = fake_xclip("observed-paste");
@@ -1508,6 +1545,105 @@ mod tests {
         assert_eq!(read, PasteRead::Unobserved);
         release(&program);
         std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn the_keys_wait_for_mutters_late_read_of_the_new_clipboard() {
+        let program = fake_xclip("late-mutter-read");
+        let _folder = Folder::of(&program);
+        let copied = program.with_file_name("clipboard.text");
+        // Under load Mutter reads the new CLIPBOARD 40 ms after the copy: an
+        // app reading before then would get the previous phrase.
+        let mutter = {
+            let program = program.clone();
+            std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                while !copied.exists() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                std::thread::sleep(Duration::from_millis(40));
+                signal(&program, Selection::Clipboard, "serve");
+            })
+        };
+        let app = std::sync::Mutex::new(None);
+        let (_, _, read) = observed_transaction(
+            program.to_str().unwrap(),
+            "text",
+            || Ok(()),
+            || {
+                // The app reads 10 ms after the Insert press.
+                let inserted = Instant::now();
+                let program = program.clone();
+                *app.lock().unwrap() = Some(std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(10));
+                    signal(&program, Selection::Clipboard, "serve");
+                }));
+                Ok(Some(inserted))
+            },
+        )
+        .unwrap();
+        mutter.join().unwrap();
+        if let Some(app) = app.lock().unwrap().take() {
+            app.join().unwrap();
+        }
+        // Mutter's read came before the keys, so the app's read counts.
+        let PasteRead::Read(read) = read else {
+            panic!("the keys went before Mutter's read: {read:?}")
+        };
+        assert_eq!(read.selection, Selection::Clipboard);
+        release(&program);
+    }
+
+    #[test]
+    fn primary_is_copied_before_clipboard() {
+        let program = fake_xclip("primary-first");
+        let _folder = Folder::of(&program);
+        observed_transaction(
+            program.to_str().unwrap(),
+            "text",
+            || Ok(()),
+            || Ok(Some(Instant::now())),
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(program.with_file_name("order")).unwrap(),
+            "primary\nclipboard\n"
+        );
+        release(&program);
+    }
+
+    #[test]
+    fn a_clipboard_helper_that_never_starts_says_whether_primary_changed() {
+        let error = owner_error(OwnerError::Spawn("No helper.".into()), true);
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(error.clipboard_changed);
+        assert!(error
+            .message
+            .contains("primary selection already holds the text"));
+        let error = owner_error(OwnerError::Spawn("No helper.".into()), false);
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(!error.clipboard_changed);
+        assert!(!error.message.contains("primary"));
+        let error = owner_error(OwnerError::Failed("Exited.".into()), false);
+        assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
+        assert!(error.clipboard_changed);
+        // The whole copy: PRIMARY takes the text, then CLIPBOARD's helper can't start.
+        let program = fake_xclip("clipboard-spawn");
+        let _folder = Folder::of(&program);
+        signal(&program, Selection::Primary, "unexec");
+        let error = observed_transaction(
+            program.to_str().unwrap(),
+            "text",
+            || panic!("no checks may follow a failed copy"),
+            || panic!("no key may follow a failed copy"),
+        )
+        .unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(error.clipboard_changed);
+        assert!(error
+            .message
+            .contains("primary selection already holds the text"));
+        release(&program);
     }
 
     #[test]

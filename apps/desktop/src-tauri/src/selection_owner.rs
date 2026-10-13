@@ -207,6 +207,43 @@ impl SelectionOwners {
             .sum()
     }
 
+    /// Waits up to `timeout` until the CLIPBOARD helper has answered a request,
+    /// and returns how long that took, or None if it didn't in time.
+    pub(crate) fn wait_clipboard_served(&self, timeout: Duration) -> Option<Duration> {
+        let started = Instant::now();
+        let deadline = started + timeout;
+        let mut progress = self.progress();
+        loop {
+            let served = self
+                .helpers
+                .iter()
+                .zip(progress.iter())
+                .any(|(helper, progress)| {
+                    helper.selection == Selection::Clipboard && !progress.served.is_empty()
+                });
+            if served {
+                return Some(started.elapsed());
+            }
+            let left = deadline.saturating_duration_since(Instant::now());
+            let clipboard_gone =
+                self.helpers
+                    .iter()
+                    .zip(progress.iter())
+                    .all(|(helper, progress)| {
+                        helper.selection != Selection::Clipboard || progress.finished
+                    });
+            if left.is_zero() || clipboard_gone {
+                return None;
+            }
+            progress = self
+                .shared
+                .changed
+                .wait_timeout(progress, left)
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .0;
+        }
+    }
+
     /// The first request either helper answered after `inserted`, the Insert
     /// press, waiting up to `timeout` from then.
     pub(crate) fn read_after(&self, inserted: Instant, timeout: Duration) -> Option<SelectionRead> {
@@ -306,9 +343,10 @@ pub(crate) mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
 
-    /// A stand-in for `xclip -verbose -selection S -in`: it keeps its input in
-    /// `S.text`, reports that it owns S, then answers one request each time
-    /// `S.serve` appears, and exits when `S.clear` appears, as on SelectionClear.
+    /// A stand-in for `xclip -verbose -selection S -in`: it adds S to `order`,
+    /// keeps its input in `S.text`, reports that it owns S, then answers one
+    /// request each time `S.serve` appears, and exits when `S.clear` appears, as
+    /// on SelectionClear.
     /// It also exits once its folder is gone or after about 10 s, so a stand-in
     /// never outlives its test: one left polling would load the whole machine.
     pub(crate) fn fake_xclip(name: &str) -> PathBuf {
@@ -326,8 +364,12 @@ pub(crate) mod tests {
             &program,
             r#"#!/bin/sh
 dir=${0%/*} selection=$3
+echo "$selection" >> "$dir/order"
 cat > "$dir/$selection.text" || exit 1
 [ -e "$dir/$selection.fail" ] && exit 1
+# Leaves the next helper unable to start, once this one has the text.
+[ -e "$dir/$selection.unexec" ] && chmod -x "$0"
+
 echo "Waiting for selection requests, Control-C to quit" >&2
 number=1 polls=0
 echo "  Waiting for selection request number $number" >&2
@@ -514,6 +556,58 @@ done
         }
         stop.store(true, Ordering::Relaxed);
         forker.join().unwrap();
+    }
+
+    /// Removes a stand-in's folder when the test ends, by panic too: its
+    /// helpers exit once the folder is gone, so none outlives the test.
+    struct Folder(PathBuf);
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn the_wait_for_a_clipboard_answer_is_bounded() {
+        let program = fake_xclip("clipboard-wait");
+        let _folder = Folder(program.parent().unwrap().to_path_buf());
+        let owners = own_both(&program, b"text");
+        let started = Instant::now();
+        assert_eq!(
+            owners.wait_clipboard_served(Duration::from_millis(30)),
+            None
+        );
+        assert!(started.elapsed() >= Duration::from_millis(30));
+        // An answer on PRIMARY isn't Mutter's read of the new CLIPBOARD.
+        signal(&program, Selection::Primary, "serve");
+        assert_eq!(
+            owners.wait_clipboard_served(Duration::from_millis(30)),
+            None
+        );
+        let answer = program.clone();
+        let mutter = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            signal(&answer, Selection::Clipboard, "serve");
+        });
+        let waited = owners
+            .wait_clipboard_served(Duration::from_secs(5))
+            .unwrap();
+        assert!(waited >= Duration::from_millis(20), "{waited:?}");
+        mutter.join().unwrap();
+        finish(&owners, &program);
+    }
+
+    #[test]
+    fn the_wait_ends_when_the_clipboard_helper_is_gone() {
+        let program = fake_xclip("clipboard-gone");
+        let _folder = Folder(program.parent().unwrap().to_path_buf());
+        let owners = own_both(&program, b"text");
+        signal(&program, Selection::Clipboard, "clear");
+        let started = Instant::now();
+        assert_eq!(owners.wait_clipboard_served(Duration::from_secs(5)), None);
+        assert!(started.elapsed() < Duration::from_secs(2));
+        finish(&owners, &program);
     }
 
     #[test]
