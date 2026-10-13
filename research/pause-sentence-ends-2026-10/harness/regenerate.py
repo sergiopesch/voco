@@ -14,13 +14,14 @@ HERE = Path(__file__).resolve().parent
 TABLES = {
     'dev-table.txt': ['summarize.py', 'runs/dev', 'P0', 'E:0.6', 'E:0.8', 'E:1.0', 'E:1.2', 'E:1.5', 'E:2.0', 'EC:0.8', 'EC:1.0', 'EC:1.2', 'EC:1.5',
                       'EWA:0.8', 'EWA:1.0', 'EWA:1.2', 'EWA:1.5', 'EWB:0.8', 'EWB:1.0', 'EWB:1.2', 'EWB:1.5', 'EWAT:1.0', 'EWAT:1.2'],
-    'test-table.txt': ['summarize.py', 'runs/test', 'P0', 'EWB:1.0'],
+    'test-table.txt': ['summarize.py', 'runs/test', 'P0', 'EWB:0.8', 'EWB:1.0'],
     'break-even-dev.txt': ['break_even.py', 'dev', 'EWB:0.8@0.8', 'EWB:1.0@1.0', 'EWB:1.2@1.2', 'EWB:1.5@1.6', 'E:1.2@1.2'],
-    'break-even-test.txt': ['break_even.py', 'test', 'EWB:1.0@1.0'],
+    'break-even-test.txt': ['break_even.py', 'test', 'EWB:0.8@0.8', 'EWB:1.0@1.0'],
     'cue-analysis-E0.8.txt': ['cue_analysis.py', 'E:0.8'],
     'lookahead-dev.txt': ['compare.py', 'dev', 'runs/dev-R6/P0.jsonl', 'runs/dev-R13/P0.jsonl'],
     'lookahead-test.txt': ['compare.py', 'test', 'runs/test-R6/P0.jsonl'],
     'zero60.txt': ['score_subset.py', 'runs/dev-zero60.jsonl'],
+    'quiet.txt': ['quiet_check.py'],
 }
 def unpack(results, work):
     (work / 'items.json').write_bytes(lzma.decompress((results / 'items.json.xz').read_bytes()))

@@ -1,2 +1,2 @@
-runs/dev-zero60.jsonl 59 P0: {'S_acc': 0.635, 'M_acc': 1.0, 'PA': 0.817, 'WER': 0.04, 'term_P': 0.795, 'term_R': 0.705}
-                      59 X : {'S_acc': 0.651, 'M_acc': 1.0, 'PA': 0.825, 'WER': 0.039, 'term_P': 0.793, 'term_R': 0.727}
+runs/dev-zero60.jsonl 60 P0: {'S_acc': 0.714, 'M_acc': 0.968, 'PA': 0.841, 'WER': 0.039, 'term_P': 0.808, 'term_R': 0.771}
+                      60 X : {'S_acc': 0.714, 'M_acc': 0.935, 'PA': 0.825, 'WER': 0.039, 'term_P': 0.81, 'term_R': 0.767}

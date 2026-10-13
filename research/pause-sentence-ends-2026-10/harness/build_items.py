@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
-"""Build the pre-registered dev and test items (PREREGISTRATION.md, Data)."""
+"""Build the pre-registered dev and test items (PREREGISTRATION.md, Data).
+
+As corrected on 13 October (README, Correction): every junction's quiet, as the
+policies' own PauseTracker measures it, is its inserted pause plus 0.3 s, the
+two 150 ms edges a between-sentence junction keeps. A junction's fill tops up
+whatever quiet it already has, so a cut between two words gets the same quiet
+as a join between two utterances, and the fill is the recording's own quietest
+frames, so the tracker hears all of it as quiet.
+"""
 import json, os, random, re, sys
 from pathlib import Path
 import numpy as np
 from asr import Stream, load_flac
+from pauses import PauseTracker
 from text import align, norm
 SEED = 20261013
 # libri-pc/{test-clean,test-other}.json and LibriSpeech/{test-clean,test-other}.
 BASE = Path(os.environ['VOCO_PAUSE_DOWNLOADS'])
 AUDIO = Path(os.environ['VOCO_PAUSE_AUDIO']); AUDIO.mkdir(parents=True, exist_ok=True)
 GRID = [0, .4, .8, 1.2, 1.6, 2.0, 2.5]
+# The quiet of two trimmed 150 ms edges, which every junction gets on top of its pause.
+EDGES_S = .3
 RATE, FR = 16000, 320
 CLOSE = re.compile(r'["”’)\]]+$')
 def label(text):
@@ -28,26 +39,35 @@ def trim(a):
 def speech_end(a, level):
     sp = np.flatnonzero(db(a) > level)
     return (sp[-1] + 1) * FR if len(sp) else len(a)
-def tone(a):
-    e = db(a); p5 = np.percentile(e, 5)
-    w = np.convolve(10 ** (e / 10), np.ones(15) / 15, 'valid'); k = int(np.argmin(w))
-    level = 10 * np.log10(w[k] + 1e-12)
-    return (a[k * FR:k * FR + 4800].copy() if level <= p5 + 6 else None), float(p5)
-def pink(n, level, rng):
-    x = rng.standard_normal(n); f = np.fft.rfftfreq(n); s = np.fft.rfft(x); s[1:] /= np.sqrt(f[1:]); s[0] = 0
-    y = np.fft.irfft(s, n); return (y / np.sqrt(np.mean(y ** 2)) * 10 ** (level / 20)).astype(np.float32)
-def pause(seconds, src, rng):
+def quiet_at(audio, start_s, end_s):
+    """The quiet run the policies' tracker hears across [start_s, end_s], in seconds."""
+    tracker = PauseTracker(); best = 0.; lo, hi = start_s - .4, end_s + .6
+    for f in range(0, len(audio) - FR + 1, FR):
+        quiet = tracker.push(audio[f:f + FR], RATE); at = (f + FR) / RATE
+        if at > hi: break
+        if at >= lo: best = max(best, quiet)
+    return round(best, 3)
+def floor_frames(a):
+    """The recording's own 20 ms frames within 3 dB of its quietest 60 ms (the
+    dB mean of three frames, as PauseTracker's floor), which the tracker hears as
+    quiet. A recording that falls near silence between phrases gets near-silence;
+    one with a room under it gets the room."""
+    n = len(a) // FR; frames = a[:n * FR].reshape(n, FR)
+    e = 10 * np.log10(np.square(frames.astype(np.float64)).mean(1) + 1e-12)
+    floor = np.convolve(e, np.ones(3) / 3, 'valid').min()
+    return frames[e <= floor + 3]
+def pause(seconds, pool, rng):
+    """Floor frames in a random order, joined with 4 ms raised-cosine crossfades."""
     n = int(round(seconds * RATE))
-    if n == 0: return np.zeros(0, np.float32), 'none'
-    seg, p5 = src
-    if seg is None: return pink(n, min(-45, max(-65, p5)), rng), 'pink'
-    out = np.zeros(0, np.float32); fade = np.linspace(0, 1, 320, dtype=np.float32)
-    while len(out) < n + 320:
-        off = int(rng.integers(0, len(seg) - 1600 + 1)); piece = seg[off:off + 1600].copy()
-        if len(out) >= 320:
-            out[-320:] = out[-320:] * fade[::-1] + piece[:320] * fade; out = np.concatenate([out, piece[320:]])
-        else: out = np.concatenate([out, piece])
-    return out[:n], 'tone'
+    # Less than 10 ms of fill changes no frame the tracker hears.
+    if n < 160: return np.zeros(0, np.float32), 'none'
+    fade = (.5 - .5 * np.cos(np.linspace(0, np.pi, 64))).astype(np.float32)
+    out = pool[rng.integers(len(pool))].astype(np.float32)
+    while len(out) < n:
+        piece = pool[rng.integers(len(pool))].astype(np.float32)
+        out[-64:] = out[-64:] * fade[::-1] + piece[:64] * fade
+        out = np.concatenate([out, piece[64:]])
+    return out[:n], 'floor'
 def main():
     rng = random.Random(SEED); nrng = np.random.default_rng(SEED)
     rows = []
@@ -93,12 +113,16 @@ def main():
         rec = {'name': name, 'type': it['type'], 'split': it['split'], 'speaker': it['speaker'], 'ids': [u['id'] for u in it['utts']],
                'subset': it['utts'][0]['subset'], 'ref': ' '.join(refs), 'junctions': []}
         if it['type'] == 'between':
+            # The quiet each join already has, from the utterances' own edges.
+            joined = np.concatenate(audios); natural = [quiet_at(joined, b / RATE, b / RATE) for b in np.cumsum([len(a) for a in audios])[:2]]
             parts, pos, words = [], 0, 0
             for k, (a, ref) in enumerate(zip(audios, refs)):
                 parts.append(a); pos += len(a); words += len(ref.split())
                 if k < 2:
-                    p, kind = pause(it['pauses'][k], tone(a), nrng)
+                    target = it['pauses'][k] + EDGES_S; fill = max(0., target - natural[k])
+                    p, kind = pause(fill, floor_frames(a), nrng)
                     rec['junctions'].append({'words_before': words, 'label': label(ref), 'inserted_s': it['pauses'][k], 'filler': kind,
+                                             'quiet_target_s': target, 'quiet_natural_s': natural[k], 'fill_s': round(len(p) / RATE, 3),
                                              'speech_end_s': (pos - len(a) + speech_end(a, levels[k])) / RATE, 'pause_start_s': pos / RATE, 'pause_end_s': (pos + len(p)) / RATE})
                     parts.append(p); pos += len(p)
             audio = np.concatenate(parts)
@@ -122,12 +146,17 @@ def main():
                 if e10[k] <= med - 12: cands.append((i, k * 160 + 160))
             if not cands: continue
             i, cut = rng.choice(cands)
-            p, kind = pause(it['pauses'][0], tone(a), nrng)
+            # The cut's own gap between the two words, topped up to the same quiet.
+            natural = quiet_at(a, cut / RATE, cut / RATE); target = it['pauses'][0] + EDGES_S; fill = max(0., target - natural)
+            p, kind = pause(fill, floor_frames(a), nrng)
             audio = np.concatenate([a[:cut], p, a[cut:]])
             rec['junctions'].append({'words_before': i + 1, 'label': 'M', 'inserted_s': it['pauses'][0], 'filler': kind,
+                                     'quiet_target_s': target, 'quiet_natural_s': natural, 'fill_s': round(len(p) / RATE, 3),
                                      'speech_end_s': speech_end(a[:cut], levels[0]) / RATE, 'pause_start_s': cut / RATE, 'pause_end_s': (cut + len(p)) / RATE})
             rec['uncut'] = name + '-uncut.f32'; rec['uncut_text_wordtimes'] = uncut_text
             a.astype(np.float32).tofile(AUDIO / rec['uncut'])
+        # What the tracker hears at each junction of the finished item.
+        for j in rec['junctions']: j['quiet_s'] = quiet_at(audio, j['pause_start_s'], j['pause_end_s'])
         rec['audio'] = name + '.f32'; rec['seconds'] = len(audio) / RATE
         audio.astype(np.float32).tofile(AUDIO / rec['audio'])
         out.append(rec)

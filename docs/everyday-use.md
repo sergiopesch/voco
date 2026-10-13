@@ -244,8 +244,8 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - The speech model usually writes a comma or full stop only once it hears the
   next word. Where you pause between sentences, the full stop often comes a word
   late or not at all, with no capital after it; in public test speech, about 6
-  in 10 such pauses got a sentence end. VOCO doesn't add one where you pause,
-  because it would also end sentences where you only pause to think
+  to 7 in 10 such pauses got a sentence end. VOCO doesn't add one where you
+  pause, because it would also end sentences where you only pause to think
   ([the measurements](../research/pause-sentence-ends-2026-10/README.md)).
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
