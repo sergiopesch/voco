@@ -309,6 +309,8 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
             | "dictation_desktop_paste_deferred"
             | "dictation_desktop_remainder_copied"
             | "dictation_desktop_remainder_kept"
+            | "dictation_desktop_stop_space_dispatched"
+            | "dictation_desktop_stop_space_failed"
             | "recording_state_requested"
             | "recording_get_user_media_started"
             | "recording_get_user_media_constraints_fallback"

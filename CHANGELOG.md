@@ -30,6 +30,10 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- A second dictation into the same field ran into the first, as in
+  "friend.Go". When a dictation ends a sentence and VOCO typed all of it, Stop
+  now adds one space after it, so what comes next starts apart. Rich-text fields
+  may keep that space as a no-break space.
 - In Chromium's address bar, in Chrome, Brave, Edge and the like, words you
   said after a pause ran into the previous word, because the address bar strips
   the spaces around pasted text. VOCO now ends each paste inside your words, so

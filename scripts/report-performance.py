@@ -88,6 +88,9 @@ def session_summary(key, events):
             'desktop_paste_dispatched': bool(counts['dictation_desktop_paste_dispatched']),
             'desktop_remainder_copied': bool(counts['dictation_desktop_remainder_copied']),
             'desktop_remainder_kept_in_review': bool(counts['dictation_desktop_remainder_kept']),
+            # The space Stop pastes after a finished sentence; a failed one loses no words.
+            'desktop_stop_space_dispatched': bool(counts['dictation_desktop_stop_space_dispatched']),
+            'desktop_stop_space_failed': bool(counts['dictation_desktop_stop_space_failed']),
             'recovery_retained': bool(counts['dictation_recovery_retained']),
         },
         'event_counts': dict(counts),
