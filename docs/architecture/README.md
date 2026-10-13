@@ -160,10 +160,12 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
    exists, so a missing device fails before the clipboard changes.
 2. ASCII control characters, including newlines and tabs, become spaces, so a
    terminal never receives Enter.
-3. It waits until 150 ms have passed after the previous paste, so that app can
-   read the clipboard first.
+3. Unless VOCO saw the app read the previous paste, it waits until 150 ms have
+   passed after that paste's keys, so the app can read the clipboard first.
 4. It copies the text to CLIPBOARD, then PRIMARY. PRIMARY is best effort; a
-   failure there only logs a warning.
+   failure there only logs a warning. On GNOME Wayland the helpers are xclip in
+   the foreground (`selection_owner.rs`), which report each request they answer
+   and keep their selection until the next copy.
 5. It waits up to 1.5 seconds for the shortcut's modifier keys to be released.
    On Wayland it reads evdev, or asks the GNOME companion through
    `ModifiersClear`; unknown state doesn't block. On X11 VOCO's grab receives
@@ -171,6 +173,12 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
 6. It sends Shift+Insert, through the virtual keyboard on Wayland and with
    `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
+7. On GNOME Wayland it waits up to 300 ms after the Insert press, which the
+   virtual keyboard reports, for the app to read the paste. Mutter's clipboard
+   manager reads each new CLIPBOARD once, right after the copy. When that read
+   came by the Insert press, the next request either helper answers after the
+   press is the app's, and the next paste can copy at once. A read only says
+   the app asked for the text, so it never changes the paste's outcome.
 
 When a suffix starts with VOCO's joining space, the stream pastes the space on
 its own first, then the words; VOCO never types it as a key. Chromium's address

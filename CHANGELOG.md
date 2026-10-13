@@ -21,6 +21,13 @@ The [release process](docs/release-process.md) describes how a release is made.
   it, setup says where to find My words later. Four marks beside Setup show the
   step you're on.
 
+### Changed
+
+- On GNOME, dictation types sooner. VOCO used to wait 150 ms after each paste
+  before the next one, in case the app was slow to take it; now it sees when
+  the app has read each paste and pastes the next words straight away. It still
+  waits the 150 ms on other desktops, and on GNOME when it can't tell.
+
 ### Fixed
 
 - In Chromium's address bar, in Chrome, Brave, Edge and the like, words you

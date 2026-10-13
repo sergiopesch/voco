@@ -15,8 +15,9 @@ import sys
 import time
 
 PRODUCTION_TEST = 'insertion::tests::paste_fixture_text_into_the_focused_application'
-# insertion.rs waits this long before the next copy so the previous recipient
-# can read its selection. Each fixture paste is a new process, so wait here.
+# Without a read it saw, insertion.rs waits this long before the next copy so
+# the previous recipient can read its selection. Each fixture paste is a new
+# process, so wait here.
 PASTE_SETTLE_S = .15
 
 

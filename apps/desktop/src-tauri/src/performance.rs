@@ -219,6 +219,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         "duration_ms",
         "settle_ms",
         "modifier_wait_ms",
+        "selection_read_ms",
         "queue_age_ms",
         "max_queue_age_ms",
         "pending_age_ms",
@@ -283,6 +284,13 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
         .filter(|s| matches!(*s, "push" | "finish"))
     {
         safe["source"] = json!(source);
+    }
+    // Whether the focused app asked for the paste's selection, not what it did with it.
+    if let Some(read) = request["selection_read"]
+        .as_str()
+        .filter(|s| matches!(*s, "clipboard" | "primary" | "none" | "unobserved"))
+    {
+        safe["selection_read"] = json!(read);
     }
     // Generic desktop insertion has no recipient-content observation capability.
     safe["destination_content_observation"] = json!("unavailable");
@@ -649,6 +657,21 @@ mod tests {
             speech_quality_payload(&json!({"event":"terminal", "session":"private words"}))
                 .is_none()
         );
+    }
+
+    #[test]
+    fn a_paste_read_keeps_its_selection_and_time_but_nothing_else() {
+        let request = json!({"event":"native_dispatch", "session":"12345678-1234-1234-1234-123456789abc",
+            "delivery_seq":3, "outcome":"dispatched", "selection_read":"primary", "selection_read_ms":1.5});
+        let safe = speech_quality_payload(&request).unwrap();
+        assert_eq!(safe["selection_read"], "primary");
+        assert_eq!(safe["selection_read_ms"], 1.5);
+        assert_eq!(safe["destination_content_observation"], "unavailable");
+        let forged = json!({"event":"native_dispatch", "session":"12345678-1234-1234-1234-123456789abc",
+            "selection_read":"PRIVATE_SENTINEL", "selection_read_ms":-1});
+        let safe = speech_quality_payload(&forged).unwrap();
+        assert!(safe.get("selection_read").is_none());
+        assert!(safe.get("selection_read_ms").is_none());
     }
 
     #[test]
