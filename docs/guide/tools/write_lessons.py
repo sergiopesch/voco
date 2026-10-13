@@ -87,7 +87,7 @@ lesson(
         ),
         (
             "Stop finishes the job",
-            "Stop sends the last audio, waits for the final transcript and pastes it. Words that couldn't be pasted are copied to the clipboard, and VOCO tells you.",
+            "Stop sends the last audio, waits for the final transcript and pastes it. After a finished sentence it adds one space, so the next dictation starts apart. Words that couldn't be pasted are copied to the clipboard, and VOCO tells you.",
         ),
     ],
     [
@@ -383,7 +383,7 @@ lesson(
         ("Compare", "VOCO keeps only text that extends the previous transcript."),
         (
             "Paste",
-            "The new words go to delivery. If a paste is still running, newer words wait and go together.",
+            "The new words go to delivery, each desktop paste ending between two characters that aren't spaces. If a paste is still running, newer words wait and go together.",
         ),
     ],
     [
@@ -397,7 +397,7 @@ lesson(
         ),
         (
             "Three paste outcomes",
-            "A paste that changes nothing leaves the words pending, and Stop retries them 3 times, 250 ms apart. A rejected paste, refused before the clipboard changed, stops typing. An uncertain paste also stops typing, and VOCO never sends those words again.",
+            "A paste that changes nothing leaves the words pending for the next words, a quiet release or Stop, which retries them 3 times, 250 ms apart. A rejected paste, refused before the clipboard changed, stops typing. An uncertain paste also stops typing, and VOCO never sends those words again.",
         ),
         (
             "Metadata, not words",
@@ -561,6 +561,10 @@ lesson(
             "NVIDIA's GGUF holds the decoder's vocabulary but not the SentencePiece tokenizer the recognizer needs to turn phrases into the model's pieces. VOCO's copy adds that tokenizer from NVIDIA's checkpoint as one metadata entry. Every weight and every other entry stays as NVIDIA published it, and the pinned fingerprint is that of the result.",
         ),
         (
+            "Punctuation comes with the next word",
+            "Measured on public speech, the recognizer usually writes a comma or full stop only once it hears the next word, so at a pause its text rarely ends in one. In the study's development set, today's recognizer gave 62.7% of pauses between sentences a sentence end, so where you pause the full stop can come a word late or not at all. The worker changes recognized text only for spelling and My words, so VOCO adds no full stop of its own where you pause.",
+        ),
+        (
             "Turning the gate off",
             "VOCO_SILENCE_GATE=off disables the gate. The default mode, zero, treats a packet as quiet only when every sample is exactly zero. Any other value stops the worker before the model loads.",
         ),
@@ -569,7 +573,9 @@ lesson(
         (R + "adapters.py", "Checks the model fingerprint and loads the native library."),
         (R + "nemo_bridge.cpp", "The bridge into NeMo-Speech.cpp."),
         (R + "streaming.py", "The warmup, the silence gate and frame joining."),
-        (R + "worker_main.py", "The request loop and the thread rule."),
+        (R + "worker_main.py", "The request loop and the thread rule; it changes recognized text only for spelling and My words."),
+        ("research/pause-sentence-ends-2026-10/harness/run_policies.py", "The pause study's runs on public speech, which record the recognizer's text at every pause."),
+        ("research/pause-sentence-ends-2026-10/results/dev-table.txt", "The pause study's development results; P0 is today's recognizer."),
         (R + "MODEL-IDENTITY.json", "The model's source, revision and fingerprint, and those of the NVIDIA file and tokenizer it is built from."),
         ("scripts/graft-model-tokenizer.py", "Adds the tokenizer to NVIDIA's GGUF and checks every pin."),
         (R + "NATIVE-BUILD.json", "Pinned revisions, patch digests and processor flags."),
@@ -594,7 +600,7 @@ lesson(
     "The last step puts words into another app. VOCO does it the way you would: copy, then paste.",
     [
         "insertion.rs pastes one group of words at a time. It puts the words on the clipboard, then presses Shift+Insert. In the code's words, \"Shift+Insert is the paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal emulators.\"",
-        "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Before each paste it checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
+        "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
         "An optional Chromium extension offers a second route. In a tab where you enable it, VOCO inserts words at the caret of one plain text field, and the extension confirms each insert with a receipt.",
     ],
     [
@@ -608,9 +614,12 @@ lesson(
         ),
         (
             "Settle",
-            "VOCO waits until 150 ms have passed since the previous paste, so that app can read the clipboard first.",
+            "VOCO lets the app read the previous paste first. Where xclip copies on GNOME Wayland, it watches for that read, for up to 300 ms after the Insert press; elsewhere, and whenever it can't tell, it waits until 150 ms after the previous paste's keys.",
         ),
-        ("Copy", "The words go to CLIPBOARD, then PRIMARY. A PRIMARY failure only logs a warning."),
+        (
+            "Copy",
+            "The words go to CLIPBOARD and PRIMARY, and a PRIMARY failure only logs a warning. Where xclip copies on GNOME Wayland, PRIMARY goes first, and VOCO waits up to 100 ms for Mutter's read of the new CLIPBOARD, which shows the copy is current.",
+        ),
         (
             "Press",
             "VOCO waits up to 1.5 seconds for the shortcut's modifier keys to be released, then sends Shift+Insert.",
@@ -618,8 +627,16 @@ lesson(
     ],
     [
         (
-            "A joining space pasted on its own",
-            "When new words start with VOCO's joining space, VOCO pastes the space by itself first, then the words, and never types it as a key. Chromium's address bar strips the spaces around pasted text but keeps a paste of only whitespace as one space. In the Chromium extension's field, the space stays with its words.",
+            "Every space inside a paste",
+            "Chromium's address bar strips the spaces at the edges of pasted text, and its rich-text fields turn a space pasted alone into a no-break space. So each live paste ends between two characters that aren't spaces, never inside a letter and its accents, and the last letter waits for the next words. After 0.75 seconds of audio with no new words, the held text goes out on its own. The next words' space is then pasted alone, which the address bar keeps, so a rich-text field gets at most one no-break space for each pause. The final text goes out whole. In the Chromium extension's field each space stays with its words, and a trailing space waits for them.",
+        ),
+        (
+            "Seeing the app read",
+            "On GNOME Wayland with DISPLAY set, where xclip copies, each copy runs it in the foreground with -verbose, which reports every request it answers except TARGETS, and keeps the selection until the next copy. Mutter's clipboard manager reads each new CLIPBOARD once. When that read is in by the Insert press, the first answer after the press is the app's read, and the next copy follows at once. A read before the press, during the wait for a young keyboard or the gap after Shift, never counts. A read shows that the app asked for the text, not that the words arrived.",
+        ),
+        (
+            "Waiting for GNOME's switch",
+            "A helper reports owning its selection just before its request leaves for the X server, and until the server has it, an app pastes the previous copy. So where xclip copies on GNOME Wayland, VOCO copies PRIMARY first, then CLIPBOARD, and before the keys waits up to 100 ms for Mutter's read of the new CLIPBOARD. Nothing reads PRIMARY that way, so its early copy is a head start, not proof. Without the read in time, the keys go anyway.",
         ),
         (
             "Three failure outcomes",
@@ -647,16 +664,17 @@ lesson(
         ),
         (
             "The clipboard keeps the words",
-            "VOCO doesn't restore what the clipboard held before. After dictation, the clipboard holds the last words VOCO pasted.",
+            "VOCO doesn't restore what the clipboard held before. After dictation, the clipboard holds VOCO's last paste, such as the end of your last word or the space Stop adds after a finished sentence. The helper holding it keeps running, even after VOCO quits, until something else is copied.",
         ),
     ],
     [
         (B + "insertion.rs", "Checks helpers, copies both selections and presses Shift+Insert."),
-        (B + "virtual_keyboard.rs", "VOCO's own keyboard for the Wayland paste keys."),
+        (B + "virtual_keyboard.rs", "VOCO's own keyboard for the Wayland paste keys, which reports when Insert went out."),
+        (B + "selection_owner.rs", "The GNOME copies: xclip helpers that keep both selections and report each read."),
         (B + "desktop_session.rs", "Tracks the originating desktop session and asks logind whether it is active and locked."),
         (F + "lib/dictationRecording.ts", "Checks paste readiness before a recording starts."),
         (F + "App.tsx", "Hides VOCO's window before dictation into another app."),
-        (F + "lib/dictationStream.ts", "Hands new words to delivery one group at a time, a joining space on its own."),
+        (F + "lib/dictationStream.ts", "Ends each live paste inside the words and lets held text go after a pause."),
         (
             B + "process_runner.rs",
             "Runs helper programs within bounds and tells a failed start apart from a failure after the helper may have acted.",
@@ -668,7 +686,7 @@ lesson(
         ("integrations/chromium/content.js", "Finds the eligible field and inserts at the caret."),
         (F + "lib/browserStreamDelivery.ts", "Never retries an insert whose receipt is missing."),
     ],
-    "Dispatched means the paste keys went out. Only the browser route gets a receipt from the page; for other apps VOCO can't see whether the words arrived.",
+    "Dispatched means the paste keys went out. On GNOME VOCO also sees the app read the clipboard, but only the browser route gets a receipt from the page; for other apps VOCO can't see whether the words arrived.",
     "A paste helper fails after it started. Why doesn't VOCO simply try again?",
     [
         "The keys may already have reached the app, so a retry could type the words twice",
@@ -685,7 +703,7 @@ lesson(
     "Stop means finish the work.",
     "Pressing Stop doesn't throw away the end of your sentence. VOCO finishes the work before it goes quiet.",
     [
-        "When you stop, VOCO flushes the microphone and sends the audio the worker hasn't heard yet, including the last partial packet. Then it asks for the final transcript and pastes the last words.",
+        "When you stop, VOCO flushes the microphone and sends the audio the worker hasn't heard yet, including the last partial packet. Then it asks for the final transcript and pastes the last words, and after a finished sentence, one space.",
         "If some words couldn't be pasted, VOCO copies them to the clipboard and tells you. If even the copy fails, the words wait in Review.",
         "A recognition failure is different. VOCO copies nothing, because the transcript may be missing words, and asks you to check your text field.",
     ],
@@ -704,11 +722,15 @@ lesson(
         ),
         (
             "Deliver or copy",
-            "Words left over go to CLIPBOARD and PRIMARY, joining space included, and VOCO shows \"Dictation copied to clipboard\".",
+            "Words left over go to CLIPBOARD and PRIMARY, with any space before them, and VOCO shows \"Dictation copied to clipboard\".",
         ),
         ("Clean up", "VOCO clears the audio from memory and deletes the recording's journal entry."),
     ],
     [
+        (
+            "A space after a finished sentence",
+            "When the whole final text went out, with no cancel and no failed or uncertain paste, and it ends with . ? ! or …, perhaps before closing quotes or brackets, Stop pastes one space on its own after it, so your next dictation or typing starts apart. It never does in the Chromium extension's field, the voice test or Say it. If that paste fails, VOCO says nothing and copies nothing, because no words are missing.",
+        ),
         (
             "Typing stopped, listening continues",
             "When a paste is rejected or uncertain, VOCO shows \"VOCO stopped typing\" with \"It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.\"",
@@ -734,7 +756,7 @@ lesson(
         (F + "lib/dictationRecording.ts", "The Stop sequence, the clipboard copy and every notice."),
         (F + "lib/desktopCaptureTail.ts", "Forwards the audio the stream hasn't received."),
         (F + "lib/audioCaptureFlush.ts", "The 80 ms flush confirmation."),
-        (F + "lib/dictationStream.ts", "Finishes the stream and reports undelivered words."),
+        (F + "lib/dictationStream.ts", "Finishes the stream, reports undelivered words and whether all of the final text went out."),
         (B + "insertion.rs", "Copies leftover words to both selections without sending keys."),
         (F + "lib/crashRecovery.ts", "Saves words in Review when copying fails."),
     ],
@@ -1096,6 +1118,10 @@ lesson(
         (
             "Know what is measured",
             "Each quality record names its clock_domain and counts samples at queue_ingress, where audio enters the queue. The replay measures the worker's process boundary, not capture, the receiving app or the screen.",
+        ),
+        (
+            "Reads, not proof",
+            "Each paste's record says which selection the app read and how many milliseconds after the Insert press, that nothing read it within 300 ms, or that the helpers couldn't tell, as they can only where xclip copies on GNOME Wayland. A read shows that the app asked for the text, not that the words arrived.",
         ),
         (
             "Descriptive statistics",
@@ -1609,6 +1635,7 @@ lesson(
     [
         (B + "insertion.rs", "Chooses the clipboard helper and the paste keys for each session."),
         (B + "virtual_keyboard.rs", "VOCO's keyboard: two keys, 12 ms apart."),
+        (B + "selection_owner.rs", "Runs xclip with -verbose where it copies on GNOME Wayland, and reports each read."),
         (B + "desktop_session.rs", "Binds the originating desktop session and checks whether it is active and locked."),
         (B + "lib.rs", "Shortcut routes for each session, and the keyboard created at startup."),
         ("integrations/gnome/voco-panel@voco.local/extension.js", "The GNOME grab on Wayland."),
@@ -1631,8 +1658,8 @@ chapters[-1]["comparison"] = {
         [
             "GNOME on Wayland",
             "The companion's Shell grab of Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
-            "VOCO virtual keyboard, after the modifier wait and session check; unavailable session status permits keys",
-            "xclip through XWayland when DISPLAY is set, otherwise wl-copy",
+            "VOCO virtual keyboard, after Mutter's read of a new xclip copy (up to 100 ms), the modifier wait and the session check; unavailable session status permits keys",
+            "xclip through XWayland when DISPLAY is set, run with -verbose so it reports each read; otherwise wl-copy",
         ],
         [
             "Other Wayland desktops",
@@ -1656,7 +1683,7 @@ chapters[-1]["comparison"] = {
     "scope": "Code paths at the commit this guide records. Session detection reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY as the table describes.",
     "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing.",
 }
-chapters[-1]["sourceNote"] = "The table follows insertion.rs (helpers and keys), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
+chapters[-1]["sourceNote"] = "The table follows insertion.rs (helpers and keys), selection_owner.rs (the GNOME copies), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
 
 # Fail closed if a lesson cites a path absent from the pinned source.
 root = Path(__file__).resolve().parents[1]
