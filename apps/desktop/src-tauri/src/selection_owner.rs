@@ -304,7 +304,6 @@ fn serve(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
 
     /// A stand-in for `xclip -verbose -selection S -in`: it keeps its input in
@@ -323,7 +322,7 @@ pub(crate) mod tests {
         ));
         std::fs::create_dir(&directory).unwrap();
         let program = directory.join("xclip");
-        std::fs::write(
+        write_program(
             &program,
             r#"#!/bin/sh
 dir=${0%/*} selection=$3
@@ -342,10 +341,29 @@ while [ -d "$dir" ] && [ ! -e "$dir/$selection.clear" ] && [ "$polls" -lt 5000 ]
   sleep 0.002
 done
 "#,
-        )
-        .unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        );
         program
+    }
+
+    /// Writes an executable that this process never holds open for writing.
+    /// Tests run in parallel threads, and a thread that forks while another
+    /// writes the file gives its child that descriptor until the child execs;
+    /// the kernel won't run a file open for writing, so spawning the stand-in
+    /// would fail with ETXTBSY. A child process writes it instead.
+    fn write_program(path: &Path, contents: &str) {
+        let mut writer = std::process::Command::new("/bin/sh")
+            .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "write-program"])
+            .arg(path)
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap();
+        writer
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(contents.as_bytes())
+            .unwrap();
+        assert!(writer.wait().unwrap().success());
     }
 
     pub(crate) fn signal(program: &Path, selection: Selection, what: &str) {
@@ -458,6 +476,44 @@ done
             .unwrap_err();
         assert!(matches!(error, OwnerError::Spawn(_)), "{error:?}");
         std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+    }
+
+    /// Its forks also hold other tests' descriptors, such as a socket they
+    /// just closed, so it runs alone: `cargo test --lib -- --ignored
+    /// stand_ins_start_while_other_threads_fork`.
+    #[test]
+    #[ignore = "Forks without pause; run it on its own"]
+    fn stand_ins_start_while_other_threads_fork() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        // Other tests fork all the time, as this thread does: a stand-in
+        // written while a fork held its descriptor couldn't start.
+        let stop = Arc::new(AtomicBool::new(false));
+        let forker = {
+            let stop = Arc::clone(&stop);
+            std::thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    let mut child = std::process::Command::new("/bin/true");
+                    // SAFETY: an empty closure; it makes the spawn fork, as
+                    // VOCO's helpers do, rather than use posix_spawn.
+                    unsafe { child.pre_exec(|| Ok(())) };
+                    let _ = child.status();
+                }
+            })
+        };
+        for _ in 0..40 {
+            let program = fake_xclip("fork-race");
+            let mut stand_in = std::process::Command::new(&program)
+                .args(["-verbose", "-selection", "clipboard", "-in"])
+                .stdin(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("the stand-in must start");
+            signal(&program, Selection::Clipboard, "clear");
+            assert!(stand_in.wait().unwrap().success());
+            std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+        }
+        stop.store(true, Ordering::Relaxed);
+        forker.join().unwrap();
     }
 
     #[test]
