@@ -1,0 +1,2 @@
+{'no cue': 35, 'comma': 3, 'set A': 13, 'set B': 10}
+[('the', 4), ('was', 3), ('of', 3), ('story', 2), ('he', 2), ('to', 2), ('with', 2), ('have', 2), ('if', 1), ('you', 1), ('neuburg', 1), ('cart', 1), ('large', 1), ('or', 1), ('men', 1), ('mighty', 1), ('been', 1), ('how', 1), ('ask', 1), ('up', 1)]

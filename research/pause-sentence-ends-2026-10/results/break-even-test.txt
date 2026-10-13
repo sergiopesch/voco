@@ -1,0 +1,2 @@
+EWB:0.8, inserted pause >= 0.8 s: S 0.721 -> 0.904 (n=136), M 0.848 -> 0.304 (n=79), break-even 2.96 between-sentence pauses per mid-sentence pause
+EWB:1.0, inserted pause >= 1.0 s: S 0.727 -> 0.909 (n=110), M 0.871 -> 0.258 (n=62), break-even 3.37 between-sentence pauses per mid-sentence pause
