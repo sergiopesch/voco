@@ -3,7 +3,7 @@
 import json, re, sys
 from pathlib import Path
 import numpy as np
-from build_items import align, norm
+from text import align, norm
 TERM = re.compile(r'[.?!]["”’)\]]*$')
 COMMA = re.compile(r'[,;:\-–—]["”’)\]]*$')
 def tokens(text):
@@ -19,6 +19,16 @@ def hyp_index(al, i):
         if al[i] and al[i][0] is not None: return al[i][0]
         i -= 1
     return None
+def final_times(row):
+    """For each word of the final text, the audio time of the first push that has it
+    in its final form, or the end of the audio if only finish did. Archived runs
+    keep these as final_at instead of every push."""
+    if 'final_at' in row: return row['final_at']
+    ht = tokens(row['final']); out = [None] * len(ht)
+    for at, text in row['pushes']:
+        for k, t in enumerate(tokens(text)[:len(ht)]):
+            if out[k] is None and t == ht[k]: out[k] = at
+    return [row['audio_s'] if t is None else t for t in out]
 def score_item(item, row):
     rt = tokens(item['ref']); ht = tokens(row['final'])
     rn = [norm(t) for t in rt]; hn = [norm(t) for t in ht]
@@ -48,15 +58,8 @@ def score_item(item, row):
         else:
             ok = None
         # delay: first push whose h-th token is final and carries the terminator
-        delay = None
-        if term_h:
-            # the first push where word h has its final form, terminator included
-            for at, text in row['pushes']:
-                tt = tokens(text)
-                if len(tt) > h and tt[h] == ht[h]:
-                    delay = at - j['speech_end_s']; break
-            else:
-                delay = row['audio_s'] - j['speech_end_s']
+        # delay: when word h reached its final form, terminator included
+        delay = final_times(row)[h] - j['speech_end_s'] if term_h else None
         junctions.append({**j, 'h': h, 'term': term_h, 'comma': comma_h, 'next_cap': nxt_cap, 'correct': ok, 'dels': dels, 'delay': delay,
                           'forced': any(j['pause_start_s'] - .3 <= f <= j['pause_end_s'] + .5 for f in row['forces'])})
     # global terminator precision/recall over aligned words, capital errors on matched words

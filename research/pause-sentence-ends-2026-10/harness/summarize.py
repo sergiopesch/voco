@@ -1,5 +1,6 @@
 import json, sys, subprocess
-out = subprocess.run(['python3', 'score.py', 'items.json', sys.argv[1], *sys.argv[2:]], capture_output=True, text=True).stdout
+from pathlib import Path
+out = subprocess.run([sys.executable, str(Path(__file__).with_name('score.py')), 'items.json', sys.argv[1], *sys.argv[2:]], capture_output=True, text=True, check=True).stdout
 first = out.index('{'); print(out[:first].strip()); t = json.loads(out[first:])
 cols = ['S_acc', 'M_acc', 'M_inserted_acc', 'M_natural_acc', 'PA', 'term_P', 'term_R']
 print('policy     ' + ' '.join(f'{c[:6]:>6}' for c in cols) + '   WER%  jdel viol   rtf   d50   d90  PA_ci            M_ci             WER_ci')

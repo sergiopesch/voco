@@ -140,7 +140,8 @@ Exploratory, outside the decision rule (addendum to the pre-registration):
   60.7% on dev. It improves recognition elsewhere: WER 3.73% against 4.13% on
   dev (interval −0.75 to −0.05 points) and 2.98% against 3.27% on test
   (−0.57 to +0.01), and more full stops are found
-  ([lookahead.txt](results/lookahead.txt)), at about 0.18 s more delay per word
+  ([lookahead-dev.txt](results/lookahead-dev.txt),
+  [lookahead-test.txt](results/lookahead-test.txt)), at about 0.18 s more delay per word
   ([engine benchmark](../engine-benchmark-2026-10/README.md)).
 - **Digital silence** in the pauses, through the worker's own gate, left S at
   65.1% against 63.5% on 59 dev items ([zero60.txt](results/zero60.txt)).
@@ -175,6 +176,15 @@ python3 summarize.py runs/dev P0 E:1.2 EWB:1.0
 VOCO_LAB_CONTEXT=6 VOCO_LAB_NO_UNCUT=1 python3 run_policies.py items.json dev runs/dev-R6 P0
 ```
 
-[results/runs](results/runs) holds each run's final text and forced ends
-(`EWB-1.0` is policy `EWB:1.0`), and [results/items.json.xz](results/items.json.xz)
-each item's references and pauses.
+`archive.py` writes runs to [results/runs](results/runs): each run's final
+text, the time each of its words took its final form, and its forced ends
+(`EWB-1.0` is policy `EWB:1.0`). [results/items.json.xz](results/items.json.xz)
+holds each item's references and pauses. The tables rebuild from those files
+alone, with no audio or recognizer:
+
+```bash
+python3 harness/regenerate.py results
+```
+
+It says, for each table, whether the rebuilt one matches the committed one;
+`prosody-dev.txt` needs the audio and isn't rebuilt.

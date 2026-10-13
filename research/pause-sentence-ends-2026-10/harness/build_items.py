@@ -4,6 +4,7 @@ import json, os, random, re, sys
 from pathlib import Path
 import numpy as np
 from asr import Stream, load_flac
+from text import align, norm
 SEED = 20261013
 # libri-pc/{test-clean,test-other}.json and LibriSpeech/{test-clean,test-other}.
 BASE = Path(os.environ['VOCO_PAUSE_DOWNLOADS'])
@@ -14,7 +15,6 @@ CLOSE = re.compile(r'["”’)\]]+$')
 def label(text):
     t = CLOSE.sub('', text.strip())
     return 'S' if t[-1] in '.?!' else 'C' if t[-1] in ',;:-–—' else 'N'
-def norm(w): return re.sub(r"[^\w']", '', w.lower()).strip("'")
 def db(a, hop=FR):
     n = (len(a) - FR) // hop + 1
     if n <= 0: return np.array([-120.])
@@ -48,19 +48,6 @@ def pause(seconds, src, rng):
             out[-320:] = out[-320:] * fade[::-1] + piece[:320] * fade; out = np.concatenate([out, piece[320:]])
         else: out = np.concatenate([out, piece])
     return out[:n], 'tone'
-def align(ref, hyp):
-    """Edit-distance alignment; returns for each ref index the hyp index (or None) and op."""
-    n, m = len(ref), len(hyp); d = np.zeros((n + 1, m + 1), np.int32); d[:, 0] = range(n + 1); d[0, :] = range(m + 1)
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            d[i, j] = min(d[i-1, j] + 1, d[i, j-1] + 1, d[i-1, j-1] + (ref[i-1] != hyp[j-1]))
-    i, j, out = n, m, [None] * n
-    while i > 0 or j > 0:
-        if i > 0 and j > 0 and d[i, j] == d[i-1, j-1] + (ref[i-1] != hyp[j-1]):
-            out[i-1] = (j-1, 'ok' if ref[i-1] == hyp[j-1] else 'sub'); i -= 1; j -= 1
-        elif i > 0 and d[i, j] == d[i-1, j] + 1: out[i-1] = (None, 'del'); i -= 1
-        else: j -= 1
-    return out
 def main():
     rng = random.Random(SEED); nrng = np.random.default_rng(SEED)
     rows = []
