@@ -173,10 +173,11 @@ Each new suffix goes to `insertion.rs`, one paste at a time:
 6. It sends Shift+Insert, through the virtual keyboard on Wayland and with
    `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
-7. On GNOME Wayland it waits up to 300 ms for the app to read the paste.
-   Mutter's clipboard manager reads each new CLIPBOARD once, right after the
-   copy. When that read came before the keys, the next request either helper
-   answers is the app's, and the next paste can copy at once. A read only says
+7. On GNOME Wayland it waits up to 300 ms after the Insert press, which the
+   virtual keyboard reports, for the app to read the paste. Mutter's clipboard
+   manager reads each new CLIPBOARD once, right after the copy. When that read
+   came by the Insert press, the next request either helper answers after the
+   press is the app's, and the next paste can copy at once. A read only says
    the app asked for the text, so it never changes the paste's outcome.
 
 When a suffix starts with VOCO's joining space, the stream pastes the space on

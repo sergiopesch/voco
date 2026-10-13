@@ -44,7 +44,7 @@ pub struct PasteMetrics {
     pub payload_utf8_bytes: usize,
     pub payload_unicode_scalars: usize,
     pub payload_utf16_units: usize,
-    /// Which selection VOCO saw the focused app read after the keys:
+    /// Which selection VOCO saw the focused app read after the Insert press:
     /// "clipboard" or "primary", "none" within READ_TIMEOUT, or "unobserved"
     /// where the helpers can't tell. A read isn't proof the text was inserted.
     pub selection_read: &'static str,
@@ -346,7 +346,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     } else {
         let (mut clipboard, mut primary) = copy_commands();
         clipboard_transaction(payload, &mut clipboard, &mut primary, before_paste, || {
-            send_paste_keys(wayland)
+            send_paste_keys(wayland).map(|_| ())
         })
         .map(|(clipboard_ms, keyboard_ms)| (clipboard_ms, keyboard_ms, PasteRead::Unobserved))
     };
@@ -398,8 +398,8 @@ impl PasteRead {
 }
 
 /// When the next copy must wait from. Once the app has read the paste, or
-/// READ_TIMEOUT has passed since its keys, nothing is left to wait for; after a
-/// failure some keys may have been sent.
+/// READ_TIMEOUT has passed since its Insert press, nothing is left to wait for;
+/// after a failure some keys may have been sent.
 fn settle_from(read: Option<PasteRead>) -> Option<Instant> {
     match read {
         Some(PasteRead::Read(_) | PasteRead::None) => None,
@@ -565,10 +565,13 @@ fn check_before_keys(wayland: bool) -> Result<(), InsertionError> {
 }
 
 /// Shift+Insert through VOCO's virtual keyboard on Wayland, or xdotool on X11.
-fn send_paste_keys(wayland: bool) -> Result<(), InsertionError> {
+/// Returns when the Insert press went out, where the keyboard reports it.
+fn send_paste_keys(wayland: bool) -> Result<Option<Instant>, InsertionError> {
     if wayland {
         #[cfg(target_os = "linux")]
-        return crate::virtual_keyboard::paste().map_err(InsertionError::uncertain);
+        return crate::virtual_keyboard::paste()
+            .map(Some)
+            .map_err(InsertionError::uncertain);
         #[cfg(not(target_os = "linux"))]
         return Err(InsertionError::no_mutation(
             "Wayland paste keys need Linux.",
@@ -576,7 +579,7 @@ fn send_paste_keys(wayland: bool) -> Result<(), InsertionError> {
     }
     let mut paste = process_runner::command("xdotool");
     paste.args(X11_PASTE_ARGUMENTS);
-    run_helper(&mut paste, None, Duration::from_secs(5))
+    run_helper(&mut paste, None, Duration::from_secs(5)).map(|()| None)
 }
 
 fn build_support(
@@ -807,7 +810,7 @@ fn clipboard_transaction(
     paste_transaction(
         || copy_selections(text, clipboard, primary),
         before_paste,
-        send_keys,
+        || send_keys().map(|()| None),
     )
     .map(|transaction| (transaction.clipboard_ms, transaction.keyboard_ms))
 }
@@ -815,15 +818,16 @@ fn clipboard_transaction(
 struct Transaction<T> {
     copied: T,
     clipboard_ms: u64,
-    keys_started: Instant,
     keyboard_ms: u64,
+    /// When the Insert press went out, where the keys report it.
+    inserted: Option<Instant>,
 }
 
 /// The copy, then the checks just before keys, then the keys.
 fn paste_transaction<T>(
     copy: impl FnOnce() -> Result<T, InsertionError>,
     before_paste: impl FnOnce() -> Result<(), InsertionError>,
-    send_keys: impl FnOnce() -> Result<(), InsertionError>,
+    send_keys: impl FnOnce() -> Result<Option<Instant>, InsertionError>,
 ) -> Result<Transaction<T>, InsertionError> {
     let copy_started = Instant::now();
     let copied = copy()?;
@@ -833,7 +837,7 @@ fn paste_transaction<T>(
         error
     })?;
     let keys_started = Instant::now();
-    send_keys().map_err(|mut error| {
+    let inserted = send_keys().map_err(|mut error| {
         // Clipboard mutation already happened, even if no key was sent. No
         // automatic retry or restoration is safe here.
         error.outcome = DeliveryOutcome::Uncertain;
@@ -849,20 +853,22 @@ fn paste_transaction<T>(
     Ok(Transaction {
         copied,
         clipboard_ms,
-        keys_started,
         keyboard_ms: elapsed_ms(keys_started),
+        inserted,
     })
 }
 
 /// The GNOME paste: xclip helpers that keep both selections and report what
 /// they answer, then the keys, then a wait of up to READ_TIMEOUT for the app's
-/// read. Mutter's clipboard manager reads each new CLIPBOARD once; until that
-/// read is in, before the keys, another read can't be told from the app's.
+/// read, the first answer after the Insert press. A read before it, during the
+/// wait for a young keyboard or the gap after Shift, can't be the app's paste.
+/// Mutter's clipboard manager reads each new CLIPBOARD once; until that read is
+/// in, by the Insert press, another read can't be told from the app's.
 fn observed_transaction(
     program: &str,
     text: &str,
     before_paste: impl FnOnce() -> Result<(), InsertionError>,
-    send_keys: impl FnOnce() -> Result<(), InsertionError>,
+    send_keys: impl FnOnce() -> Result<Option<Instant>, InsertionError>,
 ) -> Result<(u64, u64, PasteRead), InsertionError> {
     let transaction = paste_transaction(
         || {
@@ -887,12 +893,11 @@ fn observed_transaction(
         send_keys,
     )?;
     let owners = &transaction.copied;
-    let read = if owners.clipboard_served_by(transaction.keys_started) == 0 {
-        PasteRead::Unobserved
-    } else {
-        owners
-            .read_after(transaction.keys_started, READ_TIMEOUT)
-            .map_or(PasteRead::None, PasteRead::Read)
+    let read = match transaction.inserted {
+        Some(inserted) if owners.clipboard_served_by(inserted) > 0 => owners
+            .read_after(inserted, READ_TIMEOUT)
+            .map_or(PasteRead::None, PasteRead::Read),
+        _ => PasteRead::Unobserved,
     };
     Ok((transaction.clipboard_ms, transaction.keyboard_ms, read))
 }
@@ -1361,13 +1366,14 @@ mod tests {
                 Ok(())
             },
             || {
-                // The app reads the paste 10 ms after its keys.
+                // The app reads the paste 10 ms after the Insert press.
+                let inserted = Instant::now();
                 let app = program.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_millis(10));
                     signal(&app, Selection::Clipboard, "serve");
                 });
-                Ok(())
+                Ok(Some(inserted))
             },
         )
         .unwrap();
@@ -1395,9 +1401,10 @@ mod tests {
             "text",
             || Ok(()),
             || {
-                // Only one read, after the keys: it may be the clipboard manager's.
+                // Only one read, after the Insert press: it may be the clipboard manager's.
+                let inserted = Instant::now();
                 signal(&program, Selection::Clipboard, "serve");
-                Ok(())
+                Ok(Some(inserted))
             },
         )
         .unwrap();
@@ -1420,7 +1427,7 @@ mod tests {
                 served_once(&program);
                 Ok(())
             },
-            || Ok(()),
+            || Ok(Some(Instant::now())),
         )
         .unwrap();
         assert_eq!(read, PasteRead::None);
@@ -1453,6 +1460,52 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
         assert!(!error.clipboard_changed);
+        std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_read_before_the_insert_press_never_ends_the_paste() {
+        let program = fake_xclip("pre-insert-read");
+        let (_, _, read) = observed_transaction(
+            program.to_str().unwrap(),
+            "text",
+            || {
+                served_once(&program);
+                Ok(())
+            },
+            || {
+                // Another program reads while a young keyboard waits before
+                // Shift, and in the gap between Shift and Insert. Neither read
+                // can be the app's paste.
+                served_once(&program);
+                served_once(&program);
+                Ok(Some(Instant::now()))
+            },
+        )
+        .unwrap();
+        assert_eq!(read, PasteRead::None);
+        release(&program);
+        std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn keys_that_report_no_insert_press_leave_the_read_unobserved() {
+        let program = fake_xclip("no-insert-instant");
+        let (_, _, read) = observed_transaction(
+            program.to_str().unwrap(),
+            "text",
+            || {
+                served_once(&program);
+                Ok(())
+            },
+            || {
+                signal(&program, Selection::Clipboard, "serve");
+                Ok(None)
+            },
+        )
+        .unwrap();
+        assert_eq!(read, PasteRead::Unobserved);
+        release(&program);
         std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
     }
 

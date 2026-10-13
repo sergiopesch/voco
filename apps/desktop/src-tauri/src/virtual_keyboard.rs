@@ -97,8 +97,10 @@ const PASTE_STEPS: [(KeyCode, i32); 4] = [
 ];
 
 /// Send one paste gesture. The caller has already copied the text and waited
-/// for the shortcut's modifiers to be released.
-pub fn paste() -> Result<(), String> {
+/// for the shortcut's modifiers to be released. Returns when the Insert press
+/// went out: the app reads the selection only after it, not during the wait
+/// for a young device or the gap after Shift.
+pub fn paste() -> Result<Instant, String> {
     let mut keyboard = slot();
     if keyboard.is_none() {
         drop(keyboard);
@@ -115,6 +117,7 @@ pub fn paste() -> Result<(), String> {
     // Checked again after the copy and the modifier wait: the session may
     // have switched since the caller's check.
     require_active_session()?;
+    let mut inserted = None;
     for (index, (key, value)) in PASTE_STEPS.into_iter().enumerate() {
         if index > 0 {
             std::thread::sleep(KEY_GAP);
@@ -132,8 +135,11 @@ pub fn paste() -> Result<(), String> {
                 "The virtual keyboard stopped accepting keys: {error}."
             ));
         }
+        if (key, value) == (KeyCode::KEY_INSERT, 1) {
+            inserted = Some(Instant::now());
+        }
     }
-    Ok(())
+    inserted.ok_or_else(|| "The paste keys never pressed Insert.".to_string())
 }
 
 #[cfg(test)]
@@ -198,8 +204,10 @@ mod tests {
         std::thread::sleep(ADD_SETTLE);
         for _ in 0..2 {
             let sent = Instant::now();
-            paste().unwrap();
+            let inserted = paste().unwrap();
             let elapsed = sent.elapsed();
+            // Insert is pressed one gap after Shift, and the paste goes on after it.
+            assert!(inserted >= sent + KEY_GAP && inserted - sent < elapsed);
             let expected = PASTE_STEPS.to_vec();
             let mut received = Vec::new();
             while received.len() < expected.len() {

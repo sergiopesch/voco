@@ -51,7 +51,7 @@ impl std::fmt::Display for OwnerError {
     }
 }
 
-/// A read VOCO saw after the paste keys, and how long after they started.
+/// A read VOCO saw after a paste's Insert press, and how long after it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct SelectionRead {
     pub selection: Selection,
@@ -207,14 +207,10 @@ impl SelectionOwners {
             .sum()
     }
 
-    /// The first request either helper answered after `keys_started`, waiting
-    /// up to `timeout` from then.
-    pub(crate) fn read_after(
-        &self,
-        keys_started: Instant,
-        timeout: Duration,
-    ) -> Option<SelectionRead> {
-        let deadline = keys_started + timeout;
+    /// The first request either helper answered after `inserted`, the Insert
+    /// press, waiting up to `timeout` from then.
+    pub(crate) fn read_after(&self, inserted: Instant, timeout: Duration) -> Option<SelectionRead> {
+        let deadline = inserted + timeout;
         let mut progress = self.progress();
         loop {
             let first = self
@@ -222,14 +218,14 @@ impl SelectionOwners {
                 .iter()
                 .zip(progress.iter())
                 .filter_map(|(helper, progress)| {
-                    let served = progress.served.iter().find(|&&t| t > keys_started)?;
+                    let served = progress.served.iter().find(|&&t| t > inserted)?;
                     Some((*served, helper.selection))
                 })
                 .min_by_key(|(served, _)| *served);
             if let Some((served, selection)) = first {
                 return Some(SelectionRead {
                     selection,
-                    after: served - keys_started,
+                    after: served - inserted,
                 });
             }
             let left = deadline.saturating_duration_since(Instant::now());
@@ -387,7 +383,7 @@ done
     }
 
     #[test]
-    fn the_app_read_is_the_first_answer_after_the_keys_not_the_earlier_one() {
+    fn the_app_read_is_the_first_answer_after_the_insert_press_not_the_earlier_one() {
         let program = fake_xclip("selection-read");
         let owners = own_both(&program, b"Synthetic phrase.");
         assert_eq!(
@@ -397,16 +393,11 @@ done
         // Mutter's clipboard manager reads each new CLIPBOARD once.
         signal(&program, Selection::Clipboard, "serve");
         wait_until(|| owners.clipboard_served_by(Instant::now()) == 1);
-        let keys_started = Instant::now();
+        let inserted = Instant::now();
         std::thread::sleep(Duration::from_millis(20));
-        assert_eq!(
-            owners.read_after(keys_started, Duration::from_millis(15)),
-            None
-        );
+        assert_eq!(owners.read_after(inserted, Duration::from_millis(15)), None);
         signal(&program, Selection::Clipboard, "serve");
-        let read = owners
-            .read_after(keys_started, Duration::from_secs(5))
-            .unwrap();
+        let read = owners.read_after(inserted, Duration::from_secs(5)).unwrap();
         assert_eq!(read.selection, Selection::Clipboard);
         assert!(read.after >= Duration::from_millis(20));
         release(&program);
@@ -419,11 +410,9 @@ done
         let owners = own_both(&program, b"ls -la");
         signal(&program, Selection::Clipboard, "serve");
         wait_until(|| owners.clipboard_served_by(Instant::now()) == 1);
-        let keys_started = Instant::now();
+        let inserted = Instant::now();
         signal(&program, Selection::Primary, "serve");
-        let read = owners
-            .read_after(keys_started, Duration::from_secs(5))
-            .unwrap();
+        let read = owners.read_after(inserted, Duration::from_secs(5)).unwrap();
         assert_eq!(read.selection, Selection::Primary);
         assert_eq!(
             std::fs::read(program.with_file_name("primary.text")).unwrap(),
