@@ -1,0 +1,5 @@
+S 150 final-vs-median semitones p25/p50/p75 [-3.57 -1.89 -0.01] slope st/s p50 -3.5
+M 95 final-vs-median semitones p25/p50/p75 [-2.27 -0.69  1.14] slope st/s p50 -3.8
+N 16 final-vs-median semitones p25/p50/p75 [-3.53 -1.97  0.88] slope st/s p50 -9.8
+AUC final pitch (S lower than M/N): 0.601
+AUC slope (S falls more): 0.457
