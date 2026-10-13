@@ -562,7 +562,7 @@ lesson(
         ),
         (
             "Punctuation comes with the next word",
-            "The model usually writes a comma or full stop only once it hears the next word. Where you pause between sentences, the full stop can come a word late or not at all, and the next sentence may start without a capital. VOCO adds no full stop of its own where you pause.",
+            "Measured on public speech, the recognizer usually writes a comma or full stop only once it hears the next word, so at a pause its text rarely ends in one. In the study's development set, today's recognizer gave 62.7% of pauses between sentences a sentence end, so where you pause the full stop can come a word late or not at all. The worker changes recognized text only for spelling and My words, so VOCO adds no full stop of its own where you pause.",
         ),
         (
             "Turning the gate off",
@@ -573,7 +573,9 @@ lesson(
         (R + "adapters.py", "Checks the model fingerprint and loads the native library."),
         (R + "nemo_bridge.cpp", "The bridge into NeMo-Speech.cpp."),
         (R + "streaming.py", "The warmup, the silence gate and frame joining."),
-        (R + "worker_main.py", "The request loop and the thread rule."),
+        (R + "worker_main.py", "The request loop and the thread rule; it changes recognized text only for spelling and My words."),
+        ("research/pause-sentence-ends-2026-10/harness/run_policies.py", "The pause study's runs on public speech, which record the recognizer's text at every pause."),
+        ("research/pause-sentence-ends-2026-10/results/dev-table.txt", "The pause study's development results; P0 is today's recognizer."),
         (R + "MODEL-IDENTITY.json", "The model's source, revision and fingerprint, and those of the NVIDIA file and tokenizer it is built from."),
         ("scripts/graft-model-tokenizer.py", "Adds the tokenizer to NVIDIA's GGUF and checks every pin."),
         (R + "NATIVE-BUILD.json", "Pinned revisions, patch digests and processor flags."),
@@ -598,7 +600,7 @@ lesson(
     "The last step puts words into another app. VOCO does it the way you would: copy, then paste.",
     [
         "insertion.rs pastes one group of words at a time. It puts the words on the clipboard, then presses Shift+Insert. In the code's words, \"Shift+Insert is the paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal emulators.\"",
-        "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each paste ends between two characters that aren't spaces, so every space travels inside a paste. Before each paste VOCO checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
+        "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
         "An optional Chromium extension offers a second route. In a tab where you enable it, VOCO inserts words at the caret of one plain text field, and the extension confirms each insert with a receipt.",
     ],
     [

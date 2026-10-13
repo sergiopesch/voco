@@ -713,7 +713,7 @@
       },
       {
         "title": "Punctuation comes with the next word",
-        "text": "The model usually writes a comma or full stop only once it hears the next word. Where you pause between sentences, the full stop can come a word late or not at all, and the next sentence may start without a capital. VOCO adds no full stop of its own where you pause."
+        "text": "Measured on public speech, the recognizer usually writes a comma or full stop only once it hears the next word, so at a pause its text rarely ends in one. In the study's development set, today's recognizer gave 62.7% of pauses between sentences a sentence end, so where you pause the full stop can come a word late or not at all. The worker changes recognized text only for spelling and My words, so VOCO adds no full stop of its own where you pause."
       },
       {
         "title": "Turning the gate off",
@@ -735,7 +735,15 @@
       },
       {
         "path": "runtime/speech/worker_main.py",
-        "why": "The request loop and the thread rule."
+        "why": "The request loop and the thread rule; it changes recognized text only for spelling and My words."
+      },
+      {
+        "path": "research/pause-sentence-ends-2026-10/harness/run_policies.py",
+        "why": "The pause study's runs on public speech, which record the recognizer's text at every pause."
+      },
+      {
+        "path": "research/pause-sentence-ends-2026-10/results/dev-table.txt",
+        "why": "The pause study's development results; P0 is today's recognizer."
       },
       {
         "path": "runtime/speech/MODEL-IDENTITY.json",
@@ -781,7 +789,7 @@
     "intro": "The last step puts words into another app. VOCO does it the way you would: copy, then paste.",
     "story": [
       "insertion.rs pastes one group of words at a time. It puts the words on the clipboard, then presses Shift+Insert. In the code's words, \"Shift+Insert is the paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal emulators.\"",
-      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each paste ends between two characters that aren't spaces, so every space travels inside a paste. Before each paste VOCO checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
+      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
       "An optional Chromium extension offers a second route. In a tab where you enable it, VOCO inserts words at the caret of one plain text field, and the extension confirms each insert with a receipt."
     ],
     "steps": [
