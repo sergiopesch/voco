@@ -132,6 +132,15 @@ them. On other Wayland desktops, such as KDE Plasma or Hyprland, you bind a key
 to `voco --toggle` yourself, and other GNOME versions use the tray instead of the
 VOCO panel.
 
+### Sentence ends where you pause
+
+The speech model writes a comma or full stop only once it hears the next word,
+so where you pause between sentences, the full stop often comes a word late or
+not at all, and the next sentence starts without a capital. VOCO doesn't end a
+sentence where you pause: in a [measurement on public speech](../research/pause-sentence-ends-2026-10/README.md),
+every way of doing that also ended sentences where people only paused to think,
+and got more pauses wrong than it fixed.
+
 ### Apps that don't take Shift+Insert
 
 VOCO pastes with Shift+Insert. Apps that remap that key, remote desktops and

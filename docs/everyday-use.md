@@ -241,6 +241,12 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 - When it pastes, VOCO can't tell a password field from other fields, so don't
   dictate into one. The Chromium extension refuses password fields.
 - VOCO only adds text. It can't correct words after it pastes them.
+- The speech model writes a comma or full stop only once it hears the next
+  word. Where you pause between sentences, the full stop often comes a word
+  late or not at all, with no capital after it; in public test speech, about 6
+  in 10 such pauses got a sentence end. VOCO doesn't add one where you pause,
+  because it would also end sentences where you only pause to think
+  ([the measurements](../research/pause-sentence-ends-2026-10/README.md)).
 - If recognition falls more than three seconds behind, or revises words it has
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
