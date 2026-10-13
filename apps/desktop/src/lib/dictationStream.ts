@@ -40,6 +40,13 @@ export function desktopChunk(suffix: string): string {
   return suffix.slice(0, end);
 }
 
+/** After this much audio brings no new words, the held text goes out on its
+ * own. Recognition adds words every 0.6 s or sooner 90% of the time on public
+ * speech, so in 100 ms packets this releases after 0.8 s: a pause, not the
+ * cadence of recognition. Counted in audio, so it can't fire while the worker
+ * catches up on speech it hasn't recognized yet. */
+export const QUIET_RELEASE_S = 0.75;
+
 // Request sequence is the hypothesis identity in the worker protocol. IDs are
 // scoped by the random stream session and never contain transcript content.
 export interface PasteCorrelation {
@@ -103,6 +110,8 @@ export class DictationStream {
   private qualityInFlight = 0;
   private qualitySeq = 0;
   private qualityDropped = 0;
+  private quietSamples = 0;
+  private released = false;
 
   private quality(event: string, fields: Record<string, number | boolean | string | null> | (() => Record<string, number | boolean | string | null>) = {}) {
     if (!this.recordDeliveryQuality) return;
@@ -200,6 +209,7 @@ export class DictationStream {
         }
         this.respondedSamples += audio?.length ?? 0;
         if (op === "finish") this.finishResponded = true;
+        if (op === "push" && (response.text === null || response.text === this.latest)) this.quiet(audio?.length ?? 0);
         if (response.text === null) return;
         if (typeof response.text !== "string") throw new Error("Invalid recognizer text");
         const text = response.text;
@@ -221,6 +231,8 @@ export class DictationStream {
           this.hypothesisCount++;
           this.latestAt = performance.now();
           if (this.pendingSince === null) this.pendingSince = this.latestAt;
+          this.quietSamples = 0;
+          this.released = false;
         }
         if (hypothesisRecorded) this.latestSeq = seq;
         this.latest = text;
@@ -300,11 +312,28 @@ export class DictationStream {
 
   /** The part of an undelivered suffix to deliver now. Until the final text,
    * which nothing extends and so goes out whole, a desktop paste ends inside
-   * the words, and a browser field's exact append leaves a trailing space for the
-   * words it joins: the extension refuses a url field that ends in one. */
+   * the words, unless a quiet release lets the held text go, and a browser
+   * field's exact append leaves a trailing space for the words it joins: the
+   * extension refuses a url field that ends in one. After a release, the next
+   * desktop words begin with their joining space, which goes alone, as the
+   * address bar keeps a paste of only whitespace. */
   private deliverable(suffix: string) {
+    const space = this.spacesInsidePastes ? /^\s+(?=\S)/.exec(suffix)?.[0] : undefined;
+    if (space) return space;
     if (this.finishResponded) return suffix;
-    return this.spacesInsidePastes ? desktopChunk(suffix) : suffix.trimEnd();
+    if (!this.spacesInsidePastes) return suffix.trimEnd();
+    return this.released ? suffix.trimEnd() : desktopChunk(suffix);
+  }
+
+  /** Counts audio that brought no new words. After QUIET_RELEASE_S of it, the
+   * held text, but not its trailing space, goes out through deliver(), so it
+   * waits for a paste in flight; never after Stop or cancel. */
+  private quiet(samples: number) {
+    if (!this.spacesInsidePastes || this.ending || this.released) return;
+    this.quietSamples += samples;
+    if (this.quietSamples < this.rate * QUIET_RELEASE_S) return;
+    this.released = true;
+    this.deliver();
   }
 
   private ready() {

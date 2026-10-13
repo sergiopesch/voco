@@ -98,6 +98,72 @@ describe('append-only dictation stream',()=>{
   // Nothing extends the final text, so it goes out whole, its trailing space too.
   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hell','o ']);
  });
+ describe('quiet release',()=>{
+  // The worker's text for each push packet (100 ms of audio); other packets bring no new words.
+  const timeline=(byPacket:Record<number,string>,final:string)=>{let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:r.op==='finish'?final:r.op==='push'?(byPacket[n++]??null):null}));};
+  const pushes=()=>worker.mock.calls.filter(c=>c[1].request.op==='push').length;
+  const packets=async(queue:DictationStream,count:number)=>{
+   const before=pushes();queue.pushAudio(new Float32Array(1600*count),16000);
+   await vi.waitFor(()=>expect(pushes()).toBe(before+count));await new Promise(resolve=>setTimeout(resolve,5));
+  };
+  const desktop=(paste:(text:string)=>Promise<void>)=>new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  const texts=(paste:ReturnType<typeof vi.fn>)=>paste.mock.calls.map(c=>c[0]);
+  it('releases the held letter after a pause, then pastes the next joining space alone',async()=>{
+   timeline({0:'Hello world',9:'Hello world and more'},'Hello world and more.');
+   const paste=vi.fn(async(_s:string)=>{});const queue=desktop(paste);
+   // 0.7 s without new words keeps the last letter; 0.8 s releases it.
+   await packets(queue,8);expect(texts(paste)).toEqual(['Hello worl']);
+   await packets(queue,1);expect(texts(paste)).toEqual(['Hello worl','d']);
+   await packets(queue,1);expect(texts(paste)).toEqual(['Hello worl','d',' ','and mor']);
+   queue.enqueue();await queue.finish();
+   expect(texts(paste)).toEqual(['Hello worl','d',' ','and mor','e.']);
+   expect(quality().filter(e=>e.event==='delivery_requested').map(e=>[e.hypothesis_seq,e.partial]))
+    .toEqual([[1,true],[1,false],[10,true],[10,true],[11,false]]);
+  });
+  it('restarts the quiet count with every new hypothesis',async()=>{
+   timeline({0:'Hello',6:'Hello world',12:'Hello world again'},'Hello world again.');
+   const paste=vi.fn(async(_s:string)=>{});const queue=desktop(paste);
+   // Ten quiet packets since "Hello", but only five since "Hello world".
+   await packets(queue,12);expect(texts(paste)).toEqual(['Hell','o worl']);
+   await packets(queue,9);expect(texts(paste)).toEqual(['Hell','o worl','d agai','n']);
+   queue.enqueue();await queue.finish();
+   expect(texts(paste)).toEqual(['Hell','o worl','d agai','n','.']);
+  });
+  it('keeps a trailing space for the next words, and pastes the final words after it alone first',async()=>{
+   timeline({0:'Hello world, ',9:'Hello world, again'},'Hello world, again.');
+   const paste=vi.fn(async(_s:string)=>{});const queue=desktop(paste);
+   await packets(queue,9);expect(texts(paste)).toEqual(['Hello world',',']);
+   await packets(queue,1);queue.enqueue();await queue.finish();
+   expect(texts(paste)).toEqual(['Hello world',',',' ','agai','n.']);
+   timeline({0:'Hello world'},'Hello world again.');
+   const last=vi.fn(async(_s:string)=>{});const ended=desktop(last);
+   await packets(ended,9);ended.enqueue();await ended.finish();
+   // Nothing extends the final text, but its joining space still goes alone.
+   expect(texts(last)).toEqual(['Hello worl','d',' ','again.']);
+  });
+  it('waits for a paste in flight and never releases after Stop or cancel',async()=>{
+   timeline({0:'Hello world'},'Hello world.');
+   let open=0,most=0,finishFirst=()=>{};
+   const paste=vi.fn(async(text:string)=>{open++;most=Math.max(most,open);if(text==='Hello worl')await new Promise<void>(resolve=>{finishFirst=resolve;});open--;});
+   const queue=desktop(paste);
+   await packets(queue,9);
+   // The release came while "Hello worl" was still being pasted, so it waits for it.
+   expect(texts(paste)).toEqual(['Hello worl']);
+   finishFirst();await vi.waitFor(()=>expect(texts(paste)).toEqual(['Hello worl','d']));
+   queue.enqueue();await queue.finish();
+   expect(texts(paste)).toEqual(['Hello worl','d','.']);expect(most).toBe(1);
+   // Stop's tail packet would complete the quiet period, but Stop already took over.
+   timeline({0:'Hello world'},'Hello world.');
+   const stopped=vi.fn(async(_s:string)=>{});const atStop=desktop(stopped);
+   await packets(atStop,8);atStop.pushAudio(new Float32Array(800),16000);atStop.enqueue();await atStop.finish();
+   expect(texts(stopped)).toEqual(['Hello worl','d.']);
+   timeline({0:'Hello world'},'Hello world.');
+   const cancelled=vi.fn(async(_s:string)=>{});const gone=desktop(cancelled);
+   await packets(gone,1);gone.cancel();gone.pushAudio(new Float32Array(1600*9),16000);
+   await new Promise(resolve=>setTimeout(resolve,20));
+   expect(texts(cancelled)).toEqual(['Hello worl']);
+  });
+ });
  it('retains a revision and refuses to paste it',async()=>{
   let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello','Hallo'][n++]}));
   const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');

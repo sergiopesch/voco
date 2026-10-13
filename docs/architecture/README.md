@@ -180,15 +180,24 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
    press is the app's, and the next paste can copy at once. A read only says
    the app asked for the text, so it never changes the paste's outcome.
 
-Every space travels inside a paste, never alone or at its edge, and VOCO never
-types it as a key: Chromium's address bar strips the spaces around pasted text,
-and its rich-text fields turn a space pasted alone into a no-break space. So the
+Spaces travel inside pastes, never at their edge, and VOCO never types them as
+keys: Chromium's address bar strips the spaces around pasted text, and its
+rich-text fields turn a space pasted alone into a no-break space. So the
 stream ends each live paste between two graphemes without whitespace and holds
 the rest, usually the last letter, for the next hypothesis: "Hello" pastes as
 "Hell", then "Hello linux" adds "o linu". One `Intl.Segmenter` finds the
 graphemes, so a paste never separates a letter from its combining marks or
-splits a ZWJ sequence. Only the final text, which nothing extends, goes out
-whole. A browser field appends the words exactly, but a trailing space, which a
+splits a ZWJ sequence. So the last letter doesn't stay hidden through a pause,
+the held text goes out on its own once 0.75 s of audio has brought no new words
+(`QUIET_RELEASE_S`); on public speech recognition adds words every 0.6 s or
+sooner 90% of the time, so in 100 ms packets this waits 0.8 s, and counting
+audio rather than time keeps it from firing while the worker is behind. The
+release goes through `deliver()`, so it waits for a paste in flight, keeps a
+trailing space for the next words and never fires after Stop or cancel. The
+next words then begin with their space, which is pasted alone, as the address
+bar keeps a paste of only whitespace; a rich-text field turns that one into a
+no-break space. The final text, which nothing extends, goes out whole after
+such a space. A browser field appends the words exactly, but a trailing space, which a
 push has when spelling or My words holds back the open word after it, waits for
 the words it joins. A delivery record marks `partial` a delivery that reached
 only part of its hypothesis. VOCO never restores the previous clipboard.

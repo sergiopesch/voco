@@ -272,14 +272,15 @@ await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopSt
 await start();
 assertMeterLevel(await page.evaluate(()=>window.store.getState().audioLevel));
 await page.evaluate(()=>window.captureWorklet.port.onmessage({data:{type:'samples',data:new Float32Array(16000)}}));
-await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length>=1);
 assert.equal(await page.evaluate(()=>window.store.getState().status),'recording');
 await page.evaluate(()=>window.samples(1));await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
-// A live paste ends inside the words, and Stop pastes the rest, its spaces inside.
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Recovered word','s for manual review.']);
+// A live paste ends inside the words. A second of audio without new words
+// releases the held letter, so Stop's words begin with their space, pasted alone.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Recovered word','s',' ','for manual review.']);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
-assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),2);
+assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),4);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
 assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality'&&r.event==='delivery_dispatched')),true);
 results.push('Progressive native dictation pastes before Stop, flushes only the tail, reports paste stages and never repastes the complete transcript.');
@@ -417,9 +418,10 @@ await page.evaluate(()=>window.samples(701/16000));
 await stop();await page.waitForFunction(()=>window.store.getState().status==='idle',null,{timeout:6000});
 assert.equal(await page.evaluate(()=>window.speechAudioSamples),4800701);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2,'One successful paste and one rejection; no retry');
-// The full stop was held for the next words, so Stop copies it with them.
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),['. Later speech remains available through Stop.']);
+// "First phrase", its full stop released in the quiet that follows, then the
+// rejected space before "Later speech"; no retry.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['First phrase','.',' '],'Two pastes and one rejection; no retry');
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='copyDesktopText').map(c=>c[1])),[' Later speech remains available through Stop.']);
 assert.equal(await page.evaluate(()=>window.store.getState().transcript),'');
 assert.equal(await page.evaluate(()=>window.store.getState().error),null);
 assert.notEqual(await page.evaluate(()=>window.store.getState().surface),'review');

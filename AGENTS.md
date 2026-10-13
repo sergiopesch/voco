@@ -173,14 +173,19 @@ change.
   destination token, focus probe, terminal detection or per-app route. Desktop
   setup checks the paste prerequisites, never a caret or an app.
 - Copy CLIPBOARD, then PRIMARY (best effort; a failure only warns), then send one
-  Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. Every
-  space travels inside pasted text, never as a key, alone or at a paste's edge:
-  Chromium's address bar strips the spaces around pasted text, and its rich-text
-  fields turn a space pasted alone into a no-break space. So each live desktop
-  paste ends between two graphemes without whitespace (`desktopChunk`, with one
+  Shift+Insert: toolkits paste CLIPBOARD and terminals paste PRIMARY. Spaces
+  travel inside pasted text, never as a key or at a paste's edge: Chromium's
+  address bar strips the spaces around pasted text, and its rich-text fields
+  turn a space pasted alone into a no-break space. So each live desktop paste
+  ends between two graphemes without whitespace (`desktopChunk`, with one
   `Intl.Segmenter`, so a letter keeps its combining marks) and the rest waits
-  for the next hypothesis; only the final text, which nothing extends, goes out
-  whole. Browser field delivery appends exactly, but a trailing space waits for
+  for the next hypothesis. After 0.75 s of audio with no new hypothesis
+  (`QUIET_RELEASE_S`, above recognition's usual gaps), the held text goes out
+  through `deliver()`, but not a trailing space and never after Stop or cancel;
+  the next words then begin with their space, pasted alone, which the address
+  bar keeps, so a rich-text field gets at most one no-break space after each
+  pause. The final text, which nothing extends, goes out whole after such a
+  space. Browser field delivery appends exactly, but a trailing space waits for
   the words it joins: the extension refuses a url field left with one. ASCII
   controls become spaces. Never send Enter and never restore the previous
   clipboard.
@@ -242,7 +247,7 @@ change.
 - Start is refused while paste is unavailable, and when `VOCO_DESKTOP_PASTE=0` or
   `VOCO_DESKTOP_STREAM=0` is set.
 - Only a `no-mutation` failure, which typed nothing, keeps its text pending for the
-  next chunk or for Stop's bounded retries (three, 250 ms apart). A rejected or
+  next chunk, a quiet release, or Stop's bounded retries (three, 250 ms apart). A rejected or
   uncertain paste stops automatic delivery; recognition keeps running until Stop.
   A paste rejection keeps microphone readiness; only a capture failure clears it.
 - Stop copies the undelivered remainder, what waited included, with
