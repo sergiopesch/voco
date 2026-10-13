@@ -310,6 +310,8 @@ pub(crate) mod tests {
     /// A stand-in for `xclip -verbose -selection S -in`: it keeps its input in
     /// `S.text`, reports that it owns S, then answers one request each time
     /// `S.serve` appears, and exits when `S.clear` appears, as on SelectionClear.
+    /// It also exits once its folder is gone or after about 10 s, so a stand-in
+    /// never outlives its test: one left polling would load the whole machine.
     pub(crate) fn fake_xclip(name: &str) -> PathBuf {
         let directory = std::env::temp_dir().join(format!(
             "voco-{name}-{}-{}",
@@ -328,14 +330,15 @@ dir=${0%/*} selection=$3
 cat > "$dir/$selection.text" || exit 1
 [ -e "$dir/$selection.fail" ] && exit 1
 echo "Waiting for selection requests, Control-C to quit" >&2
-number=1
+number=1 polls=0
 echo "  Waiting for selection request number $number" >&2
-while [ ! -e "$dir/$selection.clear" ]; do
+while [ -d "$dir" ] && [ ! -e "$dir/$selection.clear" ] && [ "$polls" -lt 5000 ]; do
   if [ -e "$dir/$selection.serve" ]; then
     rm -f "$dir/$selection.serve"
     number=$((number + 1))
     echo "  Waiting for selection request number $number" >&2
   fi
+  polls=$((polls + 1))
   sleep 0.002
 done
 "#,
@@ -382,6 +385,17 @@ done
         }
     }
 
+    /// Releases both selections, waits until every helper has exited, then
+    /// removes the stand-in's folder.
+    fn finish(owners: &SelectionOwners, program: &Path) {
+        release(program);
+        for helper in &owners.helpers {
+            let proc_path = PathBuf::from(format!("/proc/{}", helper.pid));
+            wait_until(|| !proc_path.exists());
+        }
+        std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+    }
+
     #[test]
     fn the_app_read_is_the_first_answer_after_the_insert_press_not_the_earlier_one() {
         let program = fake_xclip("selection-read");
@@ -400,8 +414,7 @@ done
         let read = owners.read_after(inserted, Duration::from_secs(5)).unwrap();
         assert_eq!(read.selection, Selection::Clipboard);
         assert!(read.after >= Duration::from_millis(20));
-        release(&program);
-        std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+        finish(&owners, &program);
     }
 
     #[test]
@@ -418,8 +431,7 @@ done
             std::fs::read(program.with_file_name("primary.text")).unwrap(),
             b"ls -la"
         );
-        release(&program);
-        std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+        finish(&owners, &program);
     }
 
     #[test]
@@ -446,6 +458,17 @@ done
             .unwrap_err();
         assert!(matches!(error, OwnerError::Spawn(_)), "{error:?}");
         std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_stand_in_never_outlives_its_folder() {
+        let program = fake_xclip("selection-orphan");
+        let owners = own_both(&program, b"text");
+        std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
+        for helper in &owners.helpers {
+            let proc_path = PathBuf::from(format!("/proc/{}", helper.pid));
+            wait_until(|| !proc_path.exists());
+        }
     }
 
     #[test]
