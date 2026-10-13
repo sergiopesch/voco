@@ -255,6 +255,14 @@ change.
   copy fails too, `keep_crash_journal` moves the text into Review; only if the
   journal can't keep it does Stop report an interruption. A Chromium exact-field
   session whose field stopped taking text ends the same way.
+- When a desktop dictation's whole final text went out, with no cancel or
+  failed or uncertain paste, and it ends a sentence (`endsSentence`: . ? ! or …,
+  perhaps before closing quotes or brackets), Stop pastes one space on its own
+  after it, through the same desktop paste, so the next dictation or typing
+  starts apart. Never in a browser field, the voice test or Say it. It passes no
+  correlation, so it reaches no hypothesis and no quality record; only
+  `dictation_desktop_stop_space_dispatched` or `_failed` traces it. A failed
+  space loses no words, so Stop says nothing and copies nothing.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's recording. Field focus loss revokes delivery but keeps the
   session's explicit Stop; stale tokens can't stop a newer session.

@@ -240,6 +240,10 @@ sends the partial packet and asks the worker to finish. The AudioWorklet must
 confirm its flush within 80 ms, or VOCO doesn't finish the recording. Then:
 
 - If every word was typed, VOCO clears the audio and deletes the journal entry.
+  When the text ends a sentence, it first pastes one space on its own after it,
+  so the next dictation or typing starts apart. That paste carries no
+  correlation, so the stream's delivery records and the quality report never see
+  it; a trace says whether it went out, and a failed one changes nothing else.
 - If words are left, VOCO copies them, what waited included, to CLIPBOARD and
   PRIMARY, and notifies "Dictation copied to clipboard" with a prompt to press
   Shift+Insert or Ctrl+V. After an uncertain paste it also warns that some

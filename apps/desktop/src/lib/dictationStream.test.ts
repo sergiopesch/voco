@@ -1,7 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const transport=vi.hoisted(()=>vi.fn().mockResolvedValue({}));
 vi.mock('@tauri-apps/api/core',()=>({invoke:transport}));
-import {appendOnlySuffix,DictationStream,textLengths} from './dictationStream';
+import {appendOnlySuffix,DictationStream,endsSentence,textLengths} from './dictationStream';
 const worker=vi.fn();
 const quality=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='quality');
 const requests=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>!['quality','diagnostic'].includes(r.op));
@@ -9,6 +9,13 @@ const noMutation={outcome:'no-mutation',message:'Physical modifiers are still he
 const make=()=>{const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn(),failure=vi.fn();return {paste,observed,failure,queue:new DictationStream(paste,observed,failure,vi.fn())};};
 beforeEach(()=>{worker.mockReset().mockResolvedValue({});transport.mockReset().mockImplementation((c,args)=>['quality','diagnostic'].includes(args.request.op)?Promise.resolve({logged:true}):worker(c,args));});
 describe('append-only dictation stream',()=>{
+ it('knows a sentence end: . ? ! or …, perhaps before closing quotes or brackets',()=>{
+  for(const text of ['Hello.','Really?','Wow!','Wait…','He said "go."','He said “go.”','It’s done.’','(See below.)','[Done!]','Between ten and eleven P.M.','And so...'])
+   expect(endsSentence(text),text).toBe(true);
+  // A text that already ends in a blank, a space or a control pasted as one, needs no other.
+  for(const text of ['Hello','Hello. ','Hello.\n','Hello.\u001b','','Hi,','Wait;','Visit voco.dev','Pi is 3.14','"Quoted"','(An aside)','Done.)x'])
+   expect(endsSentence(text),text).toBe(false);
+ });
  it('extends partial words and punctuation without inventing spaces',()=>{
   expect(appendOnlySuffix('Every elevat','Every elevation')).toBe('ion');
   expect(appendOnlySuffix('Hello','Hello, world.')).toBe(', world.');
@@ -94,7 +101,7 @@ describe('append-only dictation stream',()=>{
   await vi.waitFor(()=>expect(observed).toHaveBeenCalledTimes(2));
   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hell']);
   queue.enqueue();
-  await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false,complete:true,text:'Hello '});
   // Nothing extends the final text, so it goes out whole, its trailing space too.
   expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hell','o ']);
  });
@@ -187,7 +194,7 @@ describe('append-only dictation stream',()=>{
   const onFailure=vi.fn();
   const queue=new DictationStream(async()=>{throw failure},vi.fn(),onFailure,vi.fn());
   queue.pushAudio(new Float32Array(1600),16000);
-  await expect(queue.finish()).resolves.toEqual({undelivered:'Synthetic phrase',uncertain:false});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'Synthetic phrase',uncertain:false,complete:false,text:''});
   expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({message:failure.message}),'delivery');
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'rejected'});
  });
@@ -198,7 +205,7 @@ describe('append-only dictation stream',()=>{
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(failure).toHaveBeenCalledOnce());
   queue.pushAudio(new Float32Array(1701),16000);queue.enqueue();
-  await expect(queue.finish()).resolves.toEqual({undelivered:'First and later words.',uncertain:true});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'First and later words.',uncertain:true,complete:false,text:''});
   expect(observed).toHaveBeenLastCalledWith('First and later words.');
   expect(failure.mock.calls[0]?.[0]).toMatchObject({message:'Destination changed'});
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({outcome:'uncertain'});
@@ -217,7 +224,7 @@ describe('append-only dictation stream',()=>{
   queue.pushAudio(new Float32Array(1600),16000);
   await vi.waitFor(()=>expect(preview).toHaveBeenCalledWith('deferred'));
   queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
-  await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false});
+  await expect(queue.finish()).resolves.toEqual({undelivered:'',uncertain:false,complete:true,text:'Hello world.'});
   expect(paste.mock.calls[0]?.[0]).toBe('Hello');
   expect(typed[0]).toMatch(/^Hello/);
   expect(typed.join('')).toBe('Hello world.');
@@ -234,7 +241,7 @@ describe('append-only dictation stream',()=>{
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
-   await expect(result).resolves.toEqual({undelivered:'',uncertain:false});
+   await expect(result).resolves.toEqual({undelivered:'',uncertain:false,complete:true,text:'Hello'});
    expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello','Hello']);
   }finally{vi.useRealTimers();}
  });
@@ -248,7 +255,7 @@ describe('append-only dictation stream',()=>{
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
-   await expect(result).resolves.toEqual({undelivered:'Hello',uncertain:false});
+   await expect(result).resolves.toEqual({undelivered:'Hello',uncertain:false,complete:false,text:''});
    expect(paste).toHaveBeenCalledTimes(4);
    expect(failure).not.toHaveBeenCalled();
    expect(preview.mock.calls.filter(c=>c[0]==='deferred')).toHaveLength(4);
@@ -266,7 +273,7 @@ describe('append-only dictation stream',()=>{
    queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
    const result=queue.finish();
    await vi.advanceTimersByTimeAsync(1000);
-   await expect(result).resolves.toEqual({undelivered:'One two.',uncertain:true});
+   await expect(result).resolves.toEqual({undelivered:'One two.',uncertain:true,complete:false,text:''});
    expect(paste).toHaveBeenCalledOnce();
    expect(failure).toHaveBeenCalledOnce();
    expect(failure.mock.calls[0]?.[1]).toBe('delivery');
@@ -385,7 +392,7 @@ describe('privacy-preserving delivery attribution', () => {
  it('keeps uncertain delivery explicit and does not leak rejection content', async () => {
   worker.mockImplementation(async (_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:'secret_SENTINEL'}));
   const queue=new DictationStream(async()=>{throw new Error('secret_SENTINEL /private/path window title');},vi.fn(),vi.fn(),vi.fn());
-  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL',uncertain:true});
+  queue.pushAudio(new Float32Array(1600),16000);await expect(queue.finish()).resolves.toEqual({undelivered:'secret_SENTINEL',uncertain:true,complete:false,text:''});
   expect(quality().find(e=>e.event==='delivery_failed')).toMatchObject({delivery_seq:1,outcome:'uncertain'});
   expect(quality()[quality().length-1]).toMatchObject({outcome:'failed',failed_delivery_seq:1,pending_delivery_count:0,dispatched_count:0,accepted_equals_dispatched:false});
   expect(JSON.stringify(quality())).not.toContain('SENTINEL');

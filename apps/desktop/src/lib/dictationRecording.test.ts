@@ -407,6 +407,54 @@ it("successful cursor Stop clears text and audio without opening Review or touch
   expect(h.notify).not.toHaveBeenCalled();
 });
 
+it("pastes one space on its own after a finished sentence, outside the stream's accounting", async () => {
+  const h = harness();
+  h.recordingWith(async () => ({ undelivered: "", uncertain: false, complete: true, text: "He had never been father, lover, husband, friend." }));
+  await h.stopRecording();
+  // No correlation, so no delivery record: the quality report still reconciles.
+  expect(vi.mocked(h.env.pasteDesktopText).mock.calls).toEqual([[" "]]);
+  expect(h.trace).toHaveBeenCalledWith("dictation_desktop_stop_space_dispatched");
+  expect(h.copy).not.toHaveBeenCalled();
+  expect(h.notify).not.toHaveBeenCalled();
+  expect(h.current.current.phase).toBe("idle");
+});
+
+it("pastes no Stop space without a whole finished sentence, in a browser field or a local test", async () => {
+  for (const [label, finish] of [
+    ["no sentence end", { undelivered: "", uncertain: false, complete: true, text: "Go do you hear" }],
+    ["words left", { undelivered: " and the rest.", uncertain: false, complete: false, text: "Typed words" }],
+    ["uncertain", { undelivered: "One two.", uncertain: true, complete: false, text: "" }],
+    ["incomplete", { undelivered: "", uncertain: false, complete: false, text: "Cancelled words." }],
+  ] as const) {
+    const h = harness();
+    h.recordingWith(async () => finish);
+    await h.stopRecording();
+    expect(vi.mocked(h.env.pasteDesktopText).mock.calls.filter(call => call[0] === " "), label).toEqual([]);
+  }
+  const browser = harness();
+  browser.recordingWith(async () => ({ undelivered: "", uncertain: false, complete: true, text: "Typed in a page." }));
+  browser.env.browserDeliveryRef.current = { cancel: vi.fn(async () => {}) } as never;
+  await browser.stopRecording();
+  expect(browser.env.pasteDesktopText).not.toHaveBeenCalled();
+  const local = harness();
+  local.recordingWith(async () => ({ undelivered: "", uncertain: false, complete: true, text: "Voice test words." }));
+  local.pasteSession.current = false;
+  await local.stopRecording();
+  expect(local.env.pasteDesktopText).not.toHaveBeenCalled();
+});
+
+it("says nothing and copies nothing when the Stop space can't be pasted", async () => {
+  const h = harness();
+  h.recordingWith(async () => ({ undelivered: "", uncertain: false, complete: true, text: "Go do you hear?" }));
+  vi.mocked(h.env.pasteDesktopText).mockRejectedValue({ outcome: "no-mutation", message: "Release the keyboard modifiers.", clipboardChanged: false });
+  await h.stopRecording();
+  expect(h.trace).toHaveBeenCalledWith("dictation_desktop_stop_space_failed");
+  expect(h.copy).not.toHaveBeenCalled();
+  expect(h.notify).not.toHaveBeenCalled();
+  expect(h.setError).not.toHaveBeenCalled();
+  expect(h.current.current.phase).toBe("idle");
+});
+
 it("copies words the focused app did not take to the clipboard as a handled Stop", async () => {
   const h = harness(), finished = deferred<{ undelivered: string }>();
   h.recordingWith(() => finished.promise);

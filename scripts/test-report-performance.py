@@ -45,6 +45,17 @@ class PerformanceReportTests(unittest.TestCase):
         self.assertTrue(session['delivery_observations']['desktop_remainder_copied'])
         self.assertIn('desktop_paste_failure_requires_review', result['review_flags'])
 
+    def test_a_stop_space_is_observed_without_a_review_flag(self):
+        for event, dispatched in (('dictation_desktop_stop_space_dispatched', True), ('dictation_desktop_stop_space_failed', False)):
+            rows = self.session_rows([('recording_state_requested', None), ('recording_state_active', None),
+                                      ('dictation_desktop_paste_dispatched', 300), (event, None)])
+            result = report.summarize(rows)
+            delivery = result['recordings'][0]['delivery_observations']
+            self.assertEqual(delivery['desktop_stop_space_dispatched'], dispatched)
+            self.assertEqual(delivery['desktop_stop_space_failed'], not dispatched)
+            # A failed space loses no words, so it never asks for a review.
+            self.assertNotIn('desktop_paste_failure_requires_review', result['review_flags'])
+
     def test_unavailable_paste_is_flagged_before_any_dispatch(self):
         rows = self.session_rows([('recording_state_requested', None), ('dictation_desktop_paste_unavailable', None)])
         result = report.summarize(rows)

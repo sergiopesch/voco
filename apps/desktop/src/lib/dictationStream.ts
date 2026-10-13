@@ -50,6 +50,13 @@ export function desktopChunk(suffix: string): string {
  * catches up on speech it hasn't recognized yet. */
 export const QUIET_RELEASE_S = 0.75;
 
+/** Whether text ends a sentence: its last character is . ? ! or …, perhaps
+ * followed by closing quotes or brackets. Stop leaves a space after one; a text
+ * that already ends in a blank, as a space or a control is pasted, gets none. */
+export function endsSentence(text: string): boolean {
+  return /[.?!…][”’"')\]]*$/.test(text);
+}
+
 // Request sequence is the hypothesis identity in the worker protocol. IDs are
 // scoped by the random stream session and never contain transcript content.
 export interface PasteCorrelation {
@@ -401,8 +408,10 @@ export class DictationStream {
   }
 
   /** Rejects only for recognition failures. `undelivered` is recognized text
-   * that was not typed; when `uncertain`, its first chunk may have been. */
-  async finish(): Promise<{ undelivered: string; uncertain: boolean }> {
+   * that was not typed; when `uncertain`, its first chunk may have been.
+   * `complete` says the whole final text went out, without a cancel or a
+   * failed paste, and `text` is what went out. */
+  async finish(): Promise<{ undelivered: string; uncertain: boolean; complete: boolean; text: string }> {
     await this.pending;
     await this.delivery;
     // Deferred ("no-mutation") text gets a few bounded retries at Stop.
@@ -414,6 +423,8 @@ export class DictationStream {
     }
     this.terminal();
     if (this.failure) throw this.failure;
-    return { undelivered: this.cancelled ? "" : this.latest.slice(this.committed.length), uncertain: this.deliveryUncertain };
+    const complete = !this.cancelled && !this.deliveryFailure && this.finishResponded && this.latest === this.committed;
+    return { undelivered: this.cancelled ? "" : this.latest.slice(this.committed.length), uncertain: this.deliveryUncertain,
+      complete, text: this.committed };
   }
 }

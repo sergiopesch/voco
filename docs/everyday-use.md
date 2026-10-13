@@ -33,8 +33,13 @@ phrase on the clipboard and the primary selection, then presses Shift+Insert.
   every space, and rich-text fields get an ordinary space between words. After
   a pause the next space is pasted on its own, which a rich-text field can make
   a no-break space: at most one for each pause.
-- Dictation replaces what you copied last. The last phrase stays on the
-  clipboard, and clipboard managers may keep copies.
+- When a dictation ends a sentence and VOCO typed all of it, Stop adds one
+  space after it, so your next dictation or typing starts apart, as in "…
+  friend. Go do you hear? ". Rich-text fields may keep that space as a no-break
+  space.
+- Dictation replaces what you copied last. The clipboard keeps the last piece
+  VOCO pasted, often the space after a sentence, and clipboard managers may keep
+  copies.
 - VOCO never presses Enter. It turns line breaks and tabs into spaces, so a
   phrase can't run a terminal command. Read terminal text before you press
   Enter.

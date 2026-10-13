@@ -469,8 +469,9 @@ try:
     for label in ('A', 'B'):
         history = [''] + [m['text'] for m in changes if m['field'] == label]
         assert all(after.startswith(before) and len(after) > len(before) for before, after in zip(history, history[1:])), 'Field %s changed other than by appended paste' % label
-    # xdotool sends one Shift+Insert per dispatched chunk, every space inside one.
-    assert len(changes) <= c['dictation_desktop_paste_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
+    # xdotool sends one Shift+Insert per dispatched chunk, every space inside one,
+    # and one more for the space Stop leaves after a finished sentence.
+    assert len(changes) <= c['dictation_desktop_paste_dispatched'] + c['dictation_desktop_stop_space_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
     if case in ('delivery', 'lock', 'web-process'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text

@@ -5,7 +5,7 @@ import {
 } from "@/lib/audioCaptureBuffer";
 import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
-import { DictationStream } from "@/lib/dictationStream";
+import { DictationStream, endsSentence } from "@/lib/dictationStream";
 import {
   createCaptureDescriptor,
   type CaptureDescriptor,
@@ -47,7 +47,7 @@ export interface DictationRecordingEnv {
   browserDeliveryRef: Ref<BrowserStreamDelivery | null>;
   dictationStreamRef: Ref<{
     cancel(): void;
-    finish(): Promise<{ undelivered: string; uncertain?: boolean }>;
+    finish(): Promise<{ undelivered: string; uncertain?: boolean; complete?: boolean; text?: string }>;
     pushAudio?(samples: Float32Array, sampleRate: number): void;
     enqueue?(): void;
   } | null>;
@@ -674,7 +674,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       const started = performance.now();
       enqueueDesktopPhrase(audioBufferRef.current.sampleCount);
-      const { undelivered, uncertain } = await queue.finish();
+      const { undelivered, uncertain, complete, text } = await queue.finish();
       assertOutputAllowed(stoppingSessionId);
       const browser = browserDeliveryRef.current;
       browserDeliveryRef.current = null;
@@ -706,6 +706,16 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         void showNotification("Dictation copied to clipboard", uncertain
           ? "Some words may already be in the app, so check it first. Then press Shift+Insert or Ctrl+V to paste the rest."
           : "VOCO couldn't paste into the focused app. Press Shift+Insert or Ctrl+V to paste it.").catch(() => {});
+      }
+      // A desktop dictation that typed all of a finished sentence gets one space
+      // after it, pasted on its own as the address bar keeps it, so the next
+      // dictation or typing starts apart. Its paste reaches no hypothesis, and
+      // a failure loses no words, so it only leaves a trace.
+      if (complete && text && endsSentence(text) && desktopPasteSessionRef.current && !browser && !cancelledRef.current) {
+        const spaced = await pasteDesktopText(" ").then(result => result.outcome === "dispatched", () => false);
+        assertOutputAllowed(stoppingSessionId);
+        if (spaced) traceDictationEvent("dictation_desktop_stop_space_dispatched").catch(() => {});
+        else traceDictationEvent("dictation_desktop_stop_space_failed").catch(() => {});
       }
       // The dictation completed, so a missed checkpoint no longer matters;
       // checkpoint text that could not be deleted still takes the recovery path.

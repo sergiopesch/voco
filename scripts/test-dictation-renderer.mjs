@@ -196,9 +196,11 @@ await page.evaluate(()=>window.hook.toggle('browser:fixture','stop'));
 await page.waitForFunction(()=>window.store.getState().status==='idle');
 await page.waitForFunction(()=>window.hook.cursorDeliveryState==='inactive');
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='appendBrowserField').map(c=>c.slice(2))),[['','Recovered words'],['Recovered words',' for manual review.']]);
-// Each append had its receipt, so Stop only releases the lease.
+// Each append had its receipt, so Stop only releases the lease, and a browser
+// field gets no Stop space after its finished sentence.
 assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='cancelBrowserField').map(c=>c.slice(1))),[[101]]);
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['pasteDesktopText','copyDesktopText','insertText'].includes(c[0]))),false);
+assert.equal(await page.evaluate(()=>window.traceEvents.some(c=>c[0].startsWith('dictation_desktop_stop_space'))),false);
 results.push('Browser recording streams Nemotron suffixes through its exact field lease and releases it without replay.');
 
 await load();await page.evaluate(()=>{window.lease=true;window.streamFinalText='Recovered words';window.hook.toggle('browser:fixture','start');});
@@ -277,18 +279,27 @@ assert.equal(await page.evaluate(()=>window.store.getState().status),'recording'
 await page.evaluate(()=>window.samples(1));await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
 // A live paste ends inside the words. A second of audio without new words
 // releases the held letter, so Stop's words begin with their space, pasted alone.
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Recovered word','s',' ','for manual review.']);
+// The finished sentence then gets one more space on its own, for what comes next.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Recovered word','s',' ','for manual review.',' ']);
+assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_stop_space_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>['start','push','finish'].includes(r.op)).every((r,index)=>r.seq===index)),true);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_first_phrase_dispatched').length),1);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_modifier_wait_completed').length),4);
 assert.equal(await page.evaluate(()=>window.traceEvents.find(c=>c[0]==='dictation_desktop_keyboard_dispatch_completed')[1].durationMs),350);
 assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality'&&r.event==='delivery_dispatched')),true);
 results.push('Progressive native dictation pastes before Stop, flushes only the tail, reports paste stages and never repastes the complete transcript.');
+await load(); await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;window.streamFinalText='Recovered words for manual review';});
+await start();await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
+await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
+// Without a sentence end, Stop leaves no space after the words.
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Recovered word','s for manual review']);
+assert.equal(await page.evaluate(()=>window.traceEvents.some(c=>c[0].startsWith('dictation_desktop_stop_space'))),false);
+results.push('Stop pastes one space on its own after a finished sentence, and none after words that end no sentence or in a browser field.');
 await page.evaluate(()=>sessionStorage.setItem('diagnosticLogging','off'));
 await load();await page.evaluate(()=>{window.desktopPaste=true;window.desktopStream=true;});
 await start();await page.waitForFunction(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length===1);
 await stop();await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
+assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),3);
 assert.deepEqual(await page.evaluate(()=>(window.traceEvents??[]).filter(c=>/^(dictation|recording)_/.test(c[0]))),[]);
 assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='quality')),false);
 await page.evaluate(()=>sessionStorage.removeItem('diagnosticLogging'));
@@ -354,7 +365,7 @@ assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteD
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.deepEqual(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').flatMap(r=>r.audio)),await page.evaluate(()=>window.expectedStreamAudio));
 assert.deepEqual(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='push').map(r=>r.audio.length)),[...Array(20).fill(1600),321]);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Exact captured samples.']);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Exact captured samples.',' ']);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
 results.push('Irregular callbacks retain every speech and silence sample in 100 ms packets, flush the partial tail exactly once, and deliver only the final recognized text.');
 
@@ -379,7 +390,7 @@ await page.evaluate(()=>window.samples(0.25));
 await page.waitForFunction(()=>window.speechAudioSamples===24000);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').length),2);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words app','ear during speec','h before stopping now.']);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Words app','ear during speec','h before stopping now.',' ']);
 assert.equal(await page.evaluate(()=>window.traceEvents.filter(c=>c[0]==='dictation_desktop_live_prefix_dispatched').length),3);
 assert.equal(await page.evaluate(()=>window.nativeCalls.filter(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0])).length),0);
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
@@ -399,7 +410,7 @@ assert.equal(await page.evaluate(()=>window.speechRequests.some(r=>r.op==='diagn
 assert.equal(await page.evaluate(()=>window.nativeCalls.some(c=>['previewTranscribeAudio','transcribeAudio'].includes(c[0]))),false);
 await stop(); await page.waitForFunction(()=>window.store.getState().status==='idle');
 assert.equal(await page.evaluate(()=>window.speechRequests.filter(r=>r.op==='finish').length),1);
-assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.']);
+assert.deepEqual(await page.evaluate(()=>window.nativeCalls.filter(c=>c[0]==='pasteDesktopText').map(c=>c[1])),['Long stream completed.',' ']);
 results.push('Five minutes of simulated captured audio maintains sequenced 100 ms IPC packets, avoids whole-history decoding and finishes once after all captured audio.');
 
 
