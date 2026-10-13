@@ -7,12 +7,12 @@ ending sentences where you only pause to think?
 
 **Answer.** Not with this recognizer. No policy passed the
 [pre-registered](PREREGISTRATION.md) bar, so VOCO keeps today's behaviour. The
-recognizer writes a comma or full stop only once it hears the next word. While
-you pause, nothing in the text says whether the sentence is over. Asking the
-library to end the utterance there writes a full stop at about nine in ten
-pauses between sentences, but also at about half of the pauses inside a
-sentence. On held-out speech the best policy fixed 13% of sentence ends where
-it acted and broke 46% of mid-sentence pauses.
+recognizer usually writes a comma or full stop only once it hears the next
+word, so while you pause, nothing in the text says whether the sentence is
+over. Asking the library to end the utterance there writes a full stop at about
+nine in ten pauses between sentences, but also at about half of the pauses
+inside a sentence. On held-out speech the best policy fixed 13% of sentence
+ends where it acted and broke 46% of mid-sentence pauses.
 
 The pre-registration was fixed at 11:34 UTC, before any policy ran (SHA-256
 `401f2bd9…`); its addendum, for the exploratory runs, at 12:55 UTC. This record
@@ -117,8 +117,8 @@ Why it doesn't work:
 
 - **The text is silent at a pause.** Of 2,859 decision points across the dev
   runs, 32 (1.1%) ended in a full stop and none in a comma: the recognizer
-  writes its punctuation with the next word. So EC behaved exactly as E, and
-  EWAT almost exactly as EWA.
+  usually writes its punctuation with the next word. So EC behaved exactly as
+  E, and EWAT almost exactly as EWA.
 - **Word lists catch a third.** Of the 50 mid-sentence pauses that E at 0.8 s
   got wrong and today got right, 19 ended in a comma or a listed word, and 31
   in words such as "story", "cart" and "difficult"
