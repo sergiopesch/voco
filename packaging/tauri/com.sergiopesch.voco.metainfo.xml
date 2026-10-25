@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.63" date="2026-10-25">
+      <description>
+        <p>VOCO can check how it hears each word on your My words list and learn the versions it gets wrong, and setup offers My words after the voice test. Browser address bars keep every space, GNOME apps get each paste sooner, Stop leaves a space after a finished sentence, VOCO reloads its window if it crashes, and the guided installer finishes on Ubuntu 26.04.</p>
+      </description>
+    </release>
     <release version="2026.0.62" date="2026-10-11">
       <description>
         <p>VOCO introduces itself as the voice layer for Linux, starting with dictation. It writes British or American spelling and the names and terms you list in My words, and the installer opens with VOCO's microphone and name. Locking the screen now stops dictation, the speech worker can't open sockets, update checks can wait until you ask, and the GNOME top-bar panel also runs on GNOME 51. VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44, and its app framework and build tools are up to date.</p>

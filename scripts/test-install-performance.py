@@ -23,6 +23,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = (ROOT / 'install').read_text().split('# ─── Header', 1)[0]
+# The installer's own version, which its card shows and it passes the APT display.
+VERSION = re.search(r'^VERSION="([^"]+)"$', PREFIX, re.M)[1]
 APT_UI = ROOT / 'scripts/lib/install-apt-ui.py'
 # The wordmark's lit cell, drawn only while a shine passes.
 GLOW = b'\x1b[38;2;255;255;255;48;2;238;241;245m'
@@ -249,7 +251,7 @@ printf 'PROMPT REMAINS VISIBLE\\n'
                 (Path(folder) / 'apt.log').touch(mode=0o600)
                 # Feed status separately from a delayed prompt, allowing the real
                 # renderer to paint before it gives terminal output back.
-                command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true joined 2026.0.62 "$3" "$4" "$5" "" ""',
+                command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | /usr/bin/python3 "$1" "$2" true joined ' + VERSION + ' "$3" "$4" "$5" "" ""',
                            'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), lines, card, shine]
                 code, output = terminal(command, env, columns=64, rows=24)
                 self.assertEqual(code, 0, output)
@@ -257,7 +259,7 @@ printf 'PROMPT REMAINS VISIBLE\\n'
                 plain = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', output.decode())
                 if lines == '21':
                     self.assertIn('▗', plain)
-                    self.assertIn('v2026.0.62', plain)
+                    self.assertIn('v' + VERSION, plain)
                 else:
                     self.assertIn('V O C O', plain)
                 self.assertIn(b'Confirm package option: ', output)
@@ -881,7 +883,7 @@ class InstallerArtTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             (Path(folder) / 'apt.log').touch(mode=0o600)
             command = ['bash', '-c', '({ printf "pmstatus:voco:20:Unpacking\\n"; sleep .2; printf "Confirm package option: "; }) | '
-                       '/usr/bin/python3 "$1" "$2" true joined 2026.0.62 21 "$3" "$4" "$5" "$6"',
+                       '/usr/bin/python3 "$1" "$2" true joined ' + VERSION + ' 21 "$3" "$4" "$5" "$6"',
                        'fixture', str(APT_UI), str(Path(folder) / 'apt.log'), card, shine, place, removal]
             code, output = terminal(command, {**os.environ, 'TERM': 'xterm-256color'}, columns=64, rows=24)
         self.assertEqual(code, 0, output)

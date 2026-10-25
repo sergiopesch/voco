@@ -6,7 +6,13 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
-## [Unreleased]
+## [2026.0.63] - 2026-10-25
+
+VOCO can check how it hears each word on your My words list and learn the
+versions it gets wrong, and setup offers My words after the voice test. Browser
+address bars keep every space, GNOME apps get each paste sooner, and the guided
+installer finishes on Ubuntu 26.04. The [release notes](docs/releases/2026.0.63.md)
+explain how to upgrade.
 
 ### Added
 
@@ -20,6 +26,18 @@ The [release process](docs/release-process.md) describes how a release is made.
   as the first word to check. Anything else is yours to add, and if you skip
   it, setup says where to find My words later. Four marks beside Setup show the
   step you're on.
+- Two commands rerun the evidence behind VOCO's claims.
+  `scripts/check-privacy.sh` runs a release build twice in a throwaway Ubuntu
+  26.04 container and dictates a public clip each time: offline with update
+  checks off, where no process may reach the internet or DNS, and online with
+  them on, where only `api.github.com` may be reached and the speech worker
+  reaches nothing. In both, a microphone stream may exist only while dictation
+  runs. `scripts/check-speech.sh` measures recognition through the real worker:
+  the accuracy gate, word error rate, latency and My words, and with `--against`
+  another commit's worker beside this one.
+- The [pause study](research/pause-sentence-ends-2026-10/README.md), with its
+  pre-registration, harness and every run's results, measures why VOCO doesn't
+  end sentences where you pause.
 
 ### Changed
 
@@ -27,6 +45,25 @@ The [release process](docs/release-process.md) describes how a release is made.
   before the next one, in case the app was slow to take it; now it sees when
   the app has read each paste and pastes the next words straight away. It still
   waits the 150 ms on other desktops, and on GNOME when it can't tell.
+- The README qualifies its claims, and a new page,
+  [What VOCO doesn't do](docs/scope.md), lists what VOCO leaves out on purpose
+  and the limits it has today.
+- VOCO's own copy of the My words rules uses icu_normalizer 2.1.1 and
+  icu_properties 2.1.2 for Unicode's composition and letter categories.
+- Tokio 1.51.6 and mio 1.2.4, past the AsyncFd I/O-safety advisory
+  RUSTSEC-2026-0386. VOCO's code never creates an AsyncFd, and inotify, the only
+  dependency built to use one, does so only in a stream API VOCO doesn't call.
+- CI runs the speech worker from exactly the files a package ships, pulls its
+  Debian 13 image and the privacy check's image from Microsoft's mirror of
+  Docker's images, retries downloads for a minute and stops a package
+  installation after 10 minutes. Two tests wait for what they check rather than
+  a fixed time, and the xclip stand-in tests no longer fail now and then with
+  "Text file busy".
+
+### Removed
+
+- The macOS and Windows icons left over from the app template. VOCO builds only
+  Linux packages.
 
 ### Fixed
 
@@ -51,7 +88,9 @@ The [release process](docs/release-process.md) describes how a release is made.
   reloads in five minutes, VOCO leaves it closed and asks you to open VOCO again.
 - My words accepts a name with accents that have no letter of their own, such
   as the Yoruba Adéṣọ̀lá, with up to three on a letter. Settings, VOCO and the
-  speech worker now also agree on which characters are letters.
+  speech worker now also agree on which characters are letters, and on an
+  accent stored as a separate mark, as a hand-edited settings file can hold:
+  each composes accents (NFC) before it checks a word.
 - On Ubuntu 26.04 the guided installer stopped at "Package setup" and never
   finished. Ubuntu 26.04's sudo, sudo-rs, runs a command whose output feeds a
   pipe in the background of its own terminal and passes it no input. APT reads
@@ -75,6 +114,11 @@ The [release process](docs/release-process.md) describes how a release is made.
   settings, `config.json.last`, and brings them back from it, unless you reset
   the settings in between. A taught version that no longer fits the list is
   left out. Reset now also deletes that copy and the backups of earlier resets.
+- After a fresh install on GNOME, setup's last step said to press Alt+D. Until
+  the GNOME panel loads at the next login, though, Alt+D also reaches the app
+  you dictate into: a browser moves to its address bar and a terminal deletes a
+  word. While that's so, the step now leads with VOCO's note to sign out and
+  back in.
 
 ## [2026.0.62] - 2026-10-11
 
@@ -424,5 +468,6 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.63]: https://github.com/sergiopesch/voco/compare/voco.2026.0.62...voco.2026.0.63
 [2026.0.62]: https://github.com/sergiopesch/voco/compare/voco.2026.0.61...voco.2026.0.62
 [2026.0.61]: https://github.com/sergiopesch/voco/compare/voco.2026.0.59...voco.2026.0.61

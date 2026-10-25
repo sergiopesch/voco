@@ -516,7 +516,7 @@ repository.
 
 ## Release
 
-- Source version: **2026.0.62**. Latest published release: **2026.0.62**.
+- Source version: **2026.0.63**. Latest published release: **2026.0.62**.
   GitHub Releases is authoritative for publication and the package manager for the
   installed version; a version in source proves neither.
 - `packaging/published-release.json` records the published version. Keep the README
