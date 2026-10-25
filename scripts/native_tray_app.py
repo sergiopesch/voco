@@ -97,8 +97,8 @@ def tray_menu(call, app, report):
     return service, menu
 
 
-def dbusmenu_activate(call, service, menu, label):
-    """Clicks the menu item labelled label, as a tray host does."""
+def dbusmenu_activate(call, service, menu, label, *, connection=None, app=None):
+    """Clicks the real menu item; Quit's caller must still prove process exit zero."""
     layout = call(service, menu, 'com.canonical.dbusmenu', 'GetLayout',
                   GLib.Variant('(iias)', (0, -1, ['label'])))[1]
     def find(node):
@@ -110,8 +110,21 @@ def dbusmenu_activate(call, service, menu, label):
                 return value
     item = find(layout)
     assert item is not None, label
-    call(service, menu, 'com.canonical.dbusmenu', 'Event',
-         GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0)))
+    values = GLib.Variant('(isvu)', (item, 'clicked', GLib.Variant('s', ''), 0))
+    if label == 'Quit VOCO':
+        # Quit can exit before DBusMenu acknowledges Event. Send the real menu
+        # click without requesting that reply; every caller still requires the
+        # process to exit successfully within its existing ten-second deadline.
+        assert connection is not None and app is not None, 'Quit needs its session connection and process'
+        assert app.poll() is None, 'App exited before tray Quit'
+        message = Gio.DBusMessage.new_method_call(service, menu, 'com.canonical.dbusmenu', 'Event')
+        message.set_body(values)
+        message.set_flags(Gio.DBusMessageFlags.NO_REPLY_EXPECTED)
+        sent, serial = connection.send_message(message, Gio.DBusSendMessageFlags.NONE)
+        assert sent and serial, 'Tray Quit Event was not sent'
+        assert connection.flush_sync(None), 'Tray Quit Event was not flushed'
+    else:
+        call(service, menu, 'com.canonical.dbusmenu', 'Event', values)
 
 
 def wait_ready(app, log, trace, previous_ready_count):
