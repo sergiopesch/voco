@@ -143,7 +143,7 @@ try:
             try:
                 service, menu = tray.tray_menu(call, app, report)
                 def activate(label):
-                    tray.dbusmenu_activate(call, service, menu, label)
+                    tray.dbusmenu_activate(call, service, menu, label, connection=bus, app=app)
                 tray.wait_ready(app, evidence / f'app-{cycle}.log', trace, previous_ready_count)
                 if review_mode:
                     report.setdefault('crashReview', []).append(run_review(root, app, pump, activate,

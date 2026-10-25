@@ -66,7 +66,7 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \

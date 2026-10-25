@@ -133,7 +133,7 @@ try:
         def activate(label):
             name, path = items[-1]
             menu = call(name, path, 'org.freedesktop.DBus.Properties', 'Get', GLib.Variant('(ss)', ('org.kde.StatusNotifierItem', 'Menu')))[0]
-            tray.dbusmenu_activate(call, name, menu, label)
+            tray.dbusmenu_activate(call, name, menu, label, connection=bus, app=app)
         pump(.2)
         model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
         report['model'] = {'provided': model.exists()}
