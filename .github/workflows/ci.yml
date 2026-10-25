@@ -66,7 +66,7 @@ jobs:
           cache: npm
 
       - name: Install system dependencies
-        timeout-minutes: 10
+        timeout-minutes: 25
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -578,7 +578,7 @@ jobs:
             tools: apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 nodejs dpkg
           - name: Fedora 44
             image: registry.fedoraproject.org/fedora:44@sha256:8ade22c0f76f6b2f0892290b1fb39fa1bda1566ba6e276a2ed427f45589c159b
-            tools: dnf install -y git curl python3 nodejs dpkg
+            tools: dnf install -y git curl python3 nodejs dpkg diffutils
     container:
       image: ${{ matrix.image }}
     steps:
