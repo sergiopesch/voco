@@ -338,6 +338,7 @@ if case in LAUNCH:
 app = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=app_env)
 passed, failure, window_id, before_switch = False, None, None, None
 selections, tray_state, popup, popover, diagnostic_errors, confinement = {}, None, None, None, [], None
+stop_gesture = None
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
     wait_for(lambda: (root / 'runtime/voco.sock').exists(), 'application control socket')
@@ -454,7 +455,9 @@ try:
         play('second fixture playback after the focus switch')
     pump(.6)
     note_focus('before-stop')
-    subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+    stop_gesture = json.loads(subprocess.check_output([
+        '/usr/bin/python3', str(repo / 'scripts/fixtures/x11-shortcut.py')
+    ], text=True))
     wait_for(lambda: counts()['dictation_stop_to_idle'] > before['dictation_stop_to_idle'], 'successful recording returned to idle', timeout=35)
     wait_for(lambda: quiet(.5), 'the last paste to land', timeout=5)
     note_focus('delivered')
@@ -529,7 +532,8 @@ finally:
     else:
         boundary = [{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
                     'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
-                    'xdotool Shift+Insert into the focused GTK entry', 'no IBus text mutation', 'private X11 without a window manager']
+                    'xdotool Shift+Insert into the focused GTK entry', 'one atomic private-X11 Alt+D Stop gesture',
+                    'no IBus text mutation', 'private X11 without a window manager']
         if case == 'web-process':
             boundary.insert(1, 'a WebKit web process killed mid-dictation and loaded again')
     report = dict(passed=passed, failure=failure, expectedOutcome=LAUNCH.get(case, 'pasted-into-focused-field'), case=case,
@@ -540,6 +544,7 @@ finally:
                   selections=selections, traceCounts=dict(sorted(c.items())), captureRoute=capture, focus=focus_log, harnessWindow=window_id,
                   tray=tray_state, popoverWindow=popup, popover=popover, helpers={name: bool(shutil.which(name)) for name in ['xclip', 'xdotool']},
                   diagnosticErrors=diagnostic_errors, workerConfinement=confinement, windowHistory=window_history,
+                  stopGesture=stop_gesture,
                   engineSourceHashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('voco_ibus_*.py')},
                   fixtureSha256=None if case in LAUNCH else hashlib.sha256(sound.read_bytes()).hexdigest(),
                   appSha256=app_hash,
