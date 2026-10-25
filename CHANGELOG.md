@@ -50,6 +50,9 @@ explain how to upgrade.
   and the limits it has today.
 - VOCO's own copy of the My words rules uses icu_normalizer 2.1.1 and
   icu_properties 2.1.2 for Unicode's composition and letter categories.
+- Tokio 1.51.6 and mio 1.2.4, past the AsyncFd I/O-safety advisory
+  RUSTSEC-2026-0386. VOCO's code never creates an AsyncFd, and inotify, the only
+  dependency built to use one, does so only in a stream API VOCO doesn't call.
 - CI runs the speech worker from exactly the files a package ships, pulls its
   Debian 13 image and the privacy check's image from Microsoft's mirror of
   Docker's images, retries downloads for a minute and stops a package
