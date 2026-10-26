@@ -203,8 +203,8 @@ change.
   out well before CLIPBOARD's, but that isn't proof. Without the read in time
   the keys go anyway. A CLIPBOARD helper
   that never starts is a `no-mutation` failure whose error says when PRIMARY
-  already holds the text. The virtual keyboard reports when its Insert press
-  went out. When Mutter's read is in by the Insert press, the
+  already holds the text. The keyboard that sends the keys reports when its
+  Insert press went out. When Mutter's read is in by the Insert press, the
   next answer after the press, on either selection, is the app's read: the
   paste ends there, or 300 ms after the press with none. A read before it,
   during the wait for a young keyboard or the gap after Shift, never counts.
@@ -218,15 +218,38 @@ change.
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
-- Wayland keys go through VOCO's own uinput device, "VOCO virtual keyboard"
-  (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per process,
-  created at startup and reused for the process lifetime, never one per paste:
-  the compositor adds a new device late and could lose its first keys, so a
-  device younger than 500 ms waits before its first key. It declares only Shift
+- On GNOME Wayland, while the companion is attached and GNOME has loaded a
+  version with `Paste`, keys go through `org.voco.PanelInput1.Paste`. It types
+  from inside the Shell with one Clutter virtual keyboard per enable: no device
+  to settle, no portal dialog and no screen-sharing indicator. Like
+  `ModifiersClear`, it answers only the attached application, the owner of
+  `org.voco.Panel`. It refuses while a modifier is held or another paste is in
+  flight. Otherwise it sends Shift, Insert and their releases, 12 ms apart and
+  never another key, and answers once the gesture is done with the Insert
+  press's monotonic time. A refusal, or a companion that isn't there, typed
+  nothing: `no-mutation`. A call that times out, or a gesture cut short when the
+  companion is disabled, is uncertain; disabling releases any key it holds.
+  GNOME disables the companion at the lock screen, since its metadata names no
+  session modes and `ScreenShield.activate()` pushes `unlock-dialog`. VOCO's
+  origin and lock checks still run before the copy and before the call.
+- Otherwise Wayland keys go through VOCO's own uinput device, "VOCO virtual
+  keyboard" (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per
+  process, created at startup and reused for the process lifetime, never one per
+  paste: the compositor adds a new device late and could lose its first keys, so
+  a device younger than 500 ms waits before its first key. It declares only Shift
   and Insert and sends each event in its own report, 12 ms apart. Ensure it
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
+- CI's companion suite proves `Paste` on each Shell it runs. Every paste lands
+  with its exact text in a GTK field on Wayland and under XWayland. From the
+  request to the Insert press reaching the field, taking turns with Mutter's
+  RemoteDesktop API sending the same gesture over at least 200 pastes each, the
+  companion's median is at most 1 ms, and its p99 at most 2 ms, above Mutter's.
+  A paste requested from another connection, with a modifier held, while another
+  is in flight, in the `unlock-dialog` session mode or after the companion is
+  disabled sends no key. The application job's GNOME Wayland delivery runs
+  through the companion as well as through uinput.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that
