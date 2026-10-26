@@ -91,6 +91,8 @@ export interface DesktopPasteMetrics {
    * didn't within the wait, "unobserved" where the helpers can't tell. */
   selectionRead: "clipboard" | "primary" | "none" | "unobserved";
   selectionReadMs: number | null;
+  /** Which keyboard sent the keys: the GNOME companion, VOCO's uinput device or xdotool. */
+  pasteKeys: "companion" | "uinput" | "xdotool";
 }
 
 /** Pastes into whatever has focus now; rejects with an InsertionError. */

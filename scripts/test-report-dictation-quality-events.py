@@ -69,6 +69,16 @@ class QualityEventsTest(unittest.TestCase):
         report = self.run_report(rows)
         self.assertNotIn('PRIVATE_SENTINEL', json.dumps(report))
 
+    def test_paste_keys_are_counted_and_nothing_else_is_echoed(self):
+        rows = fixture()
+        native = next(row for row in rows if row.get('stage') == 'native_dispatch')
+        native['paste_keys'] = 'companion'
+        stream = self.run_report(rows)['runs'][0]['streams'][0]
+        self.assertEqual(stream['status'], 'reconciled_dispatch_metadata')
+        self.assertEqual(stream['paste_keys'], {'companion': 1})
+        native['paste_keys'] = 'PRIVATE_SENTINEL'
+        self.assertNotIn('PRIVATE_SENTINEL', json.dumps(self.run_report(rows)))
+
     def test_finished_empty_stream_reconciles_without_inventing_hypotheses(self):
         rows = fixture()
         terminal = rows[-1]

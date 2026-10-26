@@ -3,9 +3,11 @@
 # applications (default) or browser. VOCO_DELIVERY_PLATFORM picks x11 (default),
 # the bare private Xvfb, or gnome-wayland, a nested GNOME Shell with XWayland on
 # that Xvfb. VOCO_FIXTURE_PASTE_BINARY, when set, is the voco library test
-# executable that pastes through production desktop_paste. On gnome-wayland it
-# types through VOCO's real virtual keyboard, which needs VOCO_UINPUT_BRIDGE=1
-# on a disposable machine (scripts/fixtures/uinput-bridge.py).
+# executable that pastes through production desktop_paste. On gnome-wayland
+# VOCO_DELIVERY_KEYS picks its keyboard: uinput (default), VOCO's real virtual
+# keyboard, which needs VOCO_UINPUT_BRIDGE=1 on a disposable machine
+# (scripts/fixtures/uinput-bridge.py), or companion, the session's GNOME
+# companion typing inside the Shell, from integrations/gnome.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
@@ -23,10 +25,23 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
   node_binary=$(command -v node || true)
   production_paste=()
   bridged=false
+  keys=${VOCO_DELIVERY_KEYS:-uinput}
+  case $keys in
+    uinput) ;;
+    companion) [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} && $VOCO_DELIVERY_PLATFORM == gnome-wayland ]] \
+      || { echo 'The companion types only production pastes on gnome-wayland' >&2; exit 1; } ;;
+    *) echo 'Unsupported delivery keys' >&2; exit 1 ;;
+  esac
   if [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} ]]; then
     production_paste=(--ro-bind "$(realpath "$VOCO_FIXTURE_PASTE_BINARY")" /tmp/voco-fixture-paste
       --setenv VOCO_FIXTURE_PASTE_BINARY /tmp/voco-fixture-paste)
-    if [[ $VOCO_DELIVERY_PLATFORM == gnome-wayland ]]; then
+    if [[ $keys == companion ]]; then
+      # The paste test serves VOCO's panel bridge, and the session's companion
+      # attaches and types. The paste check still opens /dev/uinput, so the null
+      # device stands in for it: a paste that reached for VOCO's own keyboard
+      # couldn't create it, and no bridge runs.
+      production_paste+=(--setenv VOCO_FIXTURE_PANEL 1 --dev-bind /dev/null /dev/uinput)
+    elif [[ $VOCO_DELIVERY_PLATFORM == gnome-wayland ]]; then
       # Production pastes on Wayland through VOCO's own uinput keyboard. The
       # namespace gets /dev/uinput, still no /dev/input, and shares its X socket
       # directory, so the bridge outside grabs each VOCO keyboard and replays its
@@ -43,6 +58,9 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     probe="$fixture/data/gnome-shell/extensions/voco-private-probe@test.invalid"
     mkdir -p "$probe"
     cp "$ROOT_DIR/scripts/fixtures/gnome-private-probe/"* "$probe/"
+    if [[ $keys == companion ]]; then
+      cp -r "$ROOT_DIR/integrations/gnome/voco-panel@voco.local" "$fixture/data/gnome-shell/extensions/"
+    fi
   fi
   status=0
   source "$(dirname "${BASH_SOURCE[0]}")/lib/test-sandbox.sh"
@@ -64,7 +82,8 @@ fixture=${2:?}
 if [[ ${1:-} == --session ]]; then
   if [[ $VOCO_DELIVERY_PLATFORM == gnome-wayland ]]; then
     [[ ! -e /dev/input ]]
-    if [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} ]]; then [[ -c /dev/uinput ]]; else [[ ! -e /dev/uinput ]]; fi
+    if [[ -n ${VOCO_FIXTURE_PANEL:-} ]]; then [[ /dev/uinput -ef /dev/null ]]
+    elif [[ -n ${VOCO_FIXTURE_PASTE_BINARY:-} ]]; then [[ -c /dev/uinput ]]; else [[ ! -e /dev/uinput ]]; fi
     log=$fixture/evidence/gnome-shell.log
     export LIBGL_ALWAYS_SOFTWARE=1 XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=ubuntu:GNOME
     export GNOME_SHELL_SESSION_MODE=user
@@ -76,7 +95,9 @@ if [[ ${1:-} == --session ]]; then
     (
       # The Shell reads these from the fixture's dconf; applications keep the memory backend.
       unset GSETTINGS_BACKEND
-      gsettings set org.gnome.shell enabled-extensions "['voco-private-probe@test.invalid']"
+      extensions="'voco-private-probe@test.invalid'"
+      [[ -z ${VOCO_FIXTURE_PANEL:-} ]] || extensions+=", 'voco-panel@voco.local'"
+      gsettings set org.gnome.shell enabled-extensions "[$extensions]"
       gsettings set org.gnome.shell disable-user-extensions false
       gsettings set org.gnome.shell welcome-dialog-last-shown-version "'999'"
       gsettings set org.gnome.desktop.interface enable-animations false

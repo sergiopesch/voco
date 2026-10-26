@@ -2,7 +2,8 @@
 
 With VOCO_FIXTURE_PASTE_BINARY this runs production desktop_paste through its
 ignored insertion.rs test; on gnome-wayland its keys go through VOCO's virtual
-keyboard to the uinput bridge, which replays them on the private Xvfb.
+keyboard to the uinput bridge, which replays them on the private Xvfb, or, with
+VOCO_FIXTURE_PANEL, through the session's GNOME companion.
 Otherwise it replays the X11 helper commands: xclip on DISPLAY, which is
 XWayland on gnome-wayland, and xdotool keys on the private Xvfb.
 Usage: python3 focused-paste.py TEXT
@@ -48,8 +49,11 @@ def production(binary, text):
 def main():
     binary = os.environ.get('VOCO_FIXTURE_PASTE_BINARY')
     uinput = bool(binary) and os.environ.get('VOCO_DELIVERY_PLATFORM') == 'gnome-wayland'
+    # With VOCO_FIXTURE_PANEL the null device stands in for /dev/uinput.
+    companion = bool(os.environ.get('VOCO_FIXTURE_PANEL'))
     assert os.environ.get('VOCO_DELIVERY_KEYBOARD_DISPLAY') == ':0' and not Path('/dev/input').exists() \
-        and Path('/dev/uinput').is_char_device() == uinput, 'Private fixture display required'
+        and Path('/dev/uinput').is_char_device() == uinput \
+        and (not companion or os.path.samefile('/dev/uinput', '/dev/null')), 'Private fixture display required'
     text = sys.argv[1]
     if binary:
         production(binary, text)

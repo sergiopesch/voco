@@ -8,6 +8,15 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Changed
+
+- On GNOME Wayland, the GNOME companion now presses VOCO's paste keys from
+  inside GNOME Shell while it's attached, rather than VOCO's own virtual
+  keyboard. It sends the same Shift+Insert, refuses while a modifier is held,
+  and GNOME turns it off at the lock screen. The companion is now version 16:
+  after upgrading, run `voco --setup-panel` and sign out and back in. Until
+  GNOME loads it, VOCO pastes through its own keyboard.
+
 ### Fixed
 
 - On X11, pressing the shortcut just as VOCO pasted could do nothing: the Shift

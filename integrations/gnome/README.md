@@ -113,7 +113,9 @@ answers both of its methods only for the attached VOCO:
   reports no modifier held, and sends no key events.
 - `Paste() → t`, from version 16. It types VOCO's paste keys from inside the
   Shell, through one Clutter virtual keyboard per enable, so there's no device
-  to settle, no portal dialog and no screen-sharing indicator.
+  to settle, no portal dialog and no screen-sharing indicator. VOCO sends its
+  Wayland paste keys through it whenever GNOME's loaded copy offers it, which
+  VOCO checks once per attachment, and waits up to 1 second for the reply.
   - It refuses with `org.voco.ModifiersHeld` while a modifier is held, and with
     `org.voco.Busy` while another paste is in flight.
   - Otherwise it sends Shift, Insert and their releases, 12 ms apart, and

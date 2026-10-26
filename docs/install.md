@@ -196,12 +196,13 @@ To dictate, click where you want the text, press `Alt+D` and speak. Press
 VOCO types by pasting. It puts each phrase on the clipboard and presses
 Shift+Insert in the app that has keyboard focus. Helper programs set the
 clipboard. On X11 `xdotool` presses the keys; on Wayland VOCO presses them
-itself, through its own virtual keyboard:
+itself, through its own virtual keyboard, or on GNOME through the
+[GNOME panel](#gnome-panel) while it's on:
 
 | Session | Keys | Clipboard | Setup |
 | --- | --- | --- | --- |
 | X11 | `xdotool` | `xclip` | None; the package depends on both |
-| Wayland | VOCO's virtual keyboard | `wl-copy`, or `xclip` on GNOME | [Access to `/dev/uinput`](#wayland-paste-keys), from the package's udev rule |
+| Wayland | VOCO's virtual keyboard, or the GNOME panel | `wl-copy`, or `xclip` on GNOME | [Access to `/dev/uinput`](#wayland-paste-keys), from the package's udev rule |
 
 To check, run `voco --check-desktop-input`. It doesn't record, copy or type
 anything.
@@ -212,7 +213,9 @@ On Wayland, VOCO sends the paste keys through a virtual keyboard it creates on
 `/dev/uinput`, the kernel's interface for virtual input devices. No daemon,
 service or group is involved. The package installs a udev rule that gives the
 user of the active local session access to `/dev/uinput`, and applies it as it
-installs, so your session usually has access straight away.
+installs, so your session usually has access straight away. On GNOME the panel
+presses the keys from inside GNOME Shell while it's on, and VOCO's keyboard
+takes over whenever it isn't, so VOCO needs this access either way.
 
 If `voco --check-desktop-input` says VOCO can't open `/dev/uinput`, sign out and
 back in once, then check again. [Access to /dev/uinput](platform/README.md#access-to-devuinput)
@@ -222,7 +225,8 @@ explains the rule, how to check it and how to use a different policy.
 
 On GNOME 46, 48, 50 and 51, VOCO includes an optional top-bar panel with live
 microphone bars, a menu and a Stop control. On Wayland it also keeps your
-`Alt+D` or `Alt+Shift+D` shortcut from reaching the app you are typing in. The
+`Alt+D` or `Alt+Shift+D` shortcut from reaching the app you are typing in, and
+presses VOCO's paste keys. The
 guided installer turns it on. Otherwise, run `voco --setup-panel` or choose
 **Enable live panel** on VOCO's Help page. Save your work, then sign out and
 back in to load the panel. To check it without changing anything, run
