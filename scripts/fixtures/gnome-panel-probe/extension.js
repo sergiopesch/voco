@@ -1,10 +1,11 @@
 // Test-only, installed exclusively in a disposable desktop namespace.
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method><method name="Focus"><arg type="b" direction="in"/></method><method name="Pointer"><arg type="ad" direction="out"/></method><method name="Screenshot"><arg type="s" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/></method></interface></node>';
+const xml = '<node><interface name="org.voco.PanelProbe"><method name="Inspect"><arg type="s" direction="out"/></method><method name="Stop"/><method name="Menu"/><method name="MenuAction"><arg type="s" direction="in"/></method><method name="Overview"/><method name="NativeState"><arg type="s" direction="out"/></method><method name="Crowd"><arg type="b" direction="in"/></method><method name="SlowDown"><arg type="d" direction="in"/></method><method name="Focus"><arg type="b" direction="in"/></method><method name="Pointer"><arg type="ad" direction="out"/></method><method name="Screenshot"><arg type="s" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/><arg type="i" direction="in"/></method><method name="PushSessionMode"><arg type="s" direction="in"/></method><method name="PopSessionMode"><arg type="s" direction="in"/></method><method name="CompanionState"><arg type="i" direction="out"/></method><method name="Modifiers"><arg type="u" direction="out"/></method><method name="DisableCompanionAfter"><arg type="u" direction="in"/></method><method name="ActivateWindow"><arg type="s" direction="in"/><arg type="b" direction="out"/></method><method name="FocusedWindow"><arg type="s" direction="out"/></method></interface></node>';
 function bounds(actor) {
     const [x, y] = actor.get_transformed_position();
     const [width, height] = actor.get_transformed_size();
@@ -91,5 +92,25 @@ export default class Probe extends Extension {
             'GetState', null, null, Gio.DBusCallFlags.NO_AUTO_START, 1500, null).deep_unpack()[0];
     }
     Overview() { Main.overview.hide(); }
+    // What ScreenShield.activate() and its deactivation do to the session mode,
+    // without a display manager; this probe's metadata keeps it through both.
+    PushSessionMode(mode) { Main.sessionMode.pushMode(mode); }
+    PopSessionMode(mode) { Main.sessionMode.popMode(mode); }
+    CompanionState() { return Main.extensionManager.lookup('voco-panel@voco.local')?.state ?? -1; }
+    Modifiers() { return global.get_pointer()[2]; }
+    ActivateWindow(title) {
+        const window = global.get_window_actors().map(actor => actor.meta_window).find(w => w.get_title() === title);
+        window?.activate(global.get_current_time());
+        return Boolean(window);
+    }
+    FocusedWindow() { return global.display.focus_window?.get_title() ?? ''; }
+    // Disables the companion from a Shell timer, so the cut lands inside a
+    // paste gesture started just after this call returns.
+    DisableCompanionAfter(ms) {
+        GLib.timeout_add(GLib.PRIORITY_HIGH, ms, () => {
+            Main.extensionManager.disableExtension('voco-panel@voco.local');
+            return GLib.SOURCE_REMOVE;
+        });
+    }
     disable() { this.SlowDown(1); this.spacer?.destroy(); this.object?.unexport(); this.object = null; }
 }

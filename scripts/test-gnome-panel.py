@@ -6,7 +6,9 @@ from pathlib import Path
 import re
 import subprocess
 import shutil
+import statistics
 import sys
+import threading
 import time
 import gi
 gi.require_version('Gio', '2.0')
@@ -89,12 +91,15 @@ def screenshot(name):
     subprocess.run(['/usr/bin/python3','-c',panel_code,str(evidence / ('panel-'+name+'.png'))], env={**os.environ,'DISPLAY':':77','GDK_BACKEND':'x11'}, check=True)
 def start_shell():
     global shell
+    # With XWayland, which the Paste checks type under. It must run from the
+    # Shell's start: after a Shell restart, no key reached an XWayland client.
+    Path('/tmp/.X11-unix').mkdir(mode=0o1777, exist_ok=True); os.chmod('/tmp/.X11-unix', 0o1777)
     if headless:
         # GNOME 50 has neither --nested nor --sm-disable. The virtual monitor has
         # the nested window's 800x600, so every geometry check keeps its meaning.
-        shell = subprocess.Popen(['gnome-shell','--headless','--virtual-monitor','800x600','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test'], stdout=log,stderr=subprocess.STDOUT)
+        shell = subprocess.Popen(['gnome-shell','--headless','--virtual-monitor','800x600','--wayland','--force-animations','--wayland-display=voco-panel-test'], stdout=log,stderr=subprocess.STDOUT)
     else:
-        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--no-x11','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
+        shell = subprocess.Popen(['gnome-shell','--nested','--wayland','--force-animations','--wayland-display=voco-panel-test','--sm-disable'], env={**os.environ,'DISPLAY':':77'}, stdout=log,stderr=subprocess.STDOUT)
     # A busy runner has taken 16 seconds to start the Shell, so the checks'
     # own time starts once the probe answers.
     deadline = time.monotonic() + 60
@@ -634,6 +639,144 @@ try:
     assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
     assert not stop_reservations, 'the companion must not use the v10 Stop reservation'
     assert entry.get_text() == 'Keep my dictated words', entry.get_text()
+    # Paste: VOCO's keys typed from inside the Shell (AGENTS.md, Delivery). A field
+    # in its own process times each Insert press as the compositor delivers it,
+    # whatever this process is doing.
+    class PasteField:
+        def __init__(self, env):
+            self.records = []; self.lock = threading.Lock()
+            self.process = subprocess.Popen(['/usr/bin/python3', str(Path(__file__).resolve().parent / 'fixtures/paste-field.py')],
+                env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
+            threading.Thread(target=self.read, daemon=True).start()
+            assert wait_for(lambda: self.seen('ready'), 20), 'the paste field did not start'
+            # A new window may not take focus by itself; a paste needs it focused.
+            def focused():
+                if call('FocusedWindow').unpack()[0] == 'VOCO paste fixture': return True
+                call('ActivateWindow', GLib.Variant('(s)', ('VOCO paste fixture',))); return False
+            assert wait_for(focused, 10), 'the paste field did not take focus'
+            pump(.3)
+        def read(self):
+            for line in self.process.stdout:
+                with self.lock: self.records.append(json.loads(line))
+        def seen(self, what, since=0.0):
+            with self.lock: return [r for r in self.records if r['what'] == what and r['t'] >= since]
+        def command(self, line, reply):
+            mark = time.monotonic(); self.process.stdin.write(line + '\n'); self.process.stdin.flush()
+            assert wait_for(lambda: self.seen(reply, mark), 3), line
+        def text(self):
+            texts = self.seen('text'); return texts[-1]['text'] if texts else ''
+        def close(self):
+            self.process.terminate(); self.process.wait(timeout=5); pump(.3)
+    SHIFT_KEY, INSERT_KEY = 42, 110
+    def paste_call(connection=bus):
+        return connection.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1', 'Paste',
+            None, GLib.VariantType('(t)'), Gio.DBusCallFlags.NO_AUTO_START, 2000, None).unpack()[0]
+    def refusal(connection=bus):
+        try: paste_call(connection); return None
+        except GLib.Error as error: return str(error)
+    class MutterKeys:
+        """Mutter's RemoteDesktop API, which GNOME Remote Desktop and the portal use:
+        the baseline Paste must keep up with."""
+        def __init__(self):
+            self.path = bus.call_sync('org.gnome.Mutter.RemoteDesktop', '/org/gnome/Mutter/RemoteDesktop',
+                'org.gnome.Mutter.RemoteDesktop', 'CreateSession', None, GLib.VariantType('(o)'),
+                Gio.DBusCallFlags.NONE, 3000, None).unpack()[0]
+            self.session('Start')
+            # Mutter adds the session's keyboard at its first key, as RemoteInput notes.
+            self.key(SHIFT_KEY, True); self.key(SHIFT_KEY, False); pump(.3)
+        def session(self, method, params=None):
+            bus.call_sync('org.gnome.Mutter.RemoteDesktop', self.path, 'org.gnome.Mutter.RemoteDesktop.Session',
+                method, params, None, Gio.DBusCallFlags.NONE, 1500, None)
+        def key(self, code, pressed): self.session('NotifyKeyboardKeycode', GLib.Variant('(ub)', (code, pressed)))
+    mutter_keys = MutterKeys()
+    def via_mutter():
+        # VOCO's uinput gesture, through Mutter's API: each event on its own, 12 ms apart.
+        started = time.monotonic()
+        mutter_keys.key(SHIFT_KEY, True); time.sleep(.012)
+        mutter_keys.key(INSERT_KEY, True); time.sleep(.012)
+        mutter_keys.key(INSERT_KEY, False); time.sleep(.012)
+        mutter_keys.key(SHIFT_KEY, False)
+        return started
+    def via_companion():
+        started = time.monotonic(); paste_call(); return started
+    def measure(field, via, text):
+        field.command('clear', 'cleared'); field.command('copy ' + text, 'copied')
+        started = via()
+        landed = wait_for(lambda: field.text() == text, 3)
+        inserts = field.seen('insert', started)
+        return {'landed': landed, 'inserts': len(inserts), 'shift': bool(inserts) and inserts[0]['shift'],
+                'ms': round((inserts[0]['t'] - started) * 1000, 2) if inserts else None}
+    def quantile(values, q):
+        values = sorted(values); return values[min(len(values) - 1, round(q * (len(values) - 1)))]
+    field = PasteField({**os.environ, 'GDK_BACKEND': 'wayland'})
+    paste_runs = {'mutter': [], 'companion': []}
+    for round_number in range(200):
+        for name in (('mutter', 'companion') if round_number % 2 else ('companion', 'mutter')):
+            paste_runs[name].append(measure(field, via_mutter if name == 'mutter' else via_companion, f'paste{round_number}{name}'))
+    wrong = {name: [r for r in runs if not (r['landed'] and r['inserts'] == 1 and r['shift'])] for name, runs in paste_runs.items()}
+    assert not any(wrong.values()), {name: runs[:3] for name, runs in wrong.items()}
+    paste_ms = {name: [r['ms'] for r in runs] for name, runs in paste_runs.items()}
+    paste_median = {name: round(statistics.median(values), 2) for name, values in paste_ms.items()}
+    paste_p99 = {name: quantile(values, .99) for name, values in paste_ms.items()}
+    report['paste'] = {'wayland': {'rounds': 200, 'requestToInsertMedianMs': paste_median, 'requestToInsertP99Ms': paste_p99}}
+    assert paste_median['companion'] <= paste_median['mutter'] + 1 and paste_p99['companion'] <= paste_p99['mutter'] + 2, report['paste']
+    # Refusals type nothing: another connection, a held modifier, a paste in flight.
+    def silent_since(started): pump(.3); return not field.seen('insert', started)
+    stranger = Gio.DBusConnection.new_for_address_sync(os.environ['DBUS_SESSION_BUS_ADDRESS'],
+        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
+    started = time.monotonic(); refused = refusal(stranger); stranger.close_sync(None)
+    assert refused and 'NotAttached' in refused and silent_since(started), refused
+    keys('keydown', 'Alt_L'); pump(.05)
+    started = time.monotonic(); refused = refusal()
+    assert refused and 'ModifiersHeld' in refused and silent_since(started), refused
+    keys('keyup', 'Alt_L'); pump(.05)
+    field.command('clear', 'cleared'); field.command('copy busyx', 'copied')
+    first = []; started = time.monotonic()
+    bus.call('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1', 'Paste', None, GLib.VariantType('(t)'),
+        Gio.DBusCallFlags.NO_AUTO_START, 2000, None, lambda connection, result: first.append(connection.call_finish(result)))
+    refused = refusal()
+    assert refused and 'Busy' in refused, refused
+    assert wait_for(lambda: first and field.text() == 'busyx', 2) and len(field.seen('insert', started)) == 1, field.text()
+    # GNOME disables the companion at the lock screen; ScreenShield.activate()
+    # pushes this session mode.
+    before_attach = len(attached)
+    call('PushSessionMode', GLib.Variant('(s)', ('unlock-dialog',)))
+    assert wait_for(lambda: call('CompanionState').unpack()[0] != 1, 5), 'the lock screen must disable the companion'
+    started = time.monotonic(); refused = refusal()
+    assert refused and silent_since(started), refused
+    call('PopSessionMode', GLib.Variant('(s)', ('unlock-dialog',)))
+    assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again after the lock screen'
+    pump(.4)
+    assert measure(field, via_companion, 'unlockedx')['landed'], 'Paste must work again after the lock screen'
+    # Disabled between Shift and Insert: the call fails and no key stays held.
+    field.command('clear', 'cleared'); field.command('copy midwayx', 'copied')
+    outcome = []; before_attach = len(attached)
+    call('DisableCompanionAfter', GLib.Variant('(u)', (6,)))
+    def finished(connection, result):
+        try: outcome.append(connection.call_finish(result))
+        except GLib.Error as error: outcome.append(str(error))
+    bus.call('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1', 'Paste', None, GLib.VariantType('(t)'),
+        Gio.DBusCallFlags.NO_AUTO_START, 2000, None, finished)
+    assert wait_for(lambda: outcome, 2) and 'Disabled' in str(outcome[0]), outcome
+    pump(.2)
+    assert not call('Modifiers').unpack()[0] & 1, 'a cut paste must release Shift'
+    started = time.monotonic(); refused = refusal()
+    assert refused and silent_since(started), 'a disabled companion must send no key'
+    subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
+    assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again once enabled'
+    pump(.4)
+    assert measure(field, via_companion, 'enabledx')['landed'], 'Paste must work again once enabled'
+    field.close()
+    report['paste'].update(refusals=['another connection', 'held modifier', 'busy', 'unlock-dialog', 'disabled'], cutGestureReleasedShift=True)
+    # The same, under XWayland: X11 apps get the paste too.
+    displays = re.findall(r'Using public X11 display (:\d+)', (evidence / 'shell.log').read_text())
+    authorities = sorted(Path(os.environ['XDG_RUNTIME_DIR']).glob('.mutter-Xwaylandauth.*'), key=lambda path: path.stat().st_mtime)
+    assert displays and authorities, 'the Shell offers no XWayland'
+    field = PasteField({**os.environ, 'GDK_BACKEND': 'x11', 'DISPLAY': displays[-1], 'XAUTHORITY': str(authorities[-1])})
+    x11_runs = [measure(field, via_companion, f'xwayland{number}') for number in range(20)]
+    field.close()
+    assert all(r['landed'] and r['inserts'] == 1 and r['shift'] for r in x11_runs), x11_runs[:3]
+    report['paste']['xwayland'] = {'pastes': len(x11_runs), 'requestToInsertMedianMs': round(statistics.median(r['ms'] for r in x11_runs), 2)}
     # Super may open the overview; test it only after all focused-field checks.
     for modifier in ('Alt_L', 'Alt_R', 'Control_L', 'Control_R', 'Shift_L', 'Shift_R', 'Super_L', 'Super_R'):
         keys('keydown', modifier);pump(.03)
