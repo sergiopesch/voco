@@ -27,6 +27,11 @@ const TEXT_MIME: &str = "text/plain;charset=utf-8";
 // pressed; a lost release expires after MODIFIER_RELEASE_TIMEOUT.
 static X11_SHORTCUT_PRESSED: Mutex<Option<Instant>> = Mutex::new(None);
 
+// The X server connection that says which modifiers are held, with its root
+// window: opened by the first X11 paste, dropped after an error.
+#[cfg(target_os = "linux")]
+static X11_SERVER: Mutex<Option<(x11rb::rust_connection::RustConnection, u32)>> = Mutex::new(None);
+
 #[derive(Debug, serde::Serialize)]
 pub struct InsertionResult {
     #[serde(rename = "pasteMetrics")]
@@ -334,12 +339,13 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     }
     let mut modifier_wait_ms = 0;
     // Wayland keys are raw events: a still-held shortcut modifier would turn
-    // Shift+Insert into another chord. xdotool clears modifiers itself, but
-    // X11 delivers its keys to VOCO's grab until the shortcut is released.
+    // Shift+Insert into another chord. X11 delivers its keys to VOCO's grab
+    // until the shortcut is released, and xdotool's Shift would turn a shortcut
+    // someone is pressing into another chord (x11_keys_held).
     let held: fn() -> Option<bool> = if wayland {
         shortcut_modifiers_held
     } else {
-        x11_shortcut_held
+        x11_keys_held
     };
     let before_paste = || {
         modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
@@ -457,6 +463,61 @@ fn x11_shortcut_held() -> Option<bool> {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     Some(pressed.is_some_and(|at| at.elapsed() < MODIFIER_RELEASE_TIMEOUT))
+}
+
+/// An X11 paste also waits while a modifier is held: someone pressing Alt+D
+/// as xdotool holds Shift for Shift+Insert presses Alt+Shift+D, which neither
+/// IBus nor VOCO's grab takes for the shortcut, so the press is lost (#193).
+fn x11_keys_held() -> Option<bool> {
+    any_held(x11_shortcut_held(), x11_modifiers_held())
+}
+
+/// Held when either says so; unknown only when both are.
+fn any_held(first: Option<bool>, second: Option<bool>) -> Option<bool> {
+    match (first, second) {
+        (Some(true), _) | (_, Some(true)) => Some(true),
+        (None, None) => None,
+        _ => Some(false),
+    }
+}
+
+/// Shift, Control, Alt (Mod1), Super (Mod4) and AltGr (Mod5): the modifiers
+/// evdev's wait covers. Caps Lock and Num Lock are states, not held keys.
+#[cfg(target_os = "linux")]
+fn x11_mask_holds_modifier(mask: x11rb::protocol::xproto::KeyButMask) -> bool {
+    use x11rb::protocol::xproto::KeyButMask as Mask;
+    let chord = Mask::SHIFT | Mask::CONTROL | Mask::MOD1 | Mask::MOD4 | Mask::MOD5;
+    u16::from(mask & chord) != 0
+}
+
+/// The modifiers the X server holds, from its pointer state. Unknown without
+/// a server to ask, which never blocks delivery.
+#[cfg(target_os = "linux")]
+fn x11_modifiers_held() -> Option<bool> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::ConnectionExt;
+    let mut server = X11_SERVER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if server.is_none() {
+        let (connection, screen) = x11rb::connect(None).ok()?;
+        let root = connection.setup().roots.get(screen)?.root;
+        *server = Some((connection, root));
+    }
+    let (connection, root) = server.as_ref()?;
+    let reply = connection
+        .query_pointer(*root)
+        .ok()
+        .and_then(|cookie| cookie.reply().ok());
+    if reply.is_none() {
+        *server = None;
+    }
+    reply.map(|reply| x11_mask_holds_modifier(reply.mask))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn x11_modifiers_held() -> Option<bool> {
+    None
 }
 
 fn wait_for_modifier_release(
@@ -983,6 +1044,36 @@ mod tests {
         *X11_SHORTCUT_PRESSED.lock().unwrap() =
             Instant::now().checked_sub(MODIFIER_RELEASE_TIMEOUT);
         assert_eq!(x11_shortcut_held(), Some(false));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn x11_paste_waits_for_held_modifiers_but_not_lock_states() {
+        use x11rb::protocol::xproto::KeyButMask as Mask;
+        for held in [
+            Mask::SHIFT,
+            Mask::CONTROL,
+            Mask::MOD1,
+            Mask::MOD4,
+            Mask::MOD5,
+        ] {
+            assert!(x11_mask_holds_modifier(held), "{held:?}");
+        }
+        for free in [Mask::LOCK, Mask::MOD2, Mask::MOD3, Mask::BUTTON1] {
+            assert!(!x11_mask_holds_modifier(free), "{free:?}");
+        }
+        assert!(x11_mask_holds_modifier(
+            Mask::LOCK | Mask::MOD2 | Mask::MOD1
+        ));
+    }
+
+    #[test]
+    fn a_held_chord_or_modifier_holds_an_x11_paste_and_unknown_never_does() {
+        assert_eq!(any_held(Some(false), Some(true)), Some(true));
+        assert_eq!(any_held(Some(true), None), Some(true));
+        assert_eq!(any_held(Some(false), None), Some(false));
+        assert_eq!(any_held(Some(false), Some(false)), Some(false));
+        assert_eq!(any_held(None, None), None);
     }
 
     #[test]

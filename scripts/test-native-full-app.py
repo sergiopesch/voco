@@ -21,6 +21,10 @@ while a dictation runs, as one did on CI. VOCO must load its window again: a new
 process starts, a second renderer reports ready, the tray returns to Ready, one
 notification says the dictation was interrupted, and a dictation afterwards delivers
 as in delivery.
+modifier-hold: Alt is held from the start of speech until VOCO has requested a paste, then
+0.3 s more, as when someone starts the shortcut. That paste must wait for the release:
+Shift+Insert sent under a held Alt would turn the shortcut into Alt+Shift+D (#193).
+Otherwise it delivers as in delivery.
 Every dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -51,7 +55,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'launcher', 'autostart'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
@@ -129,6 +133,27 @@ def web_processes():
 def play(description):
     player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
     wait_for(lambda: player.poll() is not None, description)
+    assert player.returncode == 0, 'paplay failed during ' + description
+
+def play_holding_alt(description):
+    """Play the fixture with Alt held until 0.3 s after VOCO requests a paste."""
+    requested = counts()['dictation_desktop_paste_requested']
+    hold = dict(paste_at=None, released=False)
+    subprocess.run(['xdotool', 'keydown', 'Alt_L'], check=True)
+    try:
+        player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
+        def released_and_played():
+            now = time.monotonic()
+            if hold['paste_at'] is None and counts()['dictation_desktop_paste_requested'] > requested:
+                hold['paste_at'] = now
+            if not hold['released'] and hold['paste_at'] is not None and now - hold['paste_at'] >= .3:
+                subprocess.run(['xdotool', 'keyup', 'Alt_L'], check=True)
+                hold['released'] = True
+            return hold['released'] and player.poll() is not None
+        wait_for(released_and_played, description)
+    finally:
+        if not hold['released']:
+            subprocess.run(['xdotool', 'keyup', 'Alt_L'], check=False)
     assert player.returncode == 0, 'paplay failed during ' + description
 
 paste_activity = dict(counts=None, t=t0)
@@ -440,7 +465,10 @@ try:
     observable_fields = ('Source Output #', 'Driver:', 'Source:', 'Sample Specification:', 'Corked:', 'Mute:', 'application.name =', 'application.process.binary =')
     (root / 'evidence/pulse-source-outputs.txt').write_text('\n'.join(line for line in pulse_outputs.splitlines() if line.strip().startswith(observable_fields)) + '\n')
     pump(.5)
-    play('fixture playback')
+    if case == 'modifier-hold':
+        play_holding_alt('fixture playback with Alt held')
+    else:
+        play('fixture playback')
     if case == 'focus-switch':
         # Streaming pastes A's text before Stop. Switch only after it settles, with no
         # paste requested, in flight or landing, so each chunk has one recipient; the
@@ -475,7 +503,7 @@ try:
     # xdotool sends one Shift+Insert per dispatched chunk, every space inside one,
     # and one more for the space Stop leaves after a finished sentence.
     assert len(changes) <= c['dictation_desktop_paste_dispatched'] + c['dictation_desktop_stop_space_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
-    if case in ('delivery', 'lock', 'web-process'):
+    if case in ('delivery', 'lock', 'web-process', 'modifier-hold'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
     elif case == 'spelling':
@@ -489,6 +517,10 @@ try:
         assert other_text, 'Nothing was pasted into B after focus moved to it'
         # Concatenate unseparated: a chunk boundary may fall inside a word.
         assert words(text + other_text) == expected, 'Fields A+B did not receive both utterances exactly once: %r + %r' % (text, other_text)
+    if case == 'modifier-hold':
+        waits = [x.get('duration_ms') for x in traces() if x.get('event') == 'dictation_desktop_modifier_wait_completed']
+        assert any(isinstance(ms, (int, float)) and ms >= 250 for ms in waits), \
+            'No paste waited for the held Alt; modifier waits (ms): %r' % waits
     last = changes[-1]
     history = [''] + [m['text'] for m in changes if m['field'] == last['field']]
     selections = dict(lastPaste=last['text'][len(history[-2]):], clipboard=Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text(),
