@@ -175,7 +175,10 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
 5. It waits up to 1.5 seconds for the shortcut's modifier keys to be released.
    On Wayland it reads evdev, or asks the GNOME companion through
    `ModifiersClear`; unknown state doesn't block. On X11 VOCO's grab receives
-   every key while the chord is held, so the paste waits for the release.
+   every key while the chord is held, so the paste waits for the release. It
+   also waits while the X server reports Shift, Control, Alt, Super or AltGr
+   held: the Shift of Shift+Insert would turn a shortcut someone is pressing,
+   such as Alt+D, into Alt+Shift+D, which nothing takes for the shortcut.
 6. It sends Shift+Insert, through the virtual keyboard on Wayland and with
    `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.

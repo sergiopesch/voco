@@ -100,7 +100,7 @@ engine, native desktop and delivery suites. `VOCO_NATIVE_DEPS` and
 The full-application, Wayland and browser suites run the release build with the
 [provisioned runtime](../linux-packaging.md#runtime-provisioning), checked
 against `MODEL-IDENTITY.json` and `NATIVE-BUILD.json`. `--full-application` has
-six cases:
+eight cases:
 - **`delivery`:** one field keeps focus and gets the words exactly once.
 - **`focus-switch`:** focus moves mid-recording, and each field keeps only what
   was pasted while it had focus.
@@ -109,6 +109,12 @@ six cases:
   serves the session, locked when VOCO starts. The shortcut starts nothing until
   it unlocks. A lock then stops a running dictation, the clip reaches no field,
   and after unlocking a dictation delivers as in `delivery`.
+- **`web-process`:** WebKit's web process dies while a dictation runs. VOCO must
+  load its window again, say once that the dictation was interrupted, and then
+  deliver as in `delivery`.
+- **`modifier-hold`:** Alt is held from the start of speech until VOCO has
+  requested a paste, and 0.3 s more. That paste must wait for the release, then
+  deliver as in `delivery`.
 - **`launcher`:** VOCO starts as GIO launches its desktop entry, which names
   `VOCO.desktop` and the process it started. VOCO must open the Ready popover by
   itself once it's ready, with no second launch.
@@ -116,7 +122,7 @@ six cases:
   must stay in the tray.
 
 Any IBus preedit or commit, refused paste, copied remainder or fallback capture
-fails the four dictation cases; the two launch cases don't dictate.
+fails the six dictation cases; the two launch cases don't dictate.
 `--browser-application` runs a short recording and, with
 `VOCO_BROWSER_LONG_CAPTURE=1`, a long one.
 
