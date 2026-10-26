@@ -241,7 +241,7 @@ if sorted(path.name for path in Path(".github/workflows").iterdir()) != ["ci.yml
 if "\npermissions:\n  contents: read\n" not in workflow or "checks: write" in workflow:
     raise SystemExit(f"{workflow_path} must stay read-only")
 unpinned = [action for action in re.findall(r"uses: (\S+)", workflow)
-            if not re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", action)]
+            if not re.fullmatch(r"[\w.-]+/[\w.-]+(?:/[\w.-]+)*@[0-9a-f]{40}", action)]
 if unpinned:
     raise SystemExit(f"{workflow_path} actions must be pinned to full commit SHAs: {unpinned}")
 if workflow.count("actions/checkout@") != workflow.count("persist-credentials: false"):
