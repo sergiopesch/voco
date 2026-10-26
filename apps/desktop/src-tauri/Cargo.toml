@@ -54,6 +54,8 @@ glib = "0.18"
 evdev = "0.13"
 inotify = "0.11"
 libc = "0.2"
+# The X server's held modifiers before an X11 paste; global-hotkey already builds it.
+x11rb = "0.13"
 
 [patch.crates-io]
 global-hotkey = { path = "../../../vendor/global-hotkey" }

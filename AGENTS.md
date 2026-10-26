@@ -214,7 +214,10 @@ change.
   modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
-  after the press.
+  after the press. An X11 paste also waits, at most 1.5 s, while the X server's
+  pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
+  shortcut being pressed makes it another chord, which neither IBus nor the grab
+  takes, and the press is lost.
 - Wayland keys go through VOCO's own uinput device, "VOCO virtual keyboard"
   (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per process,
   created at startup and reused for the process lifetime, never one per paste:

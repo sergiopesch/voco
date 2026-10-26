@@ -6,6 +6,16 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [Unreleased]
+
+### Fixed
+
+- On X11, pressing the shortcut just as VOCO pasted could do nothing: the Shift
+  of VOCO's Shift+Insert turned Alt+D into Alt+Shift+D, which isn't the
+  shortcut. A paste now waits while Shift, Control, Alt, Super or AltGr is held,
+  as it already did on Wayland, and no longer releases and presses a held Alt
+  around the paste.
+
 ## [2026.0.63] - 2026-10-25
 
 VOCO can check how it hears each word on your My words list and learn the
