@@ -65,11 +65,30 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # Ubuntu's Azure mirror can crawl: one run spent 25 minutes on 254 MB of
+      # packages. Packages master fetched this ISO week come from the cache, so the
+      # mirror serves only those updated since, and apt checks each cached package
+      # against the signed indexes before it installs it. The cache restores into
+      # apt's own archive folder, whose partial folder stays _apt's for its sandbox.
+      - name: Prepare the system package cache
+        id: apt-week
+        run: |
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+          sudo chown "$USER" /var/cache/apt/archives
+
+      - name: Restore downloaded system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
+          restore-keys: apt-${{ github.job }}-
+
       - name: Install system dependencies
         timeout-minutes: 25
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=true \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev libpulse-dev \
@@ -79,6 +98,17 @@ jobs:
             weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
             gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland \
             ffmpeg locales
+          # Superseded versions would otherwise grow the cache every week.
+          sudo apt-get autoclean
+
+      # Only master saves, as with the Rust cache, so pull requests don't fill the
+      # repository's cache.
+      - name: Save downloaded system packages
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
 
       - name: Install Node dependencies
         run: npm ci
@@ -257,15 +287,39 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # System packages come from master's weekly cache, as in Frontend Checks.
+      - name: Prepare the system package cache
+        id: apt-week
+        run: |
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+          sudo chown "$USER" /var/cache/apt/archives
+
+      - name: Restore downloaded system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
+          restore-keys: apt-${{ github.job }}-
+
       - name: Install system dependencies
         timeout-minutes: 10
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=true \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev libpulse-dev python3-numpy libsentencepiece0 \
             pulseaudio pulseaudio-utils bubblewrap binutils
+          sudo apt-get autoclean
+
+      # Only master saves, as in Frontend Checks.
+      - name: Save downloaded system packages
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
         with:
@@ -358,11 +412,26 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # System packages come from master's weekly cache, as in Frontend Checks.
+      - name: Prepare the system package cache
+        id: apt-week
+        run: |
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+          sudo chown "$USER" /var/cache/apt/archives
+
+      - name: Restore downloaded system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
+          restore-keys: apt-${{ github.job }}-
+
       - name: Install system dependencies
         timeout-minutes: 10
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=true \
             pkg-config libglib2.0-dev libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev libpulse-dev \
@@ -372,6 +441,15 @@ jobs:
             gnome-shell gnome-shell-extension-appindicator xwayland \
             gnome-text-editor gnome-terminal nano acl \
             libsentencepiece0 pulseaudio pulseaudio-utils
+          sudo apt-get autoclean
+
+      # Only master saves, as in Frontend Checks.
+      - name: Save downloaded system packages
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
         with:
@@ -508,13 +586,37 @@ jobs:
         with:
           persist-credentials: false
 
+      # System packages come from master's weekly cache, as in Frontend Checks.
+      - name: Prepare the system package cache
+        id: apt-week
+        run: |
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+          sudo chown "$USER" /var/cache/apt/archives
+
+      - name: Restore downloaded system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
+          restore-keys: apt-${{ github.job }}-
+
       - name: Install system dependencies
         timeout-minutes: 10
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y -o APT::Keep-Downloaded-Packages=true \
             bubblewrap dbus-bin dbus-daemon libglib2.0-bin python3 python3-gi gir1.2-gtk-3.0 \
             gnome-shell gnome-shell-ubuntu-extensions
+          sudo apt-get autoclean
+
+      # Only master saves, as in Frontend Checks.
+      - name: Save downloaded system packages
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
 
       # GNOME 50 has no nested mode; the harness runs Shell headless and sends
       # keys and clicks through a private RemoteDesktop session.
