@@ -104,7 +104,7 @@ jobs:
       # Only master saves, as with the Rust cache, so pull requests don't fill the
       # repository's cache.
       - name: Save downloaded system packages
-        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/pull/200/merge') && steps.apt-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /var/cache/apt/archives/*.deb
@@ -315,7 +315,7 @@ jobs:
 
       # Only master saves, as in Frontend Checks.
       - name: Save downloaded system packages
-        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/pull/200/merge') && steps.apt-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /var/cache/apt/archives/*.deb
@@ -445,7 +445,7 @@ jobs:
 
       # Only master saves, as in Frontend Checks.
       - name: Save downloaded system packages
-        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/pull/200/merge') && steps.apt-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /var/cache/apt/archives/*.deb
@@ -612,7 +612,7 @@ jobs:
 
       # Only master saves, as in Frontend Checks.
       - name: Save downloaded system packages
-        if: (github.ref == 'refs/heads/master' || github.ref == 'refs/pull/200/merge') && steps.apt-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /var/cache/apt/archives/*.deb
