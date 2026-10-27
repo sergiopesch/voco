@@ -61,13 +61,16 @@ parts:
       - libpython3.12-stdlib
       - python3-numpy
       - libsentencepiece0
+    # Snapcraft reuses an LXD instance's build folder, so a rebuild replaces
+    # the staging copy rather than expect it absent; both parts do this.
     override-build: |
       craftctl default
       cd "$CRAFT_PART_INSTALL"
-      mkdir ../python
-      for entry in *; do mv "$entry" ../python/; done
+      python="$CRAFT_PART_BUILD/python"
+      rm -rf "$python" && mkdir "$python"
+      for entry in *; do mv "$entry" "$python/"; done
       mkdir -p usr/lib/voco/snap
-      mv ../python usr/lib/voco/snap/python
+      mv "$python" usr/lib/voco/snap/python
       install -m 0755 "$CRAFT_PROJECT_DIR/wrappers/python3" usr/lib/voco/snap/python3
 
   helpers:
@@ -76,10 +79,11 @@ parts:
     override-build: |
       craftctl default
       cd "$CRAFT_PART_INSTALL"
-      mkdir ../helpers
-      for entry in *; do mv "$entry" ../helpers/; done
+      helpers="$CRAFT_PART_BUILD/helpers"
+      rm -rf "$helpers" && mkdir "$helpers"
+      for entry in *; do mv "$entry" "$helpers/"; done
       mkdir -p usr/lib/voco/snap usr/bin
-      mv ../helpers usr/lib/voco/snap/helpers
+      mv "$helpers" usr/lib/voco/snap/helpers
       install -m 0755 "$CRAFT_PROJECT_DIR/wrappers/run-helper" usr/lib/voco/snap/run-helper
       for helper in xclip xdotool notify-send; do
         ln -s ../lib/voco/snap/run-helper "usr/bin/$helper"
