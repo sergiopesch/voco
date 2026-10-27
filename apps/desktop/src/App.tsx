@@ -26,6 +26,7 @@ import {
   releaseBrowserRecording,
   traceHotkeyEvent,
   takeLauncherActivation,
+  storeUpdates,
 } from "@/lib/tauri";
 import {
   checkForUpdates,
@@ -211,6 +212,11 @@ export function App() {
   const [activationRequest, setActivationRequest] = useState(0);
   const onboardingHandoffRef = useRef(false);
   const [initComplete, setInitComplete] = useState(false);
+  // Null until known; the snap's store updates VOCO, so it never checks.
+  const [updatesByStore, setUpdatesByStore] = useState<boolean | null>(null);
+  useEffect(() => {
+    void storeUpdates().then(setUpdatesByStore, () => setUpdatesByStore(false));
+  }, []);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [runtimeDiagnosticsFailed, setRuntimeDiagnosticsFailed] = useState(false);
   const [runtimeStatusEpoch, setRuntimeStatusEpoch] = useState<number | null>(null);
@@ -890,7 +896,7 @@ export function App() {
   // The automatic check at startup is this effect's first run, once init
   // completes; later runs follow a change of channel.
   useEffect(() => {
-    if (!initComplete || !config?.updateChannel || !config.automaticUpdateChecks) {
+    if (!initComplete || updatesByStore !== false || !config?.updateChannel || !config.automaticUpdateChecks) {
       return;
     }
     if (updateCheckCoordinator.lastCheckedChannel === config.updateChannel) {
@@ -898,7 +904,7 @@ export function App() {
     }
 
     void runUpdateCheck(config.updateChannel);
-  }, [config?.automaticUpdateChecks, config?.updateChannel, initComplete, runUpdateCheck, updateCheckCoordinator]);
+  }, [config?.automaticUpdateChecks, config?.updateChannel, initComplete, runUpdateCheck, updateCheckCoordinator, updatesByStore]);
 
   useEffect(() => {
     if (runtimeStatusEpoch === null || status !== "recording") return;
@@ -1251,6 +1257,7 @@ export function App() {
         onConfigChange={applyConfigPatch}
         onRefreshDevices={refreshDevices}
         onRequestMicrophoneAccess={requestMicrophoneAccess}
+        updatesByStore={updatesByStore === true}
         onCheckForUpdates={() => runUpdateCheck(config.updateChannel, undefined, true)}
         onOpenReleasePage={(url) => openExternalUrl(url)}
         onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}

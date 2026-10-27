@@ -393,7 +393,21 @@ with a 15-second timeout. Both of those automatic checks happen only while
 `automaticUpdateChecks` is on: with **Only when I choose**, neither runs, and
 turning automatic checks back on checks at once. **Check for updates** in
 Settings always asks. VOCO
-only tells you a release exists; it never downloads or installs anything.
+only tells you a release exists; it never downloads or installs anything. In
+the snap the Snap Store updates VOCO, so `store_updates` tells the renderer to
+check nothing, and Settings shows only the installed version.
+
+## The snap
+
+`confinement.rs` knows VOCO runs as its snap when snapd names it `voco`
+(`SNAP_NAME`). Strict confinement gives it no `/dev/uinput`, `/dev/input`,
+IBus engine, systemd user manager or network, so the snap skips what needs
+them: the virtual keyboard, passive evdev, the IBus listener, the retired
+`voco-ydotoold.service` and the update check. On Wayland only the companion
+types for it: the paste check passes once the companion asks for work, and a
+paste without it typed nothing. Until then, setup says what's missing: on GNOME,
+the VOCO panel from extensions.gnome.org; on other Wayland desktops, the `.deb`
+or RPM instead. X11 sessions keep `xdotool` and `xclip`.
 
 ## Logs
 

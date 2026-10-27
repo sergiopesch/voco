@@ -18,6 +18,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `desktop_session.rs` — Retains the originating graphical login and checks its active seat before Wayland paste, and follows its screen lock through logind's `LockedHint`; bounded logind discovery supports user-manager app launches.
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the My words rules, the copy from the legacy `voice` directory and the update cache.
+- `confinement.rs` — Whether VOCO runs as its strict snap, which skips what confinement forbids and leaves updates to the Snap Store.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
 - `tray.rs` — Tray icon, menu, status line and meter animation.
 - `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.

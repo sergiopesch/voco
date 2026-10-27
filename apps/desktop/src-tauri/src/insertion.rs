@@ -318,7 +318,11 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ));
     }
     let wayland = matches!(preflight.session, SessionKind::Wayland);
-    let keys = paste_keys(wayland, companion_asks_for_work);
+    let keys = paste_keys(
+        wayland,
+        crate::confinement::is_snap(),
+        companion_asks_for_work,
+    );
     // Create the keyboard before replacing clipboard contents, so a missing
     // device can never leave the clipboard changed with nothing typed.
     if keys == PasteKeys::Uinput {
@@ -655,11 +659,17 @@ impl PasteKeys {
 }
 
 /// On GNOME Wayland, the attached companion types once its loaded copy asks
-/// VOCO for work; otherwise VOCO's uinput device does. X11 keeps xdotool.
-fn paste_keys(wayland: bool, companion_asks_for_work: impl FnOnce() -> bool) -> PasteKeys {
+/// VOCO for work; otherwise VOCO's uinput device does, except in the snap,
+/// which has no other keyboard, so a missing companion refuses there. X11 keeps
+/// xdotool.
+fn paste_keys(
+    wayland: bool,
+    confined: bool,
+    companion_asks_for_work: impl FnOnce() -> bool,
+) -> PasteKeys {
     if !wayland {
         PasteKeys::Xdotool
-    } else if companion_asks_for_work() {
+    } else if confined || companion_asks_for_work() {
         PasteKeys::Companion
     } else {
         PasteKeys::Uinput
@@ -869,12 +879,39 @@ fn input_preflight_with(
 }
 
 fn input_preflight() -> InputPreflight {
+    // The snap can't open /dev/uinput; on Wayland only the companion types for it.
+    let keyboard: fn() -> Result<(), String> = if crate::confinement::is_snap() {
+        companion_keys_ready
+    } else {
+        virtual_keyboard_access
+    };
     input_preflight_with(
         session_kind(),
         desktop_clipboard_helper(),
         command_available,
-        virtual_keyboard_access,
+        keyboard,
     )
+}
+
+/// What the snap needs on GNOME Wayland before it can type.
+const SNAP_NEEDS_PANEL: &str = "On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.";
+/// On other Wayland desktops the snap can't type at all.
+const SNAP_DESKTOP_UNSUPPORTED: &str = "The VOCO snap types only on GNOME and in X11 sessions. On this desktop, install VOCO's .deb or RPM from its GitHub releases instead.";
+
+/// The snap's Wayland keys: the companion's, once it asks for work.
+fn companion_keys_ready() -> Result<(), String> {
+    if companion_asks_for_work() {
+        return Ok(());
+    }
+    Err(snap_keys_missing(crate::is_gnome_desktop(&crate::current_desktop())).into())
+}
+
+fn snap_keys_missing(gnome: bool) -> &'static str {
+    if gnome {
+        SNAP_NEEDS_PANEL
+    } else {
+        SNAP_DESKTOP_UNSUPPORTED
+    }
 }
 
 /// A failed spawn proves the helper did not run. Any later error is uncertain:
@@ -1067,13 +1104,23 @@ mod tests {
     use std::cell::Cell;
 
     #[test]
+    fn the_snap_names_what_it_needs_to_type_on_wayland() {
+        assert_eq!(snap_keys_missing(true), SNAP_NEEDS_PANEL);
+        assert_eq!(snap_keys_missing(false), SNAP_DESKTOP_UNSUPPORTED);
+    }
+
+    #[test]
     fn wayland_pastes_through_the_companion_only_when_it_asks_for_work() {
-        assert_eq!(paste_keys(true, || true), PasteKeys::Companion);
-        assert_eq!(paste_keys(true, || false), PasteKeys::Uinput);
-        assert_eq!(
-            paste_keys(false, || panic!("an X11 paste asked the companion")),
-            PasteKeys::Xdotool
-        );
+        assert_eq!(paste_keys(true, false, || true), PasteKeys::Companion);
+        assert_eq!(paste_keys(true, false, || false), PasteKeys::Uinput);
+        // The snap has no other keyboard: an absent companion refuses.
+        assert_eq!(paste_keys(true, true, || false), PasteKeys::Companion);
+        for confined in [false, true] {
+            assert_eq!(
+                paste_keys(false, confined, || panic!("X11 asked the companion")),
+                PasteKeys::Xdotool
+            );
+        }
         let labels =
             [PasteKeys::Companion, PasteKeys::Uinput, PasteKeys::Xdotool].map(PasteKeys::label);
         assert_eq!(
