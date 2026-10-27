@@ -146,8 +146,13 @@ A replica of VOCO's paste commands runs unless `VOCO_FIXTURE_PASTE_BINARY` names
 the `voco` library test executable, which pastes through the production code.
 On `gnome-wayland` that code types through VOCO's real virtual keyboard, which
 the [uinput bridge](#the-uinput-bridge) replays, so it needs
-`VOCO_UINPUT_BRIDGE=1`. CI runs `gnome-wayland` only this way, with a release
-build of the test executable. `VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json`,
+`VOCO_UINPUT_BRIDGE=1`. With `VOCO_DELIVERY_KEYS=companion`, the session loads
+the repository's GNOME companion instead. Each paste serves VOCO's panel bridge
+until the companion attaches, then the companion types. The null device stands
+in for `/dev/uinput`, which the paste check opens, so a paste that reached for
+VOCO's own keyboard couldn't create it, and no bridge runs. CI runs
+`gnome-wayland` only with production paste, through both keyboards, with a
+release build of the test executable. `VOCO_DELIVERY_EVIDENCE_DIR` receives `results.json`,
 the bridge's `uinput-bridge.jsonl` and failure screenshots.
 
 ### The uinput bridge
@@ -271,7 +276,7 @@ requests into it, on Ubuntu 24.04 unless the table says otherwise. Evidence arti
 | RustSec Audit | `cargo audit` with cargo-audit 0.22.2 | None |
 | Frontend Checks | `verify:devops`, `verify:security`, `check`, `lint` and `npm test`; the installer suites again in a German locale, where Bash writes times with a decimal comma; the spelling table against the pinned VarCon file; the renderer suites, the panel model and the exact-field suite; the GNOME companion; both delivery suites on `x11`; the IBus engine, native desktop and native Wayland suites; the frontend build, and desktop entry and AppStream validation | `native-desktop-evidence` |
 | Rust Check & Test | `cargo fmt`, Clippy, the glib checks, `cargo test`, the C callbacks and native capture latency; then it provisions the runtime and runs the speech baseline and the worker protocol | `speech-regression-evidence` |
-| Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, both delivery suites on `gnome-wayland` through the release build's production paste and the uinput bridge, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
+| Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, both delivery suites on `gnome-wayland` through the release build's production paste and the uinput bridge, the applications suite through the GNOME companion, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
 | GNOME 50 Companion | On `ubuntu-26.04`, the companion regression headless on GNOME Shell 50 | `gnome50-panel-evidence` |
 | GNOME 51 Companion | The same regression on GNOME Shell 51, built from a digest-pinned Fedora 45 image and run in rootless Podman | `gnome51-panel-evidence` |
 | Debian 13 Runtime, Fedora 44 Runtime | In digest-pinned containers, VOCO's package dependencies by that distribution's names, then the speech runtime, IBus and worker protocol tests and the speech baseline on its Python | None |

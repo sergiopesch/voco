@@ -426,8 +426,8 @@ impl Logind {
     }
 }
 
-/// The D-Bus error name logind answered with, or None when it didn't answer.
-fn remote_error(error: &glib::Error) -> Option<glib::GString> {
+/// The D-Bus error name a service answered with, or None when it didn't answer.
+pub(crate) fn remote_error(error: &glib::Error) -> Option<glib::GString> {
     // GIO 0.18 exposes this through its C binding. The returned string is newly
     // allocated; GString takes and frees ownership.
     unsafe {

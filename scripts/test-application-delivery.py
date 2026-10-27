@@ -27,8 +27,12 @@ if wayland:
 else:
     assert os.environ['DISPLAY'] == ':0'
 assert not any(Path(path).exists() for path in ('/dev/input', '/dev/snd'))
-# Only production paste on Wayland types, through VOCO's real virtual keyboard.
+# Only production paste on Wayland types, through VOCO's real virtual keyboard
+# or, with VOCO_FIXTURE_PANEL, the session's GNOME companion, where the null
+# device stands in for /dev/uinput.
+companion = bool(os.environ.get('VOCO_FIXTURE_PANEL'))
 assert Path('/dev/uinput').is_char_device() == (wayland and bool(os.environ.get('VOCO_FIXTURE_PASTE_BINARY')))
+assert not companion or os.path.samefile('/dev/uinput', '/dev/null')
 fixtures = Path(__file__).with_name('fixtures')
 results = []; processes = []; windows = []
 SCREENSHOT = """import sys
@@ -288,7 +292,9 @@ try:
     trial('VS Code editor', vscode, 'VOCO_VSCODE_BINARY')
 finally:
     paste_mode = 'production' if os.environ.get('VOCO_FIXTURE_PASTE_BINARY') else 'replica'
-    (out/'results.json').write_text(json.dumps({'platform': platform, 'paste': paste_mode, 'results': results}, indent=2) + '\n')
+    (out/'results.json').write_text(json.dumps({'platform': platform, 'paste': paste_mode,
+        'keys': 'companion' if companion else 'uinput' if wayland and paste_mode == 'production' else 'xdotool',
+        'results': results}, indent=2) + '\n')
     for process in processes:
         if process.poll() is None: process.terminate()
 statuses = [item['status'] for item in results]

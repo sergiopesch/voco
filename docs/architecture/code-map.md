@@ -21,7 +21,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
 - `tray.rs` — Tray icon, menu, status line and meter animation.
 - `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.
-- `panel.rs` — GNOME companion bridge on D-Bus (`org.voco.Panel1`), its shortcut leases and the `ModifiersClear` call.
+- `panel.rs` — GNOME companion bridge on D-Bus (`org.voco.Panel1`), its shortcut leases, and the `ModifiersClear` and `Paste` calls.
 - `panel_setup.rs` — Bounded companion check and setup; a check is reused for 20 seconds, or 2 seconds after a failure.
 - `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
 - `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.

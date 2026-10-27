@@ -65,6 +65,14 @@ On Wayland, VOCO sends its paste keys through its own virtual keyboard on
 device VOCO creates: it has only Shift and Insert, and VOCO keeps it while it
 runs. No daemon, socket or service stands between VOCO and the kernel.
 
+On GNOME with the companion attached, the companion presses VOCO's paste keys
+instead, from inside GNOME Shell (`org.voco.PanelInput1.Paste`). It answers only
+the application attached as `org.voco.Panel` and sends only Shift+Insert, never
+while a modifier is held, and GNOME disables it at the lock screen. A program of
+yours that owned `org.voco.Panel` before VOCO started could ask it for a
+Shift+Insert; your access to `/dev/uinput` already lets any of your programs do
+that.
+
 The package's udev rule tags `/dev/uinput` with `uaccess`, so logind gives the
 user of the active local session read and write access through an ACL, and
 moves it when another user's session becomes active. Other accounts, users
@@ -121,6 +129,7 @@ denials.
 | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` | VOCO, talking to its IBus engine | Directory 0700, socket 0600, peer checks on both sides, 1-second timeout, requests up to 65,536 bytes and replies up to 64,000. Protocol 6 rejects every text operation. |
 | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` | `voco-browser-host` | Directory 0700 and a socket owned by you with no group or other access; peer user ID must match. |
 | `org.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. Every other method answers only the attached connection. |
+| `org.voco.PanelInput1` in GNOME Shell | VOCO, attached as `org.voco.Panel` | The companion answers only the attached application. `ModifiersClear` reads the compositor's held modifiers; `Paste` sends Shift+Insert and refuses while a modifier is held or another paste is in flight. |
 
 Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger and
 activation sockets move to `voco-<uid>` in the temporary directory, which must

@@ -57,6 +57,8 @@ pub struct PasteMetrics {
     /// where the helpers can't tell. A read isn't proof the text was inserted.
     pub selection_read: &'static str,
     pub selection_read_ms: Option<f64>,
+    /// Which keyboard sent the keys: "companion", "uinput" or "xdotool".
+    pub paste_keys: &'static str,
 }
 
 /// Optional queue correlation; never includes destination identity or content.
@@ -99,6 +101,7 @@ pub fn correlated_desktop_paste(
                     serde_json::json!(metrics.payload_unicode_scalars);
                 record["payload_utf16_units"] = serde_json::json!(metrics.payload_utf16_units);
                 record["selection_read"] = serde_json::json!(metrics.selection_read);
+                record["paste_keys"] = serde_json::json!(metrics.paste_keys);
                 if let Some(read_ms) = metrics.selection_read_ms {
                     record["selection_read_ms"] = serde_json::json!(read_ms);
                 }
@@ -315,9 +318,10 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ));
     }
     let wayland = matches!(preflight.session, SessionKind::Wayland);
+    let keys = paste_keys(wayland, companion_offers_paste);
     // Create the keyboard before replacing clipboard contents, so a missing
     // device can never leave the clipboard changed with nothing typed.
-    if wayland {
+    if keys == PasteKeys::Uinput {
         ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
     }
     let routed = paste_text(text);
@@ -352,11 +356,11 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         check_before_keys(wayland)
     };
     let result = if reads_observable(preflight.session, helper) {
-        observed_transaction(helper, payload, before_paste, || send_paste_keys(wayland))
+        observed_transaction(helper, payload, before_paste, || send_paste_keys(keys))
     } else {
         let (mut clipboard, mut primary) = copy_commands();
         clipboard_transaction(payload, &mut clipboard, &mut primary, before_paste, || {
-            send_paste_keys(wayland).map(|_| ())
+            send_paste_keys(keys).map(|_| ())
         })
         .map(|(clipboard_ms, keyboard_ms)| (clipboard_ms, keyboard_ms, PasteRead::Unobserved))
     };
@@ -375,6 +379,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
             payload_utf16_units: payload.encode_utf16().count(),
             selection_read: read.label(),
             selection_read_ms: read.after_ms(),
+            paste_keys: keys.label(),
         },
         outcome: "dispatched",
     })
@@ -629,22 +634,78 @@ fn check_before_keys(wayland: bool) -> Result<(), InsertionError> {
     Ok(())
 }
 
-/// Shift+Insert through VOCO's virtual keyboard on Wayland, or xdotool on X11.
-/// Returns when the Insert press went out, where the keyboard reports it.
-fn send_paste_keys(wayland: bool) -> Result<Option<Instant>, InsertionError> {
-    if wayland {
-        #[cfg(target_os = "linux")]
-        return crate::virtual_keyboard::paste()
-            .map(Some)
-            .map_err(InsertionError::uncertain);
-        #[cfg(not(target_os = "linux"))]
-        return Err(InsertionError::no_mutation(
-            "Wayland paste keys need Linux.",
-        ));
+/// Which keyboard sends a paste's Shift+Insert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PasteKeys {
+    /// The GNOME companion, typing inside the Shell (panel.rs).
+    Companion,
+    /// VOCO's own uinput device (virtual_keyboard.rs).
+    Uinput,
+    Xdotool,
+}
+
+impl PasteKeys {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Companion => "companion",
+            Self::Uinput => "uinput",
+            Self::Xdotool => "xdotool",
+        }
     }
-    let mut paste = process_runner::command("xdotool");
-    paste.args(X11_PASTE_ARGUMENTS);
-    run_helper(&mut paste, None, Duration::from_secs(5)).map(|()| None)
+}
+
+/// On GNOME Wayland, the attached companion types when its loaded copy offers
+/// Paste; otherwise VOCO's uinput device does. X11 keeps xdotool.
+fn paste_keys(wayland: bool, companion_offers_paste: impl FnOnce() -> bool) -> PasteKeys {
+    if !wayland {
+        PasteKeys::Xdotool
+    } else if companion_offers_paste() {
+        PasteKeys::Companion
+    } else {
+        PasteKeys::Uinput
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn companion_offers_paste() -> bool {
+    crate::panel::companion_offers_paste()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn companion_offers_paste() -> bool {
+    false
+}
+
+/// Shift+Insert through the companion or VOCO's virtual keyboard on Wayland, or
+/// xdotool on X11. Returns when the Insert press went out, where the keyboard
+/// reports it.
+fn send_paste_keys(keys: PasteKeys) -> Result<Option<Instant>, InsertionError> {
+    match keys {
+        #[cfg(target_os = "linux")]
+        PasteKeys::Companion => crate::panel::companion_paste()
+            .map(Some)
+            .map_err(|failure| match failure {
+                crate::panel::CompanionPasteError::NoMutation(message) => {
+                    InsertionError::no_mutation(message)
+                }
+                crate::panel::CompanionPasteError::Uncertain(message) => {
+                    InsertionError::uncertain(message)
+                }
+            }),
+        #[cfg(target_os = "linux")]
+        PasteKeys::Uinput => crate::virtual_keyboard::paste()
+            .map(Some)
+            .map_err(InsertionError::uncertain),
+        #[cfg(not(target_os = "linux"))]
+        PasteKeys::Companion | PasteKeys::Uinput => Err(InsertionError::no_mutation(
+            "Wayland paste keys need Linux.",
+        )),
+        PasteKeys::Xdotool => {
+            let mut paste = process_runner::command("xdotool");
+            paste.args(X11_PASTE_ARGUMENTS);
+            run_helper(&mut paste, None, Duration::from_secs(5)).map(|()| None)
+        }
+    }
 }
 
 fn build_support(
@@ -1004,6 +1065,23 @@ fn owner_error(error: OwnerError, primary_changed: bool) -> InsertionError {
 mod tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn wayland_pastes_through_the_companion_only_when_it_offers_paste() {
+        assert_eq!(paste_keys(true, || true), PasteKeys::Companion);
+        assert_eq!(paste_keys(true, || false), PasteKeys::Uinput);
+        assert_eq!(
+            paste_keys(false, || panic!("an X11 paste asked the companion")),
+            PasteKeys::Xdotool
+        );
+        let labels =
+            [PasteKeys::Companion, PasteKeys::Uinput, PasteKeys::Xdotool].map(PasteKeys::label);
+        assert_eq!(
+            labels,
+            ["companion", "uinput", "xdotool"],
+            "performance.rs keeps exactly these"
+        );
+    }
 
     fn scratch_directory(name: &str) -> std::path::PathBuf {
         let directory = std::env::temp_dir().join(format!(
@@ -1756,7 +1834,16 @@ mod tests {
             !Path::new("/dev/input").exists(),
             "Run only in a private desktop namespace"
         );
+        // VOCO_FIXTURE_PANEL=1: the session's GNOME companion types the keys.
+        let companion = std::env::var_os("VOCO_FIXTURE_PANEL").is_some();
+        #[cfg(target_os = "linux")]
+        if companion {
+            crate::panel::serve_for_fixture(Duration::from_secs(10)).unwrap();
+        }
         let result = desktop_paste(&text).unwrap();
         assert_eq!(result.outcome, "dispatched");
+        if companion {
+            assert_eq!(result.paste_metrics.paste_keys, "companion");
+        }
     }
 }

@@ -541,6 +541,16 @@ jobs:
           VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
         run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
 
+      # The same production paste, typed by the session's GNOME companion: no
+      # uinput device and no bridge.
+      - name: Application delivery through the GNOME companion on GNOME Wayland
+        timeout-minutes: 5
+        env:
+          VOCO_DELIVERY_PLATFORM: gnome-wayland
+          VOCO_DELIVERY_KEYS: companion
+          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-companion
+        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
+
       - name: Application Wayland lifecycle and model cache readiness
         timeout-minutes: 3
         env:
@@ -570,6 +580,7 @@ jobs:
             ${{ runner.temp }}/voco-application-native/
             ${{ runner.temp }}/voco-application-delivery-gnome-wayland/
             ${{ runner.temp }}/voco-browser-delivery-gnome-wayland/
+            ${{ runner.temp }}/voco-application-delivery-gnome-companion/
             ${{ runner.temp }}/voco-application-wayland/
             ${{ runner.temp }}/voco-application-browser/
             ${{ runner.temp }}/voco-application-toolbar/

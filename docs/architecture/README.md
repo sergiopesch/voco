@@ -18,8 +18,8 @@ and [Security](../security/README.md) covers trust boundaries and data handling.
 | Renderer | `apps/desktop/src/` | React and TypeScript in WebKitGTK. Window, onboarding, settings, recording orchestration and X11 capture. |
 | Speech worker | `runtime/speech/` | Python process with a C++ bridge to the native recognizer. One warm worker serves every recording. |
 | Native runtime | `runtime/native/` | Pinned, patched build of NeMo-Speech.cpp and ggml for x86-64 with AVX2, FMA and F16C. |
-| Virtual keyboard | `apps/desktop/src-tauri/src/virtual_keyboard.rs`, `packaging/udev/` | VOCO's own uinput keyboard sends the Wayland paste keys. The package's udev rule gives the user of the active local session access to `/dev/uinput`. |
-| GNOME companion | `integrations/gnome/` | Optional extension for GNOME 46, 48, 50 and 51: panel pill, live meter, Stop and a shortcut grab on Wayland. |
+| Virtual keyboard | `apps/desktop/src-tauri/src/virtual_keyboard.rs`, `packaging/udev/` | VOCO's own uinput keyboard sends the Wayland paste keys when the GNOME companion doesn't. The package's udev rule gives the user of the active local session access to `/dev/uinput`. |
+| GNOME companion | `integrations/gnome/` | Optional extension for GNOME 46, 48, 50 and 51: panel pill, live meter, Stop, a shortcut grab and the paste keys on Wayland. |
 | IBus engine | `apps/desktop/src-tauri/resources/`, `packaging/ibus/` | Optional input source that consumes the shortcut in IBus-aware fields. It never edits text. |
 | Chromium extension | `integrations/chromium/` | Optional delivery into one plain text field of an enabled tab, through `voco-browser-host`. |
 | Packages | `packaging/`, `scripts/package-nvidia.py`, `scripts/rpm_package.py` | One staged tree becomes the Debian package and the Fedora RPM, with the same files; see [Linux packaging](../linux-packaging.md). |
@@ -156,7 +156,9 @@ says which words are everyday; it loads in its own chunk on the first check.
 Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
 
 1. VOCO checks that the screen isn't locked, then the clipboard helper, plus
-   `xdotool` on X11 or access to `/dev/uinput` on Wayland. On Wayland it also makes sure its virtual keyboard
+   `xdotool` on X11 or access to `/dev/uinput` on Wayland. On Wayland it then
+   picks the keyboard: the GNOME companion's while it's attached and its loaded
+   copy offers `Paste`, otherwise its own virtual keyboard, which it makes sure
    exists, so a missing device fails before the clipboard changes.
 2. ASCII control characters, including newlines and tabs, become spaces, so a
    terminal never receives Enter.
@@ -179,11 +181,11 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
    also waits while the X server reports Shift, Control, Alt, Super or AltGr
    held: the Shift of Shift+Insert would turn a shortcut someone is pressing,
    such as Alt+D, into Alt+Shift+D, which nothing takes for the shortcut.
-6. It sends Shift+Insert, through the virtual keyboard on Wayland and with
-   `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
+6. It sends Shift+Insert: through the companion or the virtual keyboard on
+   Wayland, and with `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
 7. On GNOME Wayland it waits up to 300 ms after the Insert press, which the
-   virtual keyboard reports, for the app to read the paste. Mutter's clipboard
+   keyboard that sent it reports, for the app to read the paste. Mutter's clipboard
    manager reads each new CLIPBOARD once, right after the copy. When that read
    came by the Insert press, the next request either helper answers after the
    press is the app's, and the next paste can copy at once. A read only says
@@ -231,13 +233,28 @@ new one. The evdev shortcut listener ignores the device by name, so its keys
 never count as the shortcut or a held modifier. When VOCO exits, the kernel
 removes the device and releases any key it still held.
 
+On GNOME with the companion attached, the companion types the keys instead,
+through `org.voco.PanelInput1.Paste`. VOCO asks each attached Shell once,
+through its introspection, whether the copy it has loaded offers `Paste`: a
+Shell still running a copy from before version 16 keeps VOCO's own keyboard,
+and one that doesn't answer within 150 ms gets VOCO's keyboard for that paste
+and is asked again at the next. The companion types with one Clutter virtual
+keyboard per enable, inside the Shell, so there's no device to settle. It
+answers only the attached application and refuses while a modifier is held or
+another paste is in flight. Otherwise it sends Shift, Insert and their
+releases, 12 ms apart, and replies with the Insert press's monotonic time,
+which VOCO reads as the press for step 7. VOCO waits up to 1 second for the
+reply. GNOME disables the companion at the lock screen, and disabling it
+mid-gesture releases any key it holds. The screen lock and origin checks run
+on this route too.
+
 A failed paste has one of three outcomes:
 
 | Outcome | Meaning | Result |
 | --- | --- | --- |
-| No change | No keys were sent. A helper is missing, VOCO can't open `/dev/uinput` or create its keyboard, or the modifiers stayed held. | The text stays pending for the next result. Stop retries it 3 times, 250 ms apart. |
+| No change | No keys were sent. A helper is missing, VOCO can't open `/dev/uinput` or create its keyboard, the modifiers stayed held, or the companion refused or went away. | The text stays pending for the next result. Stop retries it 3 times, 250 ms apart. |
 | Rejected | VOCO refused before touching the clipboard. Paste is off, or the text is outside 1 to 100,000 bytes. | Typing stops for this recording. |
-| Uncertain | A helper failed after it started, or the virtual keyboard stopped accepting keys, so the clipboard or the app may already hold the text. | Typing stops, and VOCO never replays that text. |
+| Uncertain | A helper failed after it started, the virtual keyboard stopped accepting keys, or the companion didn't answer within 1 second or was disabled mid-gesture, so the clipboard or the app may already hold the text. | Typing stops, and VOCO never replays that text. |
 
 When typing stops, VOCO notifies "VOCO stopped typing" and keeps listening.
 Recognition runs through Stop, so the full transcript is still available.
@@ -303,9 +320,10 @@ panel button's click gesture leaves primary presses and touches to the pill.
 The companion talks to `org.voco.Panel1` on the session bus at `/org/voco/Panel`.
 `Attach` succeeds only for the current owner of `org.gnome.Shell` and hides the
 tray. When the companion calls `Detach`, or stops calling `GetState` for more
-than 5 seconds, VOCO drops the lease and shows the tray again. When evdev can't
-read the keyboards, VOCO calls back into the companion's
-`org.voco.PanelInput1.ModifiersClear` before a Wayland paste.
+than 5 seconds, VOCO drops the lease and shows the tray again. VOCO calls back
+into the companion's `org.voco.PanelInput1`: `ModifiersClear` before a Wayland
+paste when evdev can't read the keyboards, and `Paste` to type the paste keys
+(see [Delivery](#delivery)).
 The [GNOME companion guide](../../integrations/gnome/README.md) describes the
 full interface.
 
@@ -396,11 +414,16 @@ records.
 - **VOCO's own virtual keyboard on Wayland.** A two-key uinput device in the
   app needs no daemon, socket or service, and the package's `uaccess` rule
   limits `/dev/uinput` to the user of the active local session, without a group.
+- **The companion's keys on GNOME.** Typing inside the Shell needs no device to
+  settle, no portal dialog and no screen-sharing indicator. CI's companion suite
+  holds it within 1 ms of Mutter's RemoteDesktop API at the median and 2 ms at
+  the 99th percentile. VOCO keeps its own keyboard for other Wayland sessions
+  and whenever the companion isn't attached.
 - **xclip on GNOME's XWayland.** GNOME lacks the wlroots data-control protocol,
   and `wl-copy`'s temporary focus surface can stall under focus-stealing
   prevention. XWayland bridges the clipboard without a focus-taking surface, so
   on GNOME with a `DISPLAY` VOCO sets both selections through xclip. Keys still
-  go through VOCO's virtual keyboard.
+  go through the companion or VOCO's virtual keyboard.
 - **No focus probe or per-app routing.** Each chunk goes to whatever has focus
   when it is ready. One path for every app is simpler to reason about than
   guessing a destination.

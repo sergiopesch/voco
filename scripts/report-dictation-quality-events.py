@@ -25,6 +25,8 @@ BOOLS = {'append_only', 'changed', 'finish_responded', 'accepted_equals_dispatch
 OUTCOMES = {'finished', 'incomplete', 'cancelled', 'failed', 'dispatched', 'rejected', 'no-mutation', 'uncertain'}
 # Whether the focused app asked for a paste's selection; a read isn't proof of insertion.
 SELECTION_READS = {'clipboard', 'primary', 'none', 'unobserved'}
+# Which keyboard sent a paste's keys.
+PASTE_KEYS = {'companion', 'uinput', 'xdotool'}
 
 
 def uint(value):
@@ -53,6 +55,10 @@ def safe_quality(row):
         if row['selection_read'] not in SELECTION_READS:
             raise ValueError('invalid selection read')
         safe['selection_read'] = row['selection_read']
+    if 'paste_keys' in row:
+        if row['paste_keys'] not in PASTE_KEYS:
+            raise ValueError('invalid paste keys')
+        safe['paste_keys'] = row['paste_keys']
     return safe
 
 
@@ -175,6 +181,8 @@ def stream_summary(events, envelope_incomplete):
             # Reads after the keys; "none" means the focused app never asked within the wait.
             'selection_reads': dict(sorted(Counter(e['selection_read'] for e in stages['native_dispatch']
                                                    if 'selection_read' in e).items())),
+            'paste_keys': dict(sorted(Counter(e['paste_keys'] for e in stages['native_dispatch']
+                                              if 'paste_keys' in e).items())),
             'sample_observation_scope': 'queue_ingress',
             'destination_content_observation': 'unavailable'}
 

@@ -291,6 +291,13 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
     {
         safe["selection_read"] = json!(read);
     }
+    // Which keyboard sent the paste's keys.
+    if let Some(keys) = request["paste_keys"]
+        .as_str()
+        .filter(|s| matches!(*s, "companion" | "uinput" | "xdotool"))
+    {
+        safe["paste_keys"] = json!(keys);
+    }
     // Generic desktop insertion has no recipient-content observation capability.
     safe["destination_content_observation"] = json!("unavailable");
     Some(safe)
@@ -671,6 +678,24 @@ mod tests {
         let safe = speech_quality_payload(&forged).unwrap();
         assert!(safe.get("selection_read").is_none());
         assert!(safe.get("selection_read_ms").is_none());
+    }
+
+    #[test]
+    fn a_paste_keeps_which_keyboard_sent_it_but_nothing_else() {
+        for keys in ["companion", "uinput", "xdotool"] {
+            let request = json!({"event":"native_dispatch", "session":"12345678-1234-1234-1234-123456789abc",
+                "outcome":"dispatched", "paste_keys":keys});
+            assert_eq!(
+                speech_quality_payload(&request).unwrap()["paste_keys"],
+                keys
+            );
+        }
+        let forged = json!({"event":"native_dispatch", "session":"12345678-1234-1234-1234-123456789abc",
+            "paste_keys":"PRIVATE_SENTINEL"});
+        assert!(speech_quality_payload(&forged)
+            .unwrap()
+            .get("paste_keys")
+            .is_none());
     }
 
     #[test]
