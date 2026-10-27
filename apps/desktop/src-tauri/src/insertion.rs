@@ -686,6 +686,16 @@ fn companion_asks_for_work() -> bool {
     false
 }
 
+#[cfg(target_os = "linux")]
+fn companion_asks_for_voco() -> Option<bool> {
+    crate::panel::companion_asks_for_voco()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn companion_asks_for_voco() -> Option<bool> {
+    Some(false)
+}
+
 /// Shift+Insert through the companion or VOCO's virtual keyboard on Wayland, or
 /// xdotool on X11. Returns when the Insert press went out, where the keyboard
 /// reports it.
@@ -912,19 +922,29 @@ const SNAP_NEEDS_PANEL: &str = "On Wayland, the VOCO snap types through the VOCO
 /// On other Wayland desktops the snap can't type at all.
 const SNAP_DESKTOP_UNSUPPORTED: &str = "The VOCO snap types only on GNOME and in X11 sessions. On this desktop, install VOCO's .deb or RPM from its GitHub releases instead.";
 
-/// The snap's Wayland keys: the companion's, once it asks for work.
+/// For `voco --check-desktop-input` while no VOCO answers: the companion
+/// attaches to the running VOCO, so only that VOCO knows.
+const SNAP_CHECK_NEEDS_VOCO: &str = "On Wayland, the VOCO snap types through the VOCO panel, and only the running VOCO can tell whether the panel is connected. Open VOCO, then check again.";
+
+/// The snap's Wayland keys: the companion's, once it asks VOCO for work.
 fn companion_keys_ready() -> Result<(), String> {
-    if companion_asks_for_work() {
+    let asking = companion_asks_for_voco();
+    if asking == Some(true) {
         return Ok(());
     }
-    Err(snap_keys_missing(crate::is_gnome_desktop(&crate::current_desktop())).into())
+    Err(snap_keys_missing(
+        crate::is_gnome_desktop(&crate::current_desktop()),
+        asking.is_some(),
+    )
+    .into())
 }
 
-fn snap_keys_missing(gnome: bool) -> &'static str {
-    if gnome {
-        SNAP_NEEDS_PANEL
-    } else {
-        SNAP_DESKTOP_UNSUPPORTED
+/// `voco_answered`: a VOCO answered whether its companion asks for work.
+fn snap_keys_missing(gnome: bool, voco_answered: bool) -> &'static str {
+    match (gnome, voco_answered) {
+        (false, _) => SNAP_DESKTOP_UNSUPPORTED,
+        (true, true) => SNAP_NEEDS_PANEL,
+        (true, false) => SNAP_CHECK_NEEDS_VOCO,
     }
 }
 
@@ -1119,8 +1139,12 @@ mod tests {
 
     #[test]
     fn the_snap_names_what_it_needs_to_type_on_wayland() {
-        assert_eq!(snap_keys_missing(true), SNAP_NEEDS_PANEL);
-        assert_eq!(snap_keys_missing(false), SNAP_DESKTOP_UNSUPPORTED);
+        assert_eq!(snap_keys_missing(true, true), SNAP_NEEDS_PANEL);
+        // A check outside VOCO can't learn about the companion until VOCO runs.
+        assert_eq!(snap_keys_missing(true, false), SNAP_CHECK_NEEDS_VOCO);
+        for answered in [false, true] {
+            assert_eq!(snap_keys_missing(false, answered), SNAP_DESKTOP_UNSUPPORTED);
+        }
     }
 
     #[test]
@@ -1900,6 +1924,8 @@ mod tests {
         #[cfg(target_os = "linux")]
         if companion {
             crate::panel::serve_for_fixture(Duration::from_secs(10)).unwrap();
+            // What the snap's `voco --check-desktop-input` asks the running VOCO.
+            assert_eq!(crate::panel::ask_running_voco(), Some(true));
         }
         let result = desktop_paste(&text).unwrap();
         assert_eq!(result.outcome, "dispatched");

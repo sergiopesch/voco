@@ -131,7 +131,9 @@ with `idle` after 20 seconds:
 - `changed`: it polls `GetState` at once.
 
 VOCO accepts a report only from the attached Shell and only for its open
-request. An earlier VOCO, which doesn't know `NextRequest`, answers it with
+request. `CompanionAsking() → b`, true while the attached companion asks for
+work, is the one method any caller may use: the snap's
+`voco --check-desktop-input` and `--check-panel` run apart from VOCO and ask it. An earlier VOCO, which doesn't know `NextRequest`, answers it with
 `UnknownMethod`, and the companion then stops asking. For it the companion still
 serves `org.voco.PanelInput1.ModifiersClear() → b` at `/org/voco/PanelInput`,
 for the attached VOCO only, and still polls at each `Changed`.

@@ -88,7 +88,7 @@ pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
     if crate::confinement::is_snap() {
         return Ok(snap_status(
             &crate::current_desktop(),
-            crate::panel::companion_asks_for_work(),
+            crate::panel::companion_asks_for_voco(),
         ));
     }
     check_on(&crate::current_desktop(), || run_helper(enable))
@@ -113,25 +113,33 @@ fn other_desktop() -> PanelSetupStatus {
 }
 
 /// The snap can't ask GNOME Shell about extensions, nor enable one, so the
-/// companion's own attachment says it runs. Without it, setup points to the
-/// page the snap's companion comes from.
-fn snap_status(desktop: &str, asking: bool) -> PanelSetupStatus {
+/// companion's own attachment says it runs: `asking`, from the running VOCO,
+/// None when none answered. Without it, setup points to the page the snap's
+/// companion comes from.
+fn snap_status(desktop: &str, asking: Option<bool>) -> PanelSetupStatus {
     if !crate::is_gnome_desktop(desktop) {
         return other_desktop();
     }
-    if asking {
-        return PanelSetupStatus {
+    match asking {
+        Some(true) => PanelSetupStatus {
             status: "active".into(),
             detail: "Live panel bars and Stop are active.".into(),
             can_enable: false,
             url: None,
-        };
-    }
-    PanelSetupStatus {
-        status: "extensions-site".into(),
-        detail: "Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.".into(),
-        can_enable: false,
-        url: Some(COMPANION_PAGE.into()),
+        },
+        Some(false) => PanelSetupStatus {
+            status: "extensions-site".into(),
+            detail: "Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.".into(),
+            can_enable: false,
+            url: Some(COMPANION_PAGE.into()),
+        },
+        // Only `voco --check-panel` asks while no VOCO runs.
+        None => PanelSetupStatus {
+            status: "unavailable".into(),
+            detail: "Only the running VOCO can tell whether the VOCO panel is connected. Open VOCO, then check again.".into(),
+            can_enable: false,
+            url: None,
+        },
     }
 }
 
@@ -219,13 +227,19 @@ mod tests {
 
     #[test]
     fn the_snap_learns_its_companion_from_the_attachment_and_points_to_its_page() {
-        let missing = snap_status("ubuntu:GNOME", false);
+        let missing = snap_status("ubuntu:GNOME", Some(false));
         assert_eq!(missing.status, "extensions-site");
         assert_eq!(missing.url.as_deref(), Some(COMPANION_PAGE));
         assert!(!missing.can_enable, "the snap can't enable an extension");
-        let active = snap_status("ubuntu:GNOME", true);
+        let active = snap_status("ubuntu:GNOME", Some(true));
         assert_eq!((active.status.as_str(), active.url), ("active", None));
-        assert_eq!(snap_status("KDE", false).status, "other-desktop");
+        // A check outside VOCO, with no VOCO to ask, claims neither.
+        let unknown = snap_status("ubuntu:GNOME", None);
+        assert_eq!(unknown.status, "unavailable");
+        assert!(unknown.detail.contains("Open VOCO, then check again"));
+        for asking in [None, Some(false), Some(true)] {
+            assert_eq!(snap_status("KDE", asking).status, "other-desktop");
+        }
     }
 
     #[test]

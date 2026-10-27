@@ -130,7 +130,7 @@ denials.
 | `$XDG_RUNTIME_DIR/voco-activate.sock` | A second `voco` launch, such as a click on VOCO's launcher | The same directory, mode and peer check as the trigger socket. Each connection only presents VOCO's window; it never starts or stops dictation. |
 | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` | VOCO, talking to its IBus engine | Directory 0700, socket 0600, peer checks on both sides, 1-second timeout, requests up to 65,536 bytes and replies up to 64,000. Protocol 6 rejects every text operation. |
 | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` | `voco-browser-host` | Directory 0700 and a socket owned by you with no group or other access; peer user ID must match. |
-| `org.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. Every other method answers only the attached connection, and VOCO accepts the companion's paste and modifier reports only for the request it has open. |
+| `org.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. `CompanionAsking` tells any caller whether the attached companion asks for work, for the snap's `voco --check-desktop-input` and `--check-panel`. Every other method answers only the attached connection, and VOCO accepts the companion's paste and modifier reports only for the request it has open. |
 | `org.voco.PanelInput1` in GNOME Shell | A VOCO from before `NextRequest`, attached as `org.voco.Panel` | The companion answers only the attached application. `ModifiersClear` reads the compositor's held modifiers. |
 
 Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger and

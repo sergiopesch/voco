@@ -490,7 +490,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   `dbus` slot for `org.voco.Panel`; `check-devops.sh` checks both lists.
 - It types only through the companion on GNOME Wayland and through `xdotool` on
   X11. Elsewhere Start is refused, and setup names the build that supports that
-  desktop. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
+  desktop. Only the running VOCO knows whether the companion asks it for work, so
+  `voco --check-desktop-input` and `--check-panel` ask it with
+  `org.voco.Panel1.CompanionAsking`, the one method any caller may use, and with
+  no VOCO to ask they claim neither. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
   X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus route.
 - logind's session signals don't reach a snap, because `login-session-observe`
   receives only the manager's, and `GetSessionByPID` is out of its reach. So the

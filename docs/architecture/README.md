@@ -405,7 +405,10 @@ IBus engine, systemd user manager or network, so the snap skips what needs
 them: the virtual keyboard, passive evdev, the IBus listener, the retired
 `voco-ydotoold.service` and the update check. On Wayland only the companion
 types for it: the paste check passes once the companion asks for work, and a
-paste without it typed nothing. Until then, setup says what's missing: on GNOME,
+paste without it typed nothing. `voco --check-desktop-input` and
+`--check-panel` run apart from the VOCO the companion works for, so they ask it
+with `CompanionAsking`, which answers any caller; when no VOCO answers, they
+say to open VOCO and check again. Until then, setup says what's missing: on GNOME,
 the VOCO panel from extensions.gnome.org; on other Wayland desktops, the `.deb`
 or RPM instead. X11 sessions keep `xdotool` and `xclip`.
 
