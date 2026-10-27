@@ -59,6 +59,8 @@ export interface PanelSetupStatus {
   status: string;
   detail: string;
   canEnable: boolean;
+  /** The companion's page, for the snap, which can't install it. */
+  url?: string;
 }
 export function getPanelSetupStatus(): Promise<PanelSetupStatus> {
   return invoke("get_panel_setup_status");

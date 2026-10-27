@@ -495,9 +495,9 @@ and the update check. [The snap](#the-snap) lists its rules.
 - logind's session signals don't reach a snap, because `login-session-observe`
   receives only the manager's, and `GetSessionByPID` is out of its reach. So the
   snap binds its origin through a validated session ID or the user's sessions,
-  reads `LockedHint` and `Active` at each check and once a second while
-  dictating, and stops dictation when it reads locked. Until
-  `login-session-observe` is connected, both checks reject (`no-mutation`) and
+  reads `LockedHint` and `Active` at each check and `LockedHint` once a second,
+  and stops dictation when it reads locked. Until `login-session-observe` is
+  connected, both checks reject (`no-mutation`), on X11 as on Wayland, and
   Start is refused with the `snap connect` remedy.
 - Its config, journal and logs live in `$SNAP_USER_DATA`. It never reads a
   package's config, and a package never reads its.

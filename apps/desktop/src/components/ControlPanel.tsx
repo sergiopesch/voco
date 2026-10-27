@@ -819,6 +819,7 @@ export function ControlPanel({
             setupError={nativeMicrophone?.error ?? errorMessage}
             onRetrySetup={nativeMicrophone?.error ? () => void nativeMicrophone.initialize().catch(() => {}) : undefined}
             desktopSetupError={desktopSetupError}
+            desktopSetupPanel={desktopInput?.available === false && desktopInput.setupArea === "panel"}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
             onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
             checkingDesktopSetup={checkingInput}

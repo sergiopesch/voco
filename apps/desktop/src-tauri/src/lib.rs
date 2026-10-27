@@ -1161,6 +1161,7 @@ const DESKTOP_SETUP_GUIDE: &str =
 
 fn is_allowed_external_url(url: &str) -> bool {
     url == DESKTOP_SETUP_GUIDE
+        || url == panel_setup::COMPANION_PAGE
         || url
             .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
             .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
@@ -2516,6 +2517,11 @@ mod tests {
     #[test]
     fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
         assert!(is_allowed_external_url(DESKTOP_SETUP_GUIDE));
+        // The snap's companion page, exactly.
+        assert!(is_allowed_external_url(panel_setup::COMPANION_PAGE));
+        assert!(!is_allowed_external_url(
+            "https://extensions.gnome.org/#q=elsewhere"
+        ));
         assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
         ));

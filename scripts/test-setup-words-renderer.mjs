@@ -274,6 +274,22 @@ try {
     assert.equal((await handoff.innerText()).split('Sign out and back in').length, 2, 'The fix reads once');
     results.push({ case: 'enabling-the-panel-updates-the-shortcut-note', passed: true });
 
+    // The snap types on GNOME Wayland only through the companion, which it
+    // can't install: setup stops there and points to the companion's page.
+    const companionPage = 'https://extensions.gnome.org/#q=VOCO';
+    await load({
+        desktopInput: { available: false, setupArea: 'panel',
+            detail: 'On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.' },
+        panel: { status: 'extensions-site', canEnable: false, url: companionPage,
+            detail: 'Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.' } });
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    const setup = page.getByRole('region', { name: 'Voice setup' }).or(page.locator('.voco-setup'));
+    await setup.getByRole('button', { name: 'Get the VOCO panel', exact: true }).click();
+    await page.waitForFunction(url => window.calls.some(([name, target]) => name === 'openExternalUrl' && target === url), companionPage);
+    assert.equal(await setup.getByRole('button', { name: 'Enable live panel', exact: true }).count(), 0, 'The snap enables no extension');
+    assert.equal(await handoff.count(), 0, 'Setup stops until the snap can type');
+    results.push({ case: 'the-snap-points-to-the-companion-page', passed: true });
+
     // Continue without saying it keeps the name, edited if they changed it.
     await load();
     await nameField().fill('  Siobhán   Ní Kelly ');

@@ -59,6 +59,7 @@ pub fn note_launch() {
         pid.as_deref(),
         autostart,
         std::process::id(),
+        crate::confinement::is_snap(),
     ) {
         PENDING.store(true, Ordering::SeqCst);
         crate::trace_hotkey_event("launcher_activation_requested", Some("launch"));
@@ -70,6 +71,7 @@ fn opened_by_launcher(
     pid: Option<&OsStr>,
     autostart: bool,
     own_pid: u32,
+    confined: bool,
 ) -> bool {
     let (Some(entry), Some(pid)) = (entry, pid) else {
         return false;
@@ -77,10 +79,18 @@ fn opened_by_launcher(
     let entry = Path::new(entry);
     !autostart
         && pid.to_str().and_then(|pid| pid.parse::<u32>().ok()) == Some(own_pid)
-        && entry.file_name() == Some(OsStr::new("VOCO.desktop"))
+        && entry
+            .file_name()
+            .is_some_and(|name| launcher_entry(name, confined))
         && !entry
             .components()
             .any(|part| part.as_os_str() == "autostart")
+}
+
+/// The package's desktop entry, or snapd's copy of the snap's, which it names
+/// after the snap and its app.
+fn launcher_entry(name: &OsStr, confined: bool) -> bool {
+    name == "VOCO.desktop" || (confined && name == "voco_voco.desktop")
 }
 
 #[tauri::command]
@@ -93,7 +103,24 @@ mod tests {
     use super::*;
 
     fn opened(entry: Option<&str>, pid: Option<&str>, autostart: bool) -> bool {
-        opened_by_launcher(entry.map(OsStr::new), pid.map(OsStr::new), autostart, 4242)
+        opened_by_launcher(
+            entry.map(OsStr::new),
+            pid.map(OsStr::new),
+            autostart,
+            4242,
+            false,
+        )
+    }
+
+    #[test]
+    fn the_snap_s_launcher_is_snapd_s_copy_of_its_entry() {
+        let snapd = Some(OsStr::new(
+            "/var/lib/snapd/desktop/applications/voco_voco.desktop",
+        ));
+        let pid = Some(OsStr::new("4242"));
+        assert!(opened_by_launcher(snapd, pid, false, 4242, true));
+        assert!(!opened_by_launcher(snapd, pid, false, 4242, false));
+        assert!(!opened_by_launcher(snapd, pid, true, 4242, true));
     }
 
     #[test]

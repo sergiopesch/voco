@@ -86,7 +86,9 @@ ACL moves, and its keys reach whichever session is then active. VOCO therefore
 asks logind whether the desktop session it started in is active, before copying
 a phrase and again before sending keys. If logind reports that session inactive,
 VOCO stops the paste and sends no keys. When logind can't answer, VOCO permits
-the paste. These checks do not lock the session: a switch after the last check
+the paste, but when logind refuses VOCO, as it refuses the snap until
+`login-session-observe` is connected, VOCO stops the paste, on X11 as on
+Wayland. These checks do not lock the session: a switch after the last check
 can still redirect the keys. VOCO also follows the screen lock that logind
 reports for that session: while the screen is locked it sends no keys and its
 shortcut starts nothing, and locking the screen stops a dictation.

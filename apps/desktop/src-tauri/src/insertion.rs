@@ -239,7 +239,9 @@ fn input_status_with(preflight: &InputPreflight) -> DesktopInputStatus {
         } else {
             support.detail.clone()
         },
-        setup_area: None,
+        // The snap's Wayland keys wait for the companion, which the panel's
+        // setup points to.
+        setup_area: (!support.available && support.detail == SNAP_NEEDS_PANEL).then_some("panel"),
     }
 }
 
@@ -337,14 +339,10 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     let helper = desktop_clipboard_helper();
     let preflight_ms = elapsed_ms(started);
     let settle_ms = settle(*last_paste);
-    // Behind a locked screen keys would reach the lock screen, not the app.
-    // Checked after the waits, just before the copy, and again before keys.
-    #[cfg(target_os = "linux")]
-    if crate::desktop_session::is_locked() {
-        return Err(InsertionError::no_mutation(
-            crate::desktop_session::LOCKED_DETAIL,
-        ));
-    }
+    // Behind a locked screen keys would reach the lock screen, not the app,
+    // and on Wayland they reach whichever login owns the seat. Checked after
+    // the waits, just before the copy, and again before keys, on every route.
+    check_session(wayland)?;
     let mut modifier_wait_ms = 0;
     // Wayland keys are raw events: a still-held shortcut modifier would turn
     // Shift+Insert into another chord. X11 delivers its keys to VOCO's grab
@@ -357,7 +355,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     };
     let before_paste = || {
         modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
-        check_before_keys(wayland)
+        check_session(wayland)
     };
     let result = if reads_observable(preflight.session, helper) {
         observed_transaction(helper, payload, before_paste, || send_paste_keys(keys))
@@ -617,13 +615,15 @@ fn virtual_keyboard_access() -> Result<(), String> {
     Err("Wayland paste keys need Linux.".into())
 }
 
-/// The check just before keys, after the copy and the modifier wait: the screen
-/// may have locked, or the session switched, meanwhile. Nothing is typed yet,
-/// so a refusal here keeps the text for the next try.
-fn check_before_keys(wayland: bool) -> Result<(), InsertionError> {
+/// The check just before the copy, and again just before keys after the modifier
+/// wait: the screen may have locked, or the session switched, meanwhile.
+/// Nothing is typed yet, so a refusal keeps the text for the next try.
+fn check_session(wayland: bool) -> Result<(), InsertionError> {
     #[cfg(target_os = "linux")]
     {
-        if wayland {
+        // The snap can't follow the lock through logind's signals and must not
+        // type while logind refuses it, on X11 as on Wayland.
+        if wayland || crate::confinement::is_snap() {
             return crate::virtual_keyboard::require_active_session()
                 .map_err(InsertionError::no_mutation);
         }
@@ -880,17 +880,31 @@ fn input_preflight_with(
 
 fn input_preflight() -> InputPreflight {
     // The snap can't open /dev/uinput; on Wayland only the companion types for it.
-    let keyboard: fn() -> Result<(), String> = if crate::confinement::is_snap() {
+    let confined = crate::confinement::is_snap();
+    let keyboard: fn() -> Result<(), String> = if confined {
         companion_keys_ready
     } else {
         virtual_keyboard_access
     };
-    input_preflight_with(
+    let mut preflight = input_preflight_with(
         session_kind(),
         desktop_clipboard_helper(),
         command_available,
         keyboard,
-    )
+    );
+    // Until login-session-observe is connected the snap can't check the session
+    // it types into, so it types nothing.
+    #[cfg(target_os = "linux")]
+    if confined && crate::desktop_session::logind_denied() {
+        for support in [
+            &mut preflight.diagnostics.type_simulation,
+            &mut preflight.diagnostics.clipboard,
+        ] {
+            support.available = false;
+            support.detail = crate::desktop_session::LOGIND_DENIED_DETAIL.into();
+        }
+    }
+    preflight
 }
 
 /// What the snap needs on GNOME Wayland before it can type.
