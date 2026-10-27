@@ -880,7 +880,7 @@ lesson(
         ),
         (
             "Update checks",
-            "VOCO checks after startup and when you change the update channel, unless Update checks is set to Only when I choose. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks.",
+            "VOCO checks after startup and when you change the update channel, unless Update checks is set to Only when I choose. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks. The snap never checks: Settings shows its version and \"The Snap Store keeps VOCO up to date.\"",
         ),
         (
             "Only a notice",
@@ -903,6 +903,7 @@ lesson(
     [
         (B + "config.rs", "Loads, patches and saves the settings and their copy, and restores what an earlier VOCO dropped."),
         (F + "components/ControlPanel.tsx", "The settings window, including the update channel."),
+        (B + "confinement.rs", "Tells the window when the Snap Store updates VOCO, so it never checks."),
         (F + "components/ConfigRecoveryPanel.tsx", "The three ways out when settings can't load."),
         (F + "lib/updates.ts", "Asks GitHub for releases and filters them by channel."),
         (F + "lib/updateCheckCoordinator.ts", "Decides when to check and when to reuse the cached answer."),
@@ -961,7 +962,7 @@ lesson(
         ),
         (
             "Checking input",
-            "voco --check-desktop-input checks the paste prerequisites without launching VOCO or sending keys: the clipboard helper, xdotool on X11, and on Wayland that /dev/uinput opens for reading and writing. It exits with code 1 when something is missing.",
+            "voco --check-desktop-input checks the paste prerequisites without launching VOCO or sending keys: the clipboard helper, xdotool on X11, and on Wayland that /dev/uinput opens for reading and writing. In the snap on Wayland it instead asks the running VOCO, through CompanionAsking, whether the companion asks it for work, since only that VOCO knows. It exits with code 1 when something is missing.",
         ),
         (
             "Access from a udev rule",
@@ -1186,7 +1187,7 @@ lesson(
     "A test is a promise written as code: when this happens, VOCO does that. Running the tests checks that the promises still hold.",
     [
         "npm test runs scripts/test-unit.sh, the fast checks that need no microphone, speech model or desktop session.",
-        "CI runs on every push and pull request to master, in eight jobs. Some start the real app in private desktop sessions and paste into real applications, and one runs the speech runtime in Debian 13 and Fedora 44 containers.",
+        "CI runs on every push and pull request to master, in nine jobs. Some start the real app in private desktop sessions and paste into real applications, one runs the speech runtime in Debian 13 and Fedora 44 containers, and one checks what strict confinement lets a snap do on the session bus.",
         "Tests use only public or synthetic audio. No personal recording is part of any test.",
     ],
     [
@@ -1210,8 +1211,8 @@ lesson(
     ],
     [
         (
-            "Eight CI jobs",
-            "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, and a runtime job that runs once for Debian 13 and once for Fedora 44.",
+            "Nine CI jobs",
+            "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns org.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work.",
         ),
         (
             "Private sessions",
@@ -1256,7 +1257,8 @@ lesson(
     ],
     [
         ("scripts/test-unit.sh", "The fast checks behind npm test."),
-        (".github/workflows/ci.yml", "The eight CI jobs."),
+        (".github/workflows/ci.yml", "The nine CI jobs."),
+        ("scripts/test-snap-dbus-probe.py", "Drives the probe snap on the session bus, as GNOME Shell would."),
         (
             "scripts/test-private-ibus-engine-hosted.sh",
             "Runs desktop tests in private sessions, and only on GitHub Actions.",
