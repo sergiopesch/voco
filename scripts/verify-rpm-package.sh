@@ -106,7 +106,7 @@ assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
 for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
-  assert_entry "/usr/share/gnome-shell/extensions/voco-panel@voco.local/${file}" -rw-r--r--
+  assert_entry "/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/${file}" -rw-r--r--
 done
 assert_entry /usr/lib/udev/rules.d/70-voco-uinput.rules -rw-r--r--
 assert_entry /usr/lib/modules-load.d/voco-uinput.conf -rw-r--r--
@@ -209,8 +209,8 @@ for file in manifest.json background.js content.js; do
   cmp "${ROOT_DIR}/integrations/chromium/${file}" "${PAYLOAD}/usr/share/voco/chromium/${file}"
 done
 for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
-  cmp "${ROOT_DIR}/integrations/gnome/voco-panel@voco.local/${file}" \
-    "${PAYLOAD}/usr/share/gnome-shell/extensions/voco-panel@voco.local/${file}"
+  cmp "${ROOT_DIR}/integrations/gnome/voco-panel@sergiopesch.com/${file}" \
+    "${PAYLOAD}/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/${file}"
 done
 python3 - "${PAYLOAD}" <<'BROWSER'
 import base64, hashlib, json, pathlib, subprocess, sys

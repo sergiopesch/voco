@@ -222,11 +222,11 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ## GNOME companion: `integrations/gnome/`
 
-- `voco-panel@voco.local/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
-- `voco-panel@voco.local/model.js` — Presentation model shared with the Node tests.
-- `voco-panel@voco.local/metadata.json` — Extension metadata for GNOME Shell 46, 48, 50 and 51.
-- `voco-panel@voco.local/stylesheet.css` — Pill and meter styles.
-- `voco-panel@voco.local/voco-symbol.png` — Microphone symbol.
+- `voco-panel@sergiopesch.com/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
+- `voco-panel@sergiopesch.com/model.js` — Presentation model shared with the Node tests.
+- `voco-panel@sergiopesch.com/metadata.json` — Extension metadata for GNOME Shell 46, 48, 50 and 51.
+- `voco-panel@sergiopesch.com/stylesheet.css` — Pill and meter styles.
+- `voco-panel@sergiopesch.com/voco-symbol.png` — Microphone symbol.
 - `package.json` — Marks the directory as ES modules for the tests.
 - `README.md` — [Companion guide](../../integrations/gnome/README.md).
 

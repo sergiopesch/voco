@@ -1,5 +1,5 @@
 {
-  "uuid": "voco-panel@voco.local",
+  "uuid": "voco-panel@sergiopesch.com",
   "name": "VOCO",
   "description": "VOCO live dictation meter with Settings, Review and Stop in its menu. On Wayland it consumes VOCO's dictation shortcut.",
   "shell-version": [

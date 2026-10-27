@@ -40,7 +40,7 @@ def make_stage(root):
         "usr/share/doc/voco/vendor/glib/LICENSE": "MIT",
         "usr/share/doc/voco/README.md": "readme",
         "usr/share/doc/voco/docs/install.md": "install",
-        "usr/share/gnome-shell/extensions/voco-panel@voco.local/metadata.json": "{}",
+        "usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/metadata.json": "{}",
         "usr/share/icons/hicolor/256x256@2/apps/voco.png": "png",
         "usr/share/ibus/component/voco.xml": "<component/>",
         "usr/share/metainfo/com.sergiopesch.voco.metainfo.xml": "<component/>",
@@ -74,7 +74,7 @@ class FileListTests(unittest.TestCase):
         lines = rpm.file_list(self.stage)
         self.assertEqual(lines, sorted(lines, key=lambda line: line.split()[-1]))
         for tree in ("/usr/lib/voco", "/usr/share/voco",
-                     "/usr/share/gnome-shell/extensions/voco-panel@voco.local"):
+                     "/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com"):
             self.assertIn(tree, lines)
         for directory in rpm.SHARED_DIRECTORIES:
             self.assertIn("%dir /" + directory, lines)

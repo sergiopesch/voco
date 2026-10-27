@@ -4,7 +4,10 @@ from pathlib import Path
 import sys
 import time
 
-UUID = 'voco-panel@voco.local'
+UUID = 'voco-panel@sergiopesch.com'
+# The companion's UUID until 2026.0.63. extensions.gnome.org publishes it under a
+# namespace the maintainer owns, so setup moves an enabled earlier copy to UUID.
+OLD_UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
 COMPANION_VERSION = 17
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
@@ -44,6 +47,12 @@ def classify(version, installed, info, enabled, globally_disabled):
     return result('disabled', 'Enable live microphone bars and the VOCO menu in your top panel.', True)
 
 
+def enabled_with_companion(enabled):
+    """The enabled extensions with this companion and without its earlier UUID."""
+    kept = [uuid for uuid in enabled if uuid != OLD_UUID]
+    return kept if UUID in kept else [*kept, UUID]
+
+
 def check(enable=False):
     # Query the running shell, not a potentially different installed shell version.
     import gi
@@ -73,6 +82,9 @@ def check(enable=False):
         if info:
             if not call('org.gnome.Shell.Extensions', 'EnableExtension', GLib.Variant('(s)', (UUID,))):
                 return result('error', 'GNOME could not enable the panel. Check VOCO in Extensions.')
+            if OLD_UUID in enabled:
+                settings.set_strv('enabled-extensions', enabled_with_companion(settings.get_strv('enabled-extensions')))
+                Gio.Settings.sync()
             for _ in range(5):
                 time.sleep(.1)
                 context = GLib.MainContext.default()
@@ -86,7 +98,7 @@ def check(enable=False):
             return result('pending', 'Panel activation requested. Check again in a moment.')
         # Only this extension is added. A newly installed system extension is
         # discovered at next login; never restart Shell or change the global switch.
-        if not settings.set_strv('enabled-extensions', [*enabled, UUID]):
+        if not settings.set_strv('enabled-extensions', enabled_with_companion(enabled)):
             return result('error', 'GNOME could not save panel activation. Check again in Extensions.')
         Gio.Settings.sync()
         return check(False)

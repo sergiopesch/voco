@@ -40,13 +40,13 @@ if [[ ${1:-} != --inside ]]; then
   fi
   if [[ -n ${VOCO_PANEL_PACKAGE_ROOT:-} ]]; then
     cp --reflink=auto "$VOCO_PANEL_PACKAGE_ROOT/usr/bin/voco" "$run/voco"
-    cp -a "$VOCO_PANEL_PACKAGE_ROOT/usr/share/gnome-shell/extensions/voco-panel@voco.local" "$run/panel-payload"
+    cp -a "$VOCO_PANEL_PACKAGE_ROOT/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com" "$run/panel-payload"
     mkdir -p "$run/system-extensions"
     cp -a /usr/share/gnome-shell/extensions/ubuntu-appindicators@ubuntu.com "$run/system-extensions/"
   fi
   mkdir -p "$run/data/gnome-shell/extensions"
   if [[ -z ${VOCO_PANEL_PACKAGE_ROOT:-} ]]; then
-    cp -a "${VOCO_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@voco.local}" "$run/data/gnome-shell/extensions/voco-panel@voco.local"
+    cp -a "${VOCO_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@sergiopesch.com}" "$run/data/gnome-shell/extensions/voco-panel@sergiopesch.com"
   fi
   cp -a "$ROOT/scripts/fixtures/gnome-panel-probe" "$run/data/gnome-shell/extensions/voco-panel-probe@test.invalid"
   trap 'status=$?; mkdir -p "$VOCO_PANEL_EVIDENCE_DIR"; cp -a "$run/evidence/." "$VOCO_PANEL_EVIDENCE_DIR/"; echo "$status" > "$VOCO_PANEL_EVIDENCE_DIR/exit-code"; rm -rf "$run"; exit "$status"' EXIT

@@ -1,7 +1,7 @@
 # GNOME companion
 
-`voco-panel@voco.local` is an optional GNOME Shell extension for GNOME 46, 48
-and 50, and the VOCO packages install it. While VOCO runs, the companion replaces VOCO's
+`voco-panel@sergiopesch.com` is an optional GNOME Shell extension for GNOME 46,
+48, 50 and 51, and the VOCO packages install it. While VOCO runs, the companion replaces VOCO's
 tray icon with a pill in the top bar that shows a live microphone meter while
 you dictate. In a Wayland session it also consumes VOCO's shortcut, so the
 focused app never receives it. It keeps no recording state: VOCO decides, and
@@ -35,12 +35,13 @@ recording.
 ## Set it up
 
 The package installs the companion in
-`/usr/share/gnome-shell/extensions/voco-panel@voco.local/`, and its scripts
+`/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/`, and its scripts
 never change user settings. Each user turns it on once, with `voco --setup-panel`,
 which the guided installer runs, or with **Enable live panel** on VOCO's Help
 page or last onboarding step. Setup turns on only this extension, asks the
 running Shell first, and never restarts Shell or changes GNOME's switch that
-turns off all extensions.
+turns off all extensions. It also moves an enabled copy under the companion's
+earlier UUID, `voco-panel@voco.local`, to this one.
 
 A Shell that started before the files arrived finds them at the next login, so
 after installing, save your work and sign out and back in. After an upgrade
@@ -57,7 +58,7 @@ date; setup then turns the new one on if needed and reports `restart`.
 | `missing`, `blocked`, `error`, `pending`, `unavailable` | Files missing, extensions off or forbidden, a load failure, activation in progress, or no answer. The message says which. | 2 |
 
 It exits 1 when its helper can't run. To turn the companion off, run
-`gnome-extensions disable voco-panel@voco.local`; VOCO shows its tray again.
+`gnome-extensions disable voco-panel@sergiopesch.com`; VOCO shows its tray again.
 
 ## The shortcut on Wayland
 
@@ -137,7 +138,7 @@ for the attached VOCO only, and still polls at each `Changed`.
 
 ## Files and tests
 
-`voco-panel@voco.local/` holds `extension.js` (pill, menu, meter, grab and bus
+`voco-panel@sergiopesch.com/` holds `extension.js` (pill, menu, meter, grab and bus
 calls), `model.js` (state checks, shared with Node tests), `metadata.json`,
 `stylesheet.css` and `voco-symbol.png`, a copy of `assets/voco-symbol-ui.png`.
 In `apps/desktop/src-tauri/`, `src/panel.rs` serves the bus, `src/tray.rs` builds

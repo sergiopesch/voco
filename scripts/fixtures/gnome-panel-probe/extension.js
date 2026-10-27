@@ -23,10 +23,10 @@ export default class Probe extends Extension {
         this.object.export(Gio.DBus.session, '/org/voco/PanelProbe');
     }
     Inspect() {
-        const indicator = Main.panel.statusArea['voco-panel@voco.local'];
+        const indicator = Main.panel.statusArea['voco-panel@sergiopesch.com'];
         const actors = indicator ? children(indicator) : [];
         // The companion eases its meter through an adjustment, not an actor property.
-        const reveal = Main.extensionManager.lookup('voco-panel@voco.local')?.stateObj?._reveal;
+        const reveal = Main.extensionManager.lookup('voco-panel@sergiopesch.com')?.stateObj?._reveal;
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
             indicatorFocus: indicator ? indicator.has_style_pseudo_class('focus') : null,
             revealing: Boolean(reveal?.get_transition('value')),
@@ -45,14 +45,14 @@ export default class Probe extends Extension {
                 style: actor.style_class}))});
     }
     Stop() {
-        const indicator = Main.panel.statusArea['voco-panel@voco.local'];
+        const indicator = Main.panel.statusArea['voco-panel@sergiopesch.com'];
         children(indicator).find(actor => actor.accessible_name?.endsWith('Stop dictation')).emit('clicked', 1);
     }
     Menu() {
-        Main.panel.statusArea['voco-panel@voco.local'].menu.toggle();
+        Main.panel.statusArea['voco-panel@sergiopesch.com'].menu.toggle();
     }
     MenuAction(label) {
-        const item = Main.panel.statusArea['voco-panel@voco.local'].menu._getMenuItems()
+        const item = Main.panel.statusArea['voco-panel@sergiopesch.com'].menu._getMenuItems()
             .find(item => item.label?.text === label);
         if (item?.sensitive && item.visible) item.activate(null);
     }
@@ -64,7 +64,7 @@ export default class Probe extends Extension {
         }
     }
     Focus(enabled) {
-        const indicator = Main.panel.statusArea['voco-panel@voco.local'];
+        const indicator = Main.panel.statusArea['voco-panel@sergiopesch.com'];
         if (enabled) children(indicator).find(actor => actor instanceof St.Button).grab_key_focus();
         else global.stage.set_key_focus(null);
     }
@@ -96,7 +96,7 @@ export default class Probe extends Extension {
     // without a display manager; this probe's metadata keeps it through both.
     PushSessionMode(mode) { Main.sessionMode.pushMode(mode); }
     PopSessionMode(mode) { Main.sessionMode.popMode(mode); }
-    CompanionState() { return Main.extensionManager.lookup('voco-panel@voco.local')?.state ?? -1; }
+    CompanionState() { return Main.extensionManager.lookup('voco-panel@sergiopesch.com')?.state ?? -1; }
     Modifiers() { return global.get_pointer()[2]; }
     ActivateWindow(title) {
         const window = global.get_window_actors().map(actor => actor.meta_window).find(w => w.get_title() === title);
@@ -108,7 +108,7 @@ export default class Probe extends Extension {
     // paste gesture started just after this call returns.
     DisableCompanionAfter(ms) {
         GLib.timeout_add(GLib.PRIORITY_HIGH, ms, () => {
-            Main.extensionManager.disableExtension('voco-panel@voco.local');
+            Main.extensionManager.disableExtension('voco-panel@sergiopesch.com');
             return GLib.SOURCE_REMOVE;
         });
     }

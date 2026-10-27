@@ -60,7 +60,7 @@ Both packages install these paths:
 | `/usr/libexec/voco-browser-host` | The native messaging host for the [Chromium extension](../integrations/chromium/README.md) |
 | `/usr/share/voco/chromium/` | The extension's `manifest.json`, `background.js` and `content.js` |
 | `/etc/opt/chrome/native-messaging-hosts/`, `/etc/chromium/native-messaging-hosts/` | `com.voco.exact_field.json`, which lets the extension start the host |
-| `/usr/share/gnome-shell/extensions/voco-panel@voco.local/` | The [GNOME companion](../integrations/gnome/README.md) |
+| `/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/` | The [GNOME companion](../integrations/gnome/README.md) |
 | `/usr/libexec/voco-ibus-engine`, `/usr/lib/voco/ibus/`, `/usr/share/ibus/component/voco.xml` | The optional IBus shortcut engine |
 | `/usr/share/applications/VOCO.desktop` | The desktop entry |
 | `/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml` | AppStream metadata, including the release notes |
