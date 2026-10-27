@@ -220,6 +220,9 @@ jobs:
             sleep 0.5
           done
           python3 -c "import sys, time; print(f'model ready after {time.time() - float(sys.argv[1]):.1f} s')" "${start}"
+          # The helpers reach the X server from inside the confinement: a
+          # clipboard round trip through xclip, and xdotool's paste keys.
+          snap run --shell voco -c 'export DISPLAY=:99; printf "voco-trial" | xclip -selection clipboard -in; sleep 1; xclip -selection clipboard -out; echo; xdotool key --clearmodifiers shift+Insert; echo "xdotool exit $?"; notify-send --version'
           sleep 5
           pkill -f 'snap/voco/.*/usr/bin/voco' || true
           sleep 2
