@@ -789,13 +789,13 @@
     "intro": "The last step puts words into another app. VOCO does it the way you would: copy, then paste.",
     "story": [
       "insertion.rs pastes one group of words at a time. It puts the words on the clipboard, then presses Shift+Insert. In the code's words, \"Shift+Insert is the paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal emulators.\"",
-      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, its own virtual keyboard, and it waits for you to release the shortcut's keys.",
+      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, access to its own virtual keyboard, and it waits for you to release the shortcut's keys.",
       "An optional Chromium extension offers a second route. In a tab where you enable it, VOCO inserts words at the caret of one plain text field, and the extension confirms each insert with a receipt."
     ],
     "steps": [
       {
         "label": "Check",
-        "detail": "The text must be 1 to 100,000 bytes and the helpers ready. On Wayland the virtual keyboard must exist, and this session must be the active one."
+        "detail": "The text must be 1 to 100,000 bytes and the helpers ready. On Wayland this session must be the active one, and VOCO's own virtual keyboard must exist unless the GNOME companion will press the keys."
       },
       {
         "label": "Clean",
@@ -811,7 +811,7 @@
       },
       {
         "label": "Press",
-        "detail": "VOCO waits up to 1.5 seconds for the shortcut's modifier keys to be released, then sends Shift+Insert."
+        "detail": "VOCO waits up to 1.5 seconds for the shortcut's modifier keys to be released, and on X11 also while the X server reports Shift, Control, Alt, Super or AltGr held. Then it sends Shift+Insert."
       }
     ],
     "facts": [
@@ -826,6 +826,10 @@
       {
         "title": "Waiting for GNOME's switch",
         "text": "A helper reports owning its selection just before its request leaves for the X server, and until the server has it, an app pastes the previous copy. So where xclip copies on GNOME Wayland, VOCO copies PRIMARY first, then CLIPBOARD, and before the keys waits up to 100 ms for Mutter's read of the new CLIPBOARD. Nothing reads PRIMARY that way, so its early copy is a head start, not proof. Without the read in time, the keys go anyway."
+      },
+      {
+        "title": "Keys from inside GNOME Shell",
+        "text": "On GNOME Wayland, while the companion is attached and the copy GNOME has loaded offers Paste, the companion presses Shift and Insert from inside the Shell with a keyboard of its own, 12 ms apart, and replies with the moment its Insert press went out. VOCO asks each attached Shell once whether it offers Paste, and waits up to 1 second for each paste. A refusal, because a modifier is held or another paste is in flight, sends no keys, so the words wait; no reply in time makes the paste uncertain. Everywhere else, VOCO's own virtual keyboard presses the keys."
       },
       {
         "title": "Three failure outcomes",
@@ -864,6 +868,10 @@
       {
         "path": "apps/desktop/src-tauri/src/virtual_keyboard.rs",
         "why": "VOCO's own keyboard for the Wayland paste keys, which reports when Insert went out."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/panel.rs",
+        "why": "Asks the GNOME companion to press the paste keys when the Shell's loaded copy offers Paste."
       },
       {
         "path": "apps/desktop/src-tauri/src/selection_owner.rs",
@@ -1238,7 +1246,7 @@
     "story": [
       "Only one copy of VOCO runs per login. Launching it again brings the running copy forward and never starts a recording.",
       "Other programs reach VOCO through private sockets that check the caller's user ID. Notifications go through D-Bus, the desktop's message bus.",
-      "On Wayland, VOCO presses the paste keys through its own virtual keyboard. A udev rule in the package lets the person at the computer use /dev/uinput, so there is no service, daemon or group to set up."
+      "On Wayland, VOCO presses the paste keys through its own virtual keyboard, or on GNOME through the companion when it offers to. A udev rule in the package lets the person at the computer use /dev/uinput, so there is no service, daemon or group to set up."
     ],
     "steps": [
       {
@@ -1413,7 +1421,7 @@
       },
       {
         "title": "Paste keys for one person",
-        "text": "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift and Insert. Before copying and before sending keys, VOCO checks its originating session. An inactive or locked result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys."
+        "text": "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift and Insert, and so can the GNOME companion's, which answers only the attached VOCO. Before copying and before sending keys, VOCO checks its originating session. An inactive or locked result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys."
       },
       {
         "title": "Same user, not same program",
@@ -1560,6 +1568,10 @@
         "text": "Each paste's record says which selection the app read and how many milliseconds after the Insert press, that nothing read it within 300 ms, or that the helpers couldn't tell, as they can only where xclip copies on GNOME Wayland. A read shows that the app asked for the text, not that the words arrived."
       },
       {
+        "title": "Which keyboard typed",
+        "text": "Each paste's record also names the keyboard that sent its keys: companion, uinput or xdotool. report-dictation-quality-events.py counts them for each session, so timings can be compared by keyboard."
+      },
+      {
         "title": "Descriptive statistics",
         "text": "Percentiles use the nearest-rank method and keep their sample counts. A few runs describe those runs, nothing more."
       }
@@ -1639,7 +1651,7 @@
       },
       {
         "label": "Application checks",
-        "detail": "A release build runs end to end in private sessions: the GNOME panel, capture and paste into a focused field, the Wayland lifecycle and Chromium. On GNOME Wayland its paste keys go through VOCO's real virtual keyboard."
+        "detail": "A release build runs end to end in private sessions: the GNOME panel, capture and paste into a focused field, the Wayland lifecycle and Chromium. On GNOME Wayland its paste keys go through VOCO's real virtual keyboard, and the applications suite runs once more through the GNOME companion."
       },
       {
         "label": "Audit",
@@ -1662,6 +1674,14 @@
       {
         "title": "A bridge for the paste keys",
         "text": "The Wayland delivery suites give their private session /dev/uinput but no /dev/input. A test-only bridge outside the session grabs each device named VOCO virtual keyboard, so its keys reach no real desktop, and replays them in order into the session's display. It accepts only the paste gesture and refuses to run beside a graphical login."
+      },
+      {
+        "title": "Typing through the companion",
+        "text": "The companion run loads the repository's GNOME companion into the private session. Each production paste waits for it to attach and checks that it pressed the keys. /dev/null, which discards everything, stands in for /dev/uinput, so a paste that reached for VOCO's own keyboard couldn't type anywhere."
+      },
+      {
+        "title": "Paste against Mutter",
+        "text": "On each Shell it runs, the companion suite pastes into a GTK field 200 times through the companion and 200 times through Mutter's RemoteDesktop API, taking turns. Every paste must arrive exactly, and from the request to the Insert press the companion's median may be at most 1 ms above Mutter's, and its 99th percentile at most 2 ms. 20 more pastes go to a field under XWayland. Pastes asked for by another connection, with a modifier held, while one is in flight, at the lock screen or after disabling must send no key."
       },
       {
         "title": "GNOME 50 and 51, headless",
@@ -1716,6 +1736,10 @@
       {
         "path": "scripts/test-gnome-panel-container.sh",
         "why": "Runs the companion suite on a Fedora image's GNOME Shell in rootless Podman."
+      },
+      {
+        "path": "scripts/fixtures/paste-field.py",
+        "why": "The GTK field the companion suite times each paste in."
       },
       {
         "path": "runtime/speech/test_worker_protocol.py",
@@ -2146,7 +2170,7 @@
     "story": [
       "The optional companion for GNOME 46, 48, 50 and 51 shows VOCO's microphone in the top bar. While you dictate, a seven-bar meter opens on its left when there is room beside the clock.",
       "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing.",
-      "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs Alt+D or Alt+Shift+D inside the Shell, so other apps never see the shortcut."
+      "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs Alt+D or Alt+Shift+D inside the Shell, so other apps never see the shortcut, and presses VOCO's paste keys."
     ],
     "steps": [
       {
@@ -2192,6 +2216,10 @@
         "text": "When VOCO can't read the keyboards, it asks the companion through ModifiersClear whether the shortcut's keys are up before a Wayland paste."
       },
       {
+        "title": "Paste keys from the Shell",
+        "text": "From companion version 16, Paste presses Shift and Insert with one virtual keyboard per enable, 12 ms apart, and answers with the time the Insert press went out. It answers only the attached VOCO, and refuses with ModifiersHeld while a modifier is held and with Busy while another paste is in flight. Disabled during a paste, it releases the keys it holds, and GNOME disables it at the lock screen."
+      },
+      {
         "title": "Setup messages",
         "text": "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\" After an update, including a copy the Shell marked out of date at login: \"Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.\""
       },
@@ -2223,7 +2251,7 @@
     "files": [
       {
         "path": "integrations/gnome/voco-panel@voco.local/extension.js",
-        "why": "The companion: the pill, the bars, the menu and the Wayland grab."
+        "why": "The companion: the pill, the bars, the menu, the Wayland grab and the paste keys."
       },
       {
         "path": "integrations/gnome/voco-panel@voco.local/model.js",
@@ -2231,11 +2259,11 @@
       },
       {
         "path": "integrations/gnome/voco-panel@voco.local/metadata.json",
-        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 15."
+        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 16."
       },
       {
         "path": "apps/desktop/src-tauri/src/panel.rs",
-        "why": "VOCO's D-Bus service for the companion: Attach, state and the shortcut lease."
+        "why": "VOCO's D-Bus service for the companion: Attach, state, the shortcut lease and the Paste call."
       },
       {
         "path": "apps/desktop/src-tauri/src/panel_setup.rs",
@@ -2301,7 +2329,7 @@
     "intro": "Linux desktops differ in how programs may read keys and send them. VOCO picks a helper for each job from the session it runs in.",
     "story": [
       "VOCO reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY. If XDG_SESSION_TYPE says wayland, VOCO takes the Wayland path. If it says x11, VOCO takes X11 even when WAYLAND_DISPLAY is set. When XDG_SESSION_TYPE is tty, unset or empty, WAYLAND_DISPLAY chooses Wayland and DISPLAY alone chooses X11; neither variable means no desktop session.",
-      "On Wayland, keys go through VOCO's own virtual keyboard, a uinput device named VOCO virtual keyboard. On GNOME with an X display, xclip sets the clipboard through XWayland: GNOME lacks the wlroots data-control protocol, wl-copy's temporary focus surface can stall, and XWayland bridges the clipboard without taking focus. Other Wayland desktops use wl-copy.",
+      "On Wayland, keys go through VOCO's own virtual keyboard, a uinput device named VOCO virtual keyboard, or on GNOME through the companion's keyboard inside the Shell when it offers Paste. On GNOME with an X display, xclip sets the clipboard through XWayland: GNOME lacks the wlroots data-control protocol, wl-copy's temporary focus surface can stall, and XWayland bridges the clipboard without taking focus. Other Wayland desktops use wl-copy.",
       "On X11, xdotool sends the keys and xclip sets the clipboard. The table below shows each combination."
     ],
     "steps": [
@@ -2315,7 +2343,7 @@
       },
       {
         "label": "Keys",
-        "detail": "On Wayland VOCO presses Shift+Insert through its virtual keyboard. X11 uses xdotool."
+        "detail": "On Wayland the GNOME companion presses Shift+Insert when it offers Paste, and VOCO's virtual keyboard otherwise. X11 uses xdotool."
       },
       {
         "label": "Clipboard",
@@ -2348,8 +2376,12 @@
         "text": "If the keyboard stops accepting keys, VOCO releases Shift and drops the device, and the next paste creates a fresh one."
       },
       {
+        "title": "The companion's keyboard",
+        "text": "On GNOME Wayland, while the companion is attached and the copy GNOME has loaded offers Paste, it presses the keys from inside the Shell, so no new device has to settle first. A Shell still running an older copy keeps VOCO's keyboard until the next login."
+      },
+      {
         "title": "Keys stay on Wayland",
-        "text": "Even when xclip sets the clipboard on GNOME, the paste keys still go through the virtual keyboard."
+        "text": "Even when xclip sets the clipboard on GNOME, the paste keys still go through the companion or the virtual keyboard."
       }
     ],
     "files": [
@@ -2375,7 +2407,7 @@
       },
       {
         "path": "integrations/gnome/voco-panel@voco.local/extension.js",
-        "why": "The GNOME grab on Wayland."
+        "why": "The GNOME grab and paste keys on Wayland."
       },
       {
         "path": "packaging/udev/70-voco-uinput.rules",
@@ -2407,7 +2439,7 @@
         "xdotool"
       ],
       "correct": 1,
-      "why": "GNOME lacks the data-control protocol, so with DISPLAY set VOCO uses xclip through XWayland, which needs no window that takes focus. The paste keys still go through VOCO's virtual keyboard."
+      "why": "GNOME lacks the data-control protocol, so with DISPLAY set VOCO uses xclip through XWayland, which needs no window that takes focus. The paste keys still go through the companion or VOCO's virtual keyboard."
     },
     "lab": "journey",
     "comparison": {
@@ -2422,7 +2454,7 @@
         [
           "GNOME on Wayland",
           "The companion's Shell grab of Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
-          "VOCO virtual keyboard, after Mutter's read of a new xclip copy (up to 100 ms), the modifier wait and the session check; unavailable session status permits keys",
+          "The companion's keyboard when its loaded copy offers Paste, otherwise VOCO virtual keyboard, after Mutter's read of a new xclip copy (up to 100 ms), the modifier wait and the session check; unavailable session status permits keys",
           "xclip through XWayland when DISPLAY is set, run with -verbose so it reports each read; otherwise wl-copy"
         ],
         [
@@ -2434,7 +2466,7 @@
         [
           "X11",
           "VOCO's global key grab, toggling on release",
-          "xdotool key --clearmodifiers shift+Insert",
+          "xdotool key --clearmodifiers shift+Insert, once the shortcut is released and the X server reports no Shift, Control, Alt, Super or AltGr held, waiting at most 1.5 seconds",
           "xclip"
         ],
         [
