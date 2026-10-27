@@ -20,6 +20,10 @@ The [release process](docs/release-process.md) describes how a release is made.
 - The GNOME companion is now `voco-panel@sergiopesch.com`, a name
   extensions.gnome.org can publish. `voco --setup-panel` moves an enabled
   `voco-panel@voco.local` to it; sign out and back in afterwards.
+- The companion's description now says what it does on Wayland: it holds VOCO's
+  shortcut and presses VOCO's paste keys, Shift+Insert, only when VOCO asks. Its
+  metadata names its version in `version-name`, which extensions.gnome.org
+  keeps, so panel setup counts a copy from the site as current.
 
 ### Fixed
 

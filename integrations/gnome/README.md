@@ -145,8 +145,10 @@ calls), `model.js` (state checks, shared with Node tests), `metadata.json`,
 `stylesheet.css` and `voco-symbol.png`, a copy of `assets/voco-symbol-ui.png`.
 In `apps/desktop/src-tauri/`, `src/panel.rs` serves the bus, `src/tray.rs` builds
 the state and `src/panel_setup.rs` runs `resources/voco_gnome_panel.py`. A change
-that needs Shell to load new code raises both `version` in `metadata.json` and
-`COMPANION_VERSION` in `voco_gnome_panel.py`. `scripts/package-gnome-panel.py`
+that needs Shell to load new code raises both `version-name` in `metadata.json`
+and `COMPANION_VERSION` in `voco_gnome_panel.py`. The metadata has no `version`,
+because extensions.gnome.org replaces it with its own upload number; it keeps
+`version-name`, so a copy from the site and the packaged copy read alike. `scripts/package-gnome-panel.py`
 writes a reproducible archive of the five files, attached to each release.
 
 - `node --test scripts/test-panel-model.mjs` checks state validation, meter

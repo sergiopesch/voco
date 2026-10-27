@@ -363,9 +363,11 @@ and the update check. [The snap](#the-snap) lists its rules.
   setup opens the companion's page on extensions.gnome.org through the portal and
   reports the companion active once it attaches. Keep "sign out and back in"
   feedback distinct from active status.
-- Bump the companion metadata and the setup contract together when loaded code
-  must change, and compare GNOME's loaded metadata so an in-place upgrade can't
-  report old code as current. After an upgrade, users re-run panel setup and sign
+- Bump the companion metadata's `version-name` and the setup contract together
+  when loaded code must change, and compare GNOME's loaded metadata so an
+  in-place upgrade can't report old code as current. The metadata has no
+  `version`: extensions.gnome.org replaces it with its own upload number and
+  keeps `version-name`. After an upgrade, users re-run panel setup and sign
   out and back in. A copy Shell marked out of date at login (after a
   distribution upgrade, for example) awaits that login: setup may enable it and
   reports `restart`, never a load error.
