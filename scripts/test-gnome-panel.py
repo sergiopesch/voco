@@ -713,13 +713,20 @@ try:
         mutter_keys.key(INSERT_KEY, False); time.sleep(.012)
         mutter_keys.key(SHIFT_KEY, False)
         return started
+    # A paste's report marks the end of its gesture, 36 ms after Shift went down.
+    # The next paste waits for it, as one waits for VOCO's call to return:
+    # overlapping gestures would share the seat's Shift.
+    unsettled = []
     def via_companion():
-        return hand_out('paste')[1]
+        request_id, started = hand_out('paste')
+        unsettled.append(request_id)
+        return started
     def measure(field, via, text):
         field.command('clear', 'cleared'); field.command('copy ' + text, 'copied')
         started = via()
         landed = wait_for(lambda: field.text() == text, 3)
         inserts = field.seen('insert', started)
+        while unsettled: report_on(unsettled.pop(), 2)
         return {'landed': landed, 'inserts': len(inserts), 'shift': bool(inserts) and inserts[0]['shift'],
                 'ms': round((inserts[0]['t'] - started) * 1000, 2) if inserts else None}
     def quantile(values, q):
