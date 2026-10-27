@@ -217,8 +217,8 @@ only part of its hypothesis. VOCO never restores the previous clipboard.
 through logind's `LockedHint`: it subscribes to the session's changes, then
 reads the first value on the same main context. While logind doesn't answer, it
 keeps trying, up to every 30 s. While the screen is locked, a paste
-fails with no change, checked before the copy and again just before keys, and
-no shortcut starts dictation. When the screen locks during a dictation, VOCO
+fails with no change, checked before the copy and again just before keys on
+every route, and no shortcut starts dictation. When the screen locks during a dictation, VOCO
 stops it and notifies "Dictation stopped"; words it couldn't type go to the
 clipboard as after any Stop.
 
@@ -393,7 +393,41 @@ with a 15-second timeout. Both of those automatic checks happen only while
 `automaticUpdateChecks` is on: with **Only when I choose**, neither runs, and
 turning automatic checks back on checks at once. **Check for updates** in
 Settings always asks. VOCO
-only tells you a release exists; it never downloads or installs anything.
+only tells you a release exists; it never downloads or installs anything. In
+the snap the Snap Store updates VOCO, so `store_updates` tells the renderer to
+check nothing, and Settings shows only the installed version.
+
+## The snap
+
+`confinement.rs` knows VOCO runs as its snap when snapd names it `voco`
+(`SNAP_NAME`). Strict confinement gives it no `/dev/uinput`, `/dev/input`,
+IBus engine, systemd user manager or network, so the snap skips what needs
+them: the virtual keyboard, passive evdev, the IBus listener, the retired
+`voco-ydotoold.service` and the update check. On Wayland only the companion
+types for it: the paste check passes once the companion asks for work, and a
+paste without it typed nothing. `voco --check-desktop-input` and
+`--check-panel` run apart from the VOCO the companion works for, so they ask it
+with `CompanionAsking`, which answers any caller; when no VOCO answers, they
+say to open VOCO and check again. Until then, setup says what's missing: on GNOME,
+the VOCO panel from extensions.gnome.org; on other Wayland desktops, the `.deb`
+or RPM instead. X11 sessions keep `xdotool` and `xclip`.
+
+logind's session signals don't reach a snap, because `login-session-observe`
+passes only the manager's, and `GetSessionByPID` is out of its reach. So the
+snap binds the session it started in by `XDG_SESSION_ID`, or as the user's one
+graphical login, and reads `LockedHint` once a second instead of following it.
+It checks the session before the copy and before the keys on X11 too. Before
+`login-session-observe` is connected, logind answers it with `AccessDenied`:
+unlike a logind that doesn't answer, which leaves pasting allowed, a refusal
+refuses each paste and the paste check, which names the `snap connect`
+command, until a later check binds the session.
+
+The snap can't ask GNOME Shell about extensions, nor enable one, so
+`panel_setup.rs` reports its companion active once it asks for work, and
+otherwise points setup and Help to `COMPANION_PAGE` on extensions.gnome.org;
+setup shows the link wherever the paste check fails for want of the companion.
+snapd installs the snap's desktop entry as `voco_voco.desktop`, which
+`activation.rs` counts as VOCO's launcher in the snap only.
 
 ## Logs
 

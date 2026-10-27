@@ -21,6 +21,7 @@ const XML: &str = r#"<node><interface name="org.voco.Panel1">
 <method name="PasteDone"><arg type="u" direction="in"/><arg type="t" direction="in"/></method>
 <method name="PasteRefused"><arg type="u" direction="in"/><arg type="s" direction="in"/></method>
 <method name="ModifiersState"><arg type="u" direction="in"/><arg type="b" direction="in"/></method>
+<method name="CompanionAsking"><arg type="b" direction="out"/></method>
 </interface></node>"#;
 /// ReserveShortcut: the companion holds its grab at every status and renews it about
 /// once a second.
@@ -183,6 +184,35 @@ pub(crate) fn companion_asks_for_work() -> bool {
     ASKING
         .lock()
         .is_ok_and(|asking| asking.as_deref() == Some(owner.as_str()))
+}
+
+/// Whether the companion asks VOCO for work. The VOCO that serves
+/// org.voco.Panel knows; another process, such as `voco --check-desktop-input`,
+/// asks that VOCO. None when no VOCO answers.
+pub(crate) fn companion_asks_for_voco() -> Option<bool> {
+    if SERVE_CONTEXT.lock().is_ok_and(|context| context.is_some()) {
+        return Some(companion_asks_for_work());
+    }
+    ask_running_voco()
+}
+
+/// The answer of the VOCO that serves org.voco.Panel, within half a second.
+pub(crate) fn ask_running_voco() -> Option<bool> {
+    let bus = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).ok()?;
+    bus.call_sync(
+        Some("org.voco.Panel"),
+        PATH,
+        INTERFACE,
+        "CompanionAsking",
+        None,
+        None,
+        gio::DBusCallFlags::NO_AUTO_START,
+        500,
+        gio::Cancellable::NONE,
+    )
+    .ok()?
+    .get::<(bool,)>()
+    .map(|(asking,)| asking)
 }
 
 /// Work for the companion. A confined VOCO can answer the Shell but not call
@@ -563,7 +593,8 @@ fn release(host: &impl Host, lease: &mut Lease) {
 
 type Reply = Result<Option<glib::Variant>, (&'static str, &'static str)>;
 
-/// Every method but Attach, answered only for the attached Shell connection.
+/// Every method but Attach, answered only for the attached Shell connection,
+/// except CompanionAsking, which any caller may ask.
 fn handle(
     host: &impl Host,
     lease: &mut Lease,
@@ -571,6 +602,9 @@ fn handle(
     method: &str,
     parameters: &glib::Variant,
 ) -> Reply {
+    if method == "CompanionAsking" {
+        return Ok(Some((companion_asks_for_work(),).to_variant()));
+    }
     if !lease.admits(sender) {
         return Err(("org.voco.NotAttached", "Attach from GNOME Shell first"));
     }
@@ -1213,6 +1247,39 @@ mod tests {
         set_owner(Some(":1.6".into()));
         assert!(!companion_asks_for_work(), "a new attachment asks again");
         set_owner(None);
+    }
+
+    #[test]
+    fn any_caller_learns_whether_the_companion_asks_for_work() {
+        let _serial = serial();
+        let host = fake(idle(Some("<Alt>d")));
+        let mut lease = attach(":1.5");
+        let ask = |lease: &mut Lease, sender: &str| {
+            call(&host, lease, sender, "CompanionAsking", ().to_variant())
+        };
+        // `voco --check-desktop-input` in the snap asks from its own connection.
+        assert_eq!(ask(&mut Lease::default(), ":1.9"), Ok(false));
+        *ASKING.lock().unwrap() = Some(":1.5".into());
+        assert_eq!(ask(&mut Lease::default(), ":1.9"), Ok(true));
+        assert_eq!(ask(&mut lease, ":1.5"), Ok(true));
+        assert!(lease.admits(":1.5"), "asking changes no lease");
+        set_owner(None);
+        assert_eq!(ask(&mut Lease::default(), ":1.9"), Ok(false));
+        let info = gio::DBusNodeInfo::for_xml(XML).unwrap();
+        let interface = info.lookup_interface(INTERFACE).unwrap();
+        assert!(interface.lookup_method("CompanionAsking").is_some());
+    }
+
+    #[test]
+    fn the_voco_serving_the_bridge_answers_for_itself() {
+        let _serial = serial();
+        *SERVE_CONTEXT.lock().unwrap() = Some(glib::MainContext::new());
+        set_owner(Some(":1.5".into()));
+        assert_eq!(companion_asks_for_voco(), Some(false));
+        *ASKING.lock().unwrap() = Some(":1.5".into());
+        assert_eq!(companion_asks_for_voco(), Some(true));
+        set_owner(None);
+        *SERVE_CONTEXT.lock().unwrap() = None;
     }
 
     #[test]

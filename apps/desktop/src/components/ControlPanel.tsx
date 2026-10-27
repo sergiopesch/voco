@@ -52,6 +52,8 @@ interface ControlPanelProps {
   errorMessage: string | null;
   statusLabel: string;
   updateState: UpdateCheckState;
+  /** The snap: the Snap Store updates VOCO, so Settings has no update controls. */
+  updatesByStore?: boolean;
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
   captureNotice?: string | null;
@@ -156,6 +158,7 @@ export function ControlPanel({
   errorMessage,
   statusLabel,
   updateState,
+  updatesByStore = false,
   runtimeDiagnostics,
   dictationStatus,
   captureNotice,
@@ -816,6 +819,7 @@ export function ControlPanel({
             setupError={nativeMicrophone?.error ?? errorMessage}
             onRetrySetup={nativeMicrophone?.error ? () => void nativeMicrophone.initialize().catch(() => {}) : undefined}
             desktopSetupError={desktopSetupError}
+            desktopSetupPanel={desktopInput?.available === false && desktopInput.setupArea === "panel"}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
             onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
             checkingDesktopSetup={checkingInput}
@@ -939,6 +943,12 @@ export function ControlPanel({
               {activeSection === "Updates" ? (
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Updates</h2></div>
+                  {updatesByStore ? (
+                  <div className="voco-preferences__card voco-preferences__form">
+                    <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Installed version</strong></span><span className="voco-preferences__row-value">{updateState.currentVersion ?? "Checking…"}</span></div>
+                    <p className="voco-preferences__status" role="status">The Snap Store keeps VOCO up to date.</p>
+                  </div>
+                  ) : (<>
                   <div className="voco-preferences__card voco-preferences__form">
                     <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Installed version</strong></span><span className="voco-preferences__row-value">{updateState.currentVersion ?? "Checking…"}</span></div>
                     <p className="voco-preferences__status" role="status">{updateStatusCopy}</p>
@@ -963,6 +973,7 @@ export function ControlPanel({
                       {updateState.latestRelease?.url ? <p><strong>Release page:</strong> <code>{updateState.latestRelease.url}</code></p> : null}
                     </div>
                   </details>
+                  </>)}
                 </section>
               ) : null}
 

@@ -239,7 +239,9 @@ fn input_status_with(preflight: &InputPreflight) -> DesktopInputStatus {
         } else {
             support.detail.clone()
         },
-        setup_area: None,
+        // The snap's Wayland keys wait for the companion, which the panel's
+        // setup points to.
+        setup_area: (!support.available && support.detail == SNAP_NEEDS_PANEL).then_some("panel"),
     }
 }
 
@@ -318,7 +320,11 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ));
     }
     let wayland = matches!(preflight.session, SessionKind::Wayland);
-    let keys = paste_keys(wayland, companion_asks_for_work);
+    let keys = paste_keys(
+        wayland,
+        crate::confinement::is_snap(),
+        companion_asks_for_work,
+    );
     // Create the keyboard before replacing clipboard contents, so a missing
     // device can never leave the clipboard changed with nothing typed.
     if keys == PasteKeys::Uinput {
@@ -333,14 +339,10 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     let helper = desktop_clipboard_helper();
     let preflight_ms = elapsed_ms(started);
     let settle_ms = settle(*last_paste);
-    // Behind a locked screen keys would reach the lock screen, not the app.
-    // Checked after the waits, just before the copy, and again before keys.
-    #[cfg(target_os = "linux")]
-    if crate::desktop_session::is_locked() {
-        return Err(InsertionError::no_mutation(
-            crate::desktop_session::LOCKED_DETAIL,
-        ));
-    }
+    // Behind a locked screen keys would reach the lock screen, not the app,
+    // and on Wayland they reach whichever login owns the seat. Checked after
+    // the waits, just before the copy, and again before keys, on every route.
+    check_session(wayland)?;
     let mut modifier_wait_ms = 0;
     // Wayland keys are raw events: a still-held shortcut modifier would turn
     // Shift+Insert into another chord. X11 delivers its keys to VOCO's grab
@@ -353,7 +355,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     };
     let before_paste = || {
         modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
-        check_before_keys(wayland)
+        check_session(wayland)
     };
     let result = if reads_observable(preflight.session, helper) {
         observed_transaction(helper, payload, before_paste, || send_paste_keys(keys))
@@ -613,13 +615,15 @@ fn virtual_keyboard_access() -> Result<(), String> {
     Err("Wayland paste keys need Linux.".into())
 }
 
-/// The check just before keys, after the copy and the modifier wait: the screen
-/// may have locked, or the session switched, meanwhile. Nothing is typed yet,
-/// so a refusal here keeps the text for the next try.
-fn check_before_keys(wayland: bool) -> Result<(), InsertionError> {
+/// The check just before the copy, and again just before keys after the modifier
+/// wait: the screen may have locked, or the session switched, meanwhile.
+/// Nothing is typed yet, so a refusal keeps the text for the next try.
+fn check_session(wayland: bool) -> Result<(), InsertionError> {
     #[cfg(target_os = "linux")]
     {
-        if wayland {
+        // The snap can't follow the lock through logind's signals and must not
+        // type while logind refuses it, on X11 as on Wayland.
+        if wayland || crate::confinement::is_snap() {
             return crate::virtual_keyboard::require_active_session()
                 .map_err(InsertionError::no_mutation);
         }
@@ -655,11 +659,17 @@ impl PasteKeys {
 }
 
 /// On GNOME Wayland, the attached companion types once its loaded copy asks
-/// VOCO for work; otherwise VOCO's uinput device does. X11 keeps xdotool.
-fn paste_keys(wayland: bool, companion_asks_for_work: impl FnOnce() -> bool) -> PasteKeys {
+/// VOCO for work; otherwise VOCO's uinput device does, except in the snap,
+/// which has no other keyboard, so a missing companion refuses there. X11 keeps
+/// xdotool.
+fn paste_keys(
+    wayland: bool,
+    confined: bool,
+    companion_asks_for_work: impl FnOnce() -> bool,
+) -> PasteKeys {
     if !wayland {
         PasteKeys::Xdotool
-    } else if companion_asks_for_work() {
+    } else if confined || companion_asks_for_work() {
         PasteKeys::Companion
     } else {
         PasteKeys::Uinput
@@ -674,6 +684,16 @@ fn companion_asks_for_work() -> bool {
 #[cfg(not(target_os = "linux"))]
 fn companion_asks_for_work() -> bool {
     false
+}
+
+#[cfg(target_os = "linux")]
+fn companion_asks_for_voco() -> Option<bool> {
+    crate::panel::companion_asks_for_voco()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn companion_asks_for_voco() -> Option<bool> {
+    Some(false)
 }
 
 /// Shift+Insert through the companion or VOCO's virtual keyboard on Wayland, or
@@ -869,12 +889,63 @@ fn input_preflight_with(
 }
 
 fn input_preflight() -> InputPreflight {
-    input_preflight_with(
+    // The snap can't open /dev/uinput; on Wayland only the companion types for it.
+    let confined = crate::confinement::is_snap();
+    let keyboard: fn() -> Result<(), String> = if confined {
+        companion_keys_ready
+    } else {
+        virtual_keyboard_access
+    };
+    let mut preflight = input_preflight_with(
         session_kind(),
         desktop_clipboard_helper(),
         command_available,
-        virtual_keyboard_access,
+        keyboard,
+    );
+    // Until login-session-observe is connected the snap can't check the session
+    // it types into, so it types nothing.
+    #[cfg(target_os = "linux")]
+    if confined && crate::desktop_session::logind_denied() {
+        for support in [
+            &mut preflight.diagnostics.type_simulation,
+            &mut preflight.diagnostics.clipboard,
+        ] {
+            support.available = false;
+            support.detail = crate::desktop_session::LOGIND_DENIED_DETAIL.into();
+        }
+    }
+    preflight
+}
+
+/// What the snap needs on GNOME Wayland before it can type.
+const SNAP_NEEDS_PANEL: &str = "On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.";
+/// On other Wayland desktops the snap can't type at all.
+const SNAP_DESKTOP_UNSUPPORTED: &str = "The VOCO snap types only on GNOME and in X11 sessions. On this desktop, install VOCO's .deb or RPM from its GitHub releases instead.";
+
+/// For `voco --check-desktop-input` while no VOCO answers: the companion
+/// attaches to the running VOCO, so only that VOCO knows.
+const SNAP_CHECK_NEEDS_VOCO: &str = "On Wayland, the VOCO snap types through the VOCO panel, and only the running VOCO can tell whether the panel is connected. Open VOCO, then check again.";
+
+/// The snap's Wayland keys: the companion's, once it asks VOCO for work.
+fn companion_keys_ready() -> Result<(), String> {
+    let asking = companion_asks_for_voco();
+    if asking == Some(true) {
+        return Ok(());
+    }
+    Err(snap_keys_missing(
+        crate::is_gnome_desktop(&crate::current_desktop()),
+        asking.is_some(),
     )
+    .into())
+}
+
+/// `voco_answered`: a VOCO answered whether its companion asks for work.
+fn snap_keys_missing(gnome: bool, voco_answered: bool) -> &'static str {
+    match (gnome, voco_answered) {
+        (false, _) => SNAP_DESKTOP_UNSUPPORTED,
+        (true, true) => SNAP_NEEDS_PANEL,
+        (true, false) => SNAP_CHECK_NEEDS_VOCO,
+    }
 }
 
 /// A failed spawn proves the helper did not run. Any later error is uncertain:
@@ -1067,13 +1138,27 @@ mod tests {
     use std::cell::Cell;
 
     #[test]
+    fn the_snap_names_what_it_needs_to_type_on_wayland() {
+        assert_eq!(snap_keys_missing(true, true), SNAP_NEEDS_PANEL);
+        // A check outside VOCO can't learn about the companion until VOCO runs.
+        assert_eq!(snap_keys_missing(true, false), SNAP_CHECK_NEEDS_VOCO);
+        for answered in [false, true] {
+            assert_eq!(snap_keys_missing(false, answered), SNAP_DESKTOP_UNSUPPORTED);
+        }
+    }
+
+    #[test]
     fn wayland_pastes_through_the_companion_only_when_it_asks_for_work() {
-        assert_eq!(paste_keys(true, || true), PasteKeys::Companion);
-        assert_eq!(paste_keys(true, || false), PasteKeys::Uinput);
-        assert_eq!(
-            paste_keys(false, || panic!("an X11 paste asked the companion")),
-            PasteKeys::Xdotool
-        );
+        assert_eq!(paste_keys(true, false, || true), PasteKeys::Companion);
+        assert_eq!(paste_keys(true, false, || false), PasteKeys::Uinput);
+        // The snap has no other keyboard: an absent companion refuses.
+        assert_eq!(paste_keys(true, true, || false), PasteKeys::Companion);
+        for confined in [false, true] {
+            assert_eq!(
+                paste_keys(false, confined, || panic!("X11 asked the companion")),
+                PasteKeys::Xdotool
+            );
+        }
         let labels =
             [PasteKeys::Companion, PasteKeys::Uinput, PasteKeys::Xdotool].map(PasteKeys::label);
         assert_eq!(
@@ -1839,6 +1924,8 @@ mod tests {
         #[cfg(target_os = "linux")]
         if companion {
             crate::panel::serve_for_fixture(Duration::from_secs(10)).unwrap();
+            // What the snap's `voco --check-desktop-input` asks the running VOCO.
+            assert_eq!(crate::panel::ask_running_voco(), Some(true));
         }
         let result = desktop_paste(&text).unwrap();
         assert_eq!(result.outcome, "dispatched");

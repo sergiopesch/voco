@@ -16,6 +16,8 @@ interface OnboardingProps {
   attempted: boolean;
   setupError?: string | null;
   desktopSetupError?: string | null;
+  /** The failure needs the companion, which the panel's setup provides. */
+  desktopSetupPanel?: boolean;
   checkingDesktopSetup?: boolean;
   onCheckDesktopSetup?: () => void;
   onOpenDesktopSetupGuide?: () => void;
@@ -46,7 +48,7 @@ interface OnboardingProps {
 
 export function Onboarding({ microphone, status, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
-  onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError,
+  onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError, desktopSetupPanel = false,
   checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide, spelling = "british", focusPrimary = false,
   wordsDone = true, wordsChecked = true, onContinue, shortcutNote = null }: OnboardingProps) {
   // Only this view shows recognition text, so only it re-renders per hypothesis.
@@ -100,6 +102,7 @@ export function Onboarding({ microphone, status, passed,
     </div>
     {desktopSetupError ? <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details> : null}
     {desktopSetupError && onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
+    {desktopSetupError && desktopSetupPanel ? <PanelSetup disabled={busy || blocked} /> : null}
     {testing ? <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “{suggestion}”</span>}
     </div> : null}

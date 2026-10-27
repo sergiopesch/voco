@@ -12,6 +12,9 @@ const FAILED_CHECK_TTL: Duration = Duration::from_secs(2);
 
 type CheckResult = Result<PanelSetupStatus, String>;
 
+/// Where the snap's companion comes from, since the snap can't ship it.
+pub const COMPANION_PAGE: &str = "https://extensions.gnome.org/#q=VOCO";
+
 #[derive(Default)]
 struct CheckCache {
     generation: u64,
@@ -30,6 +33,9 @@ pub struct PanelSetupStatus {
     pub status: String,
     pub detail: String,
     pub can_enable: bool,
+    /// The companion's page, for the snap, which can't install it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 /// On Wayland only the desktop can consume these chords: VOCO's GNOME panel,
@@ -78,6 +84,13 @@ fn shortcut_remedy(panel: PanelSetupStatus, attached: bool) -> Option<String> {
 }
 
 pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
+    #[cfg(target_os = "linux")]
+    if crate::confinement::is_snap() {
+        return Ok(snap_status(
+            &crate::current_desktop(),
+            crate::panel::companion_asks_for_voco(),
+        ));
+    }
     check_on(&crate::current_desktop(), || run_helper(enable))
 }
 
@@ -85,14 +98,49 @@ pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
 /// and GI to learn that.
 fn check_on(desktop: &str, helper: impl FnOnce() -> CheckResult) -> CheckResult {
     if !crate::is_gnome_desktop(desktop) {
-        return Ok(PanelSetupStatus {
-            status: "other-desktop".into(),
-            detail: "Use the VOCO tray menu for status and Stop. Labels depend on your desktop."
-                .into(),
-            can_enable: false,
-        });
+        return Ok(other_desktop());
     }
     helper()
+}
+
+fn other_desktop() -> PanelSetupStatus {
+    PanelSetupStatus {
+        status: "other-desktop".into(),
+        detail: "Use the VOCO tray menu for status and Stop. Labels depend on your desktop.".into(),
+        can_enable: false,
+        url: None,
+    }
+}
+
+/// The snap can't ask GNOME Shell about extensions, nor enable one, so the
+/// companion's own attachment says it runs: `asking`, from the running VOCO,
+/// None when none answered. Without it, setup points to the page the snap's
+/// companion comes from.
+fn snap_status(desktop: &str, asking: Option<bool>) -> PanelSetupStatus {
+    if !crate::is_gnome_desktop(desktop) {
+        return other_desktop();
+    }
+    match asking {
+        Some(true) => PanelSetupStatus {
+            status: "active".into(),
+            detail: "Live panel bars and Stop are active.".into(),
+            can_enable: false,
+            url: None,
+        },
+        Some(false) => PanelSetupStatus {
+            status: "extensions-site".into(),
+            detail: "Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.".into(),
+            can_enable: false,
+            url: Some(COMPANION_PAGE.into()),
+        },
+        // Only `voco --check-panel` asks while no VOCO runs.
+        None => PanelSetupStatus {
+            status: "unavailable".into(),
+            detail: "Only the running VOCO can tell whether the VOCO panel is connected. Open VOCO, then check again.".into(),
+            can_enable: false,
+            url: None,
+        },
+    }
 }
 
 fn run_helper(enable: bool) -> CheckResult {
@@ -173,7 +221,25 @@ mod tests {
             status: status.into(),
             detail: "Sign out and back in to load the shortcut.".into(),
             can_enable: false,
+            url: None,
         })
+    }
+
+    #[test]
+    fn the_snap_learns_its_companion_from_the_attachment_and_points_to_its_page() {
+        let missing = snap_status("ubuntu:GNOME", Some(false));
+        assert_eq!(missing.status, "extensions-site");
+        assert_eq!(missing.url.as_deref(), Some(COMPANION_PAGE));
+        assert!(!missing.can_enable, "the snap can't enable an extension");
+        let active = snap_status("ubuntu:GNOME", Some(true));
+        assert_eq!((active.status.as_str(), active.url), ("active", None));
+        // A check outside VOCO, with no VOCO to ask, claims neither.
+        let unknown = snap_status("ubuntu:GNOME", None);
+        assert_eq!(unknown.status, "unavailable");
+        assert!(unknown.detail.contains("Open VOCO, then check again"));
+        for asking in [None, Some(false), Some(true)] {
+            assert_eq!(snap_status("KDE", asking).status, "other-desktop");
+        }
     }
 
     #[test]

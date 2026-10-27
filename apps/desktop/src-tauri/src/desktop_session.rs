@@ -17,13 +17,21 @@ const MAX_SESSIONS: usize = 16;
 const KEYBOARD_SEAT: &str = "seat0";
 const REFUSED: &str = "This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.";
 pub const LOCKED_DETAIL: &str = "The screen is locked, so VOCO sent no paste keys.";
+pub const LOGIND_DENIED_DETAIL: &str = "The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. Run snap connect voco:login-session-observe, then try again.";
+/// A snap receives no session signals, so it reads LockedHint this often.
+const LOCK_POLL: Duration = Duration::from_secs(1);
 /// The originating login's LockedHint, as logind last reported it.
 static SESSION_LOCKED: AtomicBool = AtomicBool::new(false);
+/// Whether logind's last answer refused this process, as it refuses a snap
+/// without login-session-observe.
+static LOGIND_DENIED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LookupError {
     Missing,
     Unavailable,
+    /// logind refused this process. Unlike Unavailable, this refuses keys.
+    Denied,
 }
 
 #[derive(Clone, Debug)]
@@ -101,8 +109,15 @@ impl Binding {
                 false
             }
             Err(LookupError::Unavailable) => true,
+            Err(LookupError::Denied) => false,
         }
     }
+}
+
+/// Not bound yet. Genuine unavailability keeps the fail-open policy; a refusal
+/// by logind refuses keys until a later check binds.
+fn undecided(error: LookupError) -> (Binding, bool) {
+    (Binding::Unresolved, error != LookupError::Denied)
 }
 
 fn bind(sessions: &impl Sessions, path: String, uid: u32, id: Option<&str>) -> (Binding, bool) {
@@ -122,7 +137,7 @@ fn bind(sessions: &impl Sessions, path: String, uid: u32, id: Option<&str>) -> (
             )
         }
         Ok(_) | Err(LookupError::Missing) => (Binding::Refused, false),
-        Err(LookupError::Unavailable) => (Binding::Unresolved, true),
+        Err(error) => undecided(error),
     }
 }
 
@@ -130,14 +145,14 @@ fn resolve(sessions: &impl Sessions, uid: u32, hint: Option<&str>) -> (Binding, 
     match sessions.for_process() {
         // Kernel/cgroup membership takes precedence over an inherited environment.
         Ok(path) => return bind(sessions, path, uid, None),
-        Err(LookupError::Unavailable) => return (Binding::Unresolved, true),
         Err(LookupError::Missing) => {}
+        Err(error) => return undecided(error),
     }
     if let Some(id) = hint.filter(|id| !id.is_empty()) {
         return match sessions.for_id(id) {
             Ok(path) => bind(sessions, path, uid, Some(id)),
             Err(LookupError::Missing) => (Binding::Refused, false),
-            Err(LookupError::Unavailable) => (Binding::Unresolved, true),
+            Err(error) => undecided(error),
         };
     }
     // User-service apps often have neither cgroup session membership nor an ID
@@ -146,7 +161,7 @@ fn resolve(sessions: &impl Sessions, uid: u32, hint: Option<&str>) -> (Binding, 
     let candidates = match sessions.for_user(uid) {
         Ok(candidates) if candidates.len() <= MAX_SESSIONS => candidates,
         Ok(_) => return (Binding::Refused, false),
-        Err(_) => return (Binding::Unresolved, true),
+        Err(error) => return undecided(error),
     };
     let mut origin = None;
     for (id, path) in candidates {
@@ -155,7 +170,7 @@ fn resolve(sessions: &impl Sessions, uid: u32, hint: Option<&str>) -> (Binding, 
             // A login known to have departed cannot be replaced on a later check.
             Err(LookupError::Missing) => return (Binding::Refused, false),
             // An incomplete enumeration cannot establish a unique origin.
-            Err(LookupError::Unavailable) => return (Binding::Unresolved, true),
+            Err(error) => return undecided(error),
         };
         if session.uid != uid || !session.graphical_user() {
             continue;
@@ -191,9 +206,17 @@ pub fn require_active() -> Result<(), String> {
     };
     if binding.check(&logind, unsafe { libc::geteuid() }, SESSION_HINT.as_deref()) {
         Ok(())
+    } else if logind_denied() {
+        Err(LOGIND_DENIED_DETAIL.into())
     } else {
         Err(REFUSED.into())
     }
+}
+
+/// Whether logind refuses this process, as it does a snap until
+/// login-session-observe is connected; setup then shows the remedy.
+pub fn logind_denied() -> bool {
+    LOGIND_DENIED.load(Ordering::SeqCst)
 }
 
 /// Whether the originating login's screen is locked. Without logind or a
@@ -275,6 +298,17 @@ fn bound_session() -> Watch<(gio::DBusConnection, String)> {
 /// in the order logind sent them, so the first read can't undo a newer change.
 fn follow_lock(bus: gio::DBusConnection, path: String, on_lock: Arc<dyn Fn() + Send + Sync>) {
     glib::MainContext::default().invoke(move || {
+        // A snap receives no session signals, since login-session-observe passes
+        // only the manager's: it reads LockedHint once a second instead. The
+        // timeout keeps the shared system bus for good.
+        if crate::confinement::is_snap() {
+            read_locked_hint(bus.clone(), path.clone(), on_lock.clone(), LOCK_POLL);
+            glib::timeout_add_local(LOCK_POLL, move || {
+                poll_locked_hint(&bus, &path, &on_lock);
+                glib::ControlFlow::Continue
+            });
+            return;
+        }
         let signal_lock = on_lock.clone();
         let _subscription = bus.signal_subscribe(
             Some("org.freedesktop.login1"),
@@ -337,6 +371,39 @@ fn read_locked_hint(
     );
 }
 
+/// One read of LockedHint for the snap's poll. A refusal is remembered for
+/// setup; anything else waits for the next read.
+fn poll_locked_hint(bus: &gio::DBusConnection, path: &str, on_lock: &Arc<dyn Fn() + Send + Sync>) {
+    let on_lock = on_lock.clone();
+    bus.call(
+        Some("org.freedesktop.login1"),
+        path,
+        "org.freedesktop.DBus.Properties",
+        "Get",
+        Some(&(SESSION_INTERFACE, "LockedHint").to_variant()),
+        None,
+        gio::DBusCallFlags::NO_AUTO_START,
+        LOCK_POLL.as_millis() as i32,
+        gio::Cancellable::NONE,
+        move |reply| match reply {
+            Ok(reply) => {
+                LOGIND_DENIED.store(false, Ordering::SeqCst);
+                let locked = reply
+                    .get::<(glib::Variant,)>()
+                    .and_then(|(value,)| value.get::<bool>());
+                if let Some(locked) = locked {
+                    note_lock(&SESSION_LOCKED, locked, &*on_lock);
+                }
+            }
+            Err(error) => {
+                if lookup_error(&error) == LookupError::Denied {
+                    LOGIND_DENIED.store(true, Ordering::SeqCst);
+                }
+            }
+        },
+    );
+}
+
 /// The next wait between tries: twice as long, up to 30 s.
 fn longer(delay: Duration) -> Duration {
     (delay * 2).min(Duration::from_secs(30))
@@ -394,7 +461,8 @@ impl Logind {
         if remaining.is_zero() {
             return Err(LookupError::Unavailable);
         }
-        self.bus
+        let reply = self
+            .bus
             .call_sync(
                 Some("org.freedesktop.login1"),
                 path,
@@ -406,7 +474,12 @@ impl Logind {
                 remaining.as_millis().clamp(1, 250) as i32,
                 gio::Cancellable::NONE,
             )
-            .map_err(|error| lookup_error(&error))
+            .map_err(|error| lookup_error(&error));
+        LOGIND_DENIED.store(
+            reply.as_ref().err() == Some(&LookupError::Denied),
+            Ordering::SeqCst,
+        );
+        reply
     }
 
     fn session_path(
@@ -438,22 +511,24 @@ fn remote_error(error: &glib::Error) -> Option<glib::GString> {
 }
 
 fn lookup_error(error: &glib::Error) -> LookupError {
-    if matches!(
-        remote_error(error).as_deref(),
+    match remote_error(error).as_deref() {
         Some(
             "org.freedesktop.login1.NoSessionForPID"
-                | "org.freedesktop.login1.NoSuchSession"
-                | "org.freedesktop.DBus.Error.UnknownObject"
-        )
-    ) {
-        LookupError::Missing
-    } else {
-        LookupError::Unavailable
+            | "org.freedesktop.login1.NoSuchSession"
+            | "org.freedesktop.DBus.Error.UnknownObject",
+        ) => LookupError::Missing,
+        Some("org.freedesktop.DBus.Error.AccessDenied") => LookupError::Denied,
+        _ => LookupError::Unavailable,
     }
 }
 
 impl Sessions for Logind {
     fn for_process(&self) -> Result<String, LookupError> {
+        // Out of a snap's reach even with login-session-observe; the snap binds
+        // through its session ID or the user's sessions.
+        if crate::confinement::is_snap() {
+            return Err(LookupError::Missing);
+        }
         self.session_path("GetSessionByPID", &(std::process::id(),).to_variant())
     }
 
@@ -647,6 +722,11 @@ mod tests {
                 "org.freedesktop.DBus.Error.NoReply",
                 LookupError::Unavailable,
             ),
+            // What a snap without login-session-observe hears.
+            (
+                "org.freedesktop.DBus.Error.AccessDenied",
+                LookupError::Denied,
+            ),
         ] {
             let name = std::ffi::CString::new(name).unwrap();
             let error: glib::Error = unsafe {
@@ -725,6 +805,30 @@ mod tests {
                 .cloned()
                 .unwrap_or(Err(LookupError::Missing))
         }
+    }
+
+    #[test]
+    fn a_refusal_by_logind_refuses_keys_until_a_later_check_binds() {
+        let mut f = Fixture::new();
+        f.process = Err(LookupError::Denied);
+        let mut binding = Binding::Unresolved;
+        assert!(!binding.check(&f, 1000, None));
+        assert_eq!(
+            binding,
+            Binding::Unresolved,
+            "a refusal never binds or refuses for good"
+        );
+        // Connected later: the next check binds through the session ID.
+        f.process = Err(LookupError::Missing);
+        let origin = f.add("origin", true);
+        assert!(binding.check(&f, 1000, Some("origin")));
+        assert!(matches!(&binding, Binding::Bound(bound) if bound.path == origin));
+        // A refusal on a bound origin refuses keys without replacing it.
+        f.sessions
+            .get_mut()
+            .insert(origin, Err(LookupError::Denied));
+        assert!(!binding.check(&f, 1000, None));
+        assert!(matches!(binding, Binding::Bound(_)));
     }
 
     #[test]

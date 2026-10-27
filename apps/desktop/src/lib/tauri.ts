@@ -28,6 +28,11 @@ export async function openConfigDirectory(): Promise<void> {
 }
 
 /** The account's full name, for setup's first My words entry; null without one. */
+/** Whether the Snap Store updates VOCO, which then never checks for updates itself. */
+export async function storeUpdates(): Promise<boolean> {
+  return invoke<boolean>("store_updates");
+}
+
 export async function getAccountName(): Promise<string | null> {
   return invoke<string | null>("get_account_name");
 }
@@ -54,6 +59,8 @@ export interface PanelSetupStatus {
   status: string;
   detail: string;
   canEnable: boolean;
+  /** The companion's page, for the snap, which can't install it. */
+  url?: string;
 }
 export function getPanelSetupStatus(): Promise<PanelSetupStatus> {
   return invoke("get_panel_setup_status");

@@ -18,6 +18,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `desktop_session.rs` — Retains the originating graphical login and checks its active seat before Wayland paste, and follows its screen lock through logind's `LockedHint`; bounded logind discovery supports user-manager app launches.
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the My words rules, the copy from the legacy `voice` directory and the update cache.
+- `confinement.rs` — Whether VOCO runs as its strict snap, which skips what confinement forbids and leaves updates to the Snap Store.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
 - `tray.rs` — Tray icon, menu, status line and meter animation.
 - `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.
@@ -378,7 +379,7 @@ can't take its single-instance lock or reach the running instance, it prints
 | Option | Behaviour | Exit status |
 | --- | --- | --- |
 | `--toggle` | Asks the VOCO running in this session to start or stop. It doesn't launch VOCO, change focus or confirm the recording state. | 1 if VOCO's socket can't be reached |
-| `--check-desktop-input` | Checks the paste prerequisites: the clipboard helper, plus `xdotool` on X11 or access to `/dev/uinput` on Wayland. It doesn't launch VOCO, create a keyboard or send keys. | 1 on failure |
+| `--check-desktop-input` | Checks the paste prerequisites: the clipboard helper, plus `xdotool` on X11 or access to `/dev/uinput` on Wayland. In the snap on Wayland, it asks the running VOCO whether the companion asks it for work instead. It doesn't launch VOCO, create a keyboard or send keys. | 1 on failure |
 | `--check-panel` | Checks the GNOME companion without changing settings. | 2 unless the companion is active, the desktop isn't GNOME, or GNOME isn't 46, 48, 50 or 51; 1 on error |
 | `--setup-panel` | Enables the packaged GNOME companion for this user, on GNOME 46, 48, 50 or 51. It may need a sign-out and never restarts Shell. | As for `--check-panel` |
 | `--version` | Prints `VOCO` and the version. | 0 |

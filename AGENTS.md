@@ -490,14 +490,17 @@ and the update check. [The snap](#the-snap) lists its rules.
   `dbus` slot for `org.voco.Panel`; `check-devops.sh` checks both lists.
 - It types only through the companion on GNOME Wayland and through `xdotool` on
   X11. Elsewhere Start is refused, and setup names the build that supports that
-  desktop. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
+  desktop. Only the running VOCO knows whether the companion asks it for work, so
+  `voco --check-desktop-input` and `--check-panel` ask it with
+  `org.voco.Panel1.CompanionAsking`, the one method any caller may use, and with
+  no VOCO to ask they claim neither. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
   X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus route.
 - logind's session signals don't reach a snap, because `login-session-observe`
   receives only the manager's, and `GetSessionByPID` is out of its reach. So the
   snap binds its origin through a validated session ID or the user's sessions,
-  reads `LockedHint` and `Active` at each check and once a second while
-  dictating, and stops dictation when it reads locked. Until
-  `login-session-observe` is connected, both checks reject (`no-mutation`) and
+  reads `LockedHint` and `Active` at each check and `LockedHint` once a second,
+  and stops dictation when it reads locked. Until `login-session-observe` is
+  connected, both checks reject (`no-mutation`), on X11 as on Wayland, and
   Start is refused with the `snap connect` remedy.
 - Its config, journal and logs live in `$SNAP_USER_DATA`. It never reads a
   package's config, and a package never reads its.

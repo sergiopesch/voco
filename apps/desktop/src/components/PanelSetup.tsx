@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { enableGnomePanel, getPanelSetupStatus } from "@/lib/tauri";
+import { enableGnomePanel, getPanelSetupStatus, openExternalUrl } from "@/lib/tauri";
 import type { PanelSetupStatus } from "@/lib/tauri";
 
 const unavailable: PanelSetupStatus = { status: "unavailable", canEnable: false,
@@ -33,6 +33,11 @@ export function PanelSetup({ disabled = false, note = null }: { disabled?: boole
   }
   return <div className="voco-panel-setup" role="group" aria-label="Panel setup">
     <p role="status">{note ?? status?.detail ?? "Checking your panel…"}</p>
+    {status?.url ?
+      <button className="voco-button voco-button--secondary" disabled={disabled}
+        onClick={() => void openExternalUrl(status.url!).catch(() => {})}>
+        Get the VOCO panel
+      </button> : null}
     {status && !["active", "other-desktop", "unsupported"].includes(status.status) ?
       <button className="voco-button voco-button--ghost" disabled={disabled}
         onClick={() => void check(status.canEnable)}>

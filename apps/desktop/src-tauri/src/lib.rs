@@ -9,6 +9,7 @@ mod browser_event_delivery;
 mod browser_protocol;
 mod browser_socket;
 mod config;
+mod confinement;
 mod crash_recovery;
 #[cfg(target_os = "linux")]
 mod desktop_notifications;
@@ -507,6 +508,12 @@ fn current_desktop() -> String {
     std::env::var_os("XDG_CURRENT_DESKTOP")
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default()
+}
+
+/// Passive evdev observes the presets on Wayland, except in the snap, which
+/// can't read /dev/input.
+fn uses_evdev_hotkey(session_is_wayland: bool, hotkey: &str) -> bool {
+    !confinement::is_snap() && wayland_preset(session_is_wayland, hotkey).is_some()
 }
 
 /// Whether an XDG_CURRENT_DESKTOP value names GNOME, alone or as in "ubuntu:GNOME".
@@ -1154,6 +1161,7 @@ const DESKTOP_SETUP_GUIDE: &str =
 
 fn is_allowed_external_url(url: &str) -> bool {
     url == DESKTOP_SETUP_GUIDE
+        || url == panel_setup::COMPANION_PAGE
         || url
             .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
             .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
@@ -1624,7 +1632,7 @@ fn sync_global_shortcut_binding(
 
 fn apply_hotkey_runtime_state(app: &tauri::AppHandle, new_hotkey: &str) -> Result<(), String> {
     let session_is_wayland = is_wayland_session();
-    let use_evdev_hotkey = wayland_preset(session_is_wayland, new_hotkey).is_some();
+    let use_evdev_hotkey = uses_evdev_hotkey(session_is_wayland, new_hotkey);
 
     #[cfg(target_os = "linux")]
     if use_evdev_hotkey {
@@ -2213,15 +2221,22 @@ pub fn run() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     if is_wayland_session() {
-        retire_legacy_input_service();
+        // The snap reaches neither systemd's user manager nor /dev/uinput; the
+        // companion types for it.
+        let confined = confinement::is_snap();
+        if !confined {
+            retire_legacy_input_service();
+        }
         // Bind the originating login before another session can become active.
         if let Err(detail) = desktop_session::require_active() {
             warn!("{detail}");
         }
         // Created now so the compositor has added the device long before the
         // first paste; a failure stays visible through desktop setup status.
-        if let Err(detail) = virtual_keyboard::ensure() {
-            warn!("{detail}");
+        if !confined {
+            if let Err(detail) = virtual_keyboard::ensure() {
+                warn!("{detail}");
+            }
         }
     }
     #[cfg(target_os = "linux")]
@@ -2259,6 +2274,7 @@ pub fn run() -> Result<(), String> {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            confinement::store_updates,
             crash_recovery::list_crash_recovery,
             crash_recovery::get_crash_journal_epoch,
             crash_recovery::dismiss_crash_recovery,
@@ -2353,13 +2369,16 @@ pub fn run() -> Result<(), String> {
                     }
                 });
             }
-            start_ibus_shortcut_listener(app.handle().clone());
+            // The snap ships no IBus engine.
+            if !confinement::is_snap() {
+                start_ibus_shortcut_listener(app.handle().clone());
+            }
             let configured_hotkey = configured_hotkey();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
             EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
-            let use_evdev_hotkey = wayland_preset(wayland_session, &hotkey).is_some();
+            let use_evdev_hotkey = uses_evdev_hotkey(wayland_session, &hotkey);
             USE_EVDEV_HOTKEY.store(use_evdev_hotkey, Ordering::SeqCst);
             trace_hotkey_event(
                 "hotkey_backend_selected",
@@ -2498,6 +2517,11 @@ mod tests {
     #[test]
     fn external_url_allowlist_accepts_voco_releases_and_exact_setup_guide() {
         assert!(is_allowed_external_url(DESKTOP_SETUP_GUIDE));
+        // The snap's companion page, exactly.
+        assert!(is_allowed_external_url(panel_setup::COMPANION_PAGE));
+        assert!(!is_allowed_external_url(
+            "https://extensions.gnome.org/#q=elsewhere"
+        ));
         assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
         ));
