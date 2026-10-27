@@ -420,7 +420,9 @@ It checks the session before the copy and before the keys on X11 too. Before
 `login-session-observe` is connected, logind answers it with `AccessDenied`:
 unlike a logind that doesn't answer, which leaves pasting allowed, a refusal
 refuses each paste and the paste check, which names the `snap connect`
-command, until a later check binds the session.
+command. Until logind answers without refusing, each paste check asks it
+again, so `voco --check-desktop-input` sees the refusal, and a plug connected
+a moment ago counts at once.
 
 The store connects neither `login-session-observe` nor `audio-record` on its
 own. So before each recording, the voice test and Say it included, the snap
