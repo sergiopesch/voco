@@ -175,37 +175,6 @@ jobs:
               raise SystemExit("The confined worker wrote different text from the package's worker")
           PY
 
-      - name: Cold warm-up with xz compression, for comparison
-        timeout-minutes: 30
-        run: |
-          root="${RUNNER_TEMP}/snap-root"
-          xz="${RUNNER_TEMP}/xz/voco_${VOCO_VERSION}_amd64.snap"
-          mkdir -p "$(dirname "${xz}")"
-          start=$(date +%s)
-          mksquashfs "${root}" "${xz}" -noappend -comp xz -all-root -no-xattrs -no-fragments -quiet
-          echo "xz pack took $(( $(date +%s) - start )) s"
-          ls -l "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.snap" "${xz}"
-          sudo snap remove --purge voco
-          sudo snap install --dangerous "${xz}"
-          sudo snap connect voco:audio-record
-          sudo snap connect voco:login-session-observe
-          snap run voco --version
-          common="${HOME}/snap/voco/common"
-          mkdir -p "${common}/fixtures"
-          cp trial/snap/worker_check.py "${common}/"
-          cp tests/fixtures/speech/manifest.json tests/fixtures/speech/*.wav "${common}/fixtures/"
-          for round in 1 2; do
-            sync; echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null
-            snap run --shell voco -c '"$VOCO_STREAM_PYTHON" -E -s -B "$SNAP_USER_COMMON/worker_check.py" "$VOCO_STREAM_PYTHON" "$VOCO_STREAM_WORKER" "$SNAP_USER_COMMON/fixtures"' \
-              > "${RUNNER_TEMP}/xz-${round}.json"
-            python3 -c 'import json, sys; r = json.load(open(sys.argv[1])); print(sys.argv[1].rsplit("/", 1)[1], "ready", r["readySeconds"], "s, WER", r["aggregateWer"])' \
-              "${RUNNER_TEMP}/xz-${round}.json"
-          done
-          sudo snap remove --purge voco
-          sudo snap install --dangerous "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.snap"
-          sudo snap connect voco:audio-record
-          sudo snap connect voco:login-session-observe
-
       - name: The app warms its worker under confinement
         timeout-minutes: 10
         run: |
@@ -228,6 +197,34 @@ jobs:
           sleep 2
           tail -60 "${RUNNER_TEMP}/app.log"
           grep -q 'Bundled Nemotron streaming model ready' "${RUNNER_TEMP}/app.log"
+
+      - name: Install a nested GNOME Shell, PulseAudio and the field's toolkit
+        timeout-minutes: 15
+        run: |
+          sudo apt-get install -y --no-install-recommends gnome-shell xwayland pulseaudio pulseaudio-utils \
+            python3-gi gir1.2-gtk-3.0 xdotool dbus libglib2.0-bin
+
+      - name: The snap dictates into a GTK field on X11
+        timeout-minutes: 10
+        run: python3 trial/snap/e2e.py x11 "${RUNNER_TEMP}/e2e-x11"
+
+      - name: The snap dictates into a GTK field on GNOME Wayland through the companion
+        timeout-minutes: 15
+        run: python3 trial/snap/e2e.py gnome-wayland "${RUNNER_TEMP}/e2e-gnome"
+
+      - name: End-to-end evidence
+        if: always()
+        run: |
+          for platform in x11 gnome; do
+            dir="${RUNNER_TEMP}/e2e-${platform}"
+            [ -d "${dir}" ] || continue
+            echo "=== ${platform}"
+            ls -l "${dir}"
+            tail -n 60 "${dir}/voco.log" 2>/dev/null || true
+            tail -n 40 "${dir}/gnome-shell.log" 2>/dev/null || true
+            tail -n 20 "${dir}/field.err" 2>/dev/null || true
+            grep -h '"paste_keys"' "${dir}/performance.jsonl" 2>/dev/null | head -5 || true
+          done
 
       - name: AppArmor and seccomp denials
         if: always()
