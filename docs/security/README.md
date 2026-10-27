@@ -230,7 +230,8 @@ session bus it owns `org.voco.Panel` through a `dbus` slot: confinement lets it
 answer GNOME Shell's calls but never call the Shell, so the companion asks it
 for work. On Wayland only the companion types for it; on X11 `xdotool` does, as
 for the packages. Until `login-session-observe` is connected, logind refuses
-the snap, and it sends no paste keys.
+the snap, and it sends no paste keys; until `audio-record` is connected, the
+snap opens no microphone and names the `snap connect` command.
 
 ## Chromium extension
 
