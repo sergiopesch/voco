@@ -376,6 +376,8 @@ try:
             wait_for(lambda: counts()['launcher_activation_presented'] > 0, 'the launcher start to present VOCO')
             wait_for(lambda: note_windows() or popover_shown(), 'the launcher start to show the popover', timeout=20)
             check_ready_popover('a launcher start')
+            # The renderer traces the popover it showed, and what closes one that closes as it opens (#204).
+            assert counts()['interactive_surface_shown'], 'The launcher start showed the popover without tracing it'
         else:
             # Well past the frontend's readiness, when a launcher start has already opened.
             for _ in range(30):
@@ -383,6 +385,7 @@ try:
                 pump(.1)
             assert not requested and not counts()['launcher_activation_presented'], 'A login autostart was taken as a launcher click'
             assert not popover_shown(), 'A login autostart opened the popover'
+            assert not counts()['interactive_surface_shown'], 'A login autostart showed a window'
             wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready', timeout=5)
             tray_state = dict(status=[label for label in tray_menus() if label.startswith('VOCO — ')])
         # No idle recording: opening VOCO, or starting it in the tray, never captures.

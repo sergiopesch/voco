@@ -34,6 +34,11 @@ try {
         // A launch noted before the renderer loads, as a cold launch from the launcher has.
         if(new URL(location.href).searchParams.get('onboarded')==='1')window.config.onboardingCompleted=true;
         if(new URL(location.href).searchParams.get('launcher')==='pending')window.activationPending=true;
+        // An X11 session, whose popover closes on any focus loss.
+        if(new URL(location.href).searchParams.get('session')==='x11'){
+          const base=window.nativeCall;
+          window.nativeCall=async(name,args)=>{const value=await base(name,args);return name==='getRuntimeDiagnostics'?{...value,sessionType:'x11-or-other'}:value;};
+        }
         window.source={selectionToken:'token-1',name:'fixture-source',label:'Public fixture source',index:62,objectSerial:'62',isMonitor:false};
         window.catalog={revision:'r1',sources:[window.source],defaultSelectionToken:'token-1'};
         window.nativeInvoke=async(name,args)=>{
@@ -373,6 +378,18 @@ try {
         assert.equal(await page.evaluate(()=>window.calls.some(c=>c[0]==='traceHotkeyEvent'&&c[1]==='launcher_activation_presented')),launch === 'pending',launch);
       }
       results.push({case:'cold-launch-opens-the-popover-only-for-a-pending-launch',passed:true});
+      // A launcher start's popover can close as it opens (#204). The trace says when it
+      // was shown and what closed it: on X11, a focus loss.
+      await page.goto(origin + '/app-microphone-check?scenario=enabled&onboarded=1&launcher=pending&session=x11');
+      await page.waitForFunction(()=>window.calls?.some(c=>c[0]==='traceHotkeyEvent'&&c[1]==='interactive_surface_shown'));
+      const shown=await page.evaluate(()=>window.calls.find(c=>c[0]==='traceHotkeyEvent'&&c[1]==='interactive_surface_shown')[2]);
+      assert.ok(Number.isInteger(shown?.durationMs)&&shown.durationMs>=0,JSON.stringify(shown));
+      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='getRuntimeDiagnostics'));
+      await page.evaluate(()=>window.focusListeners.forEach(listener=>listener({payload:false})));
+      await page.waitForFunction(()=>window.store.getState().surface==='hidden');
+      const surfaceTrace=await page.evaluate(()=>window.calls.filter(c=>c[0]==='traceHotkeyEvent'&&/^(popover_focus|interactive_surface)_/.test(c[1])).map(c=>c[1]));
+      assert.deepEqual(surfaceTrace,['interactive_surface_shown','popover_focus_lost','interactive_surface_dismissed']);
+      results.push({case:'an-x11-focus-loss-closes-the-popover-and-says-so',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();
       await page.evaluate(()=>window.silentFixture=true);

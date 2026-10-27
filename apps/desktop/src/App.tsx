@@ -284,6 +284,9 @@ export function App() {
     panelRequestVersionRef.current += 1;
     surfaceSyncVersionRef.current += 1;
     remapFocusGuardRef.current.invalidate();
+    // With the popover's focus changes, the trace says what closed a window
+    // that closes as it opens (#204).
+    if (currentSurface !== "hidden") void traceHotkeyEvent("interactive_surface_dismissed").catch(() => {});
     setSurface("hidden");
     return true;
   }, [setSurface]);
@@ -947,11 +950,19 @@ export function App() {
     const syncVersion = surfaceSyncVersionRef.current + 1;
     surfaceSyncVersionRef.current = syncVersion;
     remapFocusGuardRef.current.invalidate();
+    const requestedAt = performance.now();
 
     async function syncWindowSurface() {
       const isCurrentRequest = () =>
         surfaceSyncVersionRef.current === syncVersion &&
         useStore.getState().surface === surface;
+      // From the request until the window calls returned, queue included.
+      const traceShown = () => {
+        if (!isCurrentRequest()) return;
+        void traceHotkeyEvent("interactive_surface_shown", {
+          durationMs: Math.round(performance.now() - requestedAt),
+        }).catch(() => {});
+      };
       if (!isCurrentRequest()) {
         return;
       }
@@ -1011,6 +1022,7 @@ export function App() {
           focus: () => currentWindow.setFocus(),
           isFocused: () => currentWindow.isFocused(),
         });
+        traceShown();
         return;
       }
 
@@ -1034,6 +1046,7 @@ export function App() {
         focus: () => currentWindow.setFocus(),
         isFocused: () => currentWindow.isFocused(),
       });
+      traceShown();
     }
 
     const operation = surfaceSyncQueueRef.current.then(syncWindowSurface);
@@ -1151,6 +1164,7 @@ export function App() {
     window.addEventListener("keydown", onKeyDown);
     const cleanupFocusListener = cleanupDeferredListener(
       currentWindow.onFocusChanged(({ payload: focused }) => {
+        void traceHotkeyEvent(focused ? "popover_focus_gained" : "popover_focus_lost").catch(() => {});
         if (!isWaylandSession(runtimeSessionTypeRef.current)) {
           if (!focused) dismissInteractiveSurface();
           return;
