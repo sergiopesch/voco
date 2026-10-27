@@ -25,6 +25,8 @@ report = {'passed': False, 'suite': suite, 'scope': f'GNOME {shell_version.split
           'shellVersion': shell_version, 'states': {}}
 state = dict(version=1, token='1:1', stopSession='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
 actions = []; attached = []; detached = []; fail_next = []; stalled = []; stall_state = []
+# The companion's pending NextRequest calls, and what it reports back (AGENTS.md, Delivery).
+requests = []; reports = []
 reservations = []; held = []; hold_reservation = []; fail_reservation = []; stop_reservations = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 # The synthetic service serves the app's own interface, so it can't drift from panel.rs.
@@ -67,6 +69,10 @@ def method(connection, sender, path, interface, name, params, invocation):
         invocation.return_value(GLib.Variant('(b)', (accepted,)))
     elif name == 'Detach':
         detached.append(sender); invocation.return_value(None)
+    elif name == 'NextRequest':
+        requests.append(invocation)
+    elif name in ('PasteDone', 'PasteRefused', 'ModifiersState'):
+        reports.append((name, params.unpack())); invocation.return_value(None)
 registration = bus.register_object('/org/voco/Panel', Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0], method, None, None)
 owner = Gio.bus_own_name_on_connection(bus, 'org.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
 def pump(seconds):
@@ -668,12 +674,22 @@ try:
         def close(self):
             self.process.terminate(); self.process.wait(timeout=5); pump(.3)
     SHIFT_KEY, INSERT_KEY = 42, 110
-    def paste_call(connection=bus):
-        return connection.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1', 'Paste',
-            None, GLib.VariantType('(t)'), Gio.DBusCallFlags.NO_AUTO_START, 2000, None).unpack()[0]
-    def refusal(connection=bus):
-        try: paste_call(connection); return None
-        except GLib.Error as error: return str(error)
+    request_ids = iter(range(1, 1_000_000))
+    def take_request():
+        # Work goes to the newest call, the current attachment's, as VOCO answers
+        # it; earlier ones belong to attachments that are gone.
+        assert wait_for(lambda: requests, 2), 'the companion must ask for work'
+        invocation = requests.pop()
+        while requests: requests.pop().return_value(GLib.Variant('(su)', ('idle', 0)))
+        return invocation
+    def hand_out(kind):
+        request_id = next(request_ids)
+        invocation = take_request(); started = time.monotonic()
+        invocation.return_value(GLib.Variant('(su)', (kind, request_id)))
+        return request_id, started
+    def report_on(request_id, timeout=2):
+        found = lambda: [r for r in reports if r[1][0] == request_id]
+        return found()[0] if wait_for(found, timeout) else None
     class MutterKeys:
         """Mutter's RemoteDesktop API, which GNOME Remote Desktop and the portal use:
         the baseline Paste must keep up with."""
@@ -697,13 +713,20 @@ try:
         mutter_keys.key(INSERT_KEY, False); time.sleep(.012)
         mutter_keys.key(SHIFT_KEY, False)
         return started
+    # A paste's report marks the end of its gesture, 36 ms after Shift went down.
+    # The next paste waits for it, as one waits for VOCO's call to return:
+    # overlapping gestures would share the seat's Shift.
+    unsettled = []
     def via_companion():
-        started = time.monotonic(); paste_call(); return started
+        request_id, started = hand_out('paste')
+        unsettled.append(request_id)
+        return started
     def measure(field, via, text):
         field.command('clear', 'cleared'); field.command('copy ' + text, 'copied')
         started = via()
         landed = wait_for(lambda: field.text() == text, 3)
         inserts = field.seen('insert', started)
+        while unsettled: report_on(unsettled.pop(), 2)
         return {'landed': landed, 'inserts': len(inserts), 'shift': bool(inserts) and inserts[0]['shift'],
                 'ms': round((inserts[0]['t'] - started) * 1000, 2) if inserts else None}
     def quantile(values, q):
@@ -720,54 +743,61 @@ try:
     paste_p99 = {name: quantile(values, .99) for name, values in paste_ms.items()}
     report['paste'] = {'wayland': {'rounds': 200, 'requestToInsertMedianMs': paste_median, 'requestToInsertP99Ms': paste_p99}}
     assert paste_median['companion'] <= paste_median['mutter'] + 1 and paste_p99['companion'] <= paste_p99['mutter'] + 2, report['paste']
-    # Refusals type nothing: another connection, a held modifier, a paste in flight.
+    # Each report follows its gesture, 36 ms after the Insert the field saw.
+    pasted = lambda: [r for r in reports if r[0] == 'PasteDone']
+    assert wait_for(lambda: len(pasted()) >= 200, 2) and all(r[1][1] > 0 for r in pasted()), \
+        f'each paste reports its Insert time: {len(pasted())} reports'
+    # Refusals type nothing and say why: a held modifier, a paste in flight.
     def silent_since(started): pump(.3); return not field.seen('insert', started)
-    stranger = Gio.DBusConnection.new_for_address_sync(os.environ['DBUS_SESSION_BUS_ADDRESS'],
-        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
-    started = time.monotonic(); refused = refusal(stranger); stranger.close_sync(None)
-    assert refused and 'NotAttached' in refused and silent_since(started), refused
     keys('keydown', 'Alt_L'); pump(.05)
-    started = time.monotonic(); refused = refusal()
-    assert refused and 'ModifiersHeld' in refused and silent_since(started), refused
+    request_id, started = hand_out('modifiers')
+    assert report_on(request_id) == ('ModifiersState', (request_id, False)), reports[-3:]
+    request_id, started = hand_out('paste')
+    assert report_on(request_id) == ('PasteRefused', (request_id, 'ModifiersHeld')) and silent_since(started), reports[-3:]
     keys('keyup', 'Alt_L'); pump(.05)
+    request_id, started = hand_out('modifiers')
+    assert report_on(request_id) == ('ModifiersState', (request_id, True)), reports[-3:]
     field.command('clear', 'cleared'); field.command('copy busyx', 'copied')
-    first = []; started = time.monotonic()
-    bus.call('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1', 'Paste', None, GLib.VariantType('(t)'),
-        Gio.DBusCallFlags.NO_AUTO_START, 2000, None, lambda connection, result: first.append(connection.call_finish(result)))
-    refused = refusal()
-    assert refused and 'Busy' in refused, refused
-    assert wait_for(lambda: first and field.text() == 'busyx', 2) and len(field.seen('insert', started)) == 1, field.text()
+    first, started = hand_out('paste')
+    second, _ = hand_out('paste')
+    assert report_on(second) == ('PasteRefused', (second, 'Busy')), reports[-3:]
+    assert wait_for(lambda: report_on(first, 0) and field.text() == 'busyx', 2) and len(field.seen('insert', started)) == 1, field.text()
     # GNOME disables the companion at the lock screen; ScreenShield.activate()
     # pushes this session mode.
     before_attach = len(attached)
     call('PushSessionMode', GLib.Variant('(s)', ('unlock-dialog',)))
     assert wait_for(lambda: call('CompanionState').unpack()[0] != 1, 5), 'the lock screen must disable the companion'
-    started = time.monotonic(); refused = refusal()
-    assert refused and silent_since(started), refused
+    request_id, started = hand_out('paste')
+    assert silent_since(started) and not report_on(request_id, .3), 'the lock screen must send no key'
     call('PopSessionMode', GLib.Variant('(s)', ('unlock-dialog',)))
     assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again after the lock screen'
     pump(.4)
     assert measure(field, via_companion, 'unlockedx')['landed'], 'Paste must work again after the lock screen'
-    # Disabled between Shift and Insert: the call fails and no key stays held.
-    field.command('clear', 'cleared'); field.command('copy midwayx', 'copied')
-    outcome = []; before_attach = len(attached)
-    call('DisableCompanionAfter', GLib.Variant('(u)', (6,)))
-    def finished(connection, result):
-        try: outcome.append(connection.call_finish(result))
-        except GLib.Error as error: outcome.append(str(error))
-    bus.call('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1', 'Paste', None, GLib.VariantType('(t)'),
-        Gio.DBusCallFlags.NO_AUTO_START, 2000, None, finished)
-    assert wait_for(lambda: outcome, 2) and 'Disabled' in str(outcome[0]), outcome
-    pump(.2)
+    # Disabled between Shift and Insert: the companion says so, and no key stays
+    # held. A disable that lands before or after the gesture cuts nothing, so try again.
+    for _ in range(3):
+        field.command('clear', 'cleared'); field.command('copy midwayx', 'copied')
+        before_attach = len(attached)
+        call('DisableCompanionAfter', GLib.Variant('(u)', (8,)))
+        request_id, _ = hand_out('paste')
+        outcome = report_on(request_id); pump(.2)
+        if outcome == ('PasteRefused', (request_id, 'Disabled')): break
+        if call('CompanionState').unpack()[0] != 1:
+            subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
+        assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again'
+        pump(.4)
+    else:
+        raise AssertionError('no paste was cut short: %r' % reports[-3:])
     assert not call('Modifiers').unpack()[0] & 1, 'a cut paste must release Shift'
-    started = time.monotonic(); refused = refusal()
-    assert refused and silent_since(started), 'a disabled companion must send no key'
+    request_id, started = hand_out('paste')
+    assert silent_since(started) and not report_on(request_id, .3), 'a disabled companion must send no key'
     subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
     assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again once enabled'
     pump(.4)
     assert measure(field, via_companion, 'enabledx')['landed'], 'Paste must work again once enabled'
     field.close()
-    report['paste'].update(refusals=['another connection', 'held modifier', 'busy', 'unlock-dialog', 'disabled'], cutGestureReleasedShift=True)
+    report['paste'].update(refusals=['held modifier', 'busy', 'unlock-dialog', 'disabled'], modifierRequests=True,
+                           cutGestureReleasedShift=True)
     # The same, under XWayland: X11 apps get the paste too.
     displays = re.findall(r'Using public X11 display (:\d+)', (evidence / 'shell.log').read_text())
     authorities = sorted(Path(os.environ['XDG_RUNTIME_DIR']).glob('.mutter-Xwaylandauth.*'), key=lambda path: path.stat().st_mtime)

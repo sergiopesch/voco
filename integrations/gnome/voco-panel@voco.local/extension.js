@@ -15,15 +15,17 @@ const NAME = 'org.voco.Panel';
 const PATH = '/org/voco/Panel';
 const INTERFACE = 'org.voco.Panel1';
 const INPUT_PATH = '/org/voco/PanelInput';
+// For a VOCO from before NextRequest, which asks here before a uinput paste.
 const INPUT_XML = '<node><interface name="org.voco.PanelInput1">' +
     '<method name="ModifiersClear"><arg type="b" direction="out"/></method>' +
-    '<method name="Paste"><arg type="t" name="insertPressedUs" direction="out"/></method>' +
     '</interface></node>';
-// Paste sends only these, evdev codes as VOCO's uinput keyboard declares them,
-// with VOCO's 12 ms between events.
+// A paste sends only these, evdev codes as VOCO's uinput keyboard declares
+// them, with VOCO's 12 ms between events.
 const KEY_SHIFT = 42;
 const KEY_INSERT = 110;
 const PASTE_GAP_MS = 12;
+// VOCO answers a pending NextRequest within 20 s, so the call never expires first.
+const REQUEST_TIMEOUT_MS = 30000;
 // What a held shortcut leaves pressed: Shift+Insert under it is another chord.
 const MODIFIERS = Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL_MASK |
     Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SUPER_MASK |
@@ -54,11 +56,13 @@ export default class VocoPanel extends Extension {
         this._alive = true;
         this._inputGuard = Gio.DBusExportedObject.wrapJSObject(INPUT_XML, this);
         this._inputGuard.export(Gio.DBus.session, INPUT_PATH);
-        // Paste types through one Clutter keyboard per enable, inside the Shell:
-        // no device to settle, portal dialog or screen-sharing indicator. GNOME
-        // disables this extension at the lock screen, so it can't type there.
+        // A paste types through one Clutter keyboard per enable, inside the
+        // Shell: no device to settle, portal dialog or screen-sharing indicator.
+        // GNOME disables this extension at the lock screen, so it can't type there.
         this._keyboard = null;
         this._paste = null;
+        this._requesting = false;
+        this._requestTimer = 0;
         this._generation = 0;
         this._target = null;
         this._barsKey = null;
@@ -173,20 +177,53 @@ export default class VocoPanel extends Extension {
         return (global.get_pointer()[2] & MODIFIERS) === 0;
     }
 
-    // Shift, Insert and their releases, PASTE_GAP_MS apart. Answers once the
-    // gesture is done, with the Insert press's monotonic time for VOCO's
-    // paste-read detection. A refusal sends no key.
-    PasteAsync(_parameters, invocation) {
-        if (!this._alive || !this._attached || invocation.get_sender() !== this._owner) {
-            invocation.return_dbus_error('org.voco.NotAttached', 'Only the attached application can paste');
-            return;
-        }
+    // A confined VOCO can answer the Shell but not call it, so the companion
+    // asks VOCO for work: one NextRequest stays pending, re-armed as soon as
+    // VOCO answers. A VOCO from before NextRequest keeps its own keyboard.
+    _armRequest() {
+        if (!this._alive || !this._attached || this._requesting) return;
+        this._requesting = true;
+        const cancellable = this._cancellable;
+        const generation = this._generation;
+        Gio.DBus.session.call(this._owner, PATH, INTERFACE, 'NextRequest', null, new GLib.VariantType('(su)'),
+            Gio.DBusCallFlags.NO_AUTO_START, REQUEST_TIMEOUT_MS, this._cancellable, (connection, result) => {
+                if (!this._alive || cancellable !== this._cancellable || generation !== this._generation) return;
+                this._requesting = false;
+                let request;
+                try {
+                    request = connection.call_finish(result).deep_unpack();
+                } catch (error) {
+                    if (error.matches(Gio.DBusError, Gio.DBusError.UNKNOWN_METHOD)) return;
+                    this._requestTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+                        this._requestTimer = 0;
+                        this._armRequest();
+                        return GLib.SOURCE_REMOVE;
+                    });
+                    return;
+                }
+                this._armRequest();
+                const [kind, id] = request;
+                if (kind === 'paste') this._pasteFor(id);
+                else if (kind === 'modifiers') this._report('ModifiersState', new GLib.Variant('(ub)', [id, this._modifiersClear()]));
+                else if (kind === 'changed') this._poll();
+            });
+    }
+
+    // A report VOCO refuses, being stale or from an earlier attachment, changes nothing here.
+    _report(method, parameters) {
+        this._call(method, parameters, () => {}, () => {});
+    }
+
+    // Shift, Insert and their releases, PASTE_GAP_MS apart, then PasteDone with
+    // the Insert press's monotonic time for VOCO's paste-read detection. A
+    // refusal sends no key and says why.
+    _pasteFor(id) {
         if (this._paste) {
-            invocation.return_dbus_error('org.voco.Busy', 'Another paste is in flight; no paste keys were sent');
+            this._report('PasteRefused', new GLib.Variant('(us)', [id, 'Busy']));
             return;
         }
         if (!this._modifiersClear()) {
-            invocation.return_dbus_error('org.voco.ModifiersHeld', 'Keyboard modifiers are held; no paste keys were sent');
+            this._report('PasteRefused', new GLib.Variant('(us)', [id, 'ModifiersHeld']));
             return;
         }
         // GNOME 48 and later reach the seat through the stage's context; GNOME 51
@@ -194,7 +231,7 @@ export default class VocoPanel extends Extension {
         this._keyboard ??= (global.stage.context?.get_backend() ?? Clutter.get_default_backend())
             .get_default_seat().create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
         const keyboard = this._keyboard;
-        const paste = {invocation, timer: 0, held: new Set(), insertUs: 0};
+        const paste = {id, timer: 0, held: new Set(), insertUs: 0};
         this._paste = paste;
         const key = (code, pressed) => {
             keyboard.notify_key(GLib.get_monotonic_time(), code,
@@ -217,14 +254,15 @@ export default class VocoPanel extends Extension {
                 return GLib.SOURCE_REMOVE;
             }
             this._paste = null;
-            invocation.return_value(new GLib.Variant('(t)', [paste.insertUs]));
+            this._report('PasteDone', new GLib.Variant('(ut)', [id, paste.insertUs]));
             return GLib.SOURCE_REMOVE;
         };
         run();
     }
 
     // Disabled mid-gesture: release what the gesture holds, so no key stays
-    // down, and fail the call, which VOCO treats as an uncertain paste.
+    // down, and say so, which VOCO treats as an uncertain paste. Sent without
+    // the cancellable that disable() is about to cancel.
     _cancelPaste() {
         const paste = this._paste;
         if (!paste) return;
@@ -232,7 +270,9 @@ export default class VocoPanel extends Extension {
         if (paste.timer) GLib.source_remove(paste.timer);
         for (const code of paste.held)
             this._keyboard?.notify_key(GLib.get_monotonic_time(), code, Clutter.KeyState.RELEASED);
-        paste.invocation.return_dbus_error('org.voco.Disabled', 'The VOCO panel stopped before the paste finished');
+        if (this._attached && this._owner)
+            Gio.DBus.session.call(this._owner, PATH, INTERFACE, 'PasteRefused', new GLib.Variant('(us)', [paste.id, 'Disabled']),
+                null, Gio.DBusCallFlags.NO_AUTO_START, 1000, null, null);
     }
 
     _call(method, parameters, done, failed = () => this._retry()) {
@@ -251,7 +291,9 @@ export default class VocoPanel extends Extension {
     _attach() {
         this._call('Attach', null, result => {
             this._attached = result.deep_unpack()[0] === true;
-            if (this._attached) this._beginPolling();
+            if (!this._attached) return;
+            this._beginPolling();
+            this._armRequest();
         });
     }
 
@@ -422,6 +464,8 @@ export default class VocoPanel extends Extension {
         this._attached = false;
         this._polling = false;
         this._refreshQueued = false;
+        this._requesting = false;
+        if (this._requestTimer) { GLib.source_remove(this._requestTimer); this._requestTimer = 0; }
         if (this._signal) { Gio.DBus.session.signal_unsubscribe(this._signal); this._signal = 0; }
         this._state = null;
         this._barsKey = null;

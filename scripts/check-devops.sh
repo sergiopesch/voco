@@ -276,6 +276,8 @@ if 'python3 scripts/generate-everyday-words.py --check "$RUNNER_TEMP/2of12full.t
     raise SystemExit(f"{workflow_path} must check the everyday words against the pinned 12dicts files")
 if commands.count('python3 scripts/stage-speech-worker.py "$RUNNER_TEMP/packaged-speech"') != 1:
     raise SystemExit(f"{workflow_path} must run the speech worker from the files a package ships, once")
+if commands.count("python3 scripts/test-snap-dbus-probe.py") != 1:
+    raise SystemExit(f"{workflow_path} must prove the snap confinement the companion protocol relies on, once")
 if commands.count("run: npm run test:chromium-exact-field") != 1:
     raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
 # Downloads ride out a short outage: every curl in CI and its provisioning
