@@ -729,3 +729,33 @@ jobs:
 
       - name: Nemotron accuracy and continuity baseline
         run: node scripts/test-speech-baseline.mjs --report "$RUNNER_TEMP/voco-speech-baseline.json"
+
+  snap-probe:
+    name: Snap Confinement Probe
+    # Trial: what strict confinement lets a snap do on the session bus.
+    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Snapcraft and the probe's client libraries
+        timeout-minutes: 8
+        run: |
+          sudo snap install snapcraft --classic
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-gi gir1.2-glib-2.0 dbus
+
+      - name: Build the probe snap
+        timeout-minutes: 12
+        working-directory: scripts/fixtures/snap-dbus-probe
+        run: sudo snapcraft pack --destructive-mode --output "$RUNNER_TEMP/voco-dbus-probe.snap"
+
+      - name: Probe strict confinement on the session bus
+        timeout-minutes: 3
+        run: |
+          sudo snap install --dangerous "$RUNNER_TEMP/voco-dbus-probe.snap"
+          snap connections voco-dbus-probe
+          sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" "/run/user/$(id -u)"
+          python3 scripts/test-snap-dbus-probe.py
