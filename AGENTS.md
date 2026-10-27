@@ -16,7 +16,8 @@ setup and pull requests.
   rules, before any code.
 - No account, subscription, telemetry or cloud transcription. Update checks read
   GitHub's public releases API and never download or install anything. The
-  automatic check at startup has an off switch.
+  automatic check at startup has an off switch. The snap has no network access
+  at all: the Snap Store updates it, so it never checks.
 - One output path: streaming dictation pasted into whatever has keyboard focus.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
@@ -53,7 +54,7 @@ setup and pull requests.
   show its busy cursor until a 15 s timeout.
 - Settings are the microphone, the shortcut, English spelling, My words with
   its taught versions, the update channel and whether VOCO checks for updates at startup. Onboarding state and the installation method
-  are stored alongside them.
+  are stored alongside them. The snap has no update settings.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
   that a Stop could neither paste nor copy.
 
@@ -104,6 +105,12 @@ global-hotkey and tray-icon. Keep every GTK/WebKit consumer on the single
 patched glib; adding glib 0.20 directly leaves GTK behind. Verify source
 provenance and the optimized iterator regression before accepting a dependency
 change.
+
+VOCO ships a `.deb`, an RPM and a strict snap, `voco` in the Snap Store, from one
+staged tree. The snap serves GNOME on Wayland, typing through the companion, and
+X11 sessions. It leaves out what strict confinement forbids: the uinput keyboard
+and its udev rule, evdev, the IBus engine, the companion itself, the Chromium host
+and the update check. [The snap](#the-snap) lists its rules.
 
 ## Invariants
 
@@ -211,7 +218,7 @@ change.
   Otherwise, and with wl-copy or on X11, the next copy waits until 150 ms after
   the keys. A read is not proof of insertion, and never changes a paste's outcome.
 - Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
-  modifiers to be released (evdev, else the companion's `ModifiersClear`). Unknown
+  modifiers to be released (evdev, else the companion's modifier check). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press. An X11 paste also waits, at most 1.5 s, while the X server's
@@ -219,19 +226,27 @@ change.
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
 - On GNOME Wayland, while the companion is attached and GNOME has loaded a
-  version with `Paste`, keys go through `org.voco.PanelInput1.Paste`. It types
-  from inside the Shell with one Clutter virtual keyboard per enable: no device
-  to settle, no portal dialog and no screen-sharing indicator. Like
-  `ModifiersClear`, it answers only the attached application, the owner of
-  `org.voco.Panel`. It refuses while a modifier is held or another paste is in
-  flight. Otherwise it sends Shift, Insert and their releases, 12 ms apart and
-  never another key, and answers once the gesture is done with the Insert
-  press's monotonic time. A refusal, or a companion that isn't there, typed
-  nothing: `no-mutation`. A call that times out, or a gesture cut short when the
-  companion is disabled, is uncertain; disabling releases any key it holds.
-  GNOME disables the companion at the lock screen, since its metadata names no
-  session modes and `ScreenShield.activate()` pushes `unlock-dialog`. VOCO's
-  origin and lock checks still run before the copy and before the call.
+  version that asks VOCO for work, the companion types the paste keys. VOCO never
+  calls the Shell, because a confined VOCO can't: snapd's `dbus` slot lets a snap
+  receive from unconfined peers on classic systems, never send to them. So the
+  companion keeps one `org.voco.Panel1.NextRequest` call pending and re-arms it
+  as soon as VOCO answers. VOCO answers it with each paste, modifier check and
+  change of its state, in order, or with nothing after 20 s. For a paste the
+  companion types from inside the Shell with one Clutter virtual keyboard per
+  enable: no device to settle, no portal dialog and no screen-sharing indicator.
+  It refuses while a modifier is held or another paste is in flight. Otherwise
+  it sends Shift, Insert and their releases, 12 ms apart and never another key,
+  then reports the Insert press's monotonic time with `PasteDone`; a refusal
+  reports its reason with `PasteRefused`. VOCO accepts a report only from the
+  attached Shell and only for its open request. A refusal, a companion that isn't
+  attached, or one without a pending request, typed nothing: `no-mutation`. No
+  report within 1 s, or a gesture cut short when the companion is disabled, is
+  uncertain; disabling releases any key it holds. GNOME disables the companion
+  at the lock screen, since its metadata names no session modes and
+  `ScreenShield.activate()` pushes `unlock-dialog`. VOCO's origin and lock checks
+  still run before the copy and before the request. Outside the snap, VOCO also
+  emits `Changed` and calls `ModifiersClear` for a companion loaded before this
+  protocol, which pastes through uinput.
 - Otherwise Wayland keys go through VOCO's own uinput device, "VOCO virtual
   keyboard" (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per
   process, created at startup and reused for the process lifetime, never one per
@@ -241,15 +256,18 @@ change.
   exists before the clipboard copy, so a missing device is a `no-mutation`
   failure; after an emit error, release Shift and drop it so the next paste
   recreates it.
-- CI's companion suite proves `Paste` on each Shell it runs. Every paste lands
-  with its exact text in a GTK field on Wayland and under XWayland. From the
-  request to the Insert press reaching the field, taking turns with Mutter's
-  RemoteDesktop API sending the same gesture over at least 200 pastes each, the
-  companion's median is at most 1 ms, and its p99 at most 2 ms, above Mutter's.
-  A paste requested from another connection, with a modifier held, while another
-  is in flight, in the `unlock-dialog` session mode or after the companion is
-  disabled sends no key. The application job's GNOME Wayland delivery runs
-  through the companion as well as through uinput.
+- CI's companion suite proves this protocol on each Shell it runs. Every paste
+  lands with its exact text in a GTK field on Wayland and under XWayland. From
+  VOCO's answer to the Insert press reaching the field, taking turns with
+  Mutter's RemoteDesktop API sending the same gesture over at least 200 pastes
+  each, the companion's median is at most 1 ms, and its p99 at most 2 ms, above
+  Mutter's. A paste answered with a modifier held, while another is in flight,
+  in the `unlock-dialog` session mode or after the companion is disabled sends
+  no key. The application job's GNOME Wayland delivery runs through the
+  companion as well as through uinput. CI's snap probe proves the confinement
+  the protocol relies on: a strict snap with a session `dbus` slot answers an
+  unconfined caller's pending call and receives its calls, and its own calls to
+  that caller are refused.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that
@@ -332,13 +350,19 @@ change.
 
 ### GNOME companion and tray
 
-- Both packages bundle the companion for GNOME 46, 48, 50 and 51. Its metadata's
+- The `.deb` and RPM bundle the companion for GNOME 46, 48, 50 and 51 as
+  `voco-panel@sergiopesch.com`, and extensions.gnome.org publishes the same code
+  under that UUID for the snap, which can't ship it. Its metadata's
   `shell-version` and `SUPPORTED_SHELLS` in `voco_gnome_panel.py` name the same
   majors, and setup reports any other as `unsupported`; admit a major only after
   testing it. A Shell without `Meta.is_wayland_compositor()` (GNOME 50 and later)
   is Wayland-only. Enable the companion only through the user-run setup
-  (`voco --setup-panel`); package hooks never change enabled extensions. Keep
-  "sign out and back in" feedback distinct from active status.
+  (`voco --setup-panel`), which also moves an enabled `voco-panel@voco.local` to
+  the new UUID; package hooks never change enabled extensions. The snap can't
+  enable extensions, since GNOME's Extensions interface is out of its reach: its
+  setup opens the companion's page on extensions.gnome.org through the portal and
+  reports the companion active once it attaches. Keep "sign out and back in"
+  feedback distinct from active status.
 - Bump the companion metadata and the setup contract together when loaded code
   must change, and compare GNOME's loaded metadata so an in-place upgrade can't
   report old code as current. After an upgrade, users re-run panel setup and sign
@@ -442,8 +466,9 @@ change.
   [runtime provisioning](docs/linux-packaging.md#runtime-provisioning) and never
   replace missing pinned artifacts with mutable downloads. A base Tauri `.deb` is
   incomplete: assemble and verify the NVIDIA payload before calling it installable.
-- One staged tree becomes both packages (`package-nvidia.py --rpm`), so they
-  carry the same files; `verify-rpm-package.sh` proves it against the `.deb`.
+- One staged tree becomes both packages (`package-nvidia.py --rpm`) and the
+  snap (`--snap`), so they carry the same files; `verify-rpm-package.sh` proves
+  it for the RPM against the `.deb`.
   Every Debian dependency needs its Fedora name in `DEBIAN_TO_FEDORA`
   (`scripts/rpm_package.py`), and the spec requires exactly those. The RPM's
   only scriptlet is `packaging/rpm/post.sh`, the same best-effort rule
@@ -454,6 +479,34 @@ change.
   `verify-rpm-package.sh` the built package. CI's Debian 13 and Fedora 44 jobs
   install the dependencies by those names (`scripts/distro-dependencies.py`) and
   run the speech runtime there; hosted CI never builds a package.
+
+### The snap
+
+- The snap is strictly confined on `core24` for amd64, with the packages' pinned
+  speech runtime. `verify-snap-package.sh` proves it carries the `.deb`'s files
+  except those strict confinement can't use: the uinput rule and module file, the
+  IBus component, the companion, `voco-browser-host` and its manifests. It plugs
+  only what it uses, never `network` or `home`, and has one slot, a session
+  `dbus` slot for `org.voco.Panel`; `check-devops.sh` checks both lists.
+- It types only through the companion on GNOME Wayland and through `xdotool` on
+  X11. Elsewhere Start is refused, and setup names the build that supports that
+  desktop. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
+  X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus route.
+- logind's session signals don't reach a snap, because `login-session-observe`
+  receives only the manager's, and `GetSessionByPID` is out of its reach. So the
+  snap binds its origin through a validated session ID or the user's sessions,
+  reads `LockedHint` and `Active` at each check and once a second while
+  dictating, and stops dictation when it reads locked. Until
+  `login-session-observe` is connected, both checks reject (`no-mutation`) and
+  Start is refused with the `snap connect` remedy.
+- Its config, journal and logs live in `$SNAP_USER_DATA`. It never reads a
+  package's config, and a package never reads its.
+- The store updates it. The maintainer uploads it from the signing machine after
+  the same checks as the packages, to `edge` first; hosted CI never builds VOCO's
+  snap. Try it on Ubuntu 24.04 and the latest Ubuntu before promoting it past
+  `edge`. Ask the store to auto-connect `audio-record` and
+  `login-session-observe`; until it does, setup shows their `snap connect`
+  commands.
 
 ## Working practices
 
