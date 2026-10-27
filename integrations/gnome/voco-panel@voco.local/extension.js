@@ -15,7 +15,20 @@ const NAME = 'org.voco.Panel';
 const PATH = '/org/voco/Panel';
 const INTERFACE = 'org.voco.Panel1';
 const INPUT_PATH = '/org/voco/PanelInput';
-const INPUT_XML = '<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>';
+const INPUT_XML = '<node><interface name="org.voco.PanelInput1">' +
+    '<method name="ModifiersClear"><arg type="b" direction="out"/></method>' +
+    '<method name="Paste"><arg type="t" name="insertPressedUs" direction="out"/></method>' +
+    '</interface></node>';
+// Paste sends only these, evdev codes as VOCO's uinput keyboard declares them,
+// with VOCO's 12 ms between events.
+const KEY_SHIFT = 42;
+const KEY_INSERT = 110;
+const PASTE_GAP_MS = 12;
+// What a held shortcut leaves pressed: Shift+Insert under it is another chord.
+const MODIFIERS = Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL_MASK |
+    Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SUPER_MASK |
+    Clutter.ModifierType.META_MASK | Clutter.ModifierType.HYPER_MASK |
+    Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.MOD5_MASK;
 // GNOME 50 removed X11 sessions together with Meta.is_wayland_compositor(). The
 // metadata admits only tested majors, and on each of them a missing function
 // means a Wayland-only Shell.
@@ -41,6 +54,11 @@ export default class VocoPanel extends Extension {
         this._alive = true;
         this._inputGuard = Gio.DBusExportedObject.wrapJSObject(INPUT_XML, this);
         this._inputGuard.export(Gio.DBus.session, INPUT_PATH);
+        // Paste types through one Clutter keyboard per enable, inside the Shell:
+        // no device to settle, portal dialog or screen-sharing indicator. GNOME
+        // disables this extension at the lock screen, so it can't type there.
+        this._keyboard = null;
+        this._paste = null;
         this._generation = 0;
         this._target = null;
         this._barsKey = null;
@@ -146,13 +164,75 @@ export default class VocoPanel extends Extension {
             invocation.return_dbus_error('org.voco.NotAttached', 'Only the attached application can check input readiness');
             return;
         }
-        // A paste can be ready while the consumed shortcut is still held.
-        // Observe compositor state; never synthesize releases of the user's keys.
-        const modifiers = Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL_MASK |
-            Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SUPER_MASK |
-            Clutter.ModifierType.META_MASK | Clutter.ModifierType.HYPER_MASK |
-            Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.MOD5_MASK;
-        invocation.return_value(new GLib.Variant('(b)', [(global.get_pointer()[2] & modifiers) === 0]));
+        invocation.return_value(new GLib.Variant('(b)', [this._modifiersClear()]));
+    }
+
+    // A paste can be ready while the consumed shortcut is still held.
+    // Observe compositor state; never synthesize releases of the user's keys.
+    _modifiersClear() {
+        return (global.get_pointer()[2] & MODIFIERS) === 0;
+    }
+
+    // Shift, Insert and their releases, PASTE_GAP_MS apart. Answers once the
+    // gesture is done, with the Insert press's monotonic time for VOCO's
+    // paste-read detection. A refusal sends no key.
+    PasteAsync(_parameters, invocation) {
+        if (!this._alive || !this._attached || invocation.get_sender() !== this._owner) {
+            invocation.return_dbus_error('org.voco.NotAttached', 'Only the attached application can paste');
+            return;
+        }
+        if (this._paste) {
+            invocation.return_dbus_error('org.voco.Busy', 'Another paste is in flight; no paste keys were sent');
+            return;
+        }
+        if (!this._modifiersClear()) {
+            invocation.return_dbus_error('org.voco.ModifiersHeld', 'Keyboard modifiers are held; no paste keys were sent');
+            return;
+        }
+        // GNOME 48 and later reach the seat through the stage's context; GNOME 51
+        // removed Clutter.get_default_backend(), which GNOME 46 still needs.
+        this._keyboard ??= (global.stage.context?.get_backend() ?? Clutter.get_default_backend())
+            .get_default_seat().create_virtual_device(Clutter.InputDeviceType.KEYBOARD_DEVICE);
+        const keyboard = this._keyboard;
+        const paste = {invocation, timer: 0, held: new Set(), insertUs: 0};
+        this._paste = paste;
+        const key = (code, pressed) => {
+            keyboard.notify_key(GLib.get_monotonic_time(), code,
+                pressed ? Clutter.KeyState.PRESSED : Clutter.KeyState.RELEASED);
+            if (pressed) paste.held.add(code);
+            else paste.held.delete(code);
+        };
+        const steps = [
+            () => key(KEY_SHIFT, true),
+            () => { key(KEY_INSERT, true); paste.insertUs = GLib.get_monotonic_time(); },
+            () => key(KEY_INSERT, false),
+            () => key(KEY_SHIFT, false),
+        ];
+        let next = 0;
+        const run = () => {
+            paste.timer = 0;
+            steps[next++]();
+            if (next < steps.length) {
+                paste.timer = GLib.timeout_add(GLib.PRIORITY_HIGH, PASTE_GAP_MS, run);
+                return GLib.SOURCE_REMOVE;
+            }
+            this._paste = null;
+            invocation.return_value(new GLib.Variant('(t)', [paste.insertUs]));
+            return GLib.SOURCE_REMOVE;
+        };
+        run();
+    }
+
+    // Disabled mid-gesture: release what the gesture holds, so no key stays
+    // down, and fail the call, which VOCO treats as an uncertain paste.
+    _cancelPaste() {
+        const paste = this._paste;
+        if (!paste) return;
+        this._paste = null;
+        if (paste.timer) GLib.source_remove(paste.timer);
+        for (const code of paste.held)
+            this._keyboard?.notify_key(GLib.get_monotonic_time(), code, Clutter.KeyState.RELEASED);
+        paste.invocation.return_dbus_error('org.voco.Disabled', 'The VOCO panel stopped before the paste finished');
     }
 
     _call(method, parameters, done, failed = () => this._retry()) {
@@ -362,6 +442,8 @@ export default class VocoPanel extends Extension {
     }
 
     disable() {
+        this._cancelPaste();
+        this._keyboard = null;
         this._inputGuard?.unexport();
         this._inputGuard = null;
         this._detach();

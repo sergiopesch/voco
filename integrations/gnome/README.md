@@ -105,11 +105,24 @@ accelerators are `<Alt>d`, `<Alt><Shift>d` or null, and null on X11. The
 companion polls every 50 ms while recording, every 1.5 seconds otherwise, and
 at each `Changed`.
 
-The companion serves `org.voco.PanelInput1` at `/org/voco/PanelInput`. When
-VOCO can't read the keyboards before a Wayland paste, it calls
-`ModifiersClear() → b`, with a 150 ms limit. The companion answers only the
-attached VOCO, returns true when the compositor reports no modifier held, and
-never sends key events.
+The companion serves `org.voco.PanelInput1` at `/org/voco/PanelInput`, and
+answers both of its methods only for the attached VOCO:
+
+- `ModifiersClear() → b`. When VOCO can't read the keyboards before a Wayland
+  paste, it calls this with a 150 ms limit. It returns true when the compositor
+  reports no modifier held, and sends no key events.
+- `Paste() → t`, from version 16. It types VOCO's paste keys from inside the
+  Shell, through one Clutter virtual keyboard per enable, so there's no device
+  to settle, no portal dialog and no screen-sharing indicator.
+  - It refuses with `org.voco.ModifiersHeld` while a modifier is held, and with
+    `org.voco.Busy` while another paste is in flight.
+  - Otherwise it sends Shift, Insert and their releases, 12 ms apart, and
+    answers once they are out with the Insert press's monotonic time in
+    microseconds.
+  - Disabled mid-gesture, it releases the keys it holds and fails the call with
+    `org.voco.Disabled`.
+  - Its metadata names no session modes, so GNOME disables it at the lock
+    screen, where it can't type.
 
 ## Files and tests
 
@@ -132,7 +145,18 @@ writes a reproducible archive of the five files, attached to each release.
   with `xdotool`. GNOME 50 and 51, which have no nested mode, run headless on a
   virtual monitor of the same 800×600 size, driven through Mutter's RemoteDesktop API
   and captured with GNOME's own screenshot API; its panel also shows GNOME's
-  screen-sharing indicator. Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
+  screen-sharing indicator. Its Shell runs XWayland from the start, and its
+  `Paste` checks type into a GTK 3 field in its own process
+  (`scripts/fixtures/paste-field.py`), on Wayland and under XWayland:
+  - every paste lands exactly;
+  - over 200 rounds taking turns with Mutter's RemoteDesktop API, the
+    companion's median from the request to the Insert press is no more than
+    1 ms above Mutter's, and its p99 no more than 2 ms above;
+  - no key arrives from a paste requested by another connection, with a
+    modifier held, while another is in flight, in the `unlock-dialog` session
+    mode or after disabling.
+
+  Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
   and, for the nested mode, `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`.
   `VOCO_PANEL_APP_BINARY` adds a real `voco`, and `VOCO_PANEL_PACKAGE_ROOT`, an
   extracted package, adds setup and an upgrade; with either,

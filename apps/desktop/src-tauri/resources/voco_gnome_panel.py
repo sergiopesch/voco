@@ -6,7 +6,7 @@ import time
 
 UUID = 'voco-panel@voco.local'
 # Bump with behavior changes that require reloading the running Shell companion.
-COMPANION_VERSION = 15
+COMPANION_VERSION = 16
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 # Every runtime file of the companion, as packaged; scripts/test-panel-setup.py
 # compares it with the source directory and the Debian file map.

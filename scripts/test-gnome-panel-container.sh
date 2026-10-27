@@ -23,7 +23,7 @@ trap 'podman rmi --force "$tag" >/dev/null 2>&1 || true; rm -rf "$context"' EXIT
 podman build --quiet --tag "$tag" --file - "$context" <<EOF >/dev/null
 FROM $VOCO_PANEL_IMAGE
 RUN dnf install -y -q --setopt=install_weak_deps=False gnome-shell bubblewrap \
-      dbus-daemon dbus-tools glib2 python3 python3-gobject gtk3 && dnf clean all
+      dbus-daemon dbus-tools glib2 python3 python3-gobject gtk3 xorg-x11-server-Xwayland && dnf clean all
 EOF
 # The suite's sandbox mounts tmpfs on /run/dbus and /run/user, which a fresh
 # container lacks.
