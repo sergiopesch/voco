@@ -25,6 +25,8 @@ static SESSION_LOCKED: AtomicBool = AtomicBool::new(false);
 /// Whether logind's last answer refused this process, as it refuses a snap
 /// without login-session-observe.
 static LOGIND_DENIED: AtomicBool = AtomicBool::new(false);
+/// Whether logind has answered this process at all, even with an error.
+static LOGIND_ANSWERED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum LookupError {
@@ -214,9 +216,26 @@ pub fn require_active() -> Result<(), String> {
 }
 
 /// Whether logind refuses this process, as it does a snap until
-/// login-session-observe is connected; setup then shows the remedy.
+/// login-session-observe is connected; setup then shows the remedy. Until
+/// logind answers without refusing, each read asks it again. So
+/// `voco --check-desktop-input` sees a refusal before any other call, and a
+/// plug connected a moment ago reads as connected.
 pub fn logind_denied() -> bool {
-    LOGIND_DENIED.load(Ordering::SeqCst)
+    denied_after(&LOGIND_ANSWERED, &LOGIND_DENIED, || {
+        if let Some(logind) = Logind::connect() {
+            // Any answer will do: the user's own object is one the snap may read.
+            let _ = logind.session_path("GetUser", &(unsafe { libc::geteuid() },).to_variant());
+        }
+    })
+}
+
+/// `denied` as logind answers `ask`, asked only while it has never answered or
+/// last refused.
+fn denied_after(answered: &AtomicBool, denied: &AtomicBool, ask: impl FnOnce()) -> bool {
+    if !answered.load(Ordering::SeqCst) || denied.load(Ordering::SeqCst) {
+        ask();
+    }
+    denied.load(Ordering::SeqCst)
 }
 
 /// Whether the originating login's screen is locked. Without logind or a
@@ -461,6 +480,7 @@ impl Logind {
         if remaining.is_zero() {
             return Err(LookupError::Unavailable);
         }
+        let mut answered = true;
         let reply = self
             .bus
             .call_sync(
@@ -474,7 +494,14 @@ impl Logind {
                 remaining.as_millis().clamp(1, 250) as i32,
                 gio::Cancellable::NONE,
             )
-            .map_err(|error| lookup_error(&error));
+            .map_err(|error| {
+                // An error with a D-Bus name is still an answer; a timeout isn't.
+                answered = remote_error(&error).is_some();
+                lookup_error(&error)
+            });
+        if answered {
+            LOGIND_ANSWERED.store(true, Ordering::SeqCst);
+        }
         LOGIND_DENIED.store(
             reply.as_ref().err() == Some(&LookupError::Denied),
             Ordering::SeqCst,
@@ -632,6 +659,29 @@ mod tests {
         locked.insert("LockedHint".into(), true.to_variant());
         let session = decode_session(locked).unwrap();
         assert!(session.locked && session.active && !session.usable());
+    }
+
+    #[test]
+    fn a_refusal_is_asked_again_until_logind_answers_without_one() {
+        let answered = AtomicBool::new(false);
+        let denied = AtomicBool::new(false);
+        let asks = std::cell::Cell::new(0);
+        let ask = |refused: bool| {
+            asks.set(asks.get() + 1);
+            answered.store(true, Ordering::SeqCst);
+            denied.store(refused, Ordering::SeqCst);
+        };
+        // A process that hasn't asked logind anything yet, such as
+        // `voco --check-desktop-input`, asks before it answers.
+        assert!(denied_after(&answered, &denied, || ask(true)));
+        // While logind refuses, each read asks again, so a plug connected a
+        // moment ago reads as connected.
+        assert!(denied_after(&answered, &denied, || ask(true)));
+        assert!(!denied_after(&answered, &denied, || ask(false)));
+        assert_eq!(asks.get(), 3);
+        // Once logind answers without refusing, a read asks nothing.
+        assert!(!denied_after(&answered, &denied, || ask(true)));
+        assert_eq!(asks.get(), 3);
     }
 
     #[test]
