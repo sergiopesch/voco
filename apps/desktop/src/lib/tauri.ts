@@ -27,12 +27,23 @@ export async function openConfigDirectory(): Promise<void> {
   return invoke("open_config_directory");
 }
 
-/** The account's full name, for setup's first My words entry; null without one. */
 /** Whether the Snap Store updates VOCO, which then never checks for updates itself. */
 export async function storeUpdates(): Promise<boolean> {
   return invoke<boolean>("store_updates");
 }
 
+export interface MicrophoneAccess {
+  allowed: boolean;
+  /** What to do about it, when not allowed. */
+  detail?: string;
+}
+
+/** Refused only in the snap, until its audio-record plug is connected. */
+export async function microphoneAccess(): Promise<MicrophoneAccess> {
+  return invoke<MicrophoneAccess>("microphone_access");
+}
+
+/** The account's full name, for setup's first My words entry; null without one. */
 export async function getAccountName(): Promise<string | null> {
   return invoke<string | null>("get_account_name");
 }

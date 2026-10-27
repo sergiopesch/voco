@@ -61,6 +61,7 @@ function harness() {
   const trace = vi.fn(async (_event: string) => {});
   const setError = vi.fn();
   const notify = vi.fn(async (_summary: string, _body: string) => {});
+  const microphone: { allowed: boolean; detail?: string } = { allowed: true };
   const audioBuffer = createAudioCaptureBuffer();
   const env = {
     sessionRef: current,
@@ -115,6 +116,7 @@ function harness() {
     debugNativeCaptureEnabled: vi.fn(async () => false),
     beginNativeCapture: vi.fn(),
     releaseBrowserRecording: vi.fn(async () => {}),
+    microphoneAccess: vi.fn(async () => ({ ...microphone })),
   } as unknown as DictationRecordingEnv;
   const recording = createDictationRecording(env);
   // Puts the harness in a live desktop recording that Stop can finish.
@@ -129,7 +131,7 @@ function harness() {
     unmount: recording.dispose,
     recordingWith,
     state, current, cancelled, queue, pasteSession, status,
-    pasteStatus, captureSelection, copy, trace, setError, notify,
+    pasteStatus, captureSelection, copy, trace, setError, notify, microphone,
   };
 }
 
@@ -175,6 +177,27 @@ it("reaches source selection from input readiness alone, with no destination bin
   // The fixture stops at source selection, after every destination check.
   expect(h.captureSelection).toHaveBeenCalledOnce();
   expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Microphone settings.");
+});
+
+it.each(["cursor", "onboarding:test"])("names the snap's microphone connection before opening a microphone (%s)", async (trigger) => {
+  const h = harness();
+  const detail = "The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.";
+  Object.assign(h.microphone, { allowed: false, detail });
+  await h.startRecording(trigger === "cursor" ? undefined : trigger);
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  expect(h.env.beginNativeCapture).not.toHaveBeenCalled();
+  expect(h.env.openTracedMicrophoneStream).not.toHaveBeenCalled();
+  expect(h.current.current.phase).toBe("error");
+  expect(h.setError).toHaveBeenLastCalledWith(detail);
+  expect(h.notify).toHaveBeenCalledWith("Microphone could not start", detail);
+});
+
+it("leaves the microphone to the capture when its access check can't answer", async () => {
+  const h = harness();
+  vi.mocked(h.env.microphoneAccess).mockRejectedValueOnce(new Error("no snapctl"));
+  await h.startRecording();
+  // The fixture reaches source selection, past the check.
+  expect(h.captureSelection).toHaveBeenCalledOnce();
 });
 
 it("notifies a live recognition failure once, not again at Stop", async () => {

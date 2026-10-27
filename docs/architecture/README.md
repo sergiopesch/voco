@@ -422,6 +422,13 @@ unlike a logind that doesn't answer, which leaves pasting allowed, a refusal
 refuses each paste and the paste check, which names the `snap connect`
 command, until a later check binds the session.
 
+The store connects neither `login-session-observe` nor `audio-record` on its
+own. So before each recording, the voice test and Say it included, the snap
+asks `snapctl is-connected audio-record` (`microphone_access`): while the plug
+isn't connected, the recording fails before any microphone opens and names
+`snap connect voco:audio-record`. A `snapctl` that can't answer leaves the
+capture to report its own failure.
+
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
 otherwise points setup and Help to `COMPANION_PAGE` on extensions.gnome.org;

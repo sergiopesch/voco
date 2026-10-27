@@ -27,6 +27,7 @@ import {
   debugNativeCaptureEnabled,
   getDesktopPasteStatus,
   getDiagnosticLogging,
+  microphoneAccess,
   pasteDesktopText,
   releaseBrowserRecording,
   saveDebugNativeRetainedSource,
@@ -473,6 +474,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       debugNativeCaptureEnabled,
       beginNativeCapture,
       releaseBrowserRecording,
+      microphoneAccess,
     });
   }
   const recording = recordingRef.current;

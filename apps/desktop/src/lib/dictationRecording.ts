@@ -24,7 +24,7 @@ import {
 } from "@/lib/dictationSession";
 import { isBrowserTrigger, isLocalTrigger } from "@/lib/dictationTrigger";
 import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCapture";
-import type { HotkeyTraceFields,pasteDesktopText } from "@/lib/tauri";
+import type { HotkeyTraceFields,MicrophoneAccess,pasteDesktopText } from "@/lib/tauri";
 import type { useStore as appStore } from "@/store/useStore";
 import type { CursorDeliveryState,DesktopPasteStatus,DictationStatus } from "@/types";
 import { BrowserStreamDelivery } from "./browserStreamDelivery";
@@ -100,6 +100,7 @@ export interface DictationRecordingEnv {
   debugNativeCaptureEnabled: () => Promise<boolean>;
   beginNativeCapture: typeof beginNativeCapture;
   releaseBrowserRecording: (triggerId: string) => Promise<void>;
+  microphoneAccess: () => Promise<MicrophoneAccess>;
 }
 
 export function createDictationRecording(env: DictationRecordingEnv) {
@@ -156,6 +157,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     debugNativeCaptureEnabled,
     beginNativeCapture,
     releaseBrowserRecording,
+    microphoneAccess,
   } = env;
 
   // One controller lives for the whole launch, so these limit repeat notifications.
@@ -354,6 +356,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       clearTranscript();
       setStatus("starting");
       startFailureTitle = "Microphone could not start";
+      // The snap opens no microphone until its audio-record plug is connected.
+      // Any other answer, or none, leaves the capture to report its own failure.
+      const access = await microphoneAccess().catch(() => null);
+      assertOutputAllowed(startingSessionId);
+      if (access?.allowed === false) throw new Error(access.detail ?? "Microphone access is blocked.");
       const captureSelection = captureSelectionRef.current?.() ?? { backend: "webkit" as const };
       let captureAdmission: CaptureAdmission = "pending";
       if (captureSelection.backend === "native" && !captureSelection.selectionToken) {
