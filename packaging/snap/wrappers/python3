@@ -1,0 +1,12 @@
+#!/bin/sh
+# The speech worker's Python in VOCO's snap: Ubuntu's Python 3.12 and NumPy,
+# which the snap carries under python/ beside this file. core24's loader never
+# looks there, and Debian's alternatives never ran for NumPy's BLAS and LAPACK,
+# so this names their folders. VOCO starts the worker with only the variables
+# it reads, so this finds them from its own path, never from the environment.
+set -eu
+here=${0%/*}
+lib=$here/python/usr/lib/x86_64-linux-gnu
+LD_LIBRARY_PATH=$lib/blas:$lib/lapack:$lib
+export LD_LIBRARY_PATH
+exec "$here/python/usr/bin/python3.12" "$@"

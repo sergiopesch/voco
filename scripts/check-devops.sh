@@ -190,6 +190,7 @@ from pathlib import Path
 
 sys.path.insert(0, "scripts")
 import rpm_package
+import snap_package
 
 spec_path = Path("packaging/rpm/voco.spec.in")
 spec = spec_path.read_text()
@@ -227,6 +228,8 @@ for macro in ("__provides_exclude_from ^/usr/lib/voco/speech/", "_build_id_links
     if f"%global {macro}" not in spec:
         raise SystemExit(f"{spec_path} must keep %global {macro}")
 print("Fedora RPM packaging metadata is valid.")
+snap_package.check_recipe(snap_package.TEMPLATE.read_text())
+print("The snap recipe declares only the reviewed confinement, plugs and slot.")
 PY
 
 PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
@@ -278,6 +281,11 @@ if commands.count('python3 scripts/stage-speech-worker.py "$RUNNER_TEMP/packaged
     raise SystemExit(f"{workflow_path} must run the speech worker from the files a package ships, once")
 if commands.count("python3 scripts/test-snap-dbus-probe.py") != 1:
     raise SystemExit(f"{workflow_path} must prove the snap confinement the companion protocol relies on, once")
+# The maintainer builds VOCO's snap from the release's staged tree; hosted CI
+# builds only the probe snaps in scripts/fixtures.
+for forbidden in ("snap_package", "verify-snap-package", "packaging/snap", "--snap "):
+    if forbidden in steps:
+        raise SystemExit(f"Hosted CI must not build VOCO's snap: {forbidden}")
 if commands.count("run: npm run test:chromium-exact-field") != 1:
     raise SystemExit(f"{workflow_path} must run the Chromium recipient and background lifecycle gates")
 # Downloads ride out a short outage: every curl in CI and its provisioning

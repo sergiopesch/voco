@@ -1,0 +1,93 @@
+# VOCO's strict snap. scripts/snap_package.py renders this file for the staged
+# package tree, beside that tree's snap payload, and builds the snap from it:
+# `package-nvidia.py --snap` stages one tree for the packages and the snap.
+name: voco
+base: core24
+version: '@VERSION@'
+title: VOCO
+summary: @SUMMARY@
+description: |
+@DESCRIPTION@
+license: MIT AND Apache-2.0 AND LicenseRef-NVIDIA-Open-Model-License
+website: https://github.com/sergiopesch/voco
+source-code: https://github.com/sergiopesch/voco
+issues: https://github.com/sergiopesch/voco/issues
+icon: snap/gui/voco.png
+grade: stable
+confinement: strict
+# The speech model is most of the snap and barely compresses. lzo keeps the
+# worker's first read of it, at warm-up, close to a package's.
+compression: lzo
+platforms:
+  amd64:
+
+# The GNOME companion asks VOCO for work here: a strict snap can answer
+# GNOME Shell but never call it (AGENTS.md).
+slots:
+  panel:
+    interface: dbus
+    bus: session
+    name: org.voco.Panel
+
+apps:
+  voco:
+    command: usr/bin/voco
+    # The packages' entry. Snapcraft points its icon at the snap's own, and
+    # snapd installs it as voco_voco.desktop.
+    desktop: usr/share/applications/VOCO.desktop
+    common-id: com.sergiopesch.voco
+    extensions: [gnome]
+    plugs: [audio-playback, audio-record, login-session-observe]
+    slots: [panel]
+    environment:
+      VOCO_STREAM_PYTHON: $SNAP/usr/lib/voco/snap/python3
+      VOCO_STREAM_WORKER: $SNAP/usr/lib/voco/speech/stream_worker.py
+
+# The Ubuntu programs VOCO runs live in private folders under
+# usr/lib/voco/snap, with their libraries, and run through a wrapper that
+# names those libraries. So the app's own libraries stay the GNOME platform's.
+parts:
+  voco:
+    plugin: dump
+    source: payload
+
+  speech-python:
+    # Named explicitly, these stay in the snap even where core24 has a copy, so
+    # Python finds its standard library and NumPy beside the interpreter.
+    plugin: nil
+    stage-packages:
+      - python3.12-minimal
+      - libpython3.12-minimal
+      - libpython3.12-stdlib
+      - python3-numpy
+      - libsentencepiece0
+    override-build: |
+      craftctl default
+      cd "$CRAFT_PART_INSTALL"
+      mkdir ../python
+      for entry in *; do mv "$entry" ../python/; done
+      mkdir -p usr/lib/voco/snap
+      mv ../python usr/lib/voco/snap/python
+      install -m 0755 "$CRAFT_PROJECT_DIR/wrappers/python3" usr/lib/voco/snap/python3
+
+  helpers:
+    plugin: nil
+    stage-packages: [xclip, xdotool, libnotify-bin]
+    override-build: |
+      craftctl default
+      cd "$CRAFT_PART_INSTALL"
+      mkdir ../helpers
+      for entry in *; do mv "$entry" ../helpers/; done
+      mkdir -p usr/lib/voco/snap usr/bin
+      mv ../helpers usr/lib/voco/snap/helpers
+      install -m 0755 "$CRAFT_PROJECT_DIR/wrappers/run-helper" usr/lib/voco/snap/run-helper
+      for helper in xclip xdotool notify-send; do
+        ln -s ../lib/voco/snap/run-helper "usr/bin/$helper"
+      done
+
+# The private folders hold libraries the linter can't find on its search
+# path; verify-snap-package.sh resolves every one of them instead.
+lint:
+  ignore:
+    - library:
+        - usr/lib/voco/**

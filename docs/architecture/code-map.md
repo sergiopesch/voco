@@ -248,6 +248,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `debian/postinst.py.in` — The Debian package's only maintainer action: repairs group-writable VOCO directories to 0755 and applies the `/dev/uinput` rule.
 - `rpm/voco.spec.in` — The Fedora RPM's spec template: the Fedora requirements, no build stages, and the payload and dependency-generator settings.
 - `rpm/post.sh` — The RPM's only scriptlet: applies the `/dev/uinput` rule, as the Debian `postinst` does.
+- `snap/snapcraft.yaml.in` — The strict snap's recipe template: `core24`, the GNOME extension, VOCO's plugs and the panel slot, and the parts that put Ubuntu's Python, NumPy, SentencePiece, xclip, xdotool and notify-send in private folders.
+- `snap/wrappers/python3`, `snap/wrappers/run-helper` — Run the worker's Python and the helpers from those folders, with their libraries.
 - `published-release.json` — The version the README installs.
 
 ## Scripts: `scripts/`
@@ -256,8 +258,9 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `setup.sh` — Prepares a development checkout; `--install` builds, packages and installs the complete Debian package.
 - `build-desktop.sh` — Builds the renderer, the browser host and the base Debian bundle.
-- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, notices, documentation and the maintainer script. With `--rpm`, it also builds the Fedora RPM from the same staged tree.
+- `package-nvidia.py` — Turns the base package into the complete one: speech runtime, notices, documentation and the maintainer script. With `--rpm` and `--snap`, it also builds the Fedora RPM and the strict snap from the same staged tree.
 - `rpm_package.py` — Renders the RPM spec for the staged tree and runs rpmbuild, and holds the RPM checks: scriptlets, folder ownership, requirements, and file and dependency parity with the Debian package.
+- `snap_package.py` — Copies the staged tree's snap payload, renders the snap recipe with the store listing from the metainfo and runs snapcraft, and holds the snap checks: the recipe's reviewed lines, the built metadata, the wrappers, library resolution and file parity with the Debian package.
 - `package-gnome-panel.py` — Builds a reproducible companion zip.
 - `provision-ci-speech.sh` — Copies the speech payload of a checksum-pinned published package into `runtime/speech/` for CI.
 - `check-privacy.sh` and `privacy/` — Run a release build in a pinned container, offline and online, trace its network calls and DNS, and judge them (`privacy/analyze.py`, tested by `test-check-privacy.py`).
@@ -279,6 +282,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
 - `verify-deb-package.sh`, `verify-speech-payload.py` — Package contents.
 - `verify-rpm-package.sh` — The RPM's contents and policy; given the Debian package, it also proves that both carry the same files and dependencies.
+- `verify-snap-package.sh` — The snap's metadata, wrappers, libraries and speech payload, and that it carries the Debian package's files except those strict confinement can't use.
 - `distro-dependencies.py` — Prints the packages' dependencies by Debian or Fedora names, for CI's Debian 13 and Fedora 44 runtime jobs.
 - `verify-speech-engine.py` — Checks that shipping source and dependency metadata don't reference the retired Whisper recognizer.
 - `verify-glib-backport.py`, `verify-shortcut-backport.py`, `verify-tray-backport.py` — Vendored crate provenance and resolution.
@@ -286,7 +290,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ### Release
 
-- `assemble-release.sh` — Builds the Debian package and the RPM, verifies them and signs one release from a signed tag on the maintainer's Linux computer. It uploads nothing.
+- `assemble-release.sh` — Builds the Debian package and the RPM, verifies them and signs one release from a signed tag on the maintainer's Linux computer; with `VOCO_RELEASE_SNAP=1` it also builds and verifies the snap. It uploads nothing.
 - `sign-release-checksums.sh` — Detached, armored signatures for checksum lists, on the maintainer's computer.
 - `verify-release.sh` — Offline checksum and signature verification.
 - `test-verify-release.sh` — Signs and verifies with a throwaway key.
@@ -327,6 +331,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-dictation-renderer.mjs`, `test-microphone-app-renderer.mjs`, `test-english-spelling-renderer.mjs`, `test-my-words-renderer.mjs`, `test-setup-words-renderer.mjs`, `test-update-checks-renderer.mjs`, `renderer-fixture.mjs`, `test-brand-motion.mjs`, `audio-worklet-capture.test.mjs` — Renderer and AudioWorklet.
 - `test-speech-package.py`, `test-speech-worker.py`, `test-audio-continuity.py` — Speech packaging and worker pipes.
 - `test-rpm-package.py` — The RPM's file list, spec, header policy and parity checks; with rpmbuild installed, a real build.
+- `test-snap-package.py` — The snap's payload, store listing, recipe and build command, and each of its checks against deliberate mistakes.
 - `test-model-tokenizer.py` — The tokenizer graft adds one metadata entry, keeps every tensor byte, fetches one bounded range and replaces a model only with the pinned result.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
