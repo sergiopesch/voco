@@ -2,8 +2,9 @@
 """What strict confinement lets a snap do on the session bus, measured.
 
 Test only, on a disposable runner with snapd, after the probe snap in
-scripts/fixtures/snap-dbus-probe is installed. A private session bus that
-requires AppArmor mediation stands in for the desktop's. This process plays
+scripts/fixtures/snap-dbus-probe is installed. It uses the runner's own
+session bus when there is one, as a desktop's is, and otherwise starts one
+that requires AppArmor mediation. This process plays
 GNOME Shell, unconfined: it keeps a NextRequest call pending on the probe,
 which owns org.voco.Panel through a dbus slot, and reports back with
 PasteDone, as the companion would. The probe then calls this process and
@@ -27,17 +28,18 @@ runtime = Path(f'/run/user/{os.getuid()}')
 assert runtime.is_dir(), 'The runner needs its user runtime directory'
 folder = Path(tempfile.mkdtemp(prefix='voco-snap-probe-'))
 socket = runtime / 'bus'
-assert not socket.exists(), 'Run only where no session bus is listening'
-config = folder / 'session.conf'
-# AppArmor mediation required, as Ubuntu's session bus has it; everything else open.
-config.write_text(f"""<busconfig><type>session</type><listen>unix:path={socket}</listen>
+daemon = None
+report = {'bus': 'existing' if socket.exists() else 'private'}
+if not socket.exists():
+    config = folder / 'session.conf'
+    # AppArmor mediation required, as Ubuntu's session bus has it; everything else open.
+    config.write_text(f"""<busconfig><type>session</type><listen>unix:path={socket}</listen>
 <auth>EXTERNAL</auth><apparmor mode="required"/>
 <policy context="default"><allow send_destination="*" eavesdrop="true"/><allow eavesdrop="true"/><allow own="*"/></policy>
 </busconfig>""")
-daemon = subprocess.Popen(['dbus-daemon', '--nofork', f'--config-file={config}'],
-                          stdout=subprocess.DEVNULL, stderr=(folder / 'dbus.log').open('w'))
+    daemon = subprocess.Popen(['dbus-daemon', '--nofork', f'--config-file={config}'],
+                              stdout=subprocess.DEVNULL, stderr=(folder / 'dbus.log').open('w'))
 probe = None
-report = {}
 try:
     for _ in range(200):
         if socket.exists():
@@ -97,10 +99,13 @@ try:
 finally:
     if probe and probe.poll() is None:
         probe.terminate()
-    daemon.terminate()
-    daemon.wait()
+    if daemon:
+        daemon.terminate()
+        daemon.wait()
     report['probeLog'] = (folder / 'probe.log').read_text()[-2000:] if (folder / 'probe.log').exists() else ''
-    report['busLog'] = (folder / 'dbus.log').read_text()[-2000:]
+    report['busLog'] = (folder / 'dbus.log').read_text()[-2000:] if (folder / 'dbus.log').exists() else ''
+    report['denials'] = subprocess.run(['sudo', 'journalctl', '-k', '--no-pager', '-g', 'apparmor="DENIED"', '--since', '-5min'],
+                                       capture_output=True, text=True).stdout[-3000:]
 print(json.dumps(report, indent=1))
 seen = report.get('probe') or {}
 failures = []
