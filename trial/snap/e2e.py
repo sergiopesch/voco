@@ -9,7 +9,9 @@ grab and xdotool. Everything runs at the paths snapd lets a snap reach: the
 runner's session bus, /run/user/UID/pulse/native and wayland-N.
 
 Then VOCO starts again with one My words entry and its taught version, and a
-longer clip goes in: the recognizer writes "lotable" for its "laudable".
+longer clip goes in: the recognizer writes "lotable" for its "laudable". On X11
+it first starts with audio-record and login-session-observe disconnected, and
+each refusal must name its snap connect command.
 
 Usage: e2e.py gnome-wayland|x11 EVIDENCE_DIR
 Prints a JSON report; exits 1 unless the focused field received each clip's
@@ -37,6 +39,7 @@ revision = subprocess.check_output(["snap", "list", "voco"], text=True).splitlin
 data = Path.home() / "snap/voco" / revision
 state = data / ".local/state/voco"
 trace = state / "hotkey-trace.jsonl"
+notifications = evidence / "notifications.jsonl"
 performance = state / "performance/performance.jsonl"
 clip = repo / "tests/fixtures/speech/84-121123-0000.wav"
 EXPECTED = ["go", "do", "you", "hear"]
@@ -44,6 +47,11 @@ EXPECTED = ["go", "do", "you", "hear"]
 # first proselyte..." for this clip (the trial's recognition step prints it).
 LONG_CLIP = repo / "tests/fixtures/speech/1673-143396-0000.wav"
 MY_WORDS = {"myWords": ["laudable"], "myWordsHeard": [{"heard": "lotable", "writes": "laudable"}]}
+# Every title VOCO gives a start that failed or a dictation it couldn't finish.
+FAILURES = {"Dictation could not start", "Dictation setup incomplete", "Microphone could not start",
+            "Microphone setup required", "Microphone access is blocked", "Dictation interrupted",
+            "VOCO stopped typing", "Dictation copied to clipboard", "Dictation saved in Review",
+            "Dictation won't be typed", "Crash recovery unavailable"}
 KEYS = {"gnome-wayland": "companion", "x11": "xdotool"}[platform]
 processes = []
 report = {"platform": platform, "snapRevision": revision, "steps": []}
@@ -86,6 +94,10 @@ def events():
     return collections.Counter(row.get("event") for row in records(trace) if isinstance(row, dict))
 
 
+def notified(text):
+    return any(text in row.get("body", "") for row in records(notifications))
+
+
 def words(text):
     return re.findall("[a-z]+", (text or "").lower())
 
@@ -109,9 +121,14 @@ def start_audio(base):
     sources = lambda: subprocess.run(["pactl", "list", "short", "sources"], capture_output=True, text=True,
                                      env=environment).stdout
     wait(lambda: "voco_fixture" in sources(), "the fixture microphone")
-    subprocess.run(["pactl", "set-default-source", "voco_fixture"], check=True, env=environment)
-    wait(lambda: subprocess.run(["pactl", "get-default-source"], capture_output=True, text=True,
-                                env=environment).stdout.strip() == "voco_fixture", "the default microphone")
+    # WirePlumber makes it the default by its priority, as in the privacy check;
+    # pipewire-pulse 1.0 can't set a default without WirePlumber's metadata.
+    try:
+        wait(lambda: subprocess.run(["pactl", "get-default-source"], capture_output=True, text=True,
+                                    env=environment).stdout.strip() == "voco_fixture", "the default microphone")
+    except AssertionError:
+        print((evidence / "wireplumber.log").read_text()[-3000:])
+        raise
     return environment
 
 
@@ -244,6 +261,14 @@ try:
         field = Field({**base, **session, "GDK_BACKEND": "wayland"})
         wait(lambda: focused_title(probe, host_environment) == "VOCO paste fixture", "the field to have focus")
     else:
+        # GNOME Shell is the notification server on Wayland; on X11 this one
+        # records what VOCO shows.
+        start(["/usr/bin/python3", "-W", "ignore", str(repo / "trial/snap/notifications.py"), str(notifications)],
+              "notifications.err", env=base)
+        owner = ["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus", "--object-path",
+                 "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.NameHasOwner", "org.freedesktop.Notifications"]
+        wait(lambda: "true" in subprocess.run(owner, capture_output=True, text=True, env=base).stdout,
+             "the notification server")
         session = {"DISPLAY": host, "XDG_SESSION_TYPE": "x11"}
         field = Field({**base, **session, "GDK_BACKEND": "x11"})
         window = subprocess.check_output(["xdotool", "search", "--name", "^VOCO paste fixture$"], text=True,
@@ -275,13 +300,50 @@ try:
             note("companion asks for work")
         return process
 
-    app = launch("voco.log")
+    toggle_socket = lambda: subprocess.run(["snap", "run", "voco", "--toggle"], check=True, env=voco_environment)
+    if platform == "x11":
+        # Each unconnected plug fails closed, naming its snap connect command, and
+        # a plug connected a moment ago counts at once. What doesn't hold is noted
+        # in "problems", which fail the run once every dictation ran.
+        problems = report.setdefault("problems", [])
+        for plug in ("audio-record", "login-session-observe"):
+            subprocess.run(["sudo", "snap", "disconnect", f"voco:{plug}"], check=True)
+        check = subprocess.run(["snap", "run", "voco", "--check-desktop-input"], capture_output=True, text=True,
+                               env=voco_environment)
+        report["cliCheckUnconnected"] = {"exit": check.returncode, "output": (check.stdout + check.stderr).strip()}
+        note("check-desktop-input unconnected", **report["cliCheckUnconnected"])
+        if check.returncode != 1 or "snap connect voco:login-session-observe" not in check.stderr:
+            problems.append("voco --check-desktop-input passed without login-session-observe")
+        app = launch("voco-unconnected.log")
+
+        def refusal(after):
+            """Toggle, then return the notification VOCO shows instead of recording."""
+            shown, before = len(records(notifications)), events()
+            toggle_socket()
+            wait(lambda: len(records(notifications)) > shown, f"a refusal {after}", 20)
+            assert events()["recording_state_active"] == before["recording_state_active"], f"Recorded {after}"
+            return records(notifications)[shown]
+
+        first = refusal("with both plugs unconnected")
+        assert "snap connect voco:login-session-observe" in first["body"], f"Unexpected refusal: {first}"
+        subprocess.run(["sudo", "snap", "connect", "voco:login-session-observe"], check=True)
+        second = refusal("with audio-record unconnected")
+        report["refusals"] = [first, second]
+        note("refusals", first=first["body"], second=second["body"])
+        if "snap connect voco:audio-record" not in second["body"]:
+            problems.append(f"After login-session-observe was connected, Start was refused with: {second['body']}")
+        subprocess.run(["sudo", "snap", "connect", "voco:audio-record"], check=True)
+        # A new VOCO, so a refusal still remembered can't hide the dictations below.
+        app.terminate()
+        app.wait(timeout=20)
+        app = launch("voco.log")
+    else:
+        app = launch("voco.log")
     check = subprocess.run(["snap", "run", "voco", "--check-desktop-input"], capture_output=True, text=True,
                            env=voco_environment)
     note("check-desktop-input", exit=check.returncode, output=(check.stdout + check.stderr).strip())
     assert check.returncode == 0, "voco --check-desktop-input refused"
 
-    toggle_socket = lambda: subprocess.run(["snap", "run", "voco", "--toggle"], check=True, env=voco_environment)
     text = dictate("voco --toggle", field, audio, toggle_socket)
     assert words(text) == EXPECTED, f"Field text after Stop: {text!r}"
     report["toggleText"] = text
@@ -321,6 +383,12 @@ try:
     report.update(pasteKeys=dict(keys))
     assert keys and set(keys) == {KEYS}, f"Pastes went through {dict(keys)}, not only {KEYS}"
     assert app.poll() is None, "VOCO exited during the dictations"
+    if platform == "x11":
+        # After the refusals, no notification may report a failed or partial dictation.
+        report["notifications"] = records(notifications)
+        failed = [row for row in report["notifications"][len(report["refusals"]):] if row.get("summary") in FAILURES]
+        assert not failed, f"VOCO reported failures: {failed}"
+        assert not report["problems"], f"Problems: {report['problems']}"
     passed = True
 except Exception as error:
     report["failure"] = f"{type(error).__name__}: {error}"
