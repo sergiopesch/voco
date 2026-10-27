@@ -201,7 +201,7 @@ class SnapPackageTest(unittest.TestCase):
 
         def run(command, cwd, check, env):
             calls.append((command, cwd, env))
-            Path(command[command.index("--output") + 1]).write_text("snap")
+            Path(cwd, command[command.index("--output") + 1]).write_text("snap")
 
         for mode, flag in ((None, "--use-lxd"), ("destructive", "--destructive-mode")):
             environment = {key: value for key, value in os.environ.items() if key != "VOCO_SNAP_BUILD"}
@@ -211,8 +211,10 @@ class SnapPackageTest(unittest.TestCase):
             with patch.dict(os.environ, environment, clear=True), patch.object(snap.subprocess, "run", run):
                 built = snap.build_snap(self.stage, work, "2026.0.64")
             command, cwd, env = calls[-1]
-            self.assertEqual(built, work / "voco_2026.0.64_amd64.snap")
-            self.assertEqual(command[:3], ["snapcraft", "pack", flag])
+            # snapcraft refuses to write outside its project folder.
+            self.assertEqual(built, work / "project/voco_2026.0.64_amd64.snap")
+            self.assertEqual(command[:3] + command[-2:],
+                             ["snapcraft", "pack", flag, "--output", "voco_2026.0.64_amd64.snap"])
             self.assertEqual(cwd, work / "project")
             self.assertEqual(env["SNAPCRAFT_BUILD_INFO"], "1")
         shutil.rmtree(work)

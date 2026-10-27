@@ -219,15 +219,16 @@ def build_snap(stage, work, version):
     work.mkdir()
     project = work / "project"
     write_project(stage, project, version)
-    built = work / snap_name(version)
     mode = os.environ.get("VOCO_SNAP_BUILD", "lxd")
     if mode not in ("lxd", "destructive"):
         raise ValueError("VOCO_SNAP_BUILD must be lxd or destructive")
+    # snapcraft writes a snap only inside its project folder.
+    built = project / snap_name(version)
     command = ["snapcraft", "pack", "--use-lxd" if mode == "lxd" else "--destructive-mode",
-               "--output", str(built)]
+               "--output", built.name]
     # The build manifest records every stage package's version in the snap.
     subprocess.run(command, cwd=project, check=True, env={**os.environ, "SNAPCRAFT_BUILD_INFO": "1"})
-    produced = sorted(path for path in work.iterdir() if path.suffix == ".snap")
+    produced = sorted(path for path in project.iterdir() if path.suffix == ".snap")
     if produced != [built]:
         raise ValueError(f"snapcraft produced {produced}, not {built.name}")
     return built
