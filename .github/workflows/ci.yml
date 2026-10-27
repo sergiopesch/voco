@@ -744,7 +744,12 @@ jobs:
       - name: Install Snapcraft and the probe's client libraries
         timeout-minutes: 8
         run: |
-          sudo snap install snapcraft --classic --channel=9.x/stable
+          # The store times out a request now and then; ride out a short outage.
+          for attempt in 1 2 3 4 5; do
+            sudo snap install snapcraft --classic --channel=9.x/stable && break
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep 20
+          done
           sudo apt-get update -qq
           sudo apt-get install -y -qq python3-gi gir1.2-glib-2.0 dbus
 
