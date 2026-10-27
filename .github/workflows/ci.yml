@@ -198,11 +198,11 @@ jobs:
           tail -60 "${RUNNER_TEMP}/app.log"
           grep -q 'Bundled Nemotron streaming model ready' "${RUNNER_TEMP}/app.log"
 
-      - name: Install a nested GNOME Shell, PulseAudio and the field's toolkit
+      - name: Install a nested GNOME Shell, PipeWire and the field's toolkit
         timeout-minutes: 15
         run: |
-          sudo apt-get install -y --no-install-recommends gnome-shell xwayland pulseaudio pulseaudio-utils \
-            python3-gi gir1.2-gtk-3.0 xdotool dbus libglib2.0-bin
+          sudo apt-get install -y --no-install-recommends gnome-shell xwayland pipewire pipewire-bin \
+            pipewire-pulse wireplumber pulseaudio-utils python3-gi gir1.2-gtk-3.0 xdotool dbus libglib2.0-bin
 
       - name: The snap dictates into a GTK field on X11
         timeout-minutes: 10

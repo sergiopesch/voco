@@ -83,22 +83,28 @@ def words(text):
     return re.findall("[a-z]+", (text or "").lower())
 
 
-def pulse():
-    """A null sink whose monitor is the default microphone, at the Pulse socket
-    the snap's audio-playback plug reaches."""
-    for unit in ("pipewire-pulse.socket", "pipewire-pulse.service", "pulseaudio.socket", "pulseaudio.service"):
-        subprocess.run(["systemctl", "--user", "stop", unit], capture_output=True)
-    socket = runtime / "pulse/native"
-    socket.parent.mkdir(mode=0o700, exist_ok=True)
-    if socket.exists():
-        socket.unlink()
-    start(["pulseaudio", "--daemonize=no", "--use-pid-file=no", "--exit-idle-time=-1", "--disable-shm=true", "-n",
-           "-L", f"module-native-protocol-unix socket={socket} auth-anonymous=1",
-           "-L", "module-null-sink sink_name=fixture rate=48000",
-           "-L", "module-remap-source master=fixture.monitor source_name=voco_fixture"], "pulse.log")
-    wait(socket.exists, "PulseAudio")
-    environment = {**os.environ, "PULSE_SERVER": f"unix:{socket}"}
+def start_audio(base):
+    """PipeWire with the privacy check's devices: a null sink "fixture" and the
+    default microphone voco_fixture, which records its monitor. Its Pulse server
+    listens at /run/user/UID/pulse/native, the socket VOCO's native capture and
+    the snap's audio plugs use. Native capture needs PipeWire: a source without
+    PipeWire's object.serial is never a default microphone."""
+    for unit in ("wireplumber.service", "pipewire-pulse.socket", "pipewire-pulse.service", "pipewire.socket",
+                 "pipewire.service", "pulseaudio.socket", "pulseaudio.service"):
+        subprocess.run(["systemctl", "--user", "stop", unit], capture_output=True, env=base)
+    for stale in (runtime / "pulse/native", runtime / "pipewire-0", runtime / "pipewire-0-manager"):
+        if stale.exists():
+            stale.unlink()
+    environment = {**base, "PIPEWIRE_RUNTIME_DIR": str(runtime)}
+    start(["pipewire", "-c", str(repo / "scripts/privacy/pipewire.conf")], "pipewire.log", env=environment)
+    wait((runtime / "pulse/native").exists, "PipeWire's Pulse server")
+    start(["wireplumber"], "wireplumber.log", env=environment)
+    sources = lambda: subprocess.run(["pactl", "list", "short", "sources"], capture_output=True, text=True,
+                                     env=environment).stdout
+    wait(lambda: "voco_fixture" in sources(), "the fixture microphone")
     subprocess.run(["pactl", "set-default-source", "voco_fixture"], check=True, env=environment)
+    wait(lambda: subprocess.run(["pactl", "get-default-source"], capture_output=True, text=True,
+                                env=environment).stdout.strip() == "voco_fixture", "the default microphone")
     return environment
 
 
@@ -204,8 +210,9 @@ def dictate(how, field, environment, toggle):
     toggle()
     wait(lambda: events()["recording_state_active"] > before["recording_state_active"], f"recording ({how})")
     note("recording", how=how)
-    player = subprocess.run(["paplay", "--device=fixture", str(clip)], env=environment, capture_output=True, text=True)
-    assert player.returncode == 0, f"paplay failed: {player.stderr}"
+    player = subprocess.run(["pw-play", "--target", "fixture", str(clip)], env=environment, capture_output=True,
+                            text=True)
+    assert player.returncode == 0, f"pw-play failed: {player.stderr}"
     wait(lambda: words(field.text()) == EXPECTED, f"the words in the field ({how})", 30)
     note("words arrived", how=how, text=field.text())
     toggle()
@@ -219,8 +226,8 @@ passed = False
 try:
     base = {key: value for key, value in os.environ.items() if key not in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY")}
     base.update(XDG_RUNTIME_DIR=str(runtime), DBUS_SESSION_BUS_ADDRESS=bus, LANG="C.UTF-8")
-    audio = pulse()
-    note("pulseaudio")
+    audio = start_audio(base)
+    note("pipewire")
     host = ":7" if platform == "gnome-wayland" else ":8"
     start(["Xvfb", host, "-screen", "0", "1280x900x24", "-nolisten", "tcp"], "xvfb.log")
     wait(lambda: Path(f"/tmp/.X11-unix/X{host[1:]}").exists(), "Xvfb")
@@ -290,6 +297,12 @@ except Exception as error:
 finally:
     report["passed"] = passed
     report["lastEvents"] = [row.get("event") for row in records(trace)[-15:]]
+    if not passed:
+        # Neither log holds dictated text; their last rows say what VOCO decided.
+        for path in (trace, performance):
+            print(f"--- last rows of {path.name}")
+            for row in records(path)[-40:]:
+                print(json.dumps(row, sort_keys=True))
     for path in (trace, performance):
         if path.exists():
             (evidence / path.name).write_text(path.read_text())
