@@ -14,7 +14,7 @@ parts:
   probe:
     plugin: dump
     source: .
-    stage-packages: [python3, python3-gi, gir1.2-glib-2.0]
+    stage-packages: [python3.12, python3-gi, gir1.2-glib-2.0]
 
 slots:
   panel:
@@ -24,7 +24,7 @@ slots:
 
 apps:
   probe:
-    command: usr/bin/python3 $SNAP/probe.py
+    command: run-probe
     environment:
       PYTHONPATH: $SNAP/usr/lib/python3/dist-packages
       GI_TYPELIB_PATH: $SNAP/usr/lib/x86_64-linux-gnu/girepository-1.0
