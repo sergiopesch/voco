@@ -1,0 +1,10 @@
+#!/bin/sh
+# xclip, xdotool and notify-send in VOCO's snap. Each name in usr/bin links
+# here; Ubuntu's program of that name and its libraries live under helpers/
+# beside this file, so the app's own libraries stay the GNOME platform's.
+set -eu
+here=$(dirname "$(readlink -f "$0")")
+lib=$here/helpers/usr/lib/x86_64-linux-gnu
+LD_LIBRARY_PATH=$lib
+export LD_LIBRARY_PATH
+exec "$here/helpers/usr/bin/${0##*/}" "$@"

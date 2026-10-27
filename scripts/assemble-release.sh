@@ -6,9 +6,11 @@
 # a signed voco.<version> tag once CI has passed for it on master, as a Debian
 # package and a Fedora RPM built from the same staged tree, verifies both,
 # writes the release records and checksum manifests, and signs the manifests.
+# With VOCO_RELEASE_SNAP=1 it also builds and verifies the strict snap from
+# that tree, for the Snap Store rather than the GitHub release.
 # It uploads nothing; it ends by printing the publishing commands.
 #
-# Usage: bash scripts/assemble-release.sh OUTPUT_DIR
+# Usage: [VOCO_RELEASE_SNAP=1] bash scripts/assemble-release.sh OUTPUT_DIR
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -31,6 +33,13 @@ for command in git gpg gpgv node npm cargo python3 dpkg dpkg-deb sha256sum base6
   desktop-file-validate appstreamcli rpm rpmbuild rpm2cpio cpio; do
   command -v "${command}" >/dev/null 2>&1 || fail "Missing required command: ${command}"
 done
+SNAP_BUILD="${VOCO_RELEASE_SNAP:-0}"
+[[ "${SNAP_BUILD}" == 0 || "${SNAP_BUILD}" == 1 ]] || fail "VOCO_RELEASE_SNAP must be 0 or 1."
+if [[ "${SNAP_BUILD}" == 1 ]]; then
+  for command in snapcraft unsquashfs; do
+    command -v "${command}" >/dev/null 2>&1 || fail "Missing required command for the snap: ${command}"
+  done
+fi
 
 cd "${ROOT_DIR}"
 umask 022
@@ -46,6 +55,7 @@ TAG="voco.${VERSION}"
 COMMIT="$(git rev-parse HEAD)"
 DEB="voco_${VERSION}_amd64.deb"
 RPM="voco-${VERSION}-1.x86_64.rpm"
+SNAP="voco_${VERSION}_amd64.snap"
 
 step "Checking ${TAG} at ${COMMIT}"
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] \
@@ -141,11 +151,21 @@ shopt -u nullglob
 
 step "Packaging the speech runtime"
 mv -- "${base_packages[0]}" "${WORK}/base.deb"
-python3 scripts/package-nvidia.py "${WORK}/base.deb" "${ASSETS}/${DEB}" --rpm "${ASSETS}/${RPM}"
+# The snap goes to the Snap Store, so it stays out of the GitHub release's assets.
+snap_output=()
+if [[ "${SNAP_BUILD}" == 1 ]]; then
+  mkdir "${STAGE}/snap"
+  snap_output=(--snap "${STAGE}/snap/${SNAP}")
+fi
+python3 scripts/package-nvidia.py "${WORK}/base.deb" "${ASSETS}/${DEB}" --rpm "${ASSETS}/${RPM}" \
+  "${snap_output[@]}"
 bash scripts/verify-deb-package.sh "${ASSETS}/${DEB}" "${VERSION}"
 # With the .deb as its third argument, the RPM verifier also proves that both
 # packages carry the same files and dependencies.
 bash scripts/verify-rpm-package.sh "${ASSETS}/${RPM}" "${VERSION}" "${ASSETS}/${DEB}"
+if [[ "${SNAP_BUILD}" == 1 ]]; then
+  bash scripts/verify-snap-package.sh "${STAGE}/snap/${SNAP}" "${VERSION}" "${ASSETS}/${DEB}"
+fi
 ln -- "${ASSETS}/${DEB}" "${ASSETS}/voco_latest_amd64.deb"
 ln -- "${ASSETS}/${RPM}" "${ASSETS}/voco_latest_x86_64.rpm"
 
@@ -154,12 +174,20 @@ dpkg-deb -x "${ASSETS}/${DEB}" "${WORK}/package"
 cp runtime/speech/test_worker_protocol.py "${WORK}/package/usr/lib/voco/speech/"
 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "${WORK}/package/usr/lib/voco/speech/test_worker_protocol.py" \
   --output-dir "${WORK}/worker" --fixtures "${ROOT_DIR}/tests/fixtures/speech"
+if [[ "${SNAP_BUILD}" == 1 ]]; then
+  # The snap's worker runs on its own Python, NumPy and SentencePiece.
+  unsquashfs -no-progress -quiet -dest "${WORK}/snap" "${STAGE}/snap/${SNAP}" >/dev/null
+  cp runtime/speech/test_worker_protocol.py "${WORK}/snap/usr/lib/voco/speech/"
+  "${WORK}/snap/usr/lib/voco/snap/python3" -E -s -B "${WORK}/snap/usr/lib/voco/speech/test_worker_protocol.py" \
+    --output-dir "${WORK}/snap-worker" --fixtures "${ROOT_DIR}/tests/fixtures/speech"
+fi
 
 step "Writing the source archive, companion and records"
 git archive --format=tar.gz --prefix="voco-${VERSION}/" --output="${ASSETS}/voco_${VERSION}_source.tar.gz" "${TAG}"
 python3 scripts/package-gnome-panel.py "${ASSETS}/voco-panel@sergiopesch.com.shell-extension.zip"
 cp install KEYS "${ASSETS}/"
-python3 - "${ASSETS}" "${WORK}" "${VERSION}" "${TAG}" "${COMMIT}" "${FINGERPRINT}" "${REPOSITORY}" <<'EOF_RECORDS'
+python3 - "${ASSETS}" "${WORK}" "${VERSION}" "${TAG}" "${COMMIT}" "${FINGERPRINT}" "${REPOSITORY}" \
+  "${STAGE}/snap" <<'EOF_RECORDS'
 import hashlib
 import json
 import platform
@@ -169,7 +197,8 @@ import time
 from pathlib import Path
 
 assets, work = Path(sys.argv[1]), Path(sys.argv[2])
-version, tag, commit, fingerprint, repository = sys.argv[3:]
+version, tag, commit, fingerprint, repository = sys.argv[3:8]
+snap = Path(sys.argv[8]) / f"voco_{version}_amd64.snap"
 package = work / "package"
 
 
@@ -220,6 +249,17 @@ provenance = {
 worker = json.loads((work / "worker/worker-protocol-results.json").read_text())
 if not worker or not all(check["passed"] for check in worker):
     raise SystemExit("The packaged speech worker failed its protocol checks")
+snap_checks = {}
+if snap.exists():
+    snap_worker = json.loads((work / "snap-worker/worker-protocol-results.json").read_text())
+    if not snap_worker or not all(check["passed"] for check in snap_worker):
+        raise SystemExit("The snap's speech worker failed its protocol checks")
+    # The store gets the snap; the records tie that upload to this release.
+    provenance["snapSha256"] = digest(snap)
+    provenance["snapBytes"] = snap.stat().st_size
+    provenance["buildEnvironment"]["snapcraft"] = output("snapcraft", "--version")
+    snap_checks = {"snapVerifier": "passed",
+                   "snapWorkerProtocol": {"outcome": "passed", "checks": len(snap_worker)}}
 validation = {
     **common,
     "hostedCI": json.loads((work / "ci.json").read_text()),
@@ -229,6 +269,7 @@ validation = {
         "packageVerifier": "passed",
         "rpmPackageVerifier": "passed",
         "packagedWorkerProtocol": {"outcome": "passed", "checks": len(worker)},
+        **snap_checks,
     },
     "limits": [
         "Hosted CI tested a release build of this commit with synthetic audio in private X11, "
@@ -239,6 +280,8 @@ validation = {
         "The RPM was checked on the Ubuntu build computer with rpm and against the Debian package's "
         "files; installing it with dnf on Fedora is not part of this record.",
         "Installation from the published release happens after signing and is not part of this record.",
+        *(["The snap was checked on the build computer, outside its confinement; installing it and "
+           "running it confined is not part of this record."] if snap.exists() else []),
     ],
 }
 for name, record in (("provenance", provenance), ("validation", validation)):
@@ -298,3 +341,11 @@ RPM SHA-256:     $(sha256sum "${OUT}/assets/${RPM}" | cut -d' ' -f1)
        --notes-file ${OUT}/release-notes.md ${OUT}/assets/*
 3. Check the draft's files and notes, then publish it.
 EOF_NEXT
+if [[ "${SNAP_BUILD}" == 1 ]]; then
+  cat <<EOF_SNAP
+4. Try the snap on Ubuntu 24.04 and the latest Ubuntu, then upload it to edge:
+     sudo snap install --dangerous ${OUT}/snap/${SNAP}
+     snapcraft upload --release=edge ${OUT}/snap/${SNAP}
+   Snap SHA-256: $(sha256sum "${OUT}/snap/${SNAP}" | cut -d' ' -f1)
+EOF_SNAP
+fi

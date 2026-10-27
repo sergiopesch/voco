@@ -28,6 +28,12 @@ On the Linux computer that signs releases:
    command it can't find; the upload needs `gh`.
 4. Use Ubuntu 24.04. Its glibc 2.39 and GCC 13 runtime set both packages'
    floors, and the RPM check stops if a binary needs a newer symbol version.
+5. To build the snap too, install Snapcraft, LXD, the `core24` base and the
+   snap verifier's tools, then sign out and back in so the `lxd` group applies:
+   `sudo snap install snapcraft --classic`, `sudo snap install lxd`,
+   `sudo lxd init --auto`, `sudo usermod -aG lxd "$USER"`,
+   `sudo snap install core24` and `sudo apt install squashfs-tools python3-yaml`.
+   `snapcraft login` once lets you upload it.
 
 ## Make a release
 
@@ -95,6 +101,13 @@ worker. Then it writes the assets, signs each manifest and verifies it with
 `verify-release.sh --keys KEYS`, repeats the installer's `gpgv` check with the
 key embedded in `install`, and renders `release-notes.md`. It uploads nothing.
 
+With `VOCO_RELEASE_SNAP=1`, the assembler also builds the snap from the same
+staged tree, in an LXD instance, into `snap/` beside `assets/`, so the snap
+stays out of the GitHub release. It verifies the snap with
+`verify-snap-package.sh` against the Debian package, runs the worker protocol
+checks on the snap's own Python, and adds the snap's SHA-256, its size and those
+checks to the release records.
+
 | Asset | Contents |
 | --- | --- |
 | `voco_<version>_amd64.deb`, `voco_latest_amd64.deb` | The Debian package, under its own name and the fixed name the manual install uses |
@@ -122,6 +135,13 @@ computer with SELinux enforcing. Copy `voco-<version>-1.x86_64.rpm` there, then:
    in, and run the voice test.
 3. Remove it with `sudo dnf remove voco`.
 4. Check that `sudo ausearch -m avc -ts today` finds no denial.
+
+With the snap built, try it on Ubuntu 24.04 and on the latest Ubuntu. Install
+it with `sudo snap install --dangerous ~/voco-release/snap/voco_<version>_amd64.snap`,
+connect `audio-record` and `login-session-observe` with `sudo snap connect` while
+the store doesn't connect them automatically, install the VOCO panel from
+extensions.gnome.org on GNOME, sign out and back in, and run the voice test and a
+dictation.
 
 ### 7. Push the tag and create a draft
 
@@ -153,7 +173,19 @@ from the published tag in a desktop session, on Ubuntu or Debian and on Fedora:
 wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.<version>/install && bash voco-install
 ```
 
-### 9. Point the docs at the release
+### 9. Upload the snap
+
+Once the release is published and the snap tried on both, upload it to `edge`:
+
+```bash
+snapcraft upload --release=edge ~/voco-release/snap/voco_<version>_amd64.snap
+```
+
+Promote it past `edge` only after trying the store's copy on both systems. The
+store reviews each upload; until it auto-connects `audio-record` and
+`login-session-observe`, VOCO's setup shows their `snap connect` commands.
+
+### 10. Point the docs at the release
 
 After publishing, update in one pull request `version` in
 `packaging/published-release.json`, the version and install command in
@@ -173,19 +205,21 @@ aren't byte-identical to the ones CI ran; the validation record says so. Its
 GNOME 50 Companion job runs the companion on Ubuntu 26.04, its GNOME 51 Companion
 job runs it on Fedora 45's Shell in a container, and its Debian 13 and
 Fedora 44 Runtime jobs install the packages' dependencies by those systems'
-names and run the speech runtime there. No job builds a package, and the
-assembler requires every job to have passed.
+names and run the speech runtime there. No job builds a package or VOCO's
+snap; the Snap Confinement Probe job builds only a test snap from
+`scripts/fixtures`. The assembler requires every job to have passed.
 
 `npm run verify:devops` runs `scripts/check-devops.sh`, which fails when another
 workflow file appears or when `ci.yml` mentions `package-nvidia.py`,
-`sign-release-checksums`, `assemble-release` or any secret. It also runs
+`sign-release-checksums`, `assemble-release`, any secret or the snap's
+packaging. It also runs
 `npm run rehearse:release`, which needs no key or network. The rehearsal checks
 the versions, the release scripts and the installer helper tests; that no
 README, doc or installer comment installs from `master` or pipes a download into
 a shell; that the install guide keeps its checksum steps, the installer names
 its own tag and the README installs the published version; that the assembler
-builds the RPM from the Debian package's staged tree, verifies it against the
-Debian package and creates drafts with `--verify-tag`; and that the release
+builds the RPM and the snap from the Debian package's staged tree, verifies
+both against the Debian package and creates drafts with `--verify-tag`; and that the release
 notes give both packages' verification commands. Then it prints the release
 notes it would render. `check-devops.sh` also keeps the RPM spec in step with
 the Debian dependencies, as [Linux packaging](linux-packaging.md#package-checks)

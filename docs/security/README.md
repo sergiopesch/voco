@@ -178,7 +178,9 @@ around it does.
 VOCO starts `/usr/bin/python3 -E -s -B /usr/lib/voco/speech/stream_worker.py`
 with pipes for its input and output. `VOCO_STREAM_PYTHON` and
 `VOCO_STREAM_WORKER` can name other absolute files, which then run with your
-permissions. The flags make Python ignore `PYTHON*` variables and your own
+permissions. The snap sets them to its own worker and to a wrapper that adds
+only `LD_LIBRARY_PATH`, for the snap's private library folders, before running
+the snap's Python 3.12 with the same flags. The flags make Python ignore `PYTHON*` variables and your own
 site-packages, so neither can load other code into the worker. VOCO reads
 response lines of up to 1 MiB, and the worker reads request lines of up to
 4 MiB; a longer line ends the exchange. The worker keeps library output off the
@@ -215,6 +217,21 @@ The filter keeps the worker's own code and libraries off the network. It doesn't
 contain a worker that something has taken over: that worker still runs as you,
 reads and writes your files, and could leave a program for your next login to
 start.
+
+## The snap
+
+VOCO's snap is strictly confined on `core24`. Beside the plugs of Snapcraft's
+GNOME extension, which a desktop app needs, it plugs only `audio-playback`,
+`audio-record` and `login-session-observe`. Without `network`, `home` or a
+device plug, it can't reach the internet, read your home folder outside its own
+folders or open `/dev/uinput` and `/dev/input`. Its settings, journal and logs
+live in `$SNAP_USER_DATA`, and it never reads a package's settings. On the
+session bus it owns `org.voco.Panel` through a `dbus` slot: confinement lets it
+answer GNOME Shell's calls but never call the Shell, so the companion asks it
+for work. On Wayland only the companion types for it; on X11 `xdotool` does, as
+for the packages. Until `login-session-observe` is connected, logind refuses
+the snap, and it sends no paste keys; until `audio-record` is connected, the
+snap opens no microphone and names the `snap connect` command.
 
 ## Chromium extension
 

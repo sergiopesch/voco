@@ -55,6 +55,10 @@ contains() {
   # Both packages come from one staged tree, and the RPM is verified against the .deb.
   contains scripts/assemble-release.sh '--rpm "${ASSETS}/${RPM}"'
   contains scripts/assemble-release.sh 'bash scripts/verify-rpm-package.sh "${ASSETS}/${RPM}" "${VERSION}" "${ASSETS}/${DEB}"'
+  # The snap comes from that tree too, is verified against the .deb, and stays
+  # out of the GitHub release's assets.
+  contains scripts/assemble-release.sh 'snap_output=(--snap "${STAGE}/snap/${SNAP}")'
+  contains scripts/assemble-release.sh 'bash scripts/verify-snap-package.sh "${STAGE}/snap/${SNAP}" "${VERSION}" "${ASSETS}/${DEB}"'
   bash ./scripts/render-release-body.sh "${VERSION}" "${TAG_NAME}" > "${TMP_DIR}/release-body.md"
   for expected in \
     'voco_checksums.txt' \

@@ -487,9 +487,17 @@ and the update check. [The snap](#the-snap) lists its rules.
 - The snap is strictly confined on `core24` for amd64, with the packages' pinned
   speech runtime. `verify-snap-package.sh` proves it carries the `.deb`'s files
   except those strict confinement can't use: the uinput rule and module file, the
-  IBus component, the companion, `voco-browser-host` and its manifests. It plugs
-  only what it uses, never `network` or `home`, and has one slot, a session
-  `dbus` slot for `org.voco.Panel`; `check-devops.sh` checks both lists.
+  IBus engine and its component, the companion, and `voco-browser-host` with its
+  manifests and the Chromium extension. It plugs only what it uses, never
+  `network` or `home`, and has one slot, a session `dbus` slot for
+  `org.voco.Panel`; `check-devops.sh` checks both lists.
+- The Ubuntu programs the snap runs, Python 3.12 with NumPy and SentencePiece
+  for the worker, and xclip, xdotool and notify-send, live with their libraries
+  in private folders under `/usr/lib/voco/snap` and run through the reviewed
+  wrappers in `packaging/snap/wrappers`, so none shadows the GNOME platform's
+  libraries in the app. `VOCO_STREAM_PYTHON` names the worker's wrapper, which
+  adds only `LD_LIBRARY_PATH` for those folders, found from its own path, and
+  runs that Python with VOCO's flags.
 - It types only through the companion on GNOME Wayland and through `xdotool` on
   X11. Elsewhere Start is refused, and setup names the build that supports that
   desktop. Only the running VOCO knows whether the companion asks it for work, so
@@ -506,9 +514,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   Start is refused with the `snap connect` remedy.
 - Its config, journal and logs live in `$SNAP_USER_DATA`. It never reads a
   package's config, and a package never reads its.
-- The store updates it. The maintainer uploads it from the signing machine after
-  the same checks as the packages, to `edge` first; hosted CI never builds VOCO's
-  snap. Try it on Ubuntu 24.04 and the latest Ubuntu before promoting it past
+- The store updates it. The maintainer builds it with the release
+  (`VOCO_RELEASE_SNAP=1 scripts/assemble-release.sh`) and uploads it from the
+  signing machine after the same checks as the packages, to `edge` first; hosted
+  CI never builds VOCO's snap. Try it on Ubuntu 24.04 and the latest Ubuntu before promoting it past
   `edge`. Ask the store to auto-connect `audio-record` and
   `login-session-observe`; until it does, setup shows their `snap connect`
   commands.

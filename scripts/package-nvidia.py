@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Assemble the complete NVIDIA Debian package, and optionally the Fedora RPM
-from the same staged tree, from a Tauri base package."""
+and the strict snap from the same staged tree, from a Tauri base package."""
 import argparse
 import errno
 import hashlib
@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 from debian_maintainer import render_postinst
 import rpm_package
+import snap_package
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDORED_NOTICES = {
@@ -139,7 +140,7 @@ def stage_worker(speech):
 
 def stage_payload(base, stage, version, package_version):
     """Stage the complete package tree once: the base package plus the speech
-    runtime, documentation and licenses. Both package formats are built from it."""
+    runtime, documentation and licenses. Every package format is built from it."""
     subprocess.run(["dpkg-deb", "-R", str(base), str(stage)], check=True)
     validate_base_executables(stage)
     subprocess.run(["python3", str(ROOT / "scripts/verify-glib-backport.py")], check=True)
@@ -203,9 +204,12 @@ def main():
     parser.add_argument("--debian-version", help="Local revision, e.g. 2026.0.35+local1")
     parser.add_argument("--rpm", type=Path, metavar="OUTPUT.rpm",
                         help="Also build the Fedora package from the same staged tree")
+    parser.add_argument("--snap", type=Path, metavar="OUTPUT.snap",
+                        help="Also build the strict snap from the same staged tree")
     args = parser.parse_args()
     base, output = args.base.resolve(), args.output.resolve()
     rpm_output = args.rpm.resolve() if args.rpm else None
+    snap_output = args.snap.resolve() if args.snap else None
     version = json.loads((ROOT / "package.json").read_text())["version"]
     package_version = args.debian_version or version
     if package_version != version and not package_version.startswith(version + "+"):
@@ -221,6 +225,11 @@ def main():
         if rpm_output.exists() or rpm_output == output:
             parser.error("RPM output already exists; choose a new filename")
         rpm_output.parent.mkdir(parents=True, exist_ok=True)
+    if snap_output is not None:
+        snap_package.validate_version(package_version)
+        if snap_output.exists() or snap_output in (output, rpm_output):
+            parser.error("Snap output already exists; choose a new filename")
+        snap_output.parent.mkdir(parents=True, exist_ok=True)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="voco-package-", dir=output.parent) as directory:
         stage = Path(directory) / "stage"
@@ -228,16 +237,22 @@ def main():
         temporary_output = Path(directory) / "package.deb"
         subprocess.run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-z9", "--build",
                         str(stage), str(temporary_output)], check=True)
-        temporary_rpm = None
+        temporary_rpm = temporary_snap = None
         if rpm_output is not None:
             temporary_rpm = rpm_package.build_rpm(stage, Path(directory) / "rpm", package_version)
-        # Both archives are complete before either is published.
+        if snap_output is not None:
+            temporary_snap = snap_package.build_snap(stage, Path(directory) / "snap", package_version)
+        # Every archive is complete before any is published.
         publish(temporary_output, output)
         if temporary_rpm is not None:
             publish(temporary_rpm, rpm_output)
+        if temporary_snap is not None:
+            publish(temporary_snap, snap_output)
     summary = {**describe(output), "version": package_version, "application_version": version}
     if rpm_output is not None:
         summary["rpm"] = {**describe(rpm_output), "release": rpm_package.RELEASE}
+    if snap_output is not None:
+        summary["snap"] = describe(snap_output)
     print(json.dumps(summary))
 
 

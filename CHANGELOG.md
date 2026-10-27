@@ -8,6 +8,16 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Added
+
+- VOCO can be built as a strict snap, `voco`, for the Snap Store, from the same
+  staged tree as the `.deb` and the RPM. It types through the VOCO panel on
+  GNOME Wayland and through `xdotool` in X11 sessions, has no network access,
+  and is updated by the store. Until the store connects them on its own, VOCO
+  names the `snap connect` commands for its microphone (`audio-record`) and for
+  checking the session it types into (`login-session-observe`). The snap isn't
+  published yet.
+
 ### Changed
 
 - On GNOME Wayland, the GNOME companion now presses VOCO's paste keys from

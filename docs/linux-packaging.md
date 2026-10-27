@@ -6,8 +6,10 @@ package, `voco_<version>_amd64.deb`, for Ubuntu and Debian, and an RPM,
 the speech worker, the Nemotron model, the native CPU runtime, the optional
 desktop integrations and their license notices, so dictation needs no download
 at run time. The CPU needs AVX2, FMA and F16C, and the system needs glibc 2.39
-or later. [Install](install.md) covers installing the packages; this page covers
-how they are built and what they contain.
+or later. The same tree also becomes VOCO's strict snap for the Snap Store, with
+the files strict confinement can use ([The snap](#the-snap)). [Install](install.md)
+covers installing the packages; this page covers how they are built and what
+they contain.
 
 ## How the packages are built
 
@@ -18,14 +20,17 @@ Three steps turn a checkout into packages:
    result is a base package in `apps/desktop/src-tauri/target/release/bundle/deb/`.
    It holds the app and the integration files but no speech runtime, so it can't
    dictate and is never installed on its own.
-2. `python3 scripts/package-nvidia.py BASE.deb OUTPUT.deb [--rpm OUTPUT.rpm]`
+2. `python3 scripts/package-nvidia.py BASE.deb OUTPUT.deb [--rpm OUTPUT.rpm] [--snap OUTPUT.snap]`
    stages the complete tree once: the base package plus the speech runtime, the
-   documentation and the licenses. It builds the Debian package from that tree
-   and, with `--rpm`, [the RPM](#the-rpm) from a copy of it.
-3. `bash scripts/verify-deb-package.sh OUTPUT.deb [VERSION]` and
-   `bash scripts/verify-rpm-package.sh OUTPUT.rpm [VERSION] [OUTPUT.deb]` check
+   documentation and the licenses. It builds the Debian package from that tree,
+   with `--rpm` [the RPM](#the-rpm) from a copy of it, and with `--snap`
+   [the snap](#the-snap) from the files strict confinement can use.
+3. `bash scripts/verify-deb-package.sh OUTPUT.deb [VERSION]`,
+   `bash scripts/verify-rpm-package.sh OUTPUT.rpm [VERSION] [OUTPUT.deb]` and
+   `bash scripts/verify-snap-package.sh OUTPUT.snap VERSION OUTPUT.deb` check
    the results. Given the Debian package, the RPM check also proves that both
-   carry the same files and dependencies.
+   carry the same files and dependencies, and the snap check that the snap
+   carries the Debian package's files except those it leaves out.
 
 `bash scripts/setup.sh --install` runs the Debian steps and installs the package
 with APT. `scripts/assemble-release.sh` builds and checks both packages for a
@@ -36,16 +41,16 @@ RPM needs `rpmbuild`, which Ubuntu's `rpm` package provides.
 
 `package-nvidia.py` stops unless the base package's version equals the one in
 `package.json`. `--debian-version` may only extend that version with a `+suffix`,
-which must also be a valid RPM version when `--rpm` is given, and neither output
-file may exist yet. The script checks that the base package holds the `voco` and
+which must also be a valid RPM or snap version when `--rpm` or `--snap` is given,
+and no output file may exist yet. The script checks that the base package holds the `voco` and
 `voco-browser-host` executables, runs `scripts/verify-glib-backport.py`, and
 refuses a model whose SHA-256 differs from `runtime/speech/MODEL-IDENTITY.json`.
 It then writes `MANIFEST.json`, an inventory of every speech file and link with
 its SHA-256, sets directories to 0755 and files to 0644 or 0755, generates the
 maintainer script and rewrites the control file's version, installed size and
 checksums. It builds the Debian package with Zstandard at level 9 and, if asked,
-the RPM, and writes them to their outputs only when both are complete. It prints
-the version and each package's path, size and SHA-256.
+the RPM and the snap, and writes them to their outputs only when all are
+complete. It prints the version and each package's path, size and SHA-256.
 
 ## Contents
 
@@ -157,6 +162,73 @@ no prep, build or install stage, because nothing is compiled or downloaded.
 
 Like the Debian package, the RPM declares no configuration files, and no weak
 dependencies, conflicts or obsoletes.
+
+## The snap
+
+`scripts/snap_package.py` builds the snap from the staged tree, for the Snap
+Store rather than the GitHub release. It copies the tree into the snap's payload
+without what strict confinement can't use: the `/dev/uinput` rule and module
+file, the IBus engine and its component, the GNOME companion, which the snap
+gets from extensions.gnome.org, and `voco-browser-host` with its manifests and
+the Chromium extension. Each path it leaves out must exist in the staged tree,
+so the list can't silently go stale.
+
+It renders `packaging/snap/snapcraft.yaml.in` with the version and the store's
+summary and description. Both come from the AppStream metainfo; the snap's
+description adds where the snap types and says the Snap Store keeps VOCO up to
+date in place of the update checks. snapd accepts only SPDX identifiers in a
+snap's license, and none names the model's NVIDIA Open Model License, so the
+license reads `MIT AND Apache-2.0` and the description names the model's
+license, whose text the snap carries. Then it runs `snapcraft pack` in an LXD
+instance, or on the computer itself with `VOCO_SNAP_BUILD=destructive`, which
+needs Ubuntu 24.04 and root. `SNAPCRAFT_BUILD_INFO=1` records every stage
+package's version in the snap's `snap/manifest.yaml`.
+
+- **Confinement.** Strict, on `core24` for amd64, with Snapcraft's GNOME
+  extension, which brings GNOME 46's libraries, WebKitGTK and the desktop
+  plugs. The app also plugs `audio-playback`, `audio-record` and
+  `login-session-observe`, and has one slot, a session `dbus` slot for
+  `org.voco.Panel`. It plugs neither `network` nor `home`.
+- **Programs from Ubuntu.** The snap runs four programs from Ubuntu 24.04's
+  archive: Python 3.12 with NumPy and SentencePiece for the speech worker, and
+  xclip, xdotool and notify-send. Each lives with its libraries in a private
+  folder under `/usr/lib/voco/snap` and runs through a wrapper from
+  `packaging/snap/wrappers` that names them, so none of them shadows the GNOME
+  platform's libraries in the app. In the snap, `VOCO_STREAM_PYTHON` names the
+  worker's wrapper, which finds its folders from its own path, since VOCO
+  starts the worker with only the variables the worker reads.
+- **Compression.** lzo. The speech model is most of the snap and barely
+  compresses, and lzo keeps the worker's first read of it, at warm-up, close to
+  a package's.
+
+`verify-snap-package.sh` runs on the Ubuntu 24.04 build computer. It needs
+unsquashfs, dpkg-deb, readelf, python3 with PyYAML (`python3-yaml`) and the
+`core24` snap. It checks:
+
+- the file name `voco_<version>_amd64.snap`;
+- with `snap_package.py verify-snap`: the name, version, `core24`, strict
+  confinement, the `stable` grade and amd64; one app, `voco`, that runs
+  `usr/bin/voco` as `com.sergiopesch.voco` with exactly VOCO's plugs and the
+  GNOME extension's, the extension's content providers and only the panel slot;
+  the worker's paths; the wrappers and the helpers' links to them; that the
+  worker's Python finds its standard library and NumPy inside the snap; that no
+  library sits on the app's search path; and that the snap holds the Debian
+  package's files and links with the same modes and SHA-256 digests, except
+  the ones it leaves out, and nothing else outside its own paths;
+- with `snap_package.py verify-libraries`: that every library the private
+  programs and the speech runtime need is in their own folders, on their
+  `RUNPATH` or in `core24`;
+- that the snap's `snap/snapcraft.yaml` is this checkout's recipe, its launcher
+  entry is the packages' with the snap's icon, and it carries a build manifest;
+- the speech payload and both identity receipts, as the Debian verifier checks
+  them.
+
+`npm run test:speech-package` includes `scripts/test-snap-package.py`, which
+tests the payload, the description, the recipe and each check against
+deliberate mistakes. `npm run verify:devops` fails unless the recipe declares
+strict confinement on `core24`, the GNOME extension, VOCO's three plugs and the
+panel slot, and names no other plug, and it fails if `ci.yml` builds VOCO's
+snap: hosted CI builds only the probe snaps in `scripts/fixtures`.
 
 ## Wayland paste keys
 
