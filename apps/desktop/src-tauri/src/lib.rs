@@ -252,6 +252,10 @@ fn trace_frontend_hotkey_event(
         | "onboarding_handoff_hidden"
         | "launcher_activation_presented"
         | "launcher_activation_preserved_capture"
+        | "interactive_surface_shown"
+        | "interactive_surface_dismissed"
+        | "popover_focus_gained"
+        | "popover_focus_lost"
         | "frontend_hotkey_listener_registered" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
