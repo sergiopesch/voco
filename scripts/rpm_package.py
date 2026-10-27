@@ -24,7 +24,7 @@ ARCH = "x86_64"
 
 # VOCO's own folders, listed recursively, so rpm removes them with the package.
 OWNED_TREES = ("usr/lib/voco", "usr/share/voco", "usr/share/doc/voco",
-               "usr/share/gnome-shell/extensions/voco-panel@voco.local")
+               "usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com")
 # Shared folders that no VOCO dependency creates on Fedora 44. A folder may have
 # several owners, so VOCO owns these too and removal leaves no empty folder.
 SHARED_DIRECTORIES = ("etc/chromium", "etc/chromium/native-messaging-hosts", "etc/opt/chrome",

@@ -100,7 +100,7 @@ key embedded in `install`, and renders `release-notes.md`. It uploads nothing.
 | `voco_<version>_amd64.deb`, `voco_latest_amd64.deb` | The Debian package, under its own name and the fixed name the manual install uses |
 | `voco-<version>-1.x86_64.rpm`, `voco_latest_x86_64.rpm` | The RPM, under its own name and the fixed name the manual install uses |
 | `voco_<version>_source.tar.gz` | `git archive` of the tag |
-| `voco-panel@voco.local.shell-extension.zip` | The GNOME companion |
+| `voco-panel@sergiopesch.com.shell-extension.zip` | The GNOME companion |
 | `install`, `KEYS` | The guided installer and the public key |
 | `voco_<version>_provenance.json`, `voco_<version>_validation.json` | The source, the hashes and sizes of both packages and other files, and the build tools; the CI run, the local checks and their limits |
 | `voco_<version>_checksums.txt`, `voco_checksums.txt` | Every other asset except the signatures, under two names |

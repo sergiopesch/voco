@@ -59,7 +59,7 @@ if [[ ${1:-} != --inside && ${1:-} != --session ]]; then
     mkdir -p "$probe"
     cp "$ROOT_DIR/scripts/fixtures/gnome-private-probe/"* "$probe/"
     if [[ $keys == companion ]]; then
-      cp -r "$ROOT_DIR/integrations/gnome/voco-panel@voco.local" "$fixture/data/gnome-shell/extensions/"
+      cp -r "$ROOT_DIR/integrations/gnome/voco-panel@sergiopesch.com" "$fixture/data/gnome-shell/extensions/"
     fi
   fi
   status=0
@@ -96,7 +96,7 @@ if [[ ${1:-} == --session ]]; then
       # The Shell reads these from the fixture's dconf; applications keep the memory backend.
       unset GSETTINGS_BACKEND
       extensions="'voco-private-probe@test.invalid'"
-      [[ -z ${VOCO_FIXTURE_PANEL:-} ]] || extensions+=", 'voco-panel@voco.local'"
+      [[ -z ${VOCO_FIXTURE_PANEL:-} ]] || extensions+=", 'voco-panel@sergiopesch.com'"
       gsettings set org.gnome.shell enabled-extensions "[$extensions]"
       gsettings set org.gnome.shell disable-user-extensions false
       gsettings set org.gnome.shell welcome-dialog-last-shown-version "'999'"

@@ -14,6 +14,12 @@ class PanelSetupTests(unittest.TestCase):
         for version in ['46.0', '48.7', '50.1', '50.5']:
             self.assertEqual(panel.classify(version, True, {}, False, False)['canEnable'], True, version)
 
+    def test_enabling_moves_an_earlier_uuid_to_this_one(self):
+        old, new = panel.OLD_UUID, panel.UUID
+        self.assertEqual(panel.enabled_with_companion(['other@example.com', old]), ['other@example.com', new])
+        self.assertEqual(panel.enabled_with_companion([new, old]), [new])
+        self.assertEqual(panel.enabled_with_companion([]), [new])
+
     def test_supported_majors_match_the_companion_metadata(self):
         import json
         metadata = json.loads((ROOT / 'integrations/gnome' / panel.UUID / 'metadata.json').read_text())

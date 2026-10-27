@@ -31,8 +31,8 @@ if [[ ${1:-} != --inside ]]; then
     cp "$ROOT/scripts/test_native_cursor_capture.py" "$ROOT/scripts/fixtures/uinput-bridge.py" \
       "$ROOT/scripts/fixtures/shell-probe-input-state.py" "$ROOT/scripts/fixtures/shell-probe-wl-copy.py" \
       "$run/evidence/sources/"
-    cp -a "${VOCO_GNOME_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@voco.local}" "$run/data/gnome-shell/extensions/voco-panel@voco.local"
-    cp -a "$run/data/gnome-shell/extensions/voco-panel@voco.local" "$run/evidence/sources/"
+    cp -a "${VOCO_GNOME_PANEL_SOURCE_DIR:-$ROOT/integrations/gnome/voco-panel@sergiopesch.com}" "$run/data/gnome-shell/extensions/voco-panel@sergiopesch.com"
+    cp -a "$run/data/gnome-shell/extensions/voco-panel@sergiopesch.com" "$run/evidence/sources/"
     # The app pastes through its real virtual keyboard: the namespace gets
     # /dev/uinput, still no /dev/input, and shares its X socket directory, so the
     # bridge outside grabs each VOCO keyboard and replays its keys on the private

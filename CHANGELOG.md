@@ -17,6 +17,9 @@ The [release process](docs/release-process.md) describes how a release is made.
   its work, so a strictly confined VOCO can use it too, and is version 17:
   after upgrading, run `voco --setup-panel` and sign out and back in. Until
   GNOME loads it, VOCO pastes through its own keyboard.
+- The GNOME companion is now `voco-panel@sergiopesch.com`, a name
+  extensions.gnome.org can publish. `voco --setup-panel` moves an enabled
+  `voco-panel@voco.local` to it; sign out and back in afterwards.
 
 ### Fixed
 

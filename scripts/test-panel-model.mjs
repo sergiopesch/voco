@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {presentation, barScales} from '../integrations/gnome/voco-panel@voco.local/model.js';
+import {presentation, barScales} from '../integrations/gnome/voco-panel@sergiopesch.com/model.js';
 const state = {version: 1, token: '1:1', status: 'idle', canStop: true, canOpen: true, level: 0.8};
 test('idle cannot accidentally offer Stop or a live meter', () => {
     const p = presentation(state);

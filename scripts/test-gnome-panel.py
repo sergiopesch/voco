@@ -168,7 +168,7 @@ try:
     os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = system_address
     installed_mode = (root / 'panel-payload').exists()
     enabled = ['ubuntu-appindicators@ubuntu.com', 'voco-panel-probe@test.invalid']
-    if not installed_mode: enabled.append('voco-panel@voco.local')
+    if not installed_mode: enabled.append('voco-panel@sergiopesch.com')
     settings = [('org.gnome.shell','enabled-extensions',str(enabled)),('org.gnome.shell','disable-user-extensions','false'),('org.gnome.desktop.interface','enable-animations','true')]
     # Some distributions, Fedora among them, open GNOME's first-login tour as a
     # modal dialog over the panel.
@@ -185,7 +185,7 @@ try:
         missing = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
         assert missing.returncode == 2 and 'missing' in missing.stdout, missing
         before = subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True)
-        shutil.copytree(root/'panel-payload', Path('/usr/share/gnome-shell/extensions/voco-panel@voco.local'))
+        shutil.copytree(root/'panel-payload', Path('/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com'))
         checked = subprocess.run([str(root/'voco'), '--check-panel'], capture_output=True, text=True, timeout=6)
         assert checked.returncode == 2 and 'Enable' in checked.stdout, checked
         assert subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True) == before
@@ -193,10 +193,10 @@ try:
         report['freshPanelSetup'] = {'missing':missing.stdout, 'check':checked.stdout, 'setup':setup.stdout, 'code':setup.returncode}
         assert setup.returncode == 2 and 'Sign out' in setup.stdout, setup
         enabled_after = subprocess.check_output(['gsettings','get','org.gnome.shell','enabled-extensions'],text=True)
-        assert all(uuid in enabled_after for uuid in [*enabled, 'voco-panel@voco.local'])
+        assert all(uuid in enabled_after for uuid in [*enabled, 'voco-panel@sergiopesch.com'])
         # Load the previous metadata version, then replace files as an in-place
         # package upgrade would. GetExtensionInfo must describe loaded code.
-        metadata_path = Path('/usr/share/gnome-shell/extensions/voco-panel@voco.local/metadata.json')
+        metadata_path = Path('/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/metadata.json')
         current_metadata = json.loads(metadata_path.read_text())
         previous_metadata = {**current_metadata, 'version': current_metadata['version'] - 1}
         metadata_path.write_text(json.dumps(previous_metadata))
@@ -283,7 +283,7 @@ try:
             return bus.call_sync(service,item_path,'org.freedesktop.DBus.Properties','Get',
                 GLib.Variant('(ss)',('org.kde.StatusNotifierItem','Status')),None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         assert tray_status() == 'Passive', tray_status()
-        subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True)
+        subprocess.run(['gnome-extensions','disable','voco-panel@sergiopesch.com'],check=True)
         pump(.4)
         assert tray_status() == 'Active', tray_status()
         report['nativeTrayRestoredOnDisable'] = True
@@ -491,10 +491,10 @@ try:
     pump(.5)
     assert inspect()['indicator']['visible']
     report['reconnectVisible'] = True
-    subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True)
+    subprocess.run(['gnome-extensions','disable','voco-panel@sergiopesch.com'],check=True)
     pump(.3)
     assert inspect()['indicator'] is None
-    subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
+    subprocess.run(['gnome-extensions','enable','voco-panel@sergiopesch.com'],check=True)
     pump(.5)
     assert inspect()['indicator']['visible']
     assert inspect()['indicator']['width'] > report['states']['0-idle']['indicator']['width'] + 20
@@ -636,10 +636,10 @@ try:
     owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None);pump(.5)
     assert press('alt+shift+d') == consumed, 'reconnect must regrab'
     before_detach=len(detached)
-    subprocess.run(['gnome-extensions','disable','voco-panel@voco.local'],check=True);pump(.3)
+    subprocess.run(['gnome-extensions','disable','voco-panel@sergiopesch.com'],check=True);pump(.3)
     assert len(detached) > before_detach, 'disable must detach'
     assert press('alt+shift+d') == released, 'disable must release the compositor shortcut'
-    subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True);pump(.6)
+    subprocess.run(['gnome-extensions','enable','voco-panel@sergiopesch.com'],check=True);pump(.6)
     assert press('alt+shift+d') == consumed, 'enable must regrab'
     shortcut_state('idle', None)
     assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
@@ -783,7 +783,7 @@ try:
         outcome = report_on(request_id); pump(.2)
         if outcome == ('PasteRefused', (request_id, 'Disabled')): break
         if call('CompanionState').unpack()[0] != 1:
-            subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
+            subprocess.run(['gnome-extensions','enable','voco-panel@sergiopesch.com'],check=True)
         assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again'
         pump(.4)
     else:
@@ -791,7 +791,7 @@ try:
     assert not call('Modifiers').unpack()[0] & 1, 'a cut paste must release Shift'
     request_id, started = hand_out('paste')
     assert silent_since(started) and not report_on(request_id, .3), 'a disabled companion must send no key'
-    subprocess.run(['gnome-extensions','enable','voco-panel@voco.local'],check=True)
+    subprocess.run(['gnome-extensions','enable','voco-panel@sergiopesch.com'],check=True)
     assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again once enabled'
     pump(.4)
     assert measure(field, via_companion, 'enabledx')['landed'], 'Paste must work again once enabled'

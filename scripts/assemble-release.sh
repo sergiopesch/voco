@@ -157,7 +157,7 @@ PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "${WORK}/package/usr/lib/voco/speech/
 
 step "Writing the source archive, companion and records"
 git archive --format=tar.gz --prefix="voco-${VERSION}/" --output="${ASSETS}/voco_${VERSION}_source.tar.gz" "${TAG}"
-python3 scripts/package-gnome-panel.py "${ASSETS}/voco-panel@voco.local.shell-extension.zip"
+python3 scripts/package-gnome-panel.py "${ASSETS}/voco-panel@sergiopesch.com.shell-extension.zip"
 cp install KEYS "${ASSETS}/"
 python3 - "${ASSETS}" "${WORK}" "${VERSION}" "${TAG}" "${COMMIT}" "${FINGERPRINT}" "${REPOSITORY}" <<'EOF_RECORDS'
 import hashlib
@@ -195,8 +195,8 @@ common = {
 }
 payload = ["usr/bin/voco", "usr/libexec/voco-browser-host", "usr/lib/udev/rules.d/70-voco-uinput.rules",
            "usr/lib/voco/speech/MANIFEST.json",
-           "usr/share/gnome-shell/extensions/voco-panel@voco.local/extension.js",
-           "usr/share/gnome-shell/extensions/voco-panel@voco.local/metadata.json"]
+           "usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/extension.js",
+           "usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/metadata.json"]
 provenance = {
     **common,
     "sourceTree": output("git", "rev-parse", "HEAD^{tree}"),
@@ -253,7 +253,7 @@ step "Writing and signing the checksum manifests"
   sha256sum "${RPM}" > "voco_${VERSION}_rpm_checksums.txt"
   sha256sum voco_latest_x86_64.rpm > voco_latest_rpm_checksums.txt
   sha256sum "voco_${VERSION}_source.tar.gz" > "voco_${VERSION}_source_checksums.txt"
-  sha256sum install KEYS voco-panel@voco.local.shell-extension.zip "${DEB}" voco_latest_amd64.deb \
+  sha256sum install KEYS voco-panel@sergiopesch.com.shell-extension.zip "${DEB}" voco_latest_amd64.deb \
     "${RPM}" voco_latest_x86_64.rpm \
     "voco_${VERSION}_source.tar.gz" "voco_${VERSION}_provenance.json" "voco_${VERSION}_validation.json" \
     "voco_${VERSION}_debian_checksums.txt" voco_latest_checksums.txt \

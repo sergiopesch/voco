@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('output', type=Path)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
-source = root / 'integrations/gnome/voco-panel@voco.local'
+source = root / 'integrations/gnome/voco-panel@sergiopesch.com'
 # The setup helper lists the runtime files; sorted, the archive stays byte-identical.
 sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('panel_setup', root / 'apps/desktop/src-tauri/resources/voco_gnome_panel.py')

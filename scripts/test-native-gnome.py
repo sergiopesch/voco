@@ -35,7 +35,7 @@ try:
     report['systemServices'] = 'private bus only; no host system bus or logind'
     enabled_extensions = ['ubuntu-appindicators@ubuntu.com', 'voco-private-probe@test.invalid']
     if os.environ.get('VOCO_GNOME_CURSOR') == '1':
-        enabled_extensions.append('voco-panel@voco.local')
+        enabled_extensions.append('voco-panel@sergiopesch.com')
     for schema, key, value in [
         ('org.gnome.shell', 'enabled-extensions', str(enabled_extensions)),
         ('org.gnome.shell', 'disable-user-extensions', 'false'),

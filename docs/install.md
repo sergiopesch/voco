@@ -322,7 +322,7 @@ This also removes the package's `/dev/uinput` rule, but the access the rule
 gave lasts until you restart the computer.
 
 On GNOME, also turn off the VOCO panel in the Extensions app, or run
-`gnome-extensions disable voco-panel@voco.local`. Remove the
+`gnome-extensions disable voco-panel@sergiopesch.com`. Remove the
 **VOCO Dictation** input source and the Chromium extension if you added them.
 
 Removing the package keeps your settings and any text saved for Review. See
