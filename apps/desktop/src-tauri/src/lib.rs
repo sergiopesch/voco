@@ -2275,6 +2275,7 @@ pub fn run() -> Result<(), String> {
         })
         .invoke_handler(tauri::generate_handler![
             confinement::store_updates,
+            confinement::microphone_access,
             crash_recovery::list_crash_recovery,
             crash_recovery::get_crash_journal_epoch,
             crash_recovery::dismiss_crash_recovery,

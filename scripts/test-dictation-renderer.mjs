@@ -43,6 +43,7 @@ export const getDesktopInputStatus = async () => ({available:!window.pasteUnavai
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
 export const enableGnomePanel = getPanelSetupStatus;
 export const openExternalUrl = async (url) => { calls.push(['openExternalUrl', url]); };
+export const microphoneAccess = async () => ({allowed: true});
 export const takeLauncherActivation = async () => false;
 export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
 // Model the native paste and clipboard contract; no desktop input is touched.
