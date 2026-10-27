@@ -750,12 +750,12 @@ jobs:
       - name: Build the probe snap
         timeout-minutes: 12
         working-directory: scripts/fixtures/snap-dbus-probe
-        run: sudo snapcraft pack --destructive-mode --output "$RUNNER_TEMP/voco-dbus-probe.snap"
+        run: sudo snapcraft pack --destructive-mode --output voco-dbus-probe.snap
 
       - name: Probe strict confinement on the session bus
         timeout-minutes: 3
         run: |
-          sudo snap install --dangerous "$RUNNER_TEMP/voco-dbus-probe.snap"
+          sudo snap install --dangerous scripts/fixtures/snap-dbus-probe/voco-dbus-probe.snap
           snap connections voco-dbus-probe
           sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" "/run/user/$(id -u)"
           python3 scripts/test-snap-dbus-probe.py
