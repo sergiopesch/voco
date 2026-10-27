@@ -158,7 +158,7 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
 1. VOCO checks that the screen isn't locked, then the clipboard helper, plus
    `xdotool` on X11 or access to `/dev/uinput` on Wayland. On Wayland it then
    picks the keyboard: the GNOME companion's while it's attached and its loaded
-   copy offers `Paste`, otherwise its own virtual keyboard, which it makes sure
+   copy asks VOCO for work, otherwise its own virtual keyboard, which it makes sure
    exists, so a missing device fails before the clipboard changes.
 2. ASCII control characters, including newlines and tabs, become spaces, so a
    terminal never receives Enter.
@@ -233,20 +233,27 @@ new one. The evdev shortcut listener ignores the device by name, so its keys
 never count as the shortcut or a held modifier. When VOCO exits, the kernel
 removes the device and releases any key it still held.
 
-On GNOME with the companion attached, the companion types the keys instead,
-through `org.voco.PanelInput1.Paste`. VOCO asks each attached Shell once,
-through its introspection, whether the copy it has loaded offers `Paste`: a
-Shell still running a copy from before version 16 keeps VOCO's own keyboard,
-and one that doesn't answer within 150 ms gets VOCO's keyboard for that paste
-and is asked again at the next. The companion types with one Clutter virtual
-keyboard per enable, inside the Shell, so there's no device to settle. It
-answers only the attached application and refuses while a modifier is held or
-another paste is in flight. Otherwise it sends Shift, Insert and their
-releases, 12 ms apart, and replies with the Insert press's monotonic time,
-which VOCO reads as the press for step 7. VOCO waits up to 1 second for the
-reply. GNOME disables the companion at the lock screen, and disabling it
-mid-gesture releases any key it holds. The screen lock and origin checks run
-on this route too.
+On GNOME with the companion attached, the companion types the keys instead.
+VOCO never calls the Shell, because a confined VOCO can't: snapd's `dbus` slot
+lets a snap receive from unconfined peers, never send to them. So from version
+17 the companion asks VOCO for work. It keeps one `org.voco.Panel1.NextRequest`
+call pending, and VOCO answers it with each paste, modifier check and change of
+its state, in order, or with nothing after 20 seconds. The call stays on the
+thread that serves the panel, because gio's invocations can't cross threads;
+the paste thread hands it work through that thread's main context, and takes
+back work no call has taken there, so withdrawn work can never still be typed.
+
+The companion types with one Clutter virtual keyboard per enable, inside the
+Shell, so there's no device to settle. It refuses while a modifier is held or
+another paste is in flight, and says why with `PasteRefused`. Otherwise it sends
+Shift, Insert and their releases, 12 ms apart, and reports the Insert press's
+monotonic time with `PasteDone`, which VOCO reads as the press for step 7. VOCO
+accepts a report only from the attached Shell and only for its open request, and
+waits up to 1 second for it. GNOME disables the companion at the lock screen,
+and disabling it mid-gesture releases any key it holds and reports the paste
+cut short. A Shell still running a copy from before version 17 keeps VOCO's own
+keyboard, and VOCO sends it `Changed` and asks it `ModifiersClear` as before.
+The screen lock and origin checks run on this route too.
 
 A failed paste has one of three outcomes:
 
@@ -320,10 +327,11 @@ panel button's click gesture leaves primary presses and touches to the pill.
 The companion talks to `org.voco.Panel1` on the session bus at `/org/voco/Panel`.
 `Attach` succeeds only for the current owner of `org.gnome.Shell` and hides the
 tray. When the companion calls `Detach`, or stops calling `GetState` for more
-than 5 seconds, VOCO drops the lease and shows the tray again. VOCO calls back
-into the companion's `org.voco.PanelInput1`: `ModifiersClear` before a Wayland
-paste when evdev can't read the keyboards, and `Paste` to type the paste keys
-(see [Delivery](#delivery)).
+than 5 seconds, VOCO drops the lease and shows the tray again. From version 17
+the companion also asks VOCO for work with `NextRequest`, which VOCO answers with
+pastes, modifier checks and state changes (see [Delivery](#delivery)). For an
+earlier companion VOCO calls back into its `org.voco.PanelInput1.ModifiersClear`
+before a Wayland paste when evdev can't read the keyboards.
 The [GNOME companion guide](../../integrations/gnome/README.md) describes the
 full interface.
 

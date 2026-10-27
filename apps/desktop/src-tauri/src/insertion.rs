@@ -318,7 +318,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         ));
     }
     let wayland = matches!(preflight.session, SessionKind::Wayland);
-    let keys = paste_keys(wayland, companion_offers_paste);
+    let keys = paste_keys(wayland, companion_asks_for_work);
     // Create the keyboard before replacing clipboard contents, so a missing
     // device can never leave the clipboard changed with nothing typed.
     if keys == PasteKeys::Uinput {
@@ -654,12 +654,12 @@ impl PasteKeys {
     }
 }
 
-/// On GNOME Wayland, the attached companion types when its loaded copy offers
-/// Paste; otherwise VOCO's uinput device does. X11 keeps xdotool.
-fn paste_keys(wayland: bool, companion_offers_paste: impl FnOnce() -> bool) -> PasteKeys {
+/// On GNOME Wayland, the attached companion types once its loaded copy asks
+/// VOCO for work; otherwise VOCO's uinput device does. X11 keeps xdotool.
+fn paste_keys(wayland: bool, companion_asks_for_work: impl FnOnce() -> bool) -> PasteKeys {
     if !wayland {
         PasteKeys::Xdotool
-    } else if companion_offers_paste() {
+    } else if companion_asks_for_work() {
         PasteKeys::Companion
     } else {
         PasteKeys::Uinput
@@ -667,12 +667,12 @@ fn paste_keys(wayland: bool, companion_offers_paste: impl FnOnce() -> bool) -> P
 }
 
 #[cfg(target_os = "linux")]
-fn companion_offers_paste() -> bool {
-    crate::panel::companion_offers_paste()
+fn companion_asks_for_work() -> bool {
+    crate::panel::companion_asks_for_work()
 }
 
 #[cfg(not(target_os = "linux"))]
-fn companion_offers_paste() -> bool {
+fn companion_asks_for_work() -> bool {
     false
 }
 
@@ -1067,7 +1067,7 @@ mod tests {
     use std::cell::Cell;
 
     #[test]
-    fn wayland_pastes_through_the_companion_only_when_it_offers_paste() {
+    fn wayland_pastes_through_the_companion_only_when_it_asks_for_work() {
         assert_eq!(paste_keys(true, || true), PasteKeys::Companion);
         assert_eq!(paste_keys(true, || false), PasteKeys::Uinput);
         assert_eq!(

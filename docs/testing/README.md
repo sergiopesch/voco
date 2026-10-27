@@ -148,7 +148,7 @@ On `gnome-wayland` that code types through VOCO's real virtual keyboard, which
 the [uinput bridge](#the-uinput-bridge) replays, so it needs
 `VOCO_UINPUT_BRIDGE=1`. With `VOCO_DELIVERY_KEYS=companion`, the session loads
 the repository's GNOME companion instead. Each paste serves VOCO's panel bridge
-until the companion attaches, then the companion types. The null device stands
+until the companion attaches and asks for work, then the companion types. The null device stands
 in for `/dev/uinput`, which the paste check opens, so a paste that reached for
 VOCO's own keyboard couldn't create it, and no bridge runs. CI runs
 `gnome-wayland` only with production paste, through both keyboards, with a
@@ -280,6 +280,7 @@ requests into it, on Ubuntu 24.04 unless the table says otherwise. Evidence arti
 | GNOME 50 Companion | On `ubuntu-26.04`, the companion regression headless on GNOME Shell 50 | `gnome50-panel-evidence` |
 | GNOME 51 Companion | The same regression on GNOME Shell 51, built from a digest-pinned Fedora 45 image and run in rootless Podman | `gnome51-panel-evidence` |
 | Debian 13 Runtime, Fedora 44 Runtime | In digest-pinned containers, VOCO's package dependencies by that distribution's names, then the speech runtime, IBus and worker protocol tests and the speech baseline on its Python | None |
+| Snap Confinement Probe | A strict snap built from `scripts/fixtures/snap-dbus-probe`, owning `org.voco.Panel` through a session `dbus` slot on the runner's own session bus. An unconfined process plays GNOME Shell (`scripts/test-snap-dbus-probe.py`). The snap must answer its pending `NextRequest` and receive its report, and its own call to that process must be refused. | None |
 
 ## Manual acceptance
 

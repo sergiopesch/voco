@@ -74,7 +74,7 @@ it never touches a service that someone else set up.
 | --- | --- | --- |
 | Microphone | Rust records through libpulse | WebKit records through an AudioWorklet |
 | Clipboard | `wl-copy`, or `xclip` through XWayland on GNOME | `xclip` |
-| Paste keys | The GNOME companion while it's attached (version 16 and later), otherwise VOCO's virtual keyboard through `/dev/uinput` | `xdotool` |
+| Paste keys | The GNOME companion while it's attached (version 17 and later), otherwise VOCO's virtual keyboard through `/dev/uinput` | `xdotool` |
 | Shortcut | GNOME companion, passive evdev, IBus or `voco --toggle` | VOCO's key grab, IBus or `voco --toggle` |
 
 ## Paste helpers
@@ -127,10 +127,10 @@ can't create it at startup, it tries again before each paste. X11 sessions use
 
 On GNOME with the [companion](../../integrations/gnome/README.md) attached, the
 companion presses the paste keys instead, from a keyboard of its own inside GNOME
-Shell (`org.voco.PanelInput1.Paste`). VOCO checks once per attachment that GNOME
-has loaded companion version 16 or later; with an older one, VOCO keeps using
-its own keyboard. The companion sends the same Shift+Insert, answers only VOCO
-and sends nothing while a modifier is held. GNOME turns it off at the lock
+Shell. From version 17 it asks VOCO for its work, so a confined VOCO, which can
+answer GNOME Shell but not call it, can use it too; with an older companion, VOCO
+keeps using its own keyboard. The companion sends the same Shift+Insert, takes
+work only from VOCO and sends nothing while a modifier is held. GNOME turns it off at the lock
 screen, so it can't type there. VOCO still needs access to `/dev/uinput`, which
 setup checks, because its own keyboard types whenever the companion isn't
 attached.

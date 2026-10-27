@@ -105,26 +105,35 @@ accelerators are `<Alt>d`, `<Alt><Shift>d` or null, and null on X11. The
 companion polls every 50 ms while recording, every 1.5 seconds otherwise, and
 at each `Changed`.
 
-The companion serves `org.voco.PanelInput1` at `/org/voco/PanelInput`, and
-answers both of its methods only for the attached VOCO:
+From version 17 the companion asks VOCO for work, because a confined VOCO can
+answer GNOME Shell but not call it. After `Attach` it keeps one
+`NextRequest() → (s, u)` call pending, with a 30-second timeout, and calls it
+again as soon as VOCO answers. VOCO answers with a kind and a request id, or
+with `idle` after 20 seconds:
 
-- `ModifiersClear() → b`. When VOCO can't read the keyboards before a Wayland
-  paste, it calls this with a 150 ms limit. It returns true when the compositor
-  reports no modifier held, and sends no key events.
-- `Paste() → t`, from version 16. It types VOCO's paste keys from inside the
-  Shell, through one Clutter virtual keyboard per enable, so there's no device
-  to settle, no portal dialog and no screen-sharing indicator. VOCO sends its
-  Wayland paste keys through it whenever GNOME's loaded copy offers it, which
-  VOCO checks once per attachment, and waits up to 1 second for the reply.
-  - It refuses with `org.voco.ModifiersHeld` while a modifier is held, and with
-    `org.voco.Busy` while another paste is in flight.
-  - Otherwise it sends Shift, Insert and their releases, 12 ms apart, and
-    answers once they are out with the Insert press's monotonic time in
-    microseconds.
-  - Disabled mid-gesture, it releases the keys it holds and fails the call with
-    `org.voco.Disabled`.
+- `paste`: the companion types VOCO's paste keys from inside the Shell, through
+  one Clutter virtual keyboard per enable, so there's no device to settle, no
+  portal dialog and no screen-sharing indicator.
+  - While a modifier is held it sends no key and calls
+    `PasteRefused(id, "ModifiersHeld")`; while another paste is in flight,
+    `PasteRefused(id, "Busy")`.
+  - Otherwise it sends Shift, Insert and their releases, 12 ms apart, and then
+    calls `PasteDone(id, t)` with the Insert press's monotonic time in
+    microseconds. VOCO waits up to 1 second for it.
+  - Disabled mid-gesture, it releases the keys it holds and calls
+    `PasteRefused(id, "Disabled")`, which VOCO treats as uncertain.
   - Its metadata names no session modes, so GNOME disables it at the lock
     screen, where it can't type.
+- `modifiers`: it calls `ModifiersState(id, b)`, true when the compositor
+  reports no modifier held. VOCO asks before a Wayland paste when it can't read
+  the keyboards, with a 150 ms limit.
+- `changed`: it polls `GetState` at once.
+
+VOCO accepts a report only from the attached Shell and only for its open
+request. An earlier VOCO, which doesn't know `NextRequest`, answers it with
+`UnknownMethod`, and the companion then stops asking. For it the companion still
+serves `org.voco.PanelInput1.ModifiersClear() → b` at `/org/voco/PanelInput`,
+for the attached VOCO only, and still polls at each `Changed`.
 
 ## Files and tests
 
@@ -148,15 +157,17 @@ writes a reproducible archive of the five files, attached to each release.
   virtual monitor of the same 800×600 size, driven through Mutter's RemoteDesktop API
   and captured with GNOME's own screenshot API; its panel also shows GNOME's
   screen-sharing indicator. Its Shell runs XWayland from the start, and its
-  `Paste` checks type into a GTK 3 field in its own process
+  paste checks type into a GTK 3 field in its own process
   (`scripts/fixtures/paste-field.py`), on Wayland and under XWayland:
   - every paste lands exactly;
+  - each paste reports its Insert press with `PasteDone`;
   - over 200 rounds taking turns with Mutter's RemoteDesktop API, the
-    companion's median from the request to the Insert press is no more than
+    companion's median from VOCO's answer to the Insert press is no more than
     1 ms above Mutter's, and its p99 no more than 2 ms above;
-  - no key arrives from a paste requested by another connection, with a
-    modifier held, while another is in flight, in the `unlock-dialog` session
-    mode or after disabling.
+  - no key arrives from a paste answered with a modifier held, while another
+    is in flight, in the `unlock-dialog` session mode or after disabling, and
+    each refusal reports why;
+  - a modifier request reports the compositor's held modifiers.
 
   Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
   and, for the nested mode, `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`.

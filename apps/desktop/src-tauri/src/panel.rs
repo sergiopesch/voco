@@ -1,6 +1,9 @@
 //! Same-session GNOME panel bridge. Leases restore the native tray after shell loss.
 use glib::variant::ToVariant;
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::Manager;
 use webkit2gtk::gio;
@@ -14,6 +17,10 @@ const XML: &str = r#"<node><interface name="org.voco.Panel1">
 <method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
 <method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
 <method name="Detach"/><signal name="Changed"/>
+<method name="NextRequest"><arg type="s" direction="out"/><arg type="u" direction="out"/></method>
+<method name="PasteDone"><arg type="u" direction="in"/><arg type="t" direction="in"/></method>
+<method name="PasteRefused"><arg type="u" direction="in"/><arg type="s" direction="in"/></method>
+<method name="ModifiersState"><arg type="u" direction="in"/><arg type="b" direction="in"/></method>
 </interface></node>"#;
 /// ReserveShortcut: the companion holds its grab at every status and renews it about
 /// once a second.
@@ -27,12 +34,24 @@ static LEVEL: Mutex<Option<(u64, f64, Instant)>> = Mutex::new(None);
 // The attached Shell's latest proven grab: a ReserveShortcut accelerator or a
 // ReserveStopShortcut "session/accelerator" token. The two key spaces cannot collide.
 static SHORTCUT_UNTIL: Mutex<Option<(String, Instant)>> = Mutex::new(None);
-// Whether the attached Shell's loaded companion offers Paste, asked once per
-// attachment: a Shell still running an older copy keeps the uinput keyboard.
-static PASTE_OFFER: Mutex<Option<(String, bool)>> = Mutex::new(None);
-// The companion answers once its 36 ms gesture is out; longer means the Shell
-// is stuck, and its keys may or may not have gone.
-const PASTE_TIMEOUT_MS: i32 = 1000;
+// The attached Shell once its companion asks for work with NextRequest: it
+// takes the paste keys. A Shell still running an older copy keeps uinput.
+static ASKING: Mutex<Option<String>> = Mutex::new(None);
+// The request VOCO waits on, its next id, and the serving thread's context,
+// where the companion's pending call waits.
+static OPEN: Mutex<Option<Open>> = Mutex::new(None);
+static NEXT_REQUEST_ID: AtomicU32 = AtomicU32::new(1);
+static SERVE_CONTEXT: Mutex<Option<glib::MainContext>> = Mutex::new(None);
+// The companion reports a paste once its 36 ms gesture is out; longer means the
+// Shell is stuck, and its keys may or may not have gone.
+const PASTE_TIMEOUT: Duration = Duration::from_millis(1000);
+// A modifier check answers within ModifiersClear's 150 ms.
+const MODIFIERS_TIMEOUT: Duration = Duration::from_millis(150);
+// How long withdrawing a request waits for the serving thread.
+const WITHDRAW_TIMEOUT: Duration = Duration::from_millis(500);
+// VOCO keeps a NextRequest call this long before answering it with nothing.
+const REQUEST_IDLE: Duration = Duration::from_secs(20);
+const IDLE: (&str, u32) = ("idle", 0);
 
 // Refreshed only by the authenticated Shell while it holds the compositor grab.
 // A lost extension cannot permanently suppress the passive keyboard fallback.
@@ -96,16 +115,28 @@ fn set_owner(sender: Option<String>) {
     if let Ok(mut owner) = OWNER.lock() {
         *owner = sender;
     }
-    if let Ok(mut offer) = PASTE_OFFER.lock() {
-        *offer = None;
+    if let Ok(mut asking) = ASKING.lock() {
+        *asking = None;
     }
+    end_requests();
     // Attach, Detach and lease expiry change what the companion check reports.
     crate::panel_setup::invalidate_check();
 }
 
 /// Sample the authenticated compositor, not an asynchronously polled shortcut
-/// flag. An ordinary streaming paste may race the physical Stop chord.
+/// flag. An ordinary streaming paste may race the physical Stop chord. A
+/// companion that asks for work answers a modifier request; an earlier one
+/// answers ModifiersClear itself.
 pub(crate) fn paste_modifiers_clear() -> Result<bool, String> {
+    if companion_asks_for_work() {
+        let id = next_request_id();
+        return match ask(Request::Modifiers(id), id, MODIFIERS_TIMEOUT) {
+            Ok(Report::Modifiers(clear)) => Ok(clear),
+            _ => {
+                Err("Could not verify released keyboard modifiers; no paste keys were sent.".into())
+            }
+        };
+    }
     let owner = OWNER
         .lock()
         .ok()
@@ -143,69 +174,193 @@ pub(crate) fn paste_modifiers_clear() -> Result<bool, String> {
     Ok(clear)
 }
 
-/// The attached Shell's unique name and the connection to reach it on.
-fn attached_shell() -> Option<(String, gio::DBusConnection)> {
-    let owner = OWNER.lock().ok()?.clone()?;
-    let bus = BUS.lock().ok()?.clone()?;
-    Some((owner, bus))
-}
-
-/// Whether the attached Shell's loaded companion offers Paste: version 16 and
-/// later, by its introspection.
-pub(crate) fn companion_offers_paste() -> bool {
-    let Some((owner, bus)) = attached_shell() else {
+/// Whether the attached Shell's companion asks VOCO for work, so it takes the
+/// paste keys: version 17 and later, from its first NextRequest.
+pub(crate) fn companion_asks_for_work() -> bool {
+    let Some(owner) = OWNER.lock().ok().and_then(|owner| owner.clone()) else {
         return false;
     };
-    offer_for(&owner, || {
-        bus.call_sync(
-            Some(&owner),
-            "/org/voco/PanelInput",
-            "org.freedesktop.DBus.Introspectable",
-            "Introspect",
-            None,
-            None,
-            gio::DBusCallFlags::NO_AUTO_START,
-            150,
-            gio::Cancellable::NONE,
-        )
-        .ok()
-        .map(|reply| {
-            reply
-                .get::<(String,)>()
-                .is_some_and(|(xml,)| offers_paste(&xml))
-        })
+    ASKING
+        .lock()
+        .is_ok_and(|asking| asking.as_deref() == Some(owner.as_str()))
+}
+
+/// Work for the companion. A confined VOCO can answer the Shell but not call
+/// it, so the companion keeps one NextRequest call pending (AGENTS.md).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Request {
+    Paste(u32),
+    Modifiers(u32),
+    Changed,
+}
+
+impl Request {
+    fn wire(self) -> (&'static str, u32) {
+        match self {
+            Self::Paste(id) => ("paste", id),
+            Self::Modifiers(id) => ("modifiers", id),
+            Self::Changed => ("changed", 0),
+        }
+    }
+}
+
+/// What the companion reported for VOCO's open request.
+#[derive(Debug, PartialEq)]
+enum Report {
+    Pasted(u64),
+    Refused(String),
+    Modifiers(bool),
+}
+
+/// The one request VOCO waits on, and where its report goes: pastes are
+/// serialized, and a modifier check comes just before its paste.
+struct Open {
+    id: u32,
+    report: mpsc::Sender<Report>,
+}
+
+/// The serving thread's NextRequest call and the work no call has taken yet.
+/// gio's invocations aren't Send, so both stay on that thread.
+#[derive(Default)]
+struct Work {
+    pending: Option<(gio::DBusMethodInvocation, glib::SourceId)>,
+    queue: VecDeque<Request>,
+}
+
+thread_local! {
+    static WORK: RefCell<Work> = RefCell::new(Work::default());
+}
+
+fn next_request_id() -> u32 {
+    NEXT_REQUEST_ID.fetch_add(1, Ordering::Relaxed)
+}
+
+/// A NextRequest from the attached Shell: queued work answers it at once;
+/// otherwise it waits for some, at most REQUEST_IDLE.
+fn hold_request(invocation: gio::DBusMethodInvocation) {
+    WORK.with(|work| {
+        let mut work = work.borrow_mut();
+        if let Some(request) = work.queue.pop_front() {
+            invocation.return_value(Some(&request.wire().to_variant()));
+            return;
+        }
+        // The companion re-arms only after an answer, so a second call replaces the first.
+        if let Some((earlier, timer)) = work.pending.take() {
+            timer.remove();
+            earlier.return_value(Some(&IDLE.to_variant()));
+        }
+        let timer = glib::timeout_add_local_once(REQUEST_IDLE, || {
+            WORK.with(|work| {
+                if let Some((invocation, _)) = work.borrow_mut().pending.take() {
+                    invocation.return_value(Some(&IDLE.to_variant()));
+                }
+            });
+        });
+        work.pending = Some((invocation, timer));
+    });
+}
+
+/// Hand a request to the pending call, or queue it for the next; changes
+/// coalesce.
+fn give(request: Request) {
+    WORK.with(|work| {
+        let mut work = work.borrow_mut();
+        if let Some((invocation, timer)) = work.pending.take() {
+            timer.remove();
+            invocation.return_value(Some(&request.wire().to_variant()));
+        } else if request != Request::Changed || !work.queue.contains(&Request::Changed) {
+            work.queue.push_back(request);
+        }
+    });
+}
+
+/// Take back a request no call has taken. False once one has, when the
+/// companion may be acting on it.
+fn withdraw(request: Request) -> bool {
+    WORK.with(|work| {
+        let queue = &mut work.borrow_mut().queue;
+        let queued = queue.len();
+        queue.retain(|waiting| *waiting != request);
+        queue.len() < queued
     })
 }
 
-/// The Shell's answer, asked once per attachment. It's asked unlocked, so
-/// Attach and Detach never wait for the Shell, and a unique name is never
-/// reused, so a late answer can't speak for another Shell. No answer isn't a
-/// no: that paste uses VOCO's own keyboard, and the next one asks again.
-fn offer_for(owner: &str, ask: impl FnOnce() -> Option<bool>) -> bool {
-    let known = PASTE_OFFER.lock().ok().and_then(|offer| offer.clone());
-    if let Some((asked, offered)) = known {
-        if asked == owner {
-            return offered;
+/// A new attachment, or none, ends the old one's call and work.
+fn end_requests() {
+    WORK.with(|work| {
+        let mut work = work.borrow_mut();
+        work.queue.clear();
+        if let Some((invocation, timer)) = work.pending.take() {
+            timer.remove();
+            invocation.return_dbus_error("org.voco.NotAttached", "The VOCO panel detached");
+        }
+    });
+}
+
+/// Run f on the serving thread, where the companion's call waits. None when
+/// there is no such thread or it doesn't answer in time.
+fn on_serving_thread<T: Send + 'static>(
+    f: impl FnOnce() -> T + Send + 'static,
+    timeout: Duration,
+) -> Option<T> {
+    let context = SERVE_CONTEXT.lock().ok()?.clone()?;
+    let (answer, answers) = mpsc::channel();
+    context.invoke(move || {
+        let _ = answer.send(f());
+    });
+    answers.recv_timeout(timeout).ok()
+}
+
+/// Why a request came back without its report.
+#[derive(Debug, PartialEq)]
+enum Unanswered {
+    /// Withdrawn before any call took it: the companion never saw it.
+    NeverTaken,
+    /// Taken, or not known to be withdrawn: the companion may have acted.
+    NoReport,
+}
+
+/// Ask the companion and wait for its report on this request.
+fn ask(request: Request, id: u32, timeout: Duration) -> Result<Report, Unanswered> {
+    let (report, reports) = mpsc::channel();
+    if let Ok(mut open) = OPEN.lock() {
+        *open = Some(Open { id, report });
+    }
+    let started = Instant::now();
+    let _ = on_serving_thread(move || give(request), timeout);
+    let outcome = reports
+        .recv_timeout(timeout.saturating_sub(started.elapsed()))
+        // Withdrawn on the serving thread, where calls take work, no call can
+        // take it afterwards.
+        .map_err(
+            |_| match on_serving_thread(move || withdraw(request), WITHDRAW_TIMEOUT) {
+                Some(true) => Unanswered::NeverTaken,
+                _ => Unanswered::NoReport,
+            },
+        );
+    if let Ok(mut open) = OPEN.lock() {
+        if open.as_ref().is_some_and(|open| open.id == id) {
+            *open = None;
         }
     }
-    let Some(offered) = ask() else {
-        return false;
+    outcome
+}
+
+/// A report from the attached Shell, accepted only for VOCO's open request.
+fn report_for(id: u32, report: Report) -> Reply {
+    let Ok(open) = OPEN.lock() else {
+        return Err(("org.voco.Unavailable", "Panel unavailable"));
     };
-    if let Ok(mut offer) = PASTE_OFFER.lock() {
-        *offer = Some((owner.to_owned(), offered));
+    match open.as_ref() {
+        Some(open) if open.id == id => {
+            let _ = open.report.send(report);
+            Ok(None)
+        }
+        _ => Err(("org.voco.UnknownRequest", "No such request is open")),
     }
-    offered
 }
 
-fn offers_paste(introspection: &str) -> bool {
-    gio::DBusNodeInfo::for_xml(introspection)
-        .ok()
-        .and_then(|node| node.lookup_interface("org.voco.PanelInput1"))
-        .and_then(|interface| interface.lookup_method("Paste"))
-        .is_some()
-}
-
-/// What a failed companion Paste leaves behind.
+/// What a failed companion paste leaves behind.
 #[derive(Debug, PartialEq)]
 pub(crate) enum CompanionPasteError {
     /// No key was sent, so the text can wait for the next paste.
@@ -217,60 +372,43 @@ pub(crate) enum CompanionPasteError {
 /// Shift+Insert typed by the companion inside GNOME Shell. Returns when the
 /// Insert press went out, by the companion's clock.
 pub(crate) fn companion_paste() -> Result<Instant, CompanionPasteError> {
-    let (owner, bus) = attached_shell().ok_or_else(|| {
-        CompanionPasteError::NoMutation(
-            "The GNOME panel is unavailable; no paste keys were sent.".into(),
-        )
-    })?;
-    let reply = bus.call_sync(
-        Some(&owner),
-        "/org/voco/PanelInput",
-        "org.voco.PanelInput1",
-        "Paste",
-        None,
-        None,
-        gio::DBusCallFlags::NO_AUTO_START,
-        PASTE_TIMEOUT_MS,
-        gio::Cancellable::NONE,
-    );
+    if !companion_asks_for_work() {
+        return Err(CompanionPasteError::NoMutation(
+            "The GNOME panel isn't attached; no paste keys were sent.".into(),
+        ));
+    }
+    let id = next_request_id();
+    let reply = ask(Request::Paste(id), id, PASTE_TIMEOUT);
     let now = Instant::now();
     let now_us = glib::monotonic_time();
     match reply {
-        Ok(value) => value
-            .get::<(u64,)>()
-            .map(|(insert_us,)| instant_at(insert_us, now, now_us))
-            .ok_or_else(|| {
-                CompanionPasteError::Uncertain(
-                    "The GNOME panel answered without its paste's time.".into(),
-                )
-            }),
-        Err(error) => Err(paste_failure(
-            crate::desktop_session::remote_error(&error).as_deref(),
-            error.message(),
+        Ok(Report::Pasted(insert_us)) => Ok(instant_at(insert_us, now, now_us)),
+        Ok(Report::Refused(reason)) => Err(refusal(&reason)),
+        Ok(Report::Modifiers(_)) | Err(Unanswered::NoReport) => Err(
+            CompanionPasteError::Uncertain("The GNOME panel's paste may not have finished.".into()),
+        ),
+        Err(Unanswered::NeverTaken) => Err(CompanionPasteError::NoMutation(
+            "The GNOME panel didn't take the paste; no paste keys were sent.".into(),
         )),
     }
 }
 
-/// Refusals come before any key, and a companion that is missing or lacks
-/// Paste sends none. A timeout, a gesture cut short by disabling, or anything
-/// else may have typed.
-fn paste_failure(remote: Option<&str>, message: &str) -> CompanionPasteError {
-    match remote {
-        Some(
-            "org.voco.NotAttached"
-            | "org.voco.Busy"
-            | "org.voco.ModifiersHeld"
-            | "org.freedesktop.DBus.Error.UnknownMethod"
-            | "org.freedesktop.DBus.Error.UnknownObject"
-            | "org.freedesktop.DBus.Error.UnknownInterface"
-            | "org.freedesktop.DBus.Error.ServiceUnknown"
-            | "org.freedesktop.DBus.Error.NameHasNoOwner",
-        ) => CompanionPasteError::NoMutation(format!(
-            "The GNOME panel sent no paste keys: {message}"
-        )),
-        _ => CompanionPasteError::Uncertain(format!(
-            "The GNOME panel's paste may not have finished: {message}"
-        )),
+/// A refusal comes before any key; a gesture cut short by disabling may have
+/// typed.
+fn refusal(reason: &str) -> CompanionPasteError {
+    match reason {
+        "Disabled" => CompanionPasteError::Uncertain(
+            "The GNOME panel stopped before the paste finished.".into(),
+        ),
+        "ModifiersHeld" => CompanionPasteError::NoMutation(
+            "Keyboard modifiers are held; no paste keys were sent.".into(),
+        ),
+        "Busy" => CompanionPasteError::NoMutation(
+            "Another paste is in flight; no paste keys were sent.".into(),
+        ),
+        _ => CompanionPasteError::NoMutation(
+            "The GNOME panel refused the paste; no paste keys were sent.".into(),
+        ),
     }
 }
 
@@ -312,7 +450,19 @@ fn valid_shortcut_reservation(state: &serde_json::Value, token: &str) -> bool {
 
 /// Wake only the attached shell when authoritative state changes; meter frames
 /// remain bounded polling and no state is broadcast to unrelated bus clients.
+/// A companion that asks for work hears of it through its pending call; an
+/// earlier one listens for Changed.
 pub fn publish() {
+    if companion_asks_for_work() {
+        if let Some(context) = SERVE_CONTEXT
+            .lock()
+            .ok()
+            .and_then(|context| context.clone())
+        {
+            context.invoke(|| give(Request::Changed));
+        }
+        return;
+    }
     if let (Ok(bus), Ok(owner)) = (BUS.lock(), OWNER.lock()) {
         if let (Some(bus), Some(owner)) = (bus.as_ref(), owner.as_ref()) {
             let _ = bus.emit_signal(Some(owner), PATH, INTERFACE, "Changed", None);
@@ -473,6 +623,18 @@ fn handle(
             release(host, lease);
             return Ok(None);
         }
+        "PasteDone" => {
+            let (id, insert_us) = parameters.get::<(u32, u64)>().unwrap_or_default();
+            return report_for(id, Report::Pasted(insert_us));
+        }
+        "PasteRefused" => {
+            let (id, reason) = parameters.get::<(u32, String)>().unwrap_or_default();
+            return report_for(id, Report::Refused(reason));
+        }
+        "ModifiersState" => {
+            let (id, clear) = parameters.get::<(u32, bool)>().unwrap_or_default();
+            return report_for(id, Report::Modifiers(clear));
+        }
         _ => return Err(("org.voco.UnknownMethod", "Unknown panel method")),
     };
     Ok(Some((accepted,).to_variant()))
@@ -485,6 +647,9 @@ pub fn setup(app: &tauri::AppHandle) {
 /// Owns org.voco.Panel and answers the attached Shell for host. Its calls run
 /// on the thread-default main context of the caller.
 fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
+    if let Ok(mut context) = SERVE_CONTEXT.lock() {
+        *context = Some(glib::MainContext::ref_thread_default());
+    }
     let lease = Arc::new(Mutex::new(Lease::default()));
     let expiry_app = app.clone();
     let expiry_lease = lease.clone();
@@ -549,6 +714,22 @@ fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
                         invocation.return_value(Some(&(allowed,).to_variant()));
                         return;
                     }
+                    // Kept until VOCO has work for the companion: a confined
+                    // VOCO can only answer the Shell (AGENTS.md).
+                    if method == "NextRequest" {
+                        if !lease.admits(sender) {
+                            invocation.return_dbus_error(
+                                "org.voco.NotAttached",
+                                "Attach from GNOME Shell first",
+                            );
+                            return;
+                        }
+                        if let Ok(mut asking) = ASKING.lock() {
+                            *asking = Some(sender.to_owned());
+                        }
+                        hold_request(invocation);
+                        return;
+                    }
                     match handle(&app, &mut lease, sender, method, &parameters) {
                         Ok(reply) => invocation.return_value(reply.as_ref()),
                         Err((name, message)) => invocation.return_dbus_error(name, message),
@@ -571,7 +752,7 @@ fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
 
 /// For insertion.rs's private-desktop paste test, which pastes as one process
 /// per chunk: serves the panel bridge for an idle host and returns once the
-/// session's GNOME Shell has attached.
+/// session's companion has attached and asked for work.
 #[cfg(test)]
 pub(crate) fn serve_for_fixture(timeout: Duration) -> Result<(), String> {
     #[derive(Clone)]
@@ -600,9 +781,9 @@ pub(crate) fn serve_for_fixture(timeout: Duration) -> Result<(), String> {
             .expect("a thread-default main context");
     });
     let started = Instant::now();
-    while !is_attached() {
+    while !companion_asks_for_work() {
         if started.elapsed() > timeout {
-            return Err("GNOME Shell's companion did not attach".into());
+            return Err("GNOME Shell's companion did not ask for work".into());
         }
         std::thread::sleep(Duration::from_millis(20));
     }
@@ -970,53 +1151,95 @@ mod tests {
     }
 
     #[test]
-    fn only_the_companions_own_input_interface_can_offer_paste() {
-        let current = r#"<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method><method name="Paste"><arg type="t" name="insertPressedUs" direction="out"/></method></interface></node>"#;
-        let previous = r#"<node><interface name="org.voco.PanelInput1"><method name="ModifiersClear"><arg type="b" direction="out"/></method></interface></node>"#;
-        let elsewhere = r#"<node><interface name="org.example.Other"><method name="Paste"/></interface></node>"#;
-        assert!(offers_paste(current));
-        assert!(
-            !offers_paste(previous),
-            "a companion before 16 keeps uinput"
-        );
-        assert!(!offers_paste(elsewhere));
-        assert!(!offers_paste("not introspection"));
+    fn each_request_has_its_wire_name() {
+        assert_eq!(Request::Paste(4).wire(), ("paste", 4));
+        assert_eq!(Request::Modifiers(5).wire(), ("modifiers", 5));
+        assert_eq!(Request::Changed.wire(), ("changed", 0));
     }
 
     #[test]
-    fn refusals_and_a_missing_companion_typed_nothing_and_the_rest_may_have() {
-        for name in [
-            "org.voco.NotAttached",
-            "org.voco.Busy",
-            "org.voco.ModifiersHeld",
-            "org.freedesktop.DBus.Error.UnknownMethod",
-            "org.freedesktop.DBus.Error.UnknownObject",
-            "org.freedesktop.DBus.Error.UnknownInterface",
-            "org.freedesktop.DBus.Error.ServiceUnknown",
-            "org.freedesktop.DBus.Error.NameHasNoOwner",
-        ] {
+    fn waiting_changes_coalesce_and_withdrawn_work_is_gone() {
+        end_requests();
+        give(Request::Changed);
+        give(Request::Changed);
+        give(Request::Paste(3));
+        WORK.with(|work| {
+            assert_eq!(
+                work.borrow().queue,
+                VecDeque::from([Request::Changed, Request::Paste(3)])
+            );
+        });
+        assert!(withdraw(Request::Paste(3)));
+        assert!(!withdraw(Request::Paste(3)), "already withdrawn");
+        end_requests();
+        WORK.with(|work| assert!(work.borrow().queue.is_empty()));
+    }
+
+    #[test]
+    fn only_the_open_request_takes_a_report() {
+        let _serial = serial();
+        let (report, reports) = mpsc::channel();
+        *OPEN.lock().unwrap() = Some(Open { id: 5, report });
+        assert_eq!(
+            report_for(4, Report::Pasted(9)),
+            Err(("org.voco.UnknownRequest", "No such request is open"))
+        );
+        assert_eq!(report_for(5, Report::Pasted(9)), Ok(None));
+        assert_eq!(reports.try_recv(), Ok(Report::Pasted(9)));
+        *OPEN.lock().unwrap() = None;
+    }
+
+    #[test]
+    fn refusals_typed_nothing_and_a_cut_gesture_may_have() {
+        for reason in ["ModifiersHeld", "Busy", "Unfamiliar"] {
             assert!(
-                matches!(
-                    paste_failure(Some(name), "refused"),
-                    CompanionPasteError::NoMutation(_)
-                ),
-                "{name}"
+                matches!(refusal(reason), CompanionPasteError::NoMutation(_)),
+                "{reason}"
             );
         }
-        // Cut short by disabling, no reply, or a timeout, which has no remote name.
-        for name in [
-            Some("org.voco.Disabled"),
-            Some("org.freedesktop.DBus.Error.NoReply"),
-            None,
-        ] {
-            assert!(
-                matches!(
-                    paste_failure(name, "unknown"),
-                    CompanionPasteError::Uncertain(_)
-                ),
-                "{name:?}"
-            );
-        }
+        assert!(matches!(
+            refusal("Disabled"),
+            CompanionPasteError::Uncertain(_)
+        ));
+    }
+
+    #[test]
+    fn work_goes_to_the_shell_that_asked_in_this_attachment() {
+        let _serial = serial();
+        set_owner(Some(":1.5".into()));
+        assert!(!companion_asks_for_work(), "attached, not yet asking");
+        *ASKING.lock().unwrap() = Some(":1.5".into());
+        assert!(companion_asks_for_work());
+        set_owner(Some(":1.6".into()));
+        assert!(!companion_asks_for_work(), "a new attachment asks again");
+        set_owner(None);
+    }
+
+    #[test]
+    fn work_no_call_took_is_withdrawn_and_typed_nothing() {
+        let _serial = serial();
+        // A serving thread with no pending call: the paste waits in its queue.
+        let (ready, serving) = mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let context = glib::MainContext::new();
+            let main = glib::MainLoop::new(Some(&context), false);
+            context
+                .with_thread_default(|| {
+                    ready.send((context.clone(), main.clone())).unwrap();
+                    main.run();
+                })
+                .unwrap();
+        });
+        let (context, main) = serving.recv().unwrap();
+        *SERVE_CONTEXT.lock().unwrap() = Some(context);
+        assert_eq!(
+            ask(Request::Paste(8), 8, Duration::from_millis(50)),
+            Err(Unanswered::NeverTaken)
+        );
+        assert!(OPEN.lock().unwrap().is_none(), "the request is closed");
+        *SERVE_CONTEXT.lock().unwrap() = None;
+        main.quit();
+        thread.join().unwrap();
     }
 
     #[test]
@@ -1029,31 +1252,5 @@ mod tests {
         // A time after now, or beyond any clock, is now.
         assert_eq!(instant_at(11_000, now, 10_000), now);
         assert_eq!(instant_at(u64::MAX, now, 10_000), now);
-    }
-
-    #[test]
-    fn only_an_answer_about_paste_is_kept_for_the_attachment() {
-        let _serial = serial();
-        set_owner(Some(":1.7".into()));
-        assert!(
-            !offer_for(":1.7", || None),
-            "no answer pastes through uinput"
-        );
-        assert!(
-            offer_for(":1.7", || Some(true)),
-            "and the next paste asks again"
-        );
-        assert!(offer_for(":1.7", || panic!("asked again")));
-        assert!(!offer_for(":1.8", || Some(false)), "another Shell is asked");
-        set_owner(None);
-    }
-
-    #[test]
-    fn a_new_attachment_asks_again_whether_paste_is_offered() {
-        let _serial = serial();
-        *PASTE_OFFER.lock().unwrap() = Some((":1.5".into(), true));
-        set_owner(Some(":1.6".into()));
-        assert!(PASTE_OFFER.lock().unwrap().is_none());
-        set_owner(None);
     }
 }

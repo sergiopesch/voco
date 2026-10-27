@@ -1,0 +1,8 @@
+#!/bin/sh
+# Snapcraft leaves out stage packages the base already has, so the probe's
+# Python may be the snap's own or core24's.
+for python in "$SNAP/usr/bin/python3.12" /usr/bin/python3.12 /usr/bin/python3; do
+  [ -x "$python" ] && exec "$python" "$SNAP/probe.py"
+done
+echo "No Python 3 in the snap or its base" >&2
+exit 1

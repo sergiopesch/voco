@@ -1,0 +1,32 @@
+# Test only: a strict snap that owns org.voco.Panel through a session dbus
+# slot, as a confined VOCO would. scripts/test-snap-dbus-probe.py drives it.
+name: voco-dbus-probe
+base: core24
+version: '1'
+summary: CI probe of strict confinement on the session bus
+description: Test only. Answers an unconfined caller and reports what reached it.
+grade: devel
+confinement: strict
+platforms:
+  amd64:
+
+parts:
+  probe:
+    plugin: dump
+    source: .
+    stage-packages: [python3.12, python3-gi, gir1.2-glib-2.0]
+
+slots:
+  panel:
+    interface: dbus
+    bus: session
+    name: org.voco.Panel
+
+apps:
+  probe:
+    command: run-probe
+    environment:
+      PYTHONPATH: $SNAP/usr/lib/python3/dist-packages
+      GI_TYPELIB_PATH: $SNAP/usr/lib/x86_64-linux-gnu/girepository-1.0
+      LD_LIBRARY_PATH: $SNAP/usr/lib/x86_64-linux-gnu:$SNAP/lib/x86_64-linux-gnu
+    slots: [panel]
