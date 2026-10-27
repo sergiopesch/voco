@@ -8,7 +8,9 @@ UUID = 'voco-panel@sergiopesch.com'
 # The companion's UUID until 2026.0.63. extensions.gnome.org publishes it under a
 # namespace the maintainer owns, so setup moves an enabled earlier copy to UUID.
 OLD_UUID = 'voco-panel@voco.local'
-# Bump with behavior changes that require reloading the running Shell companion.
+# The companion's version-name, which extensions.gnome.org keeps; it replaces
+# version with its own upload number. Bump both with behavior changes that
+# require reloading the running Shell companion.
 COMPANION_VERSION = 17
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 # Every runtime file of the companion, as packaged; scripts/test-panel-setup.py
@@ -32,7 +34,7 @@ def classify(version, installed, info, enabled, globally_disabled):
     if globally_disabled:
         return result('blocked', 'GNOME extensions are turned off. Turn them on in Extensions, then check again.')
     if info.get('state') == 1:
-        if info.get('version') != COMPANION_VERSION:
+        if info.get('version-name') != str(COMPANION_VERSION):
             return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.')
         return result('active', 'Live panel bars and Stop are active.')
     if info.get('state') == 3:

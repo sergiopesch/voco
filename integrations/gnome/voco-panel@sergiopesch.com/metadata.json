@@ -1,13 +1,13 @@
 {
   "uuid": "voco-panel@sergiopesch.com",
   "name": "VOCO",
-  "description": "VOCO live dictation meter with Settings, Review and Stop in its menu. On Wayland it consumes VOCO's dictation shortcut.",
+  "description": "VOCO's top-bar companion: a live dictation meter, with Settings, Review and Stop in its menu. It needs the VOCO app.\n\nOn Wayland it holds VOCO's dictation shortcut, so the app you type in never receives it, and it presses VOCO's paste keys: Shift+Insert, only when VOCO asks, never while you hold a modifier, and never at the lock screen. It doesn't read the clipboard.",
   "shell-version": [
     "46",
     "48",
     "50",
     "51"
   ],
-  "version": 17,
-  "url": "https://github.com/sergiopesch/voco"
+  "url": "https://github.com/sergiopesch/voco",
+  "version-name": "17"
 }

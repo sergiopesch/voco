@@ -27,16 +27,27 @@ class PanelSetupTests(unittest.TestCase):
 
     def test_saved_activation_is_not_claimed_as_active_until_shell_loads_it(self):
         self.assertEqual(panel.classify('46.0', True, {}, True, False)['status'], 'restart')
-        self.assertEqual(panel.classify('46.0', True, {'state': 1, 'version': panel.COMPANION_VERSION}, True, False)['status'], 'active')
+        current = {'state': 1, 'version-name': str(panel.COMPANION_VERSION)}
+        self.assertEqual(panel.classify('46.0', True, current, True, False)['status'], 'active')
+
+    def test_a_copy_from_extensions_gnome_org_is_current_under_its_upload_number(self):
+        # The site replaces version with its own upload number and keeps version-name.
+        uploaded = {'state': 1, 'version': 3.0, 'version-name': str(panel.COMPANION_VERSION)}
+        self.assertEqual(panel.classify('50.1', True, uploaded, True, False)['status'], 'active')
 
     def test_loaded_old_or_unknown_companion_requires_session_restart(self):
-        for version in [None, panel.COMPANION_VERSION - 1, panel.COMPANION_VERSION + 1, str(panel.COMPANION_VERSION)]:
-            status = panel.classify('46.0', True, {'state': 1, 'version': version}, True, False)
-            self.assertEqual(status['status'], 'restart')
+        # Copies before 2026.0.64 have only version, which GNOME reports as a double.
+        for info in [{}, {'version': float(panel.COMPANION_VERSION)}, {'version': panel.COMPANION_VERSION},
+                     {'version-name': str(panel.COMPANION_VERSION - 1)},
+                     {'version-name': str(panel.COMPANION_VERSION + 1)},
+                     {'version-name': panel.COMPANION_VERSION}]:
+            status = panel.classify('46.0', True, {'state': 1, **info}, True, False)
+            self.assertEqual(status['status'], 'restart', info)
             self.assertFalse(status['canEnable'])
         import json
         metadata = json.loads((ROOT / 'integrations/gnome' / panel.UUID / 'metadata.json').read_text())
-        self.assertEqual(metadata['version'], panel.COMPANION_VERSION)
+        self.assertEqual(metadata['version-name'], str(panel.COMPANION_VERSION))
+        self.assertNotIn('version', metadata, 'extensions.gnome.org sets version itself')
 
     def test_missing_package_and_shell_errors_do_not_offer_false_activation(self):
         for installed, state, expected in [(False, 1, 'missing'), (True, 3, 'error')]:

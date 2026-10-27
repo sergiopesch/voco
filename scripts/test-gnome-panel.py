@@ -198,7 +198,7 @@ try:
         # package upgrade would. GetExtensionInfo must describe loaded code.
         metadata_path = Path('/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/metadata.json')
         current_metadata = json.loads(metadata_path.read_text())
-        previous_metadata = {**current_metadata, 'version': current_metadata['version'] - 1}
+        previous_metadata = {**current_metadata, 'version-name': str(int(current_metadata['version-name']) - 1)}
         metadata_path.write_text(json.dumps(previous_metadata))
         shell.terminate(); shell.wait(timeout=10); pump(.5)
         start_shell()
