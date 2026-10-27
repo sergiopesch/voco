@@ -86,7 +86,9 @@ jobs:
           mkdir -p "${out}"
           echo "VOCO_VERSION=${version}" >> "${GITHUB_ENV}"
           echo "VOCO_OUT=${out}" >> "${GITHUB_ENV}"
-          sudo env VOCO_SNAP_BUILD=destructive PATH="${PATH}" python3 scripts/package-nvidia.py \
+          # Root builds a destructive-mode snap; the glib check still needs this runner's Rust.
+          sudo env VOCO_SNAP_BUILD=destructive PATH="${PATH}" RUSTUP_HOME="${HOME}/.rustup" \
+            CARGO_HOME="${HOME}/.cargo" python3 scripts/package-nvidia.py \
             "${base}" "${out}/voco_${version}_amd64.deb" --snap "${out}/voco_${version}_amd64.snap" \
             2>&1 | tee "${out}/build.log"
           sudo chown -R "$(id -u):$(id -g)" "${out}"
