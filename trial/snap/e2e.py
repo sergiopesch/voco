@@ -8,9 +8,12 @@ which the companion grabs inside the Shell. x11: a bare Xvfb, VOCO's own X11
 grab and xdotool. Everything runs at the paths snapd lets a snap reach: the
 runner's session bus, /run/user/UID/pulse/native and wayland-N.
 
+Then VOCO starts again with one My words entry and its taught version, and a
+longer clip goes in: the recognizer writes "lotable" for its "laudable".
+
 Usage: e2e.py gnome-wayland|x11 EVIDENCE_DIR
-Prints a JSON report; exits 1 unless the focused field received the clip's
-words exactly, through the keyboard the platform should use.
+Prints a JSON report; exits 1 unless the focused field received each clip's
+words, through the keyboard the platform should use.
 """
 import ast
 import collections
@@ -37,6 +40,10 @@ trace = state / "hotkey-trace.jsonl"
 performance = state / "performance/performance.jsonl"
 clip = repo / "tests/fixtures/speech/84-121123-0000.wav"
 EXPECTED = ["go", "do", "you", "hear"]
+# Without My words the recognizer writes "A lotable regard for the honour of the
+# first proselyte..." for this clip (the trial's recognition step prints it).
+LONG_CLIP = repo / "tests/fixtures/speech/1673-143396-0000.wav"
+MY_WORDS = {"myWords": ["laudable"], "myWordsHeard": [{"heard": "lotable", "writes": "laudable"}]}
 KEYS = {"gnome-wayland": "companion", "x11": "xdotool"}[platform]
 processes = []
 report = {"platform": platform, "snapRevision": revision, "steps": []}
@@ -204,16 +211,16 @@ def focused_title(probe, environment):
     return next((window["title"] for window in windows if window["focused"]), None)
 
 
-def dictate(how, field, environment, toggle):
-    """Start, play the clip, stop; returns the field's words."""
+def dictate(how, field, environment, toggle, played=clip, arrived=lambda text: words(text) == EXPECTED):
+    """Start, play a clip, wait until its words arrive, stop; returns the field's text."""
     before = events()
     toggle()
     wait(lambda: events()["recording_state_active"] > before["recording_state_active"], f"recording ({how})")
     note("recording", how=how)
-    player = subprocess.run(["pw-play", "--target", "fixture", str(clip)], env=environment, capture_output=True,
+    player = subprocess.run(["pw-play", "--target", "fixture", str(played)], env=environment, capture_output=True,
                             text=True)
     assert player.returncode == 0, f"pw-play failed: {player.stderr}"
-    wait(lambda: words(field.text()) == EXPECTED, f"the words in the field ({how})", 30)
+    wait(lambda: arrived(field.text()), f"the words in the field ({how})", 30)
     note("words arrived", how=how, text=field.text())
     toggle()
     wait(lambda: events()["dictation_stop_to_idle"] > before["dictation_stop_to_idle"], f"Stop to finish ({how})", 30)
@@ -246,23 +253,29 @@ try:
 
     # VOCO, configured past setup, with its opt-in logs on; nothing from an earlier run.
     subprocess.run(["rm", "-rf", str(state)], check=True)
-    config = data / ".config/voco"
-    config.mkdir(mode=0o700, parents=True, exist_ok=True)
-    (data / ".config").chmod(0o700)
-    (config / "config.json").write_text(json.dumps({"onboardingCompleted": True, "hotkey": "Alt+D"}) + "\n")
-    (config / "config.json").chmod(0o600)
     voco_environment = {**base, **session, "VOCO_HOTKEY_TRACE": "1", "VOCO_PERFORMANCE_LOG": "1", "RUST_LOG": "info"}
-    app = start(["snap", "run", "voco"], "voco.log", env=voco_environment)
-    wait(lambda: "Bundled Nemotron streaming model ready" in (evidence / "voco.log").read_text()
-         and events()["frontend_hotkey_handler_ready"] > 0, "VOCO to be ready", 120)
-    note("voco ready")
 
-    if platform == "gnome-wayland":
-        asking = ["gdbus", "call", "--session", "--dest", "org.voco.Panel", "--object-path", "/org/voco/Panel",
-                  "--method", "org.voco.Panel1.CompanionAsking"]
-        wait(lambda: subprocess.run(asking, capture_output=True, text=True, env=base).stdout.strip() == "(true,)",
-             "the companion to attach and ask for work", 60)
-        note("companion asks for work")
+    def launch(log, **settings):
+        config = data / ".config/voco"
+        config.mkdir(mode=0o700, parents=True, exist_ok=True)
+        (data / ".config").chmod(0o700)
+        (config / "config.json").write_text(
+            json.dumps({"onboardingCompleted": True, "hotkey": "Alt+D", **settings}) + "\n")
+        (config / "config.json").chmod(0o600)
+        ready_before = events()["frontend_hotkey_handler_ready"]
+        process = start(["snap", "run", "voco"], log, env=voco_environment)
+        wait(lambda: "Bundled Nemotron streaming model ready" in (evidence / log).read_text()
+             and events()["frontend_hotkey_handler_ready"] > ready_before, "VOCO to be ready", 120)
+        note("voco ready", log=log)
+        if platform == "gnome-wayland":
+            asking = ["gdbus", "call", "--session", "--dest", "org.voco.Panel", "--object-path", "/org/voco/Panel",
+                      "--method", "org.voco.Panel1.CompanionAsking"]
+            wait(lambda: subprocess.run(asking, capture_output=True, text=True, env=base).stdout.strip() == "(true,)",
+                 "the companion to attach and ask for work", 60)
+            note("companion asks for work")
+        return process
+
+    app = launch("voco.log")
     check = subprocess.run(["snap", "run", "voco", "--check-desktop-input"], capture_output=True, text=True,
                            env=voco_environment)
     note("check-desktop-input", exit=check.returncode, output=(check.stdout + check.stderr).strip())
@@ -288,6 +301,24 @@ try:
         1 for line in field.lines if line.get("what") == "text"))
     expected_backend = {"gnome-wayland": "gnome_panel", "x11": "global_shortcut"}[platform]
     assert backends.get(expected_backend), f"The shortcut never toggled through {expected_backend}: {dict(backends)}"
+    assert app.poll() is None, "VOCO exited during the dictations"
+
+    # My words, which VOCO reads from its settings at each start: taught that it
+    # hears "laudable" as "lotable", VOCO types the entry.
+    app.terminate()
+    app.wait(timeout=20)
+    note("voco quit", exit=app.returncode)
+    app = launch("voco-mywords.log", **MY_WORDS)
+    field.clear()
+    if platform == "gnome-wayland":
+        wait(lambda: focused_title(probe, host_environment) == "VOCO paste fixture", "the field to keep focus")
+    text = dictate("My words", field, audio, toggle_socket, LONG_CLIP,
+                   lambda text: {"proselyte", "mosaic"} <= set(words(text)))
+    report["myWordsText"] = text
+    assert "laudable" in words(text) and "lotable" not in words(text), f"My words wasn't applied: {text!r}"
+    assert "honour" in words(text), f"British spelling wasn't applied: {text!r}"
+    keys = collections.Counter(row.get("paste_keys") for row in records(performance) if row.get("paste_keys"))
+    report.update(pasteKeys=dict(keys))
     assert keys and set(keys) == {KEYS}, f"Pastes went through {dict(keys)}, not only {KEYS}"
     assert app.poll() is None, "VOCO exited during the dictations"
     passed = True

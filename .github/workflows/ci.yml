@@ -221,6 +221,7 @@ jobs:
             echo "=== ${platform}"
             ls -l "${dir}"
             tail -n 60 "${dir}/voco.log" 2>/dev/null || true
+            tail -n 30 "${dir}/voco-mywords.log" 2>/dev/null || true
             tail -n 40 "${dir}/gnome-shell.log" 2>/dev/null || true
             tail -n 20 "${dir}/field.err" 2>/dev/null || true
             grep -h '"paste_keys"' "${dir}/performance.jsonl" 2>/dev/null | head -5 || true
