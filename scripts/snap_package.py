@@ -70,10 +70,15 @@ SLOTS = {"panel": {"interface": "dbus", "bus": "session", "name": "org.voco.Pane
 # The metainfo's update item; the snap replaces it with the store's updates.
 UPDATE_ITEM = "Update checks against GitHub Releases; VOCO never downloads or installs updates itself"
 STORE_UPDATES = "The Snap Store keeps VOCO up to date"
-# What App Center's listing says about where the snap types.
+# What App Center's listing says about where the snap types, and the license
+# the license field can't name.
 SNAP_TYPING = ("The snap types in GNOME on Wayland, through the VOCO panel from "
                "extensions.gnome.org, and in X11 sessions. On other Wayland desktops, "
                "use VOCO's .deb or RPM from its GitHub releases.")
+MODEL_LICENSE = ("VOCO is MIT-licensed, and its speech runtime Apache-2.0. The speech model, "
+                 "NVIDIA's Nemotron, comes under the NVIDIA Open Model License, and the snap "
+                 "carries every license and notice.")
+LICENSE = "MIT AND Apache-2.0"
 
 
 # The template's reviewed lines (check-devops.sh): strict on core24 with the
@@ -176,7 +181,7 @@ def description(metainfo):
             blocks.append("\n".join(f"- {item}" for item in items))
         else:
             raise ValueError(f"Unexpected element in the metainfo description: {node.tag}")
-    blocks.append(SNAP_TYPING)
+    blocks += [SNAP_TYPING, MODEL_LICENSE]
     if not summary or len(summary) > 78:
         raise ValueError("The store summary must be one line of at most 78 characters")
     return summary, "\n\n".join(blocks)
@@ -232,7 +237,7 @@ def verify_metadata(snap, version):
     """meta/snap.yaml, parsed: strict, core24, amd64, one app with the reviewed
     plugs, one slot, and no other plug."""
     expected = {"name": "voco", "version": version, "base": "core24", "confinement": "strict",
-                "grade": "stable", "architectures": [ARCH]}
+                "grade": "stable", "architectures": [ARCH], "license": LICENSE}
     for key, value in expected.items():
         if snap.get(key) != value:
             raise ValueError(f"Unexpected snap {key}: {snap.get(key)!r} (expected {value!r})")

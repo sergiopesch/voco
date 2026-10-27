@@ -8,7 +8,10 @@ title: VOCO
 summary: @SUMMARY@
 description: |
 @DESCRIPTION@
-license: MIT AND Apache-2.0 AND LicenseRef-NVIDIA-Open-Model-License
+# snapd accepts SPDX identifiers only, and none names the model's NVIDIA Open
+# Model License, so the description names it; the snap carries its text.
+license: MIT AND Apache-2.0
+contact: https://github.com/sergiopesch/voco/issues
 website: https://github.com/sergiopesch/voco
 source-code: https://github.com/sergiopesch/voco
 issues: https://github.com/sergiopesch/voco/issues

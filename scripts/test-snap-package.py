@@ -48,7 +48,7 @@ def metadata(version="2026.0.64"):
     """snap.yaml as snapcraft writes it for the recipe, parsed."""
     return {
         "name": "voco", "version": version, "base": "core24", "confinement": "strict",
-        "grade": "stable", "architectures": ["amd64"],
+        "grade": "stable", "architectures": ["amd64"], "license": "MIT AND Apache-2.0",
         "apps": {"voco": {
             "command": "usr/bin/voco", "common-id": "com.sergiopesch.voco",
             "command-chain": ["snap/command-chain/gpu-2404-wrapper", "snap/command-chain/desktop-launch"],
@@ -134,8 +134,9 @@ class SnapPackageTest(unittest.TestCase):
         self.assertIn("- Local English speech recognition with NVIDIA Nemotron", text)
         self.assertIn(f"- {snap.STORE_UPDATES}", text)
         self.assertNotIn("GitHub Releases", text)
-        self.assertTrue(text.endswith(snap.SNAP_TYPING))
-        self.assertEqual(text.count("\n\n"), 3, "two paragraphs, the list and the snap's note")
+        self.assertTrue(text.endswith(snap.SNAP_TYPING + "\n\n" + snap.MODEL_LICENSE))
+        self.assertIn("NVIDIA Open Model License", text)
+        self.assertEqual(text.count("\n\n"), 4, "two paragraphs, the list and the snap's two notes")
 
     def test_a_changed_update_item_stops_the_build(self):
         changed = self.root / "metainfo.xml"
@@ -223,6 +224,7 @@ class SnapPackageTest(unittest.TestCase):
         self.assertEqual(snap.verify_metadata(metadata(), "2026.0.64"), 15)
         changes = {
             "another version": lambda data: data.update(version="2026.0.63"),
+            "another license": lambda data: data.update(license="MIT"),
             "devmode": lambda data: data.update(confinement="devmode"),
             "another base": lambda data: data.update(base="core22"),
             "a second app": lambda data: data["apps"].update(helper={"command": "usr/bin/voco"}),

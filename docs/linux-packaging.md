@@ -176,7 +176,10 @@ so the list can't silently go stale.
 It renders `packaging/snap/snapcraft.yaml.in` with the version and the store's
 summary and description. Both come from the AppStream metainfo; the snap's
 description adds where the snap types and says the Snap Store keeps VOCO up to
-date in place of the update checks. Then it runs `snapcraft pack` in an LXD
+date in place of the update checks. snapd accepts only SPDX identifiers in a
+snap's license, and none names the model's NVIDIA Open Model License, so the
+license reads `MIT AND Apache-2.0` and the description names the model's
+license, whose text the snap carries. Then it runs `snapcraft pack` in an LXD
 instance, or on the computer itself with `VOCO_SNAP_BUILD=destructive`, which
 needs Ubuntu 24.04 and root. `SNAPCRAFT_BUILD_INFO=1` records every stage
 package's version in the snap's `snap/manifest.yaml`.
