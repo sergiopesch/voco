@@ -49,7 +49,7 @@ fn microphone_access_for(
 }
 
 /// snapctl's answer for one of this snap's plugs, within two seconds.
-fn plug_connected(plug: &str) -> Option<bool> {
+pub(crate) fn plug_connected(plug: &str) -> Option<bool> {
     let child = crate::process_runner::command("snapctl")
         .args(["is-connected", plug])
         .spawn()

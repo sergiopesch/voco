@@ -15,6 +15,12 @@ export function NativeMicrophoneSettings({ controls, disabled, onSelected }: {
     return () => { mounted.current = false; };
   }, []);
   const defaultToken = controls.sources?.defaultSelectionToken ?? null;
+  const defaultUsable = Boolean(defaultToken &&
+    controls.sources?.sources.some(source => source.selectionToken === defaultToken && source.objectSerial));
+  // With nothing chosen, a recording or test uses the system default, so show
+  // that rather than ask for a choice nobody has to make. It grants nothing:
+  // only an explicit choice or Start selects a microphone.
+  const shown = controls.selected?.selectionToken ?? (defaultUsable ? "system-default" : "");
 
   async function select(value: string) {
     const token = value === "system-default" ? defaultToken : value;
@@ -36,11 +42,11 @@ export function NativeMicrophoneSettings({ controls, disabled, onSelected }: {
   return <div className="voco-native-microphone">
     <div className="voco-field">
       <span>Microphone</span>
-      <DeviceSelect label="Microphone" value={controls.selected?.selectionToken ?? ""} disabled={disabled || controls.busy}
+      <DeviceSelect label="Microphone" value={shown} disabled={disabled || controls.busy}
         onChange={value => void select(value)}
         options={[
           { value: "", label: "Choose a microphone", disabled: true },
-          ...(defaultToken ? [{ value: "system-default", label: "System default (current device)", disabled: !controls.sources?.sources.some(source => source.selectionToken === defaultToken && source.objectSerial) }] : []),
+          ...(defaultToken ? [{ value: "system-default", label: "System default (current device)", disabled: !defaultUsable }] : []),
           ...(controls.sources?.sources.map(source => ({ value: source.selectionToken,
             label: `${source.label || source.name}${source.isMonitor ? " (output monitor)" : ""}${!source.objectSerial ? " — identity unavailable" : ""}`,
             disabled: !source.objectSerial })) ?? []),
