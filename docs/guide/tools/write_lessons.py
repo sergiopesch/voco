@@ -982,7 +982,7 @@ lesson(
         ),
         (
             "Connections the snap needs",
-            "Until the store connects them itself, the snap names the commands. Before each recording it asks snapctl whether audio-record is connected, and logind refuses it until login-session-observe is: \"The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.\"",
+            "Until the store connects them itself, the snap names the commands. Before each recording it asks snapctl whether audio-record is connected: \"The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.\" PipeWire settles what a snap may record when it connects, so native capture connects only once the plug is, and the same VOCO then records. WebKit, which captures on X11, lists its microphones once, so there VOCO asks to be restarted. logind refuses the snap until login-session-observe is connected, and while it does, the paste check asks snapctl about the plug before it asks logind again.",
         ),
     ],
     [
@@ -1551,7 +1551,7 @@ lesson(
     [
         (
             "The menu",
-            "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review and Stop dictation.",
+            "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review, Stop dictation and Quit VOCO. Quit is greyed out while VOCO dictates, and the companion offers it only to a VOCO that sends canQuit.",
         ),
         (
             "Motion",
@@ -1609,7 +1609,7 @@ lesson(
             "The companion: the pill, the bars, the menu, the Wayland grab and the paste keys.",
         ),
         ("integrations/gnome/voco-panel@sergiopesch.com/model.js", "The bar weights and height formula."),
-        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 17 as its version-name, which extensions.gnome.org keeps."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 18 as its version-name, which extensions.gnome.org keeps."),
         (B + "panel.rs", "VOCO's D-Bus service for the companion: Attach, state, the shortcut lease and the work it hands out through NextRequest."),
         (B + "panel_setup.rs", "Checks and enables the companion, and caches the result."),
         (B + "tray.rs", "The tray icon, hidden while the companion is attached."),

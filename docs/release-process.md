@@ -182,8 +182,14 @@ snapcraft upload --release=edge ~/voco-release/snap/voco_<version>_amd64.snap
 ```
 
 Promote it past `edge` only after trying the store's copy on both systems. The
-store reviews each upload; until it auto-connects `audio-record` and
-`login-session-observe`, VOCO's setup shows their `snap connect` commands.
+store reviews each upload. Its automated review holds VOCO's for a person until
+the snap has a declaration for its `panel` slot, the session `dbus` slot that
+owns `org.voco.Panel`, since the base declaration refuses connections to a named
+`dbus` slot. Before uploading, `snap-review` from the `review-tools` snap shows
+that one item and passes the rest. Ask for the declaration in the Snapcraft
+forum's store-requests category, along with auto-connection of `audio-record`
+and `login-session-observe`. Until the store auto-connects them, VOCO's setup
+shows their `snap connect` commands.
 
 ### 10. Point the docs at the release
 
