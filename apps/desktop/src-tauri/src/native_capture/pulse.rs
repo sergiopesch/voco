@@ -99,8 +99,20 @@ pub struct Pulse {
     // Keep the bounded device table out of the capture worker's stack frames.
     catalog: Option<Box<Catalog>>,
 }
-impl CaptureBackend for Pulse {
-    fn connect() -> Result<Self, String> {
+impl Pulse {
+    /// PipeWire settles what a snap may record when it connects, so a
+    /// connection opened before audio-record was connected records only
+    /// silence for as long as it lasts. The snap connects once it may record.
+    fn connect_after(
+        access: impl FnOnce() -> crate::confinement::MicrophoneAccess,
+    ) -> Result<Self, String> {
+        let access = access();
+        if !access.allowed {
+            return Err(access
+                .detail
+                .unwrap_or(crate::confinement::MICROPHONE_DETAIL)
+                .into());
+        }
         // Never consult PULSE_SERVER or autospawn: use this process user's existing socket.
         let uid = unsafe { libc::getuid() };
         let path = format!("/run/user/{uid}/pulse/native");
@@ -114,6 +126,11 @@ impl CaptureBackend for Pulse {
         let ptr = NonNull::new(unsafe { vc_new(socket.as_ptr()) })
             .ok_or("Native Pulse allocation failed")?;
         Ok(Self { ptr, catalog: None })
+    }
+}
+impl CaptureBackend for Pulse {
+    fn connect() -> Result<Self, String> {
+        Self::connect_after(crate::confinement::microphone_access)
     }
     fn enumerate(&mut self, epoch: u64) -> Result<(u64, Vec<Source>, Option<String>), String> {
         let mut catalog = empty_catalog();
@@ -241,6 +258,17 @@ impl Drop for Pulse {
 #[cfg(test)]
 mod identity_tests {
     use super::*;
+    use crate::confinement::{MicrophoneAccess, MICROPHONE_DETAIL};
+
+    #[test]
+    fn the_snap_opens_no_connection_before_it_may_record() {
+        let refused = Pulse::connect_after(|| MicrophoneAccess {
+            allowed: false,
+            detail: Some(MICROPHONE_DETAIL),
+        });
+        assert_eq!(refused.err().as_deref(), Some(MICROPHONE_DETAIL));
+    }
+
     #[test]
     fn device_catalog_initializes_on_a_small_worker_stack() {
         let catalog = std::thread::Builder::new()
