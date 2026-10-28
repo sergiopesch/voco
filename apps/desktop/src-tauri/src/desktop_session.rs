@@ -217,24 +217,44 @@ pub fn require_active() -> Result<(), String> {
 
 /// Whether logind refuses this process, as it does a snap until
 /// login-session-observe is connected; setup then shows the remedy. Until
-/// logind answers without refusing, each read asks it again. So
+/// logind answers without refusing, each read finds out again. So
 /// `voco --check-desktop-input` sees a refusal before any other call, and a
 /// plug connected a moment ago reads as connected.
 pub fn logind_denied() -> bool {
-    denied_after(&LOGIND_ANSWERED, &LOGIND_DENIED, || {
-        if let Some(logind) = Logind::connect() {
-            // Any answer will do: the user's own object is one the snap may read.
-            let _ = logind.session_path("GetUser", &(unsafe { libc::geteuid() },).to_variant());
-        }
-    })
+    denied_after(
+        &LOGIND_ANSWERED,
+        &LOGIND_DENIED,
+        || {
+            crate::confinement::is_snap()
+                .then(|| crate::confinement::plug_connected("login-session-observe"))
+                .flatten()
+        },
+        || {
+            if let Some(logind) = Logind::connect() {
+                // Any answer will do: the user's own object is one the snap may read.
+                let _ = logind.session_path("GetUser", &(unsafe { libc::geteuid() },).to_variant());
+            }
+        },
+    )
 }
 
 /// `denied` as logind answers `ask`, asked only while it has never answered or
-/// last refused.
-fn denied_after(answered: &AtomicBool, denied: &AtomicBool, ask: impl FnOnce()) -> bool {
-    if !answered.load(Ordering::SeqCst) || denied.load(Ordering::SeqCst) {
-        ask();
+/// last refused. Then the snap's plug, which `plugged` reads, says first: while
+/// it is unconnected logind would refuse again, and each refusal logs an
+/// AppArmor denial, once a second while a VOCO window polls.
+fn denied_after(
+    answered: &AtomicBool,
+    denied: &AtomicBool,
+    plugged: impl FnOnce() -> Option<bool>,
+    ask: impl FnOnce(),
+) -> bool {
+    if answered.load(Ordering::SeqCst) && !denied.load(Ordering::SeqCst) {
+        return false;
     }
+    if plugged() == Some(false) {
+        return true;
+    }
+    ask();
     denied.load(Ordering::SeqCst)
 }
 
@@ -662,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn a_refusal_is_asked_again_until_logind_answers_without_one() {
+    fn a_refusal_is_asked_again_only_once_the_plug_could_change_it() {
         let answered = AtomicBool::new(false);
         let denied = AtomicBool::new(false);
         let asks = std::cell::Cell::new(0);
@@ -671,17 +691,30 @@ mod tests {
             answered.store(true, Ordering::SeqCst);
             denied.store(refused, Ordering::SeqCst);
         };
-        // A process that hasn't asked logind anything yet, such as
-        // `voco --check-desktop-input`, asks before it answers.
-        assert!(denied_after(&answered, &denied, || ask(true)));
-        // While logind refuses, each read asks again, so a plug connected a
-        // moment ago reads as connected.
-        assert!(denied_after(&answered, &denied, || ask(true)));
-        assert!(!denied_after(&answered, &denied, || ask(false)));
-        assert_eq!(asks.get(), 3);
-        // Once logind answers without refusing, a read asks nothing.
-        assert!(!denied_after(&answered, &denied, || ask(true)));
-        assert_eq!(asks.get(), 3);
+        let read = |plug: Option<bool>, refused: bool| {
+            denied_after(&answered, &denied, || plug, || ask(refused))
+        };
+        // `voco --check-desktop-input` in a snap without the plug knows the
+        // answer without asking logind, and logs no denial.
+        assert!(read(Some(false), true));
+        assert_eq!(asks.get(), 0);
+        // Outside the snap, or with snapctl silent, it asks logind.
+        assert!(read(None, true));
+        assert_eq!(asks.get(), 1);
+        // While the plug stays unconnected, a refusal isn't asked again.
+        assert!(read(Some(false), true));
+        assert_eq!(asks.get(), 1);
+        // Once it is connected, the next read asks, so it counts at once.
+        assert!(!read(Some(true), false));
+        assert_eq!(asks.get(), 2);
+        // After an answer without a refusal, a read asks nothing, not even snapctl.
+        assert!(!denied_after(
+            &answered,
+            &denied,
+            || panic!("asked snapctl"),
+            || ask(true)
+        ));
+        assert_eq!(asks.get(), 2);
     }
 
     #[test]
