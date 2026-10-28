@@ -207,7 +207,7 @@ try {
       assert.equal(await page.locator(`[id="${await combo.getAttribute('aria-activedescendant')}"]`).getAttribute('data-value'), 'usb');
       await combo.press('Escape');
       assert.equal(await combo.getAttribute('aria-expanded'), 'false');
-      assert.equal(await combo.innerText(), 'Choose a microphone');
+      assert.equal(await combo.innerText(), 'System default (current device)');
       await combo.press('u');
       await combo.press('Enter');
       assert.equal(await combo.innerText(), 'USB microphone');
