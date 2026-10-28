@@ -276,7 +276,7 @@ gives the reason:
 
 | Reason | What to do |
 | --- | --- |
-| `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Use its tray or panel menu, or quit it with `pkill -x voco` and open VOCO again. |
+| `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Choose **Quit VOCO** in its tray or panel menu, or run `pkill -x voco`, then open VOCO again. |
 | `could not write the tray icons: …` | VOCO keeps its tray icons in `$XDG_RUNTIME_DIR/voco`, which is usually a small memory-backed folder. Free space there, or sign out and back in, then open VOCO again. |
 
 ## Performance logs

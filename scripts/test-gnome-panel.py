@@ -64,7 +64,7 @@ def method(connection, sender, path, interface, name, params, invocation):
     elif name == 'Action':
         action, token = params.unpack()
         # A consumed chord is the plain toggle; the native app decides Start or Stop.
-        accepted = (action == 'shortcut' and token == '') or (action == 'stop' and state['canStop'] and token == state['stopSession']) or (action in ('open','settings','review') and state['canOpen'] and token == state['token'])
+        accepted = (action == 'shortcut' and token == '') or (action == 'stop' and state['canStop'] and token == state['stopSession']) or (action in ('open','settings','review') and state['canOpen'] and token == state['token']) or (action == 'quit' and state.get('canQuit') and token == state['token'])
         if accepted: actions.append((action, token))
         invocation.return_value(GLib.Variant('(b)', (accepted,)))
     elif name == 'Detach':
@@ -339,7 +339,7 @@ try:
         # Stretch the meter opening and closing so the probe samples many frames.
         animated = {1: 'expanding', 4: 'collapsing'}.get(i)
         if animated: call('SlowDown', GLib.Variant('(d)', (8.0,)))
-        state.update(token=f'1:{i+1}',status=status,description=status,canStop=status in ('starting','recording'),canOpen=status not in ('starting','recording','processing'),level=.8 if status=='recording' else 0)
+        state.update(token=f'1:{i+1}',status=status,description=status,canStop=status in ('starting','recording'),canOpen=status not in ('starting','recording','processing'),canQuit=status not in ('starting','recording','processing'),level=.8 if status=='recording' else 0)
         if attached:
             bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
         if animated:
@@ -398,13 +398,21 @@ try:
         assert items['Settings']['sensitive'] == state['canOpen'], items
         assert items['Review']['sensitive'] == state['canOpen'], items
         assert items['Stop dictation']['visible'] == state['canStop'], items
+        assert items['Quit VOCO']['visible'] and items['Quit VOCO']['sensitive'] == state['canQuit'], items
         assert menu['x'] >= 0 and menu['x'] + menu['width'] <= 800, menu
         if status == 'idle':
             screenshot('idle-menu')
-            for label, action in [('Settings', 'settings'), ('Review', 'review')]:
+            for label, action in [('Settings', 'settings'), ('Review', 'review'), ('Quit VOCO', 'quit')]:
                 call('MenuAction', GLib.Variant('(s)', (label,))); pump(.2)
                 assert actions[-1] == (action, state['token']), actions
                 call('Menu'); pump(.1)
+            # A VOCO that sends no canQuit can't quit from the menu, which then offers no Quit.
+            quit_flag = state.pop('canQuit'); state['token'] += 'q'
+            bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None); pump(.3)
+            older = {item['text']: item for item in inspect()['menu']['items']}
+            assert not older['Quit VOCO']['visible'], older
+            state['canQuit'] = quit_flag; state['token'] = state['token'][:-1]
+            bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None); pump(.3)
         elif status == 'recording':
             screenshot('recording-menu')
             call('MenuAction', GLib.Variant('(s)', ('Stop dictation',))); pump(.2)

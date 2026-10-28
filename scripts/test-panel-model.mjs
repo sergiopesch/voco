@@ -35,3 +35,16 @@ test('unknown protocol fails closed and recovery never adds panel text', () => {
     assert.throws(() => presentation({...state, status: 'unknown'}));
     assert.equal(presentation({...state, status: 'recovery'}).label, '');
 });
+test('Quit is offered only by a VOCO that can quit, and never while it dictates', () => {
+    assert.equal(presentation(state).quitOffered, false);
+    assert.equal(presentation(state).canQuit, false);
+    assert.equal(presentation({...state, canQuit: 'yes'}).quitOffered, false);
+    const offered = presentation({...state, canQuit: true});
+    assert.equal(offered.quitOffered, true);
+    assert.equal(offered.canQuit, true);
+    for (const status of ['starting', 'recording', 'processing']) {
+        const p = presentation({...state, status, canQuit: true});
+        assert.equal(p.quitOffered, true);
+        assert.equal(p.canQuit, false);
+    }
+});

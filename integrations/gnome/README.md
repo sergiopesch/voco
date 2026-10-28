@@ -28,9 +28,9 @@ don't pulse.
 
 A primary click stops dictation while VOCO is starting or recording, and
 otherwise opens Settings when VOCO allows it. Other mouse buttons, the Menu key
-or Shift+F10 open the menu, where **Settings** and **Review** work only while
-you aren't dictating and **Stop dictation** shows only while VOCO is starting or
-recording.
+or Shift+F10 open the menu, where **Settings**, **Review** and **Quit VOCO**
+work only while you aren't dictating and **Stop dictation** shows only while
+VOCO is starting or recording. **Quit VOCO** quits VOCO as its tray menu does.
 
 ## Set it up
 
@@ -88,7 +88,7 @@ VOCO owns `org.voco.Panel` on the session bus and serves `org.voco.Panel1` at
 | `GetState() → s` | The state as JSON. Each call keeps the attachment alive. |
 | `ReserveShortcut(s) → b` | Holds the 2.5-second lease when the argument is the configured accelerator. |
 | `ReserveStopShortcut(s) → b` | Holds a 250 ms Stop lease for a `stopSession/accelerator` token, for an earlier companion copy that Shell keeps loaded until the next login. |
-| `Action(s, s) → b` | `shortcut` with an empty token, `stop` with `stopSession`, or `settings`, `open` or `review` with `token`. Each Stop token works once. |
+| `Action(s, s) → b` | `shortcut` with an empty token, `stop` with `stopSession`, or `settings`, `open`, `review` or `quit` with `token`. Each Stop token works once. |
 | `Detach()` | Drops the lease and shows the tray. |
 | `Changed` | Signal sent only to the attached connection when the state changes. |
 
@@ -99,7 +99,7 @@ bus name.
 
 `GetState` returns `version` (1), `status` (`initializing`, `starting`,
 `recording`, `processing`, `attention` or `idle`), `description` (the tray
-menu's status line), `token`, `stopSession`, `canStop`, `canOpen`, `level` (0
+menu's status line), `token`, `stopSession`, `canStop`, `canOpen`, `canQuit`, `level` (0
 to 1, only while recording, 0 after 250 ms without a new level),
 `shortcutAccelerator`, `stopAccelerator` and `stopShortcutToken`. The
 accelerators are `<Alt>d`, `<Alt><Shift>d` or null, and null on X11. The

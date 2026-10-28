@@ -124,6 +124,11 @@ export default class VocoPanel extends Extension {
         this._stopItem = new PopupMenu.PopupMenuItem('Stop dictation');
         this._stopItem.connect('activate', () => this._action('stop'));
         this._indicator.menu.addMenuItem(this._stopItem);
+        this._quitSeparator = new PopupMenu.PopupSeparatorMenuItem();
+        this._indicator.menu.addMenuItem(this._quitSeparator);
+        this._quitItem = new PopupMenu.PopupMenuItem('Quit VOCO');
+        this._quitItem.connect('activate', () => this._action('quit'));
+        this._indicator.menu.addMenuItem(this._quitItem);
         // The top bar's right side grows leftward, so the microphone comes last
         // and never moves: the meter opens and closes on its left.
         this._clip = new Reveal({clip_to_allocation: true, width: 0});
@@ -345,6 +350,8 @@ export default class VocoPanel extends Extension {
         this._reviewItem.setSensitive(state.canOpen);
         this._stopItem.visible = state.canStop;
         this._stopItem.setSensitive(state.canStop);
+        this._quitSeparator.visible = this._quitItem.visible = state.quitOffered;
+        this._quitItem.setSensitive(state.canQuit);
         // Only new levels, statuses or motion settings move the bars; the
         // processing pulse runs until the status changes.
         const processing = state.status === 'processing';
@@ -442,7 +449,7 @@ export default class VocoPanel extends Extension {
 
     _action(action) {
         const state = this._state;
-        if (!state || (action === 'stop' ? !state.canStop : !state.canOpen)) return;
+        if (!state || !(action === 'stop' ? state.canStop : action === 'quit' ? state.canQuit : state.canOpen)) return;
         this._indicator.menu.close();
         this._call('Action', new GLib.Variant('(ss)', [action, action === 'stop' ? state.stopSession : state.token]), () => {});
     }
