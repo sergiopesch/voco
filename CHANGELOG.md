@@ -25,7 +25,7 @@ The [release process](docs/release-process.md) describes how a release is made.
   inside GNOME Shell while it's attached, rather than VOCO's own virtual
   keyboard. It sends the same Shift+Insert, refuses while a modifier is held,
   and GNOME turns it off at the lock screen. The companion now asks VOCO for
-  its work, so a strictly confined VOCO can use it too, and is version 17:
+  its work, so a strictly confined VOCO can use it too, and is version 18:
   after upgrading, run `voco --setup-panel` and sign out and back in. Until
   GNOME loads it, VOCO pastes through its own keyboard.
 - The GNOME companion is now `voco-panel@sergiopesch.com`, a name
@@ -35,6 +35,10 @@ The [release process](docs/release-process.md) describes how a release is made.
   shortcut and presses VOCO's paste keys, Shift+Insert, only when VOCO asks. Its
   metadata names its version in `version-name`, which extensions.gnome.org
   keeps, so panel setup counts a copy from the site as current.
+
+- The GNOME panel's menu ends with **Quit VOCO**, as the tray's does, so VOCO
+  can be quit without a terminal while the panel hides the tray. It is greyed
+  out while you dictate.
 
 ### Fixed
 

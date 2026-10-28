@@ -376,7 +376,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;
   explicit setup status always re-checks.
 - While the companion is attached, VOCO hides its fallback tray icon. The
-  companion's menu is Settings, Review and Stop dictation. On every supported
+  companion's menu is Settings, Review, Stop dictation and Quit VOCO, which it
+  offers only when VOCO sends `canQuit` and enables only while VOCO isn't
+  dictating; VOCO quits as from its tray's Quit VOCO. On every supported
   Shell a primary click on the pill stops or opens Settings, and other buttons,
   Menu and Shift+F10 open the menu: from GNOME 50, the panel's click gesture must
   leave primary presses and touches to the pill.
