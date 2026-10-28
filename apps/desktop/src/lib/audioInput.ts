@@ -1,3 +1,5 @@
+import { microphoneAccess } from "@/lib/tauri";
+
 const LABEL_PREFIX = "label:";
 
 export type AudioInputFallbackStage =
@@ -111,7 +113,11 @@ function isConstraintFailure(error: unknown): boolean {
   );
 }
 
+/** For the microphone test and the access retry. The snap opens no microphone
+ * it can't use and says what to do instead; dictation checks the same itself. */
 export async function openMicrophoneStream(deviceId: string | null): Promise<MediaStream> {
+  const access = await microphoneAccess().catch(() => null);
+  if (access?.allowed === false) throw new Error(access.detail ?? "Microphone access is blocked.");
   return openMicrophoneStreamWithDiagnostics(deviceId).then((result) => result.stream);
 }
 

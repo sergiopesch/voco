@@ -2250,6 +2250,7 @@ pub fn run() -> Result<(), String> {
         warn!("Crash recovery is unavailable: {error}");
     }
     native_capture_commands::initialize();
+    confinement::note_startup();
 
     // Written before Tauri starts, in the directory this process has locked, so
     // a full or unwritable one takes the ordinary startup-failure path.
