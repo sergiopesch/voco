@@ -1,8 +1,9 @@
 name: CI
 
+# Trial branch only, never merged: builds VOCO's real snap through
+# package-nvidia.py --snap on Ubuntu 24.04, installs it and measures it under
+# strict confinement. It uploads no snap, package or artifact.
 on:
-  push:
-    branches: [master]
   pull_request:
     branches: [master]
 
@@ -10,758 +11,228 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  # Master runs finish so their Rust cache save is not lost.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
-  code-guide:
-    name: Code Guide
-    timeout-minutes: 10
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0 # The reader serves an explicitly pinned historical snapshot.
-      - name: Verify the local guide and pinned source catalog
-        working-directory: docs/guide
-        env:
-          VOCO_SOURCE: ../..
-        run: python3 -m unittest discover -s tests -v
-
-  rust-security:
-    name: RustSec Audit
-    timeout-minutes: 20
+  snap-trial:
+    name: Snap Trial
+    timeout-minutes: 150
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
-        with:
-          toolchain: 1.99.0
-
-      - name: Rust dependency security audit
-        working-directory: apps/desktop/src-tauri
+      - name: Free disk space for the build, the snap and its copies
         run: |
-          cargo install cargo-audit --version "0.22.2" --locked
-          cargo audit
-
-  check:
-    name: Frontend Checks
-    # A slow Azure apt mirror has taken 25 minutes to install the packages, and
-    # the job needs about 6 more.
-    timeout-minutes: 45
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
 
-      # Ubuntu's Azure mirror can crawl: one run spent 25 minutes on 254 MB of
-      # packages. Packages master fetched this ISO week come from the cache, so the
-      # mirror serves only those updated since, and apt checks each cached package
-      # against the signed indexes before it installs it. The cache restores into
-      # apt's own archive folder, whose partial folder stays _apt's for its sandbox.
-      - name: Prepare the system package cache
-        id: apt-week
-        run: |
-          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
-          sudo chown "$USER" /var/cache/apt/archives
-
-      - name: Restore downloaded system packages
-        id: apt-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
-          restore-keys: apt-${{ github.job }}-
-
-      - name: Install system dependencies
-        timeout-minutes: 25
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=true \
-            pkg-config libglib2.0-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev libpulse-dev \
-            desktop-file-utils appstream \
-            ibus ibus-gtk3 python3 python3-numpy python3-gi gir1.2-ibus-1.0 bubblewrap \
-            xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
-            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
-            gnome-text-editor gnome-terminal nano gnome-shell gnome-shell-extension-appindicator xwayland \
-            ffmpeg locales
-          # Superseded versions would otherwise grow the cache every week.
-          sudo apt-get autoclean
-
-      # Only master saves, as with the Rust cache, so pull requests don't fill the
-      # repository's cache.
-      - name: Save downloaded system packages
-        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: DevOps preflight
-        run: npm run verify:devops
-
-      # Bash writes times with the locale's decimal separator, so the installer
-      # runs again where it is a comma.
-      - name: Installer in a decimal-comma locale
-        run: |
-          mkdir -p "$RUNNER_TEMP/locales"
-          localedef -i de_DE -f UTF-8 "$RUNNER_TEMP/locales/de_DE.UTF-8"
-          export LOCPATH="$RUNNER_TEMP/locales" LC_ALL=de_DE.UTF-8
-          python3 scripts/test-install-journey.py
-          python3 scripts/test-install-performance.py
-
-      - name: Spelling table matches pinned VarCon
-        run: |
-          curl -fsSL --retry 6 --retry-delay 10 -o "$RUNNER_TEMP/varcon.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/varcon/varcon.txt
-          python3 scripts/generate-spelling-table.py --check "$RUNNER_TEMP/varcon.txt"
-
-      - name: Everyday words match pinned 12dicts
-        run: |
-          curl -fsSL --retry 6 --retry-delay 10 -o "$RUNNER_TEMP/2of12full.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12full.txt
-          curl -fsSL --retry 6 --retry-delay 10 -o "$RUNNER_TEMP/2of12id.txt" https://raw.githubusercontent.com/en-wl/wordlist/rel-2020.12.07/alt12dicts/2of12id.txt
-          python3 scripts/generate-everyday-words.py --check "$RUNNER_TEMP/2of12full.txt" "$RUNNER_TEMP/2of12id.txt"
-
-      - name: Dependency security audit
-        run: npm run verify:security
-
-      - name: TypeScript check
-        run: npm run check
-
-      - name: ESLint
-        run: npm run lint
-
-      - name: Frontend tests
-        run: npm test
-
-      - name: Install renderer test browser
-        timeout-minutes: 10
-        run: npx playwright install --with-deps chromium
-
-      - name: Branded interface and panel state regression
-        run: npm run test:brand-motion && node --test scripts/test-panel-model.mjs
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-brand-motion
-
-      - name: GNOME companion shortcut and lifecycle regression
-        timeout-minutes: 3
-        env:
-          VOCO_NATIVE_DEPS: /usr
-          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-panel
-        run: bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
-
-      - name: Dictation renderer lifecycle regression
-        run: npm run test:dictation-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-dictation-renderer
-
-      - name: English spelling choice regression
-        run: npm run test:english-spelling-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-english-spelling-renderer
-
-      - name: My words regression
-        run: npm run test:my-words-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-my-words-renderer
-
-      - name: Setup words and Say it regression
-        run: npm run test:setup-words-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-setup-words-renderer
-
-      - name: Update checks off switch regression
-        run: npm run test:update-checks-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-update-checks-renderer
-
-      - name: Microphone refresh and retry regression
-        run: npm run test:microphone-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}
-
-      - name: Native capture setup and recovery regression
-        timeout-minutes: 5
-        run: npm run test:native-capture-renderer
-        env:
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-capture-renderer
-
-      - name: Chromium exact-field adversarial regression
-        run: npm run test:chromium-exact-field
-
-      - name: Onboarding speech test and desktop setup regression
-        timeout-minutes: 5
-        run: npm run test:native-capture-renderer
-        env:
-          VOCO_RENDERER_SUITE: onboarding
-          VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-onboarding-renderer
-
-      - name: Browser delivery
-        timeout-minutes: 3
-        env:
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery
-        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
-
-      - name: Application delivery
-        timeout-minutes: 3
-        env:
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery
-        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
-
-      - name: Private headless IBus lifecycle
-        run: bash scripts/test-private-ibus-engine-hosted.sh
-
-      - name: Native GTK delivery and WebKit coverage checks
-        timeout-minutes: 5
-        env:
-          VOCO_NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-desktop
-        run: bash scripts/test-private-ibus-engine-hosted.sh --native-desktop
-
-      - name: Private native Wayland toolkit compatibility
-        timeout-minutes: 3
-        env:
-          VOCO_WAYLAND_DEPS: /usr
-          VOCO_WAYLAND_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-wayland
-        run: bash scripts/test-private-ibus-engine-hosted.sh --native-wayland
-
-      - name: Retain native desktop evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: native-desktop-evidence
-          path: |
-            ${{ runner.temp }}/voco-browser-delivery/
-            ${{ runner.temp }}/voco-application-delivery/
-            ${{ runner.temp }}/voco-native-desktop/
-            ${{ runner.temp }}/voco-native-wayland/
-            ${{ runner.temp }}/voco-dictation-renderer/
-            ${{ runner.temp }}/voco-english-spelling-renderer/
-            ${{ runner.temp }}/voco-my-words-renderer/
-            ${{ runner.temp }}/voco-setup-words-renderer/
-            ${{ runner.temp }}/voco-update-checks-renderer/
-            ${{ runner.temp }}/voco-microphone-${{ github.run_id }}-${{ github.run_attempt }}/
-            ${{ runner.temp }}/voco-native-capture-renderer/
-            ${{ runner.temp }}/voco-onboarding-renderer/
-            ${{ runner.temp }}/voco-brand-motion/
-            ${{ runner.temp }}/voco-panel/
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Frontend production build
-        run: npm --workspace @voco/desktop run build:frontend
-
-      - name: Validate desktop metadata
-        run: |
-          desktop-file-validate packaging/tauri/VOCO.desktop
-
-      - name: Validate AppStream metadata
-        run: |
-          appstreamcli validate packaging/tauri/com.sergiopesch.voco.metainfo.xml
-
-  rust:
-    name: Rust Check & Test
-    timeout-minutes: 60
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      # System packages come from master's weekly cache, as in Frontend Checks.
-      - name: Prepare the system package cache
-        id: apt-week
-        run: |
-          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
-          sudo chown "$USER" /var/cache/apt/archives
-
-      - name: Restore downloaded system packages
-        id: apt-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
-          restore-keys: apt-${{ github.job }}-
-
-      - name: Install system dependencies
-        timeout-minutes: 10
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=true \
-            pkg-config libglib2.0-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev libpulse-dev python3-numpy libsentencepiece0 \
-            pulseaudio pulseaudio-utils bubblewrap binutils
-          sudo apt-get autoclean
-
-      # Only master saves, as in Frontend Checks.
-      - name: Save downloaded system packages
-        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
-        with:
-          toolchain: 1.99.0
-          components: clippy,rustfmt
-
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          workspaces: apps/desktop/src-tauri
-          save-if: ${{ github.ref == 'refs/heads/master' }}
-
-      - name: Cargo fmt
-        working-directory: apps/desktop/src-tauri
-        run: cargo fmt --check
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Build production frontend for Tauri checks
-        run: npm --workspace @voco/desktop run build:frontend
-
-      # Clippy fetches the locked crates that the offline glib checks read.
-      - name: Cargo clippy
-        working-directory: apps/desktop/src-tauri
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
-
-      - name: Verify glib source backport and optimized iterator regression
-        run: |
-          python3 scripts/verify-glib-backport.py
-          python3 scripts/test-glib-variant.py --output "${{ runner.temp }}/voco-glib-regression"
-
-      - name: Cargo test
-        working-directory: apps/desktop/src-tauri
-        run: cargo test --locked --all-targets
-
-      - name: Native capture C callback lifecycle (no audio server)
-        run: npm run test:native-capture-callbacks
-
-      - name: Native capture source latency and complete audio
-        timeout-minutes: 3
-        env:
-          VOCO_NATIVE_PULSE_EVIDENCE_DIR: ${{ runner.temp }}/voco-native-pulse-latency
-        run: bash scripts/test-private-ibus-engine-hosted.sh --native-pulse-latency
-
-      - name: Provision checksum-pinned Nemotron runtime
-        run: bash scripts/provision-ci-speech.sh
-
-      - name: Nemotron speech regression baseline
-        run: |
-          npm run test:speech-baseline -- --report "${{ runner.temp }}/voco-speech-baseline.json"
-          /usr/bin/python3 runtime/speech/test_worker_protocol.py --output-dir "${{ runner.temp }}/voco-worker-protocol"
-
-      # The worker as packages ship it, without the rest of the checkout beside
-      # it, as release assembly runs it from the built package.
-      - name: Speech worker from the files a package ships
-        timeout-minutes: 5
-        run: |
-          python3 scripts/stage-speech-worker.py "$RUNNER_TEMP/packaged-speech"
-          cp runtime/speech/test_worker_protocol.py "$RUNNER_TEMP/packaged-speech/"
-          /usr/bin/python3 "$RUNNER_TEMP/packaged-speech/test_worker_protocol.py" \
-            --output-dir "$RUNNER_TEMP/voco-packaged-worker" --fixtures tests/fixtures/speech
-
-      - name: Retain speech regression results
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: speech-regression-evidence
-          path: |
-            ${{ runner.temp }}/voco-glib-regression/result.json
-            ${{ runner.temp }}/voco-native-pulse-latency/
-            ${{ runner.temp }}/voco-worker-protocol/*.json
-            ${{ runner.temp }}/voco-packaged-worker/
-            ${{ runner.temp }}/voco-speech-*.json
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # Hosted CI never assembles or signs the NVIDIA package; scripts/assemble-release.sh
-  # does that locally. This job runs the release build end to end in private sessions.
-  application:
-    name: Application
-    timeout-minutes: 60
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      # System packages come from master's weekly cache, as in Frontend Checks.
-      - name: Prepare the system package cache
-        id: apt-week
-        run: |
-          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
-          sudo chown "$USER" /var/cache/apt/archives
-
-      - name: Restore downloaded system packages
-        id: apt-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
-          restore-keys: apt-${{ github.job }}-
-
-      - name: Install system dependencies
-        timeout-minutes: 10
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=true \
-            pkg-config libglib2.0-dev libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev libpulse-dev \
-            ibus ibus-gtk3 python3 python3-numpy python3-gi gir1.2-ibus-1.0 bubblewrap \
-            xvfb xdotool xclip gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-atspi-2.0 at-spi2-core \
-            weston libweston-13-0 wayland-utils gir1.2-gtk-4.0 gir1.2-webkit-6.0 \
-            gnome-shell gnome-shell-extension-appindicator xwayland \
-            gnome-text-editor gnome-terminal nano acl \
-            libsentencepiece0 pulseaudio pulseaudio-utils
-          sudo apt-get autoclean
-
-      # Only master saves, as in Frontend Checks.
-      - name: Save downloaded system packages
-        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
-        with:
-          toolchain: 1.99.0
-
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          workspaces: apps/desktop/src-tauri
-          save-if: ${{ github.ref == 'refs/heads/master' }}
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Install test browser
-        timeout-minutes: 10
-        run: npx playwright install --with-deps chromium
-
-      - name: Build production frontend
-        run: npm --workspace @voco/desktop run build:frontend
-
-      - name: Provision checksum-pinned Nemotron runtime
-        run: bash scripts/provision-ci-speech.sh
-
-      - name: Build release application
-        working-directory: apps/desktop/src-tauri
-        run: |
-          cargo build --locked --release --features custom-protocol --bin voco --bin voco-browser-host
-          # The packaged extension files, staged outside the harnesses' private /tmp.
-          extension="${RUNNER_TEMP}/voco-chromium-extension"
-          mkdir -p "${extension}"
-          cp ../../../integrations/chromium/manifest.json ../../../integrations/chromium/background.js \
-            ../../../integrations/chromium/content.js "${extension}/"
-          {
-            echo "VOCO_NATIVE_APP_BINARY=${PWD}/target/release/voco"
-            echo "VOCO_BROWSER_HOST_BINARY=${PWD}/target/release/voco-browser-host"
-            echo "VOCO_BROWSER_EXTENSION_DIR=${extension}"
-          } >> "${GITHUB_ENV}"
-
-      - name: Application tray bridge on GNOME
-        timeout-minutes: 5
-        env:
-          VOCO_NATIVE_DEPS: /usr
-          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-panel
-          # Frontend Checks runs the synthetic companion cases on this Shell.
-          VOCO_PANEL_SUITE: bridge
-        run: VOCO_PANEL_APP_BINARY="${VOCO_NATIVE_APP_BINARY}" bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
-
-      - name: Application capture and paste into the focused field
-        timeout-minutes: 5
-        env:
-          VOCO_NATIVE_BUILD_ROLE: ci-release-build
-          VOCO_NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-native
-        run: bash scripts/test-private-ibus-engine-hosted.sh --full-application
-
-      # The virtual keyboard delivery steps paste through insertion.rs's ignored
-      # fixture test, built from the same release dependencies.
-      - name: Build the production paste test
-        working-directory: apps/desktop/src-tauri
-        run: |
-          binary=$(cargo test --locked --release --features custom-protocol --lib --no-run --message-format=json \
-            | jq -r 'select(.profile.test == true) | .executable')
-          [[ -x "${binary}" ]]
-          echo "VOCO_FIXTURE_PASTE_BINARY=${binary}" >> "${GITHUB_ENV}"
-
-      # Only the next two steps give their namespace /dev/uinput, and the bridge
-      # outside reads and grabs each VOCO keyboard. Both grants are for the runner
-      # alone; nothing becomes world-writable.
-      - name: Grant the runner VOCO's virtual keyboards
-        run: |
-          sudo modprobe uinput
-          sudo setfacl -m "u:${USER}:rw" /dev/uinput
-          printf 'SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="VOCO virtual keyboard", RUN+="/usr/bin/setfacl -m u:%s:r $devnode"\n' "${USER}" \
-            | sudo tee /etc/udev/rules.d/99-voco-uinput-bridge.rules
-          sudo udevadm control --reload-rules
-
-      - name: Application delivery through the virtual keyboard on GNOME Wayland
-        timeout-minutes: 5
-        env:
-          VOCO_DELIVERY_PLATFORM: gnome-wayland
-          VOCO_UINPUT_BRIDGE: "1"
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-wayland
-        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
-
-      - name: Browser delivery through the virtual keyboard on GNOME Wayland
-        timeout-minutes: 5
-        env:
-          VOCO_DELIVERY_PLATFORM: gnome-wayland
-          VOCO_UINPUT_BRIDGE: "1"
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-browser-delivery-gnome-wayland
-        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-delivery
-
-      # The same production paste, typed by the session's GNOME companion: no
-      # uinput device and no bridge.
-      - name: Application delivery through the GNOME companion on GNOME Wayland
-        timeout-minutes: 5
-        env:
-          VOCO_DELIVERY_PLATFORM: gnome-wayland
-          VOCO_DELIVERY_KEYS: companion
-          VOCO_DELIVERY_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-delivery-gnome-companion
-        run: bash scripts/test-private-ibus-engine-hosted.sh --application-delivery
-
-      - name: Application Wayland lifecycle and model cache readiness
-        timeout-minutes: 3
-        env:
-          VOCO_WAYLAND_DEPS: /usr
-          VOCO_WAYLAND_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-wayland
-        run: VOCO_WAYLAND_APP_BINARY="${VOCO_NATIVE_APP_BINARY}" bash scripts/test-private-ibus-engine-hosted.sh --native-wayland
-
-      - name: Application capture into an exact Chromium field
-        timeout-minutes: 8
-        env:
-          VOCO_BROWSER_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-browser
-        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-application
-
-      - name: Application Chromium toolbar action
-        timeout-minutes: 5
-        env:
-          VOCO_BROWSER_EVIDENCE_DIR: ${{ runner.temp }}/voco-application-toolbar
-        run: bash scripts/test-private-ibus-engine-hosted.sh --browser-toolbar
-
-      - name: Retain application evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: application-evidence
-          path: |
-            ${{ runner.temp }}/voco-application-panel/
-            ${{ runner.temp }}/voco-application-native/
-            ${{ runner.temp }}/voco-application-delivery-gnome-wayland/
-            ${{ runner.temp }}/voco-browser-delivery-gnome-wayland/
-            ${{ runner.temp }}/voco-application-delivery-gnome-companion/
-            ${{ runner.temp }}/voco-application-wayland/
-            ${{ runner.temp }}/voco-application-browser/
-            ${{ runner.temp }}/voco-application-toolbar/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  gnome-50:
-    name: GNOME 50 Companion
-    # Room for a slow apt mirror, as in Frontend Checks.
-    timeout-minutes: 30
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # System packages come from master's weekly cache, as in Frontend Checks.
-      - name: Prepare the system package cache
-        id: apt-week
-        run: |
-          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
-          sudo chown "$USER" /var/cache/apt/archives
-
-      - name: Restore downloaded system packages
-        id: apt-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-${{ github.job }}-${{ hashFiles('.github/workflows/ci.yml') }}-${{ steps.apt-week.outputs.week }}
-          restore-keys: apt-${{ github.job }}-
-
-      - name: Install system dependencies
-        timeout-minutes: 10
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y -o APT::Keep-Downloaded-Packages=true \
-            bubblewrap dbus-bin dbus-daemon libglib2.0-bin python3 python3-gi gir1.2-gtk-3.0 \
-            gnome-shell gnome-shell-ubuntu-extensions xwayland
-          sudo apt-get autoclean
-
-      # Only master saves, as in Frontend Checks.
-      - name: Save downloaded system packages
-        if: github.ref == 'refs/heads/master' && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-
-      # GNOME 50 has no nested mode; the harness runs Shell headless and sends
-      # keys and clicks through a private RemoteDesktop session.
-      - name: GNOME 50 companion shortcut and lifecycle regression
-        timeout-minutes: 3
-        env:
-          VOCO_NATIVE_DEPS: /usr
-          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-panel-gnome50
-        run: bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel
-
-      - name: Retain GNOME 50 companion evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: gnome50-panel-evidence
-          path: ${{ runner.temp }}/voco-panel-gnome50/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  gnome-51:
-    name: GNOME 51 Companion
-    # Room for a slow package mirror while the Shell image builds.
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # No hosted runner ships GNOME 51, and Fedora 45 does: the harness builds
-      # Shell from the pinned image and runs the suite in rootless Podman.
-      - name: GNOME 51 companion shortcut and lifecycle regression
+      - name: Install build and check dependencies
         timeout-minutes: 15
-        env:
-          VOCO_PANEL_IMAGE: registry.fedoraproject.org/fedora:45@sha256:cf60308d4ae9603f74d8be2ab8dc252a9fcc4fad6570417363af7748f23d053e
-          VOCO_PANEL_EVIDENCE_DIR: ${{ runner.temp }}/voco-panel-gnome51
-        run: bash scripts/test-private-ibus-engine-hosted.sh --gnome-panel-container
-
-      - name: Retain GNOME 51 companion evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: gnome51-panel-evidence
-          path: ${{ runner.temp }}/voco-panel-gnome51/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  distro-runtime:
-    name: ${{ matrix.name }} Runtime
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Debian 13
-            # Docker's official image, from Microsoft's mirror of it, with the
-            # same digest. Docker Hub rate-limits hosted runners, and ECR Public
-            # refuses them once its anonymous data limit is spent.
-            image: mcr.microsoft.com/mirror/docker/library/debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
-            tools: apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 nodejs dpkg
-          - name: Fedora 44
-            image: registry.fedoraproject.org/fedora:44@sha256:8ade22c0f76f6b2f0892290b1fb39fa1bda1566ba6e276a2ed427f45589c159b
-            # Provisioning compares files with cmp. Fedora's image has no
-            # diffutils, and VOCO's dependencies no longer bring it in.
-            tools: dnf install -y git curl python3 nodejs dpkg diffutils
-    container:
-      image: ${{ matrix.image }}
-    steps:
-      - name: Install checkout and provisioning tools
-        timeout-minutes: 10
-        run: ${{ matrix.tools }}
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The package's dependencies by this distribution's names: a renamed or
-      # missing package fails here, before a release does.
-      - name: Install VOCO's package dependencies
-        timeout-minutes: 10
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          if command -v apt-get >/dev/null; then
-            apt-get install -y --no-install-recommends $(python3 scripts/distro-dependencies.py debian)
-          else
-            dnf install -y $(python3 scripts/distro-dependencies.py fedora)
-          fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libglib2.0-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev libpulse-dev python3 python3-numpy python3-yaml libsentencepiece0 \
+            desktop-file-utils appstream squashfs-tools binutils xvfb
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: 1.99.0
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: apps/desktop/src-tauri
+          save-if: false
+
+      - name: Install the pinned Tauri CLI
+        timeout-minutes: 20
+        run: cargo install tauri-cli --version 2.12.1 --locked
+
+      - name: Install Node dependencies
+        run: npm ci
 
       - name: Provision checksum-pinned Nemotron runtime
         run: bash scripts/provision-ci-speech.sh
 
-      - name: Speech runtime, IBus and worker protocol on this distribution's Python
+      - name: Build the base package
+        timeout-minutes: 40
+        run: npm run build
+
+      - name: Install Snapcraft
+        timeout-minutes: 10
         run: |
-          PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s runtime/speech -p "test_*.py"
-          PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_protocol_test.py
-          PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 apps/desktop/src-tauri/resources/voco_ibus_engine_test.py
-          /usr/bin/python3 runtime/speech/test_worker_protocol.py --output-dir "$RUNNER_TEMP/voco-worker-protocol"
-
-      - name: Nemotron accuracy and continuity baseline
-        run: node scripts/test-speech-baseline.mjs --report "$RUNNER_TEMP/voco-speech-baseline.json"
-
-  snap-probe:
-    name: Snap Confinement Probe
-    # The confinement the companion's NextRequest protocol relies on: a strict
-    # snap answers an unconfined GNOME Shell but can't call it (AGENTS.md).
-    timeout-minutes: 25
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install Snapcraft and the probe's client libraries
-        timeout-minutes: 8
-        run: |
-          # The store times out a request now and then; ride out a short outage.
           for attempt in 1 2 3 4 5; do
             sudo snap install snapcraft --classic --channel=9.x/stable && break
             if [ "$attempt" = 5 ]; then exit 1; fi
             sleep 20
           done
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq python3-gi gir1.2-glib-2.0 dbus
+          snapcraft --version
 
-      - name: Build the probe snap
-        timeout-minutes: 12
-        working-directory: scripts/fixtures/snap-dbus-probe
-        run: sudo snapcraft pack --destructive-mode --output voco-dbus-probe.snap
-
-      - name: Strict confinement on the session bus
-        timeout-minutes: 3
+      - name: Build the Debian package and the snap from one staged tree
+        timeout-minutes: 40
         run: |
-          sudo snap install --dangerous scripts/fixtures/snap-dbus-probe/voco-dbus-probe.snap
-          snap connections voco-dbus-probe
+          set -o pipefail
+          version="$(node -p "require('./package.json').version")"
+          base="$(ls apps/desktop/src-tauri/target/release/bundle/deb/*_"${version}"_amd64.deb)"
+          out="${RUNNER_TEMP}/out"
+          mkdir -p "${out}"
+          echo "VOCO_VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "VOCO_OUT=${out}" >> "${GITHUB_ENV}"
+          # Root builds a destructive-mode snap; the glib check still needs this runner's Rust.
+          sudo env VOCO_SNAP_BUILD=destructive PATH="${PATH}" RUSTUP_HOME="${HOME}/.rustup" \
+            CARGO_HOME="${HOME}/.cargo" python3 scripts/package-nvidia.py \
+            "${base}" "${out}/voco_${version}_amd64.deb" --snap "${out}/voco_${version}_amd64.snap" \
+            2>&1 | tee "${out}/build.log"
+          sudo chown -R "$(id -u):$(id -g)" "${out}"
+          ls -l "${out}"
+          df -h /
+
+      - name: Snapcraft's lint report
+        if: always()
+        run: grep -iE -A40 'lint warnings|lint:' "${VOCO_OUT}/build.log" || echo "No lint section in the build log"
+
+      - name: Verify the Debian package and the snap
+        timeout-minutes: 10
+        run: |
+          bash scripts/verify-deb-package.sh "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.deb" "${VOCO_VERSION}"
+          snap list core24 >/dev/null 2>&1 || sudo snap install core24
+          bash scripts/verify-snap-package.sh "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.snap" "${VOCO_VERSION}" \
+            "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.deb"
+
+      - name: What the snap carries
+        if: always()
+        run: |
+          root="${RUNNER_TEMP}/snap-root"
+          rm -rf "${root}"
+          unsquashfs -no-progress -quiet -dest "${root}" "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.snap" >/dev/null
+          cat "${root}/meta/snap.yaml"
+          cat "${root}/meta/gui/voco.desktop"
+          du -sh "${root}" "${root}/usr/lib/voco/speech" "${root}/usr/lib/voco/snap/python" "${root}/usr/lib/voco/snap/helpers"
+          find "${root}" -maxdepth 3 -not -path '*/usr/lib/voco/snap/*' -not -path '*/usr/share/doc/*' | sort | head -120
+          ls "${root}/snap"
+          head -c 6000 "${root}/snap/manifest.yaml" || true
+          ls -l "${VOCO_OUT}"
+
+      - name: Install the snap
+        timeout-minutes: 15
+        run: |
           sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" "/run/user/$(id -u)"
-          python3 scripts/test-snap-dbus-probe.py
+          echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> "${GITHUB_ENV}"
+          sudo snap install --dangerous "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.snap"
+          snap connections voco
+          sudo snap connect voco:audio-record
+          sudo snap connect voco:login-session-observe
+          snap connections voco
+          snap run voco --version
+
+      - name: Inside the confinement
+        timeout-minutes: 10
+        run: |
+          common="${HOME}/snap/voco/common"
+          mkdir -p "${common}/fixtures"
+          cp trial/snap/inside.sh trial/snap/worker_check.py "${common}/"
+          cp tests/fixtures/speech/manifest.json tests/fixtures/speech/*.wav "${common}/fixtures/"
+          echo "--- snap run --shell, as it starts"
+          snap run --shell voco -c 'echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}"'
+          echo "--- through the app's command chain"
+          snap run --shell voco -c '"$SNAP/snap/command-chain/gpu-2404-wrapper" "$SNAP/snap/command-chain/desktop-launch" bash "$SNAP_USER_COMMON/inside.sh"'
+
+      - name: Recognition and cold warm-up, package against snap
+        timeout-minutes: 30
+        run: |
+          drop() { sync; echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null; }
+          deb="${RUNNER_TEMP}/deb-root"
+          dpkg-deb -x "${VOCO_OUT}/voco_${VOCO_VERSION}_amd64.deb" "${deb}"
+          for round in 1 2; do
+            drop
+            python3 trial/snap/worker_check.py /usr/bin/python3 "${deb}/usr/lib/voco/speech/stream_worker.py" \
+              tests/fixtures/speech > "${RUNNER_TEMP}/deb-${round}.json"
+            drop
+            snap run --shell voco -c '"$VOCO_STREAM_PYTHON" -E -s -B "$SNAP_USER_COMMON/worker_check.py" "$VOCO_STREAM_PYTHON" "$VOCO_STREAM_WORKER" "$SNAP_USER_COMMON/fixtures"' \
+              > "${RUNNER_TEMP}/snap-lzo-${round}.json"
+          done
+          python3 - "${RUNNER_TEMP}" <<'PY'
+          import json, sys
+          from pathlib import Path
+          folder = Path(sys.argv[1])
+          reports = {path.stem: json.loads(path.read_text()) for path in sorted(folder.glob("*-[12].json"))}
+          for name, report in reports.items():
+              print(f"{name}: ready {report['readySeconds']} s, aggregate WER {report['aggregateWer']}")
+          texts = {name: [fixture["text"] for fixture in report["fixtures"]] for name, report in reports.items()}
+          same = len({json.dumps(value) for value in texts.values()}) == 1
+          print("identical text in every run:", same)
+          for fixture in reports["deb-1"]["fixtures"]:
+              print(f"  {fixture['id']}: WER {fixture['wer']} - {fixture['text']}")
+          if not same:
+              raise SystemExit("The confined worker wrote different text from the package's worker")
+          PY
+
+      - name: The app warms its worker under confinement
+        timeout-minutes: 10
+        run: |
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+          ls -l "${XDG_RUNTIME_DIR}/bus" || true
+          Xvfb :99 -screen 0 1280x800x24 -nolisten tcp &
+          sleep 2
+          start=$(date +%s.%N)
+          DISPLAY=:99 RUST_LOG=info timeout 150 snap run voco > "${RUNNER_TEMP}/app.log" 2>&1 &
+          for _ in $(seq 1 280); do
+            grep -q 'Bundled Nemotron streaming model ready' "${RUNNER_TEMP}/app.log" && break
+            sleep 0.5
+          done
+          python3 -c "import sys, time; print(f'model ready after {time.time() - float(sys.argv[1]):.1f} s')" "${start}"
+          # The helpers reach the X server from inside the confinement: a
+          # clipboard round trip through xclip, and xdotool's paste keys.
+          snap run --shell voco -c 'export DISPLAY=:99; printf "voco-trial" | xclip -selection clipboard -in; sleep 1; xclip -selection clipboard -out; echo; xdotool key --clearmodifiers shift+Insert; echo "xdotool exit $?"; notify-send --version'
+          sleep 5
+          pkill -f 'snap/voco/.*/usr/bin/voco' || true
+          sleep 2
+          tail -60 "${RUNNER_TEMP}/app.log"
+          grep -q 'Bundled Nemotron streaming model ready' "${RUNNER_TEMP}/app.log"
+
+      - name: Install a nested GNOME Shell, PipeWire and the field's toolkit
+        timeout-minutes: 15
+        run: |
+          sudo apt-get install -y --no-install-recommends gnome-shell xwayland pipewire pipewire-bin \
+            pipewire-pulse wireplumber pulseaudio-utils python3-gi gir1.2-gtk-3.0 xdotool dbus libglib2.0-bin
+
+      - name: The snap dictates into a GTK field on X11
+        timeout-minutes: 10
+        # Its report lists what failed; the GNOME run goes ahead either way.
+        continue-on-error: true
+        run: python3 trial/snap/e2e.py x11 "${RUNNER_TEMP}/e2e-x11"
+
+      - name: The snap dictates into a GTK field on GNOME Wayland through the companion
+        timeout-minutes: 15
+        run: python3 trial/snap/e2e.py gnome-wayland "${RUNNER_TEMP}/e2e-gnome"
+
+      - name: End-to-end evidence
+        if: always()
+        run: |
+          for platform in x11 gnome; do
+            dir="${RUNNER_TEMP}/e2e-${platform}"
+            [ -d "${dir}" ] || continue
+            echo "=== ${platform}"
+            ls -l "${dir}"
+            tail -n 60 "${dir}/voco.log" 2>/dev/null || true
+            tail -n 60 "${dir}/voco-unconnected.log" 2>/dev/null || true
+            tail -n 30 "${dir}/voco-mywords.log" 2>/dev/null || true
+            tail -n 40 "${dir}/gnome-shell.log" 2>/dev/null || true
+            tail -n 20 "${dir}/field.err" 2>/dev/null || true
+            grep -h '"paste_keys"' "${dir}/performance.jsonl" 2>/dev/null | head -5 || true
+          done
+
+      - name: AppArmor and seccomp denials
+        if: always()
+        run: |
+          sudo journalctl -k --no-pager | grep -E 'apparmor="DENIED".*snap\.voco|audit.*snap\.voco' \
+            | sed -E 's/^.*(apparmor="DENIED".*)$/\1/' | sed -E 's/ pid=[0-9]+//; s/ fsuid=[0-9]+ ouid=[0-9]+//' \
+            | sort | uniq -c | sort -rn | head -60 || echo "No denials"
