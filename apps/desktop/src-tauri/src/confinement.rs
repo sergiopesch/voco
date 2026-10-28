@@ -1,5 +1,6 @@
 //! VOCO's strict snap, which can't use what confinement forbids: /dev/uinput,
 //! evdev, its IBus engine, systemd's user manager or the network (AGENTS.md).
+use std::sync::OnceLock;
 
 /// Whether this process runs as VOCO's snap.
 pub fn is_snap() -> bool {
@@ -20,6 +21,23 @@ fn names_voco(snap_name: Option<&std::ffi::OsStr>) -> bool {
 /// names the command that does (AGENTS.md).
 pub const MICROPHONE_DETAIL: &str =
     "The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.";
+/// WebKit, which captures on X11, lists its microphones once, through a
+/// PipeWire connection that keeps what the snap could record when it opened.
+/// So there a plug connected after VOCO started needs a restart.
+pub const MICROPHONE_RESTART_DETAIL: &str = "The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then quit VOCO and open it again.";
+pub const MICROPHONE_RECONNECTED_DETAIL: &str =
+    "VOCO can use the microphone you connected once it restarts. Quit VOCO and open it again.";
+
+/// The audio-record plug as this process started, about when WebKit listed
+/// its microphones; set only in the snap.
+static RECORD_AT_START: OnceLock<Option<bool>> = OnceLock::new();
+
+/// Read the snap's audio-record plug once, at startup.
+pub fn note_startup() {
+    if is_snap() {
+        RECORD_AT_START.get_or_init(|| plug_connected("audio-record"));
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,18 +51,39 @@ pub struct MicrophoneAccess {
 /// plug can stop it here; outside the snap capture reports its own failures.
 #[tauri::command]
 pub fn microphone_access() -> MicrophoneAccess {
-    microphone_access_for(is_snap(), || plug_connected("audio-record"))
+    microphone_access_for(
+        is_snap(),
+        || plug_connected("audio-record"),
+        crate::native_capture_commands::uses_native_backend(),
+        RECORD_AT_START.get().copied().flatten(),
+    )
 }
 
 /// A snapctl that can't answer leaves the capture to report what went wrong.
+/// `native` is native capture, which connects to PipeWire only once it may
+/// record; `at_start` is the plug as this process started.
 fn microphone_access_for(
     confined: bool,
     connected: impl FnOnce() -> Option<bool>,
+    native: bool,
+    at_start: Option<bool>,
 ) -> MicrophoneAccess {
-    let allowed = !confined || connected() != Some(false);
+    let detail = if !confined {
+        None
+    } else if connected() == Some(false) {
+        Some(if native {
+            MICROPHONE_DETAIL
+        } else {
+            MICROPHONE_RESTART_DETAIL
+        })
+    } else if !native && at_start == Some(false) {
+        Some(MICROPHONE_RECONNECTED_DETAIL)
+    } else {
+        None
+    };
     MicrophoneAccess {
-        allowed,
-        detail: (!allowed).then_some(MICROPHONE_DETAIL),
+        allowed: detail.is_none(),
+        detail,
     }
 }
 
@@ -76,22 +115,46 @@ mod tests {
 
     #[test]
     fn the_snap_names_its_microphone_connection_before_capture() {
-        let refused = microphone_access_for(true, || Some(false));
+        let allowed = MicrophoneAccess {
+            allowed: true,
+            detail: None,
+        };
+        // Native capture: connect the plug, then try again.
+        let refused = microphone_access_for(true, || Some(false), true, Some(false));
         assert!(!refused.allowed);
         assert_eq!(refused.detail, Some(MICROPHONE_DETAIL));
         assert!(MICROPHONE_DETAIL.contains("snap connect voco:audio-record"));
         // Connected, or snapctl couldn't say: the capture itself decides.
         for answer in [Some(true), None] {
             assert_eq!(
-                microphone_access_for(true, || answer),
-                MicrophoneAccess {
-                    allowed: true,
-                    detail: None
-                }
+                microphone_access_for(true, || answer, true, Some(false)),
+                allowed
             );
         }
         // Outside the snap nothing asks snapctl.
-        assert!(microphone_access_for(false, || panic!("asked snapctl")).allowed);
+        assert!(microphone_access_for(false, || panic!("asked snapctl"), false, None).allowed);
+    }
+
+    #[test]
+    fn webkit_capture_needs_a_restart_for_a_plug_connected_after_start() {
+        let allowed = MicrophoneAccess {
+            allowed: true,
+            detail: None,
+        };
+        let refused = microphone_access_for(true, || Some(false), false, Some(false));
+        assert_eq!(refused.detail, Some(MICROPHONE_RESTART_DETAIL));
+        assert!(MICROPHONE_RESTART_DETAIL.contains("snap connect voco:audio-record"));
+        // Connected since, WebKit still lists the microphones it saw at start.
+        let stale = microphone_access_for(true, || Some(true), false, Some(false));
+        assert!(!stale.allowed);
+        assert_eq!(stale.detail, Some(MICROPHONE_RECONNECTED_DETAIL));
+        // Connected at start, or unknown then: the capture decides.
+        for at_start in [Some(true), None] {
+            assert_eq!(
+                microphone_access_for(true, || Some(true), false, at_start),
+                allowed
+            );
+        }
     }
 
     #[test]

@@ -15,8 +15,9 @@ The [release process](docs/release-process.md) describes how a release is made.
   GNOME Wayland and through `xdotool` in X11 sessions, has no network access,
   and is updated by the store. Until the store connects them on its own, VOCO
   names the `snap connect` commands for its microphone (`audio-record`) and for
-  checking the session it types into (`login-session-observe`). The snap isn't
-  published yet.
+  checking the session it types into (`login-session-observe`); each counts as
+  soon as it's connected, except the microphone in an X11 session, where VOCO
+  asks to be restarted. The snap isn't published yet.
 
 ### Changed
 

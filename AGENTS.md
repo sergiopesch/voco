@@ -522,7 +522,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   CI never builds VOCO's snap. Try it on Ubuntu 24.04 and the latest Ubuntu before promoting it past
   `edge`. Ask the store to auto-connect `audio-record` and
   `login-session-observe`; until it does, setup shows their `snap connect`
-  commands.
+  commands. On X11, where WebKit captures, `audio-record` connected after VOCO
+  started needs a restart, and VOCO says so rather than open a microphone.
 
 ## Working practices
 

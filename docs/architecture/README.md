@@ -436,6 +436,12 @@ connects to PipeWire, which settles what a snap may record when it connects:
 a connection opened before the plug was connected would record only silence
 until VOCO restarted. So the snap lists no microphones until the plug is
 connected, then connects, and the next recording works without a restart.
+WebKit, which captures on X11, lists its microphones once, through its own
+PipeWire connection, so there a plug connected after VOCO started needs a
+restart. Its remedy says to quit and reopen VOCO after `snap connect`, and a
+plug connected since startup is refused with "Quit VOCO and open it again" until
+VOCO restarts. The microphone test and the access retry ask the same before
+they open a microphone.
 
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
