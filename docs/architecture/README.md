@@ -431,7 +431,11 @@ own. So before each recording, the voice test and Say it included, the snap
 asks `snapctl is-connected audio-record` (`microphone_access`): while the plug
 isn't connected, the recording fails before any microphone opens and names
 `snap connect voco:audio-record`. A `snapctl` that can't answer leaves the
-capture to report its own failure.
+capture to report its own failure. Native capture asks the same before it
+connects to PipeWire, which settles what a snap may record when it connects:
+a connection opened before the plug was connected would record only silence
+until VOCO restarted. So the snap lists no microphones until the plug is
+connected, then connects, and the next recording works without a restart.
 
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
