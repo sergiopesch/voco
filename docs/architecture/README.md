@@ -420,16 +420,22 @@ It checks the session before the copy and before the keys on X11 too. Before
 `login-session-observe` is connected, logind answers it with `AccessDenied`:
 unlike a logind that doesn't answer, which leaves pasting allowed, a refusal
 refuses each paste and the paste check, which names the `snap connect`
-command. Until logind answers without refusing, each paste check asks it
-again, so `voco --check-desktop-input` sees the refusal, and a plug connected
-a moment ago counts at once.
+command. Until logind answers without refusing, each paste check finds out
+again: it asks `snapctl` whether `login-session-observe` is connected, and logind
+only once it is, so a refusal logs no AppArmor denial at each poll. So
+`voco --check-desktop-input` sees the refusal, and a plug connected a moment
+ago counts at once.
 
 The store connects neither `login-session-observe` nor `audio-record` on its
 own. So before each recording, the voice test and Say it included, the snap
 asks `snapctl is-connected audio-record` (`microphone_access`): while the plug
 isn't connected, the recording fails before any microphone opens and names
 `snap connect voco:audio-record`. A `snapctl` that can't answer leaves the
-capture to report its own failure.
+capture to report its own failure. Native capture asks the same before it
+connects to PipeWire, which settles what a snap may record when it connects:
+a connection opened before the plug was connected would record only silence
+until VOCO restarted. So the snap lists no microphones until the plug is
+connected, then connects, and the next recording works without a restart.
 
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
