@@ -84,8 +84,8 @@ menu has no quit item, so with the panel, finish dictating and run
 VOCO uses your system's default microphone unless you choose another on the
 **Settings** page.
 
-- **Wayland:** choose from **Microphone**. **System default (current device)**
-  follows your system setting. **Refresh devices** updates the list, and
+- **Wayland:** choose from **Microphone**. Until you choose, it shows **System
+  default (current device)**, which follows your system setting. **Refresh devices** updates the list, and
   **Retry capture setup** checks microphone access again.
 - **X11:** choose from **Input device**. **Test microphone** opens a sound check
   with a live level. If the chosen microphone is missing, VOCO uses the system
