@@ -11,7 +11,7 @@ OLD_UUID = 'voco-panel@voco.local'
 # The companion's version-name, which extensions.gnome.org keeps; it replaces
 # version with its own upload number. Bump both with behavior changes that
 # require reloading the running Shell companion.
-COMPANION_VERSION = 17
+COMPANION_VERSION = 18
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 # Every runtime file of the companion, as packaged; scripts/test-panel-setup.py
 # compares it with the source directory and the Debian file map.

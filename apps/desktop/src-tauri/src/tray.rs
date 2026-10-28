@@ -764,6 +764,9 @@ fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
             format!("{}:{}", snapshot.epoch, snapshot.dictation_session_id)),
         "canStop": matches!(snapshot.dictation_status, DictationStatus::Starting | DictationStatus::Recording),
         "canOpen": presentation.settings_enabled,
+        // Quitting would end a dictation before its words are out.
+        "canQuit": !matches!(snapshot.dictation_status,
+            DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing),
         "level": crate::panel::level(snapshot.epoch, snapshot.dictation_status),
     })
 }
@@ -792,6 +795,7 @@ fn valid_panel_action(snapshot: &serde_json::Value, action: &str, token: &str) -
             "open" | "settings" | "review" => {
                 snapshot["canOpen"] == true && snapshot["token"].as_str() == Some(token)
             }
+            "quit" => snapshot["canQuit"] == true && snapshot["token"].as_str() == Some(token),
             _ => false,
         }
 }
@@ -817,6 +821,12 @@ pub fn panel_action(app: &tauri::AppHandle, action: &str, token: &str) -> bool {
         }
         "open" | "settings" => app.emit_to("main", "voco:open-settings", ()).is_ok(),
         "review" => app.emit_to("main", "voco:open-review", ()).is_ok(),
+        // As the fallback tray's Quit VOCO. The companion ignores the reply, which
+        // may not get out before the process does.
+        "quit" => {
+            app.exit(0);
+            true
+        }
         _ => false,
     }
 }
@@ -851,6 +861,21 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    fn panel_quit_needs_the_presentation_revision_and_no_dictation() {
+        let mut state = serde_json::json!({"token":"4:9", "stopSession":"4:2", "canStop":false, "canOpen":false, "canQuit":true});
+        assert!(valid_panel_action(&state, "quit", "4:9"));
+        for token in ["", "4:8", "4:2"] {
+            assert!(!valid_panel_action(&state, "quit", token));
+        }
+        state["canQuit"] = false.into();
+        assert!(!valid_panel_action(&state, "quit", "4:9"));
+        // An earlier VOCO sends no canQuit, and nothing quits it.
+        state.as_object_mut().unwrap().remove("canQuit");
+        assert!(!valid_panel_action(&state, "quit", "4:9"));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
     fn panel_actions_never_open_a_window_during_capture() {
         let mut snapshot = ready_snapshot();
         snapshot.epoch = 4;
@@ -863,6 +888,7 @@ mod tests {
             snapshot.dictation_status = status;
             let panel = panel_presentation(&snapshot);
             assert_eq!(panel["canOpen"], false);
+            assert_eq!(panel["canQuit"], false);
             assert_eq!(panel["canStop"], status != DictationStatus::Processing);
             assert_eq!(panel["token"], "4:9");
         }
@@ -871,6 +897,7 @@ mod tests {
         let panel = panel_presentation(&snapshot);
         assert_eq!(panel["status"], "attention");
         assert_eq!(panel["canOpen"], true);
+        assert_eq!(panel["canQuit"], true);
         assert_eq!(panel["canStop"], false);
         assert_eq!(panel["level"], 0.0);
         let mut fields: Vec<_> = panel
@@ -884,6 +911,7 @@ mod tests {
             fields,
             [
                 "canOpen",
+                "canQuit",
                 "canStop",
                 "description",
                 "level",

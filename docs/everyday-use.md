@@ -64,7 +64,7 @@ VOCO saves the text in [Review](#review) and shows **Dictation saved in Review**
 | Shortcut | Starts and stops dictation. It is `Alt+D` unless you change it. |
 | Tray menu | Open the tray icon's menu for **Open VOCO**, **Start dictation** or **Stop dictation**, **Settings**, **Review**, **Change shortcut** and **Quit VOCO**. |
 | GNOME panel | Seven bars move with your voice. Click to stop while you dictate, or to open Settings. |
-| GNOME panel menu | Right-click or middle-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review** and **Stop dictation**. |
+| GNOME panel menu | Right-click or middle-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review**, **Stop dictation** and **Quit VOCO**. |
 | Popover | Shows VOCO's status, your shortcut and your microphone, with **Help** and **Hide to tray**. |
 
 On GNOME the tray icon needs an AppIndicator extension. Ubuntu includes one;
@@ -75,9 +75,8 @@ Settings has five pages: **Settings** for your microphone and spelling, **My wor
 **Shortcut**, **Updates** and **Help**, which has setup steps and runtime checks. Opening
 VOCO from your app menu shows the popover, even when VOCO wasn't running, except
 while you dictate. Started from a terminal or by your desktop's startup apps,
-VOCO stays in the tray. The panel
-menu has no quit item, so with the panel, finish dictating and run
-`pkill -x voco` to quit VOCO.
+VOCO stays in the tray. To quit, choose **Quit VOCO** in the tray or panel
+menu; the panel offers it only while you aren't dictating.
 
 ## Microphone
 

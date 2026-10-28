@@ -295,8 +295,8 @@ upgrade, sign out and back in, or restart IBus, to load the new version.
 VOCO checks GitHub for new releases but never installs them. To upgrade:
 
 1. Finish any dictation, and copy anything you need from **Review**.
-2. Quit VOCO. Choose **Quit VOCO** in the tray menu. The GNOME panel has no
-   quit item, so with the panel, or without a tray icon, run `pkill -x voco`.
+2. Quit VOCO. Choose **Quit VOCO** in the tray or panel menu. If your panel
+   has no **Quit VOCO**, or there's no tray icon, run `pkill -x voco`.
 3. Run the installer for the new release, or repeat the manual install.
 
 Your settings are kept. An earlier release that you go back to removes the

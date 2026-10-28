@@ -11,6 +11,9 @@ export function presentation(state) {
         active: ['starting', 'recording', 'processing'].includes(state.status),
         canStop: state.canStop === true && ['starting', 'recording'].includes(state.status),
         canOpen: state.canOpen === true && !['starting', 'recording', 'processing'].includes(state.status),
+        // A VOCO that sends no canQuit can't quit from the menu, so it gets no Quit item.
+        quitOffered: typeof state.canQuit === 'boolean',
+        canQuit: state.canQuit === true && !['starting', 'recording', 'processing'].includes(state.status),
         level: state.status === 'recording' && Number.isFinite(state.level)
             ? Math.max(0, Math.min(1, state.level)) : 0,
         // Grabbed at every status; only chords passive evdev also observes.
