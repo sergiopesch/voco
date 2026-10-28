@@ -101,7 +101,11 @@ elif [[ "${1:-}" == --native-pulse-latency ]]; then
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
   for app_case in delivery focus-switch spelling lock web-process modifier-hold launcher autostart; do
-    VOCO_NATIVE_APP_CASE="${app_case}" VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${app_case}" \
+    # The web-process case sometimes loses the Alt+D after the reload (#153):
+    # its IBus engine traces each shortcut decision into callbacks.log.
+    trace=0
+    [[ ${app_case} == web-process ]] && trace=1
+    VOCO_NATIVE_TRACE="${trace}" VOCO_NATIVE_APP_CASE="${app_case}" VOCO_NATIVE_EVIDENCE_DIR="${application_evidence}/${app_case}" \
       PYTHONDONTWRITEBYTECODE=1 bash "${ROOT_DIR}/scripts/${TEST_SCRIPT}"
   done
 else

@@ -42,6 +42,46 @@ for name, args in [('do_focus_in_id', 'object_path, client'), ('do_set_capabilit
     s = ''.join(lines)
 s = s.replace('    def poll_trigger(self, hotkey: Any) -> dict[str, Any]:\n', '    def poll_trigger(self, hotkey: Any) -> dict[str, Any]:\n        print("POLL", hotkey, bool(self.focused_engine and self.focused_engine.can_accept_preedit), file=open(os.environ["VOCO_NATIVE_TEST_ROOT"] + "/evidence/callbacks.log", "a"), flush=True)\n')
 s = s.replace('class VocoEngine(IBus.Engine):\n', 'class VocoEngine(IBus.Engine):\n    def do_set_cursor_location(self, x, y, width, height):\n        print("CURSOR", x, y, width, height, "context", self.focus_identity, file=open(os.environ["VOCO_NATIVE_TEST_ROOT"] + "/evidence/callbacks.log", "a"), flush=True)\n\n')
+# The coordinator's shortcut decisions: each chord key with what it held and
+# returned, poll results when they change, and every focus or client change.
+# The keys are the harness's own synthetic presses.
+s = s.replace('if __name__ == "__main__":\n', '''
+def _voco_trace(*fields):
+    print("SHORTCUT", round(time.monotonic(), 3), *fields, file=open(os.environ["VOCO_NATIVE_TEST_ROOT"] + "/evidence/callbacks.log", "a"), flush=True)
+
+_voco_consume = VocoCoordinator.consume_shortcut
+def _voco_traced_consume(self, engine, keyval, state):
+    before = sorted(self.consumed_shortcut_keys)
+    result = _voco_consume(self, engine, keyval, state)
+    release = bool(int(state) & int(IBus.ModifierType.RELEASE_MASK))
+    _voco_trace("key", IBus.keyval_name(keyval), "release" if release else "press", hex(int(state)),
+                "focused", engine is self.focused_engine, "armed_for", round(self.shortcut_armed_until - time.monotonic(), 3),
+                "consumed", before, "->", sorted(self.consumed_shortcut_keys), "returned", result,
+                "trigger", self.trigger_to_deliver is not None)
+    return result
+VocoCoordinator.consume_shortcut = _voco_traced_consume
+
+_voco_poll = VocoCoordinator.poll_trigger
+_voco_last_poll = [None]
+def _voco_traced_poll(self, hotkey):
+    result = _voco_poll(self, hotkey)
+    seen = (result["armed"], result["trigger"] is not None)
+    if seen != _voco_last_poll[0] or seen[1]:
+        _voco_trace("poll", "armed", seen[0], "trigger", seen[1])
+        _voco_last_poll[0] = seen
+    return result
+VocoCoordinator.poll_trigger = _voco_traced_poll
+
+def _voco_traced(name, original):
+    def traced(self, *args):
+        _voco_trace(name, "consumed", sorted(self.consumed_shortcut_keys), "trigger", self.trigger_to_deliver is not None)
+        return original(self, *args)
+    return traced
+for _voco_name in ("activate_engine", "deactivate_engine", "disconnect_client"):
+    setattr(VocoCoordinator, _voco_name, _voco_traced(_voco_name, getattr(VocoCoordinator, _voco_name)))
+
+if __name__ == "__main__":
+''', 1)
 p.write_text(s)
 TRACE
   fi
