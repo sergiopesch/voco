@@ -8,6 +8,14 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+## [2026.0.64] - 2026-10-29
+
+On GNOME Wayland the GNOME panel now presses VOCO's paste keys from inside GNOME
+Shell, and its menu can quit VOCO. VOCO can be built as a strict snap for the
+Snap Store, the microphone setting shows the system default it uses, and an X11
+paste no longer swallows a shortcut pressed just then. The
+[release notes](docs/releases/2026.0.64.md) explain how to upgrade.
+
 ### Added
 
 - VOCO can be built as a strict snap, `voco`, for the Snap Store, from the same
@@ -17,7 +25,7 @@ The [release process](docs/release-process.md) describes how a release is made.
   names the `snap connect` commands for its microphone (`audio-record`) and for
   checking the session it types into (`login-session-observe`); each counts as
   soon as it's connected, except the microphone in an X11 session, where VOCO
-  asks to be restarted. The snap isn't published yet.
+  asks to be restarted. The Snap Store gets it on its `edge` channel first.
 
 ### Changed
 
@@ -41,6 +49,14 @@ The [release process](docs/release-process.md) describes how a release is made.
 - On Wayland the microphone selector shows **System default (current
   device)** until you choose a microphone, which is the one a recording uses,
   rather than **Choose a microphone**.
+- serde_json 1.0.154, icu_normalizer and icu_properties 2.4.0, tauri-build 2.7.2,
+  tauri-plugin-global-shortcut 2.4.1, sha2 0.11.1 and cc 1.10.0; @tauri-apps/api
+  2.12.4, React 19.3.1, zustand 5.0.16 and Vite 8.3.5; and, for development,
+  Playwright 1.64.1, ESLint 10.13.0, typescript-eslint 8.72.0 and Vitest 5.0.5.
+- CI caches the system packages it downloads, runs the GNOME companion's suite
+  on each Shell with the new paste protocol, proves the confinement it relies on
+  with a test snap, and traces the IBus engine's shortcut decisions in the case
+  that sometimes loses an Alt+D after WebKit reloads.
 
 ### Fixed
 
@@ -512,6 +528,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.64]: https://github.com/sergiopesch/voco/compare/voco.2026.0.63...voco.2026.0.64
 [2026.0.63]: https://github.com/sergiopesch/voco/compare/voco.2026.0.62...voco.2026.0.63
 [2026.0.62]: https://github.com/sergiopesch/voco/compare/voco.2026.0.61...voco.2026.0.62
 [2026.0.61]: https://github.com/sergiopesch/voco/compare/voco.2026.0.59...voco.2026.0.61

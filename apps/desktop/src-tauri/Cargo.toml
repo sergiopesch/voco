@@ -1,6 +1,6 @@
 [package]
 name = "voco"
-version = "2026.0.63"
+version = "2026.0.64"
 description = "The voice layer for Linux, starting with dictation"
 authors = ["VOCO Contributors"]
 license = "MIT"
