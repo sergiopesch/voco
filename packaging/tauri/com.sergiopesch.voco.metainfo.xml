@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.64" date="2026-10-29">
+      <description>
+        <p>On GNOME Wayland the GNOME panel presses VOCO's paste keys from inside GNOME Shell, and its menu can quit VOCO. The microphone setting shows the system default it uses, and on X11 a paste no longer swallows a shortcut pressed just then. After upgrading, run panel setup again, then sign out and back in.</p>
+      </description>
+    </release>
     <release version="2026.0.63" date="2026-10-25">
       <description>
         <p>VOCO can check how it hears each word on your My words list and learn the versions it gets wrong, and setup offers My words after the voice test. Browser address bars keep every space, GNOME apps get each paste sooner, Stop leaves a space after a finished sentence, VOCO reloads its window if it crashes, and the guided installer finishes on Ubuntu 26.04.</p>
