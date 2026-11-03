@@ -67,14 +67,22 @@ class SilenceGate:
         self.pending.clear(); self.pending_n = 0
         return frames
 
+# The recognizer's look-ahead in 80 ms steps: VOCO dictates at 1, 160 ms. 0 and
+# 6 (80 and 560 ms) stay for research; 6 trades about 0.18 s more delay per word
+# for better punctuation (research/engine-benchmark-2026-10, #175).
+CONTEXTS = {'0': 0, '1': 1, '6': 6}
+def right_context():
+    value = os.environ.get('VOCO_NEMOTRON_CONTEXT', '1')
+    if value not in CONTEXTS: raise ValueError('unsupported context')
+    return CONTEXTS[value]
+
 class StreamingSession:
     def __init__(self, gate='zero', warmup=True):
         # Reject the mode before loading the model, so a bad value never reports ready.
         if gate not in GATE_MODES: raise ValueError('gate mode')
         self.mode = gate
         started = time.monotonic()
-        self.context = int(os.environ.get('VOCO_NEMOTRON_CONTEXT', '1'))
-        if self.context not in (0,1): raise ValueError('unsupported context')
+        self.context = right_context()
         self.model = Nemotron(self.context)
         self.load_ms = (time.monotonic()-started)*1000
         self.warmup_ms = 0.

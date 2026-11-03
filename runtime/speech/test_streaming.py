@@ -7,7 +7,16 @@ from pathlib import Path
 import subprocess
 import sys
 import numpy as np
-from streaming import SilenceGate, Metrics, state_home
+from streaming import SilenceGate, Metrics, state_home, right_context
+class ContextTests(unittest.TestCase):
+    def test_the_worker_defaults_to_160_ms_and_admits_the_560_ms_research_step(self):
+        # 1 is VOCO's 160 ms step; 0 and 6 (80 and 560 ms) are research settings (#175).
+        with patch.dict(os.environ, {}, clear=True): self.assertEqual(right_context(), 1)
+        for value in ('0', '1', '6'):
+            with patch.dict(os.environ, {'VOCO_NEMOTRON_CONTEXT': value}): self.assertEqual(right_context(), int(value))
+        for value in ('2', '13', '-1', '', 'six', ' 6'):
+            with patch.dict(os.environ, {'VOCO_NEMOTRON_CONTEXT': value}), self.assertRaisesRegex(ValueError, 'unsupported context'):
+                right_context()
 class GateTests(unittest.TestCase):
     def test_logging_disabled_creates_no_directory(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'VOCO_PERFORMANCE_LOG':'0','XDG_STATE_HOME':directory}):
