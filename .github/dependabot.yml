@@ -14,6 +14,11 @@ updates:
         update-types: [minor, patch]
         # Pre-1.0 API changes and the shared patched shortcut actor need review.
         exclude-patterns: [evdev, sha2, global-hotkey, tauri-plugin-global-shortcut]
+    ignore:
+      # VOCO uses the x11rb that global-hotkey already builds. Its next minor
+      # would build a second copy; move both together when global-hotkey does.
+      - dependency-name: x11rb
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: npm
     directory: /
     schedule:
