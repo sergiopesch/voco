@@ -371,7 +371,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `package-lock.json`, `.nvmrc` — Pinned npm dependencies, and Node 24.
 - `.editorconfig`, `.gitattributes`, `.gitignore` — Editor settings, LF line endings with byte-exact vendored files and notices, and ignored paths.
 - `.github/workflows/ci.yml` — CI on pull requests and pushes to the default branch.
-- `.github/dependabot.yml` — Weekly Cargo, npm and GitHub Actions updates.
+- `.github/dependabot.yml` — Weekly Cargo, npm and GitHub Actions updates, holding x11rb at the version global-hotkey builds.
 - `.github/CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/*` — Review owner, pull request template and issue forms.
 - `docs/` — Documentation; the [index](../README.md) lists every guide.
 
