@@ -267,8 +267,12 @@ is `npm audit` at the moderate level. Scanners that match only version numbers
 may still flag glib 0.18.5, because the fix is a backport. `cargo audit` also
 warns, without failing, that `proc-macro-error` is unmaintained
 ([RUSTSEC-2024-0370](https://rustsec.org/advisories/RUSTSEC-2024-0370.html)); it
-is a procedural-macro helper that runs only while VOCO builds. Check the warnings
-again when the lockfile changes. A clean audit doesn't show that every dependency
+is a procedural-macro helper that runs only while VOCO builds. The root
+`package.json` overrides minimatch to 11.0.1 or later for
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), because
+ESLint and typescript-eslint still ask for 10; it runs only while ESLint lints.
+Drop the override once they accept 11. Check the warnings again when the
+lockfile changes. A clean audit doesn't show that every dependency
 is maintained or free of defects. Both packages install the third-party notices in `/usr/share/doc/voco/`.
 
 ## Release signing
