@@ -279,6 +279,19 @@ gives the reason:
 | `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Choose **Quit VOCO** in its tray or panel menu, or run `pkill -x voco`, then open VOCO again. |
 | `could not write the tray icons: …` | VOCO keeps its tray icons in `$XDG_RUNTIME_DIR/voco`, which is usually a small memory-backed folder. Free space there, or sign out and back in, then open VOCO again. |
 
+## The VOCO snap
+
+The snap, `voco` in the Snap Store, runs strictly confined, so these messages
+come only from it:
+
+| Message | What to do |
+| --- | --- |
+| `The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.` | Run `snap connect voco:audio-record`, which asks for your password, then start dictation again. |
+| `… Run snap connect voco:audio-record, then quit VOCO and open it again.` | In an X11 session VOCO lists microphones once, at startup. Run `snap connect voco:audio-record`, quit VOCO and open it again. |
+| `The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. …` | Run `snap connect voco:login-session-observe`, then dictate again. VOCO checks the session before each paste. |
+| `On Wayland, the VOCO snap types through the VOCO panel. …` | Install the VOCO panel from extensions.gnome.org, then sign out and back in. |
+| `The VOCO snap types only on GNOME and in X11 sessions. …` | The snap can't type on other Wayland desktops. Install the `.deb` or RPM from VOCO's [GitHub releases](https://github.com/sergiopesch/voco/releases) instead. |
+
 ## Performance logs
 
 Performance logs record how long each step of a dictation takes. They are off

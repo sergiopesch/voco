@@ -23,6 +23,12 @@ run's per-utterance results are in [results/](results/). Neither `npm test` nor
 CI runs it. This record describes the measurements of 9 October 2026; VOCO's
 documentation describes how it works now.
 
+**Note, 4 November 2026.** From 2026.0.65 VOCO dictates at 560 ms. On VOCO's
+own speech fixtures that step wrote fewer wrong words than 160 ms, which this
+benchmark's 311 utterances didn't show, and the
+[2026.0.65 release notes](../../docs/releases/2026.0.65.md) give those numbers.
+The results below are unchanged.
+
 ## Setup
 
 - **Machine:** a cloud server (Hetzner CCX33) with 8 dedicated AMD EPYC-Milan
