@@ -74,7 +74,7 @@ export const glossary = [
   ["Renderer", "The web view that draws VOCO’s window. It runs the React code inside WebKitGTK."],
   ["Review", "VOCO’s list of text it couldn’t deliver: text recovered after an unexpected exit, or text a Stop could neither paste nor copy. It keeps up to five entries, opens only from VOCO’s menu and never pastes by itself."],
   ["RPM", "The package format Fedora uses. VOCO’s RPM is built from the same staged files as its Debian package."],
-  ["Right context", "Audio after the current moment that a streaming model looks at before it decides. VOCO’s setting is 1, 160 ms, by default, and VOCO_NEMOTRON_CONTEXT accepts only 0, 1 or 6."],
+  ["Right context", "Audio after the current moment that a streaming model looks at before it decides. VOCO’s setting is 6, 560 ms, by default, and VOCO_NEMOTRON_CONTEXT accepts only 0, 1 or 6."],
   ["RSS", "Resident set size: memory a process holds in RAM. VOCO’s opt-in resource samples record the peak."],
   ["Runtime", "The software engine that executes a model or program."],
   ["Sample rate", "The number of audio measurements per second, in hertz."],

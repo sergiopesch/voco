@@ -524,7 +524,7 @@ lesson(
         ),
         (
             "Load",
-            "The recognizer loads with its right-context setting at 1, 160 ms of audio after the current moment. VOCO_NEMOTRON_CONTEXT accepts 0, 1 or 6, which are 80, 160 or 560 ms; anything else stops the worker.",
+            "The recognizer loads with its right-context setting at 6, 560 ms of audio after the current moment. VOCO_NEMOTRON_CONTEXT accepts 0, 1 or 6, which are 80, 160 or 560 ms; anything else stops the worker.",
         ),
         (
             "Warm up",
