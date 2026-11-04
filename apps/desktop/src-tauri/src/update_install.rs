@@ -12,6 +12,8 @@ use serde::Serialize;
 use std::io::{BufRead, BufReader, Read};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -227,7 +229,13 @@ fn run(app: &tauri::AppHandle, kind: PackageKind, version: Version, cancel: &Can
             return false;
         }
     };
-    let outcome = download_and_verify(app, kind, &version, &folder, cancel);
+    let outcome = download_and_verify(
+        &mut |event| emit(app, event),
+        kind,
+        &version,
+        &folder,
+        cancel,
+    );
     let finish = |event: InstallEvent| {
         let _ = update_download::clear(&folder);
         emit(app, event);
@@ -287,7 +295,7 @@ enum Stop {
 }
 
 fn download_and_verify(
-    app: &tauri::AppHandle,
+    report: &mut impl FnMut(InstallEvent),
     kind: PackageKind,
     version: &Version,
     folder: &Path,
@@ -309,16 +317,13 @@ fn download_and_verify(
             limit,
             cancel,
             |progress: Progress| {
-                emit(
-                    app,
-                    InstallEvent::Downloading {
-                        version: name.clone(),
-                        file: index + 1,
-                        files,
-                        received: progress.received,
-                        total: progress.total,
-                    },
-                )
+                report(InstallEvent::Downloading {
+                    version: name.clone(),
+                    file: index + 1,
+                    files,
+                    received: progress.received,
+                    total: progress.total,
+                })
             },
         )
         .map_err(|error| match error {
@@ -329,7 +334,7 @@ fn download_and_verify(
     if cancel.is_cancelled() {
         return Err(Stop::Cancelled);
     }
-    emit(app, InstallEvent::Verifying { version: name });
+    report(InstallEvent::Verifying { version: name });
     verify(kind, version, folder).map_err(|error| Stop::Failed(error.to_string()))
 }
 
@@ -634,6 +639,57 @@ mod tests {
             })
             .unwrap(),
             serde_json::json!({"stage":"failed","version":"2026.0.66","message":"x"})
+        );
+    }
+
+    /// The whole user-side path against a published release: VOCO's own
+    /// addresses, GitHub's redirect to its asset host, the size limits, the
+    /// signature by the release key, the checksum and the package's identity.
+    #[test]
+    #[ignore = "downloads a published release from GitHub: set VOCO_UPDATE_E2E_VERSION and VOCO_UPDATE_E2E_FOLDER"]
+    fn a_published_release_downloads_and_verifies() {
+        let version = Version::parse(&std::env::var("VOCO_UPDATE_E2E_VERSION").unwrap()).unwrap();
+        let state = PathBuf::from(std::env::var("VOCO_UPDATE_E2E_FOLDER").unwrap());
+        let folder = update_download::folder(&state).unwrap();
+        update_download::clear(&folder).unwrap();
+        let kind = package_kind().expect("APT or DNF");
+        let mut stages = Vec::new();
+        let mut last = None;
+        let result = download_and_verify(
+            &mut |event| match event {
+                InstallEvent::Downloading {
+                    file,
+                    received,
+                    total,
+                    ..
+                } => last = Some((file, received, total)),
+                event => stages.push(event),
+            },
+            kind,
+            &version,
+            &folder,
+            &Cancel::default(),
+        );
+        assert!(
+            result.is_ok(),
+            "{}",
+            match result {
+                Err(Stop::Failed(message)) => message,
+                _ => "cancelled".into(),
+            }
+        );
+        let (file, received, total) = last.unwrap();
+        assert_eq!((file, Some(received)), (3, total));
+        assert_eq!(
+            stages,
+            [InstallEvent::Verifying {
+                version: version.to_string()
+            }]
+        );
+        eprintln!(
+            "verified {} ({received} bytes) in {}",
+            kind.asset_name(&version),
+            folder.display()
         );
     }
 }
