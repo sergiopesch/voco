@@ -22,7 +22,9 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use update_verify::{PackageKind, Version, CHECKSUMS, MAX_MANIFEST_BYTES, MAX_PACKAGE_BYTES, SIGNATURE};
+use update_verify::{
+    PackageKind, Version, CHECKSUMS, MAX_MANIFEST_BYTES, MAX_PACKAGE_BYTES, SIGNATURE,
+};
 
 /// Root's own staging folder, on disk rather than in memory: a package is
 /// about 700 MB. Removed again, once empty, after every run.
@@ -60,7 +62,9 @@ fn stage(name: &str) {
 
 fn run(arguments: Vec<std::ffi::OsString>) -> Outcome {
     let [folder, version] = arguments.as_slice() else {
-        return Err(refuse("expected the download folder and the release version"));
+        return Err(refuse(
+            "expected the download folder and the release version",
+        ));
     };
     // SAFETY: geteuid has no preconditions.
     if unsafe { libc::geteuid() } != 0 {
@@ -83,15 +87,22 @@ fn run(arguments: Vec<std::ffi::OsString>) -> Outcome {
     // an old signed release can't be put back over a newer one.
     match installed_version(kind) {
         Installed::Release(installed) if installed >= version => {
-            return Err(refuse(format!("VOCO {installed} is installed, not older than {version}")))
+            return Err(refuse(format!(
+                "VOCO {installed} is installed, not older than {version}"
+            )))
         }
         Installed::Release(_) => {}
-        Installed::Other => return Err(refuse("the installed VOCO isn't a release; reinstall it with the installer")),
+        Installed::Other => {
+            return Err(refuse(
+                "the installed VOCO isn't a release; reinstall it with the installer",
+            ))
+        }
         Installed::Missing => return Err(refuse("VOCO isn't installed by the package manager")),
     }
 
     stage("verifying");
-    let staging = Staging::create().map_err(|error| refuse(format!("can't prepare {STAGING}: {error}")))?;
+    let staging =
+        Staging::create().map_err(|error| refuse(format!("can't prepare {STAGING}: {error}")))?;
     let package_name = kind.asset_name(&version);
     let source = UserFolder::open(folder, owner).map_err(refuse)?;
     for (name, limit) in [
@@ -120,8 +131,14 @@ fn run(arguments: Vec<std::ffi::OsString>) -> Outcome {
             stage(&format!("installed {version}"));
             Ok(())
         }
-        Installed::Release(installed) => Err((NOT_INSTALLED, format!("the package manager reports VOCO {installed}"))),
-        Installed::Other | Installed::Missing => Err((NOT_INSTALLED, "the package manager reports no VOCO release".into())),
+        Installed::Release(installed) => Err((
+            NOT_INSTALLED,
+            format!("the package manager reports VOCO {installed}"),
+        )),
+        Installed::Other | Installed::Missing => Err((
+            NOT_INSTALLED,
+            "the package manager reports no VOCO release".into(),
+        )),
     }
 }
 
@@ -166,7 +183,12 @@ fn installed_version(kind: PackageKind) -> Installed {
 fn installed_text(kind: PackageKind) -> Option<String> {
     let output = match kind {
         PackageKind::Deb => system_command("/usr/bin/dpkg-query")
-            .args(["--show", "--showformat=${db:Status-Abbrev} ${Version}", "--", "voco"])
+            .args([
+                "--show",
+                "--showformat=${db:Status-Abbrev} ${Version}",
+                "--",
+                "voco",
+            ])
             .stderr(Stdio::null())
             .output(),
         PackageKind::Rpm => system_command("/usr/bin/rpm")
@@ -213,11 +235,19 @@ fn install(kind: PackageKind, package: &Path) -> Outcome {
         .arg(package)
         .stdout(Stdio::from(io::stderr()))
         .status()
-        .map_err(|error| (INSTALL_FAILED, format!("can't run the package manager: {error}")))?;
+        .map_err(|error| {
+            (
+                INSTALL_FAILED,
+                format!("can't run the package manager: {error}"),
+            )
+        })?;
     if status.success() {
         Ok(())
     } else {
-        Err((INSTALL_FAILED, format!("the package manager exited with {status}")))
+        Err((
+            INSTALL_FAILED,
+            format!("the package manager exited with {status}"),
+        ))
     }
 }
 
@@ -272,7 +302,10 @@ impl UserFolder {
         let fd = open_at(libc::AT_FDCWD, path.as_os_str(), libc::O_DIRECTORY)
             .map_err(|error| format!("can't open the download folder: {error}"))?;
         let info = fd_stat(&fd).map_err(|error| error.to_string())?;
-        if info.st_mode & libc::S_IFMT != libc::S_IFDIR || info.st_uid != owner || info.st_mode & 0o077 != 0 {
+        if info.st_mode & libc::S_IFMT != libc::S_IFDIR
+            || info.st_uid != owner
+            || info.st_mode & 0o077 != 0
+        {
             return Err("the download folder isn't private to the user who asked".into());
         }
         Ok(Self { fd, owner })
@@ -286,7 +319,10 @@ impl UserFolder {
         }
         let fd = open_at(self.fd.as_raw_fd(), OsStr::new(name), libc::O_NONBLOCK)?;
         let info = fd_stat(&fd)?;
-        if info.st_mode & libc::S_IFMT != libc::S_IFREG || info.st_uid != self.owner || info.st_nlink != 1 {
+        if info.st_mode & libc::S_IFMT != libc::S_IFREG
+            || info.st_uid != self.owner
+            || info.st_nlink != 1
+        {
             return Err(io::Error::other("not a regular file of the user's"));
         }
         if info.st_size < 0 || info.st_size as u64 > limit {
@@ -308,10 +344,15 @@ impl UserFolder {
 }
 
 fn open_at(directory: libc::c_int, name: &OsStr, flags: libc::c_int) -> io::Result<OwnedFd> {
-    let name = CString::new(name.as_bytes()).map_err(|_| io::Error::other("a path with a NUL byte"))?;
+    let name =
+        CString::new(name.as_bytes()).map_err(|_| io::Error::other("a path with a NUL byte"))?;
     // SAFETY: name is a valid C string; the returned descriptor is checked.
     let fd = unsafe {
-        libc::openat(directory, name.as_ptr(), libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC | flags)
+        libc::openat(
+            directory,
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC | flags,
+        )
     };
     if fd < 0 {
         return Err(io::Error::last_os_error());
@@ -353,7 +394,10 @@ mod tests {
             return;
         }
         let (code, message) = run(arguments(&["/tmp", "2026.0.66"])).unwrap_err();
-        assert_eq!((code, message.as_str()), (REFUSED, "runs only as root, through pkexec"));
+        assert_eq!(
+            (code, message.as_str()),
+            (REFUSED, "runs only as root, through pkexec")
+        );
     }
 
     struct Dir(PathBuf);
@@ -392,7 +436,10 @@ mod tests {
         assert!(UserFolder::open(&shared.0, me()).is_err());
         let link = private.0.join("link");
         std::os::unix::fs::symlink(&private.0, &link).unwrap();
-        assert!(UserFolder::open(&link, me()).is_err(), "a link as the folder");
+        assert!(
+            UserFolder::open(&link, me()).is_err(),
+            "a link as the folder"
+        );
     }
 
     #[test]
@@ -401,18 +448,42 @@ mod tests {
         let target = Dir::new(0o755);
         let folder = UserFolder::open(&source.0, me()).unwrap();
         std::fs::write(source.0.join("voco_checksums.txt"), b"manifest").unwrap();
-        folder.copy("voco_checksums.txt", 64, &target.0.join("a")).unwrap();
+        folder
+            .copy("voco_checksums.txt", 64, &target.0.join("a"))
+            .unwrap();
         assert_eq!(std::fs::read(target.0.join("a")).unwrap(), b"manifest");
-        assert!(folder.copy("voco_checksums.txt", 64, &target.0.join("a")).is_err(), "never overwrites");
-        assert!(folder.copy("voco_checksums.txt", 4, &target.0.join("b")).is_err(), "over its limit");
+        assert!(
+            folder
+                .copy("voco_checksums.txt", 64, &target.0.join("a"))
+                .is_err(),
+            "never overwrites"
+        );
+        assert!(
+            folder
+                .copy("voco_checksums.txt", 4, &target.0.join("b"))
+                .is_err(),
+            "over its limit"
+        );
         std::os::unix::fs::symlink("/etc/hostname", source.0.join("linked")).unwrap();
-        assert!(folder.copy("linked", 64, &target.0.join("c")).is_err(), "a link");
+        assert!(
+            folder.copy("linked", 64, &target.0.join("c")).is_err(),
+            "a link"
+        );
         std::fs::hard_link(source.0.join("voco_checksums.txt"), source.0.join("hard")).unwrap();
-        assert!(folder.copy("hard", 64, &target.0.join("d")).is_err(), "a second hard link");
+        assert!(
+            folder.copy("hard", 64, &target.0.join("d")).is_err(),
+            "a second hard link"
+        );
         std::fs::create_dir(source.0.join("folder")).unwrap();
-        assert!(folder.copy("folder", 64, &target.0.join("e")).is_err(), "a folder");
+        assert!(
+            folder.copy("folder", 64, &target.0.join("e")).is_err(),
+            "a folder"
+        );
         for name in ["../x", ".hidden", "a/b"] {
-            assert!(folder.copy(name, 64, &target.0.join("f")).is_err(), "{name}");
+            assert!(
+                folder.copy(name, 64, &target.0.join("f")).is_err(),
+                "{name}"
+            );
         }
     }
 }
