@@ -8,12 +8,24 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+## [2026.0.65] - 2026-11-04
+
+Recognition looks further ahead before it writes each word, so VOCO writes fewer
+wrong words and uses less processor time, for words that appear a little later.
+The [release notes](docs/releases/2026.0.65.md) explain how to upgrade.
+
 ### Changed
 
 - Recognition looks 560 ms ahead instead of 160 ms. On VOCO's public test
   clips it wrote a third fewer wrong words and used about a third less
   processor time, and words show about 0.1 s later. Punctuation changed in both
-  directions, and sentence ends after a pause are unchanged.
+  directions, and sentence ends after a pause are unchanged. My words helps as
+  much as before, but a word the recognizer now hears differently may need its
+  taught version checked again with **Say it**.
+- typescript-eslint 8.72.1, ESLint 10.14.0 and log 0.4.35. For development,
+  ESLint's minimatch is now 11.0.3, which fixes
+  [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249);
+  VOCO doesn't ship it.
 
 ## [2026.0.64] - 2026-10-29
 
@@ -535,6 +547,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.65]: https://github.com/sergiopesch/voco/compare/voco.2026.0.64...voco.2026.0.65
 [2026.0.64]: https://github.com/sergiopesch/voco/compare/voco.2026.0.63...voco.2026.0.64
 [2026.0.63]: https://github.com/sergiopesch/voco/compare/voco.2026.0.62...voco.2026.0.63
 [2026.0.62]: https://github.com/sergiopesch/voco/compare/voco.2026.0.61...voco.2026.0.62
