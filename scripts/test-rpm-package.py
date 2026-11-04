@@ -52,7 +52,7 @@ def make_stage(root):
         path.write_text(content)
         path.chmod(0o644)
     for name in ("usr/bin/voco", "usr/bin/voco-browser-host", "usr/libexec/voco-browser-host",
-                 "usr/libexec/voco-ibus-engine"):
+                 "usr/libexec/voco-update-helper", "usr/libexec/voco-ibus-engine"):
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile("/usr/bin/true", path)
@@ -210,11 +210,11 @@ class HeaderPolicyTests(unittest.TestCase):
 class DependencyParityTests(unittest.TestCase):
     DEPENDS = ("libpulse0, libnotify-bin, ibus, python3, gir1.2-ibus-1.0, python3-gi, xclip, "
                "python3-numpy, libsentencepiece0, xdotool, wl-clipboard, "
-               "libc6 (>= 2.39), libstdc++6 (>= 13.2.0), libayatana-appindicator3-1, "
+               "libc6 (>= 2.39), libstdc++6 (>= 13.2.0), pkexec, gpgv, libayatana-appindicator3-1, "
                "libwebkit2gtk-4.1-0, libgtk-3-0")
 
     def test_the_real_debian_dependencies_map_to_the_rpm_requirements(self):
-        self.assertEqual(rpm.verify_same_dependencies(self.DEPENDS, set(rpm.FEDORA_REQUIRES)), 16)
+        self.assertEqual(rpm.verify_same_dependencies(self.DEPENDS, set(rpm.FEDORA_REQUIRES)), 18)
 
     def test_a_new_or_dropped_dependency_is_named(self):
         with self.assertRaisesRegex(ValueError, "without a reviewed Fedora name.*libnew0"):

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<!-- VOCO's Install update (AGENTS.md, Installer and packages): pkexec may run
+     only the packaged helper, and only for an administrator who types their
+     password in the active local session. -->
+<policyconfig>
+  <vendor>VOCO</vendor>
+  <vendor_url>https://github.com/sergiopesch/voco</vendor_url>
+  <icon_name>com.sergiopesch.voco</icon_name>
+  <action id="com.sergiopesch.voco.update">
+    <description>Install a VOCO update</description>
+    <message>Authentication is required to install the VOCO update</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/voco-update-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

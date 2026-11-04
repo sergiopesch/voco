@@ -113,6 +113,8 @@ assert_entry /usr/lib/modules-load.d/voco-uinput.conf -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
 assert_entry /usr/share/doc/voco/copyright -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
+assert_entry /usr/libexec/voco-update-helper -rwxr-xr-x
+assert_entry /usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy -rw-r--r--
 assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
 assert_entry /etc/chromium/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
 for file in manifest.json background.js content.js; do
@@ -162,7 +164,7 @@ fi
 
 # A development binary may link Pulse directly; never rely on a desktop's
 # incidental transitive installation to satisfy that runtime dependency.
-for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
+for executable in /usr/bin/voco /usr/libexec/voco-browser-host /usr/libexec/voco-update-helper; do
   if readelf -d "${PAYLOAD}${executable}" | grep -Eq 'NEEDED.*\[libpulse\.so\.0\]' \
     && ! grep -Fxq pulseaudio-libs <<<"${PACKAGE_REQUIRES}"; then
     echo "RPM links libpulse.so.0 but does not declare pulseaudio-libs." >&2
@@ -175,6 +177,12 @@ tail -n "$(wc -l < "${ROOT_DIR}/LICENSE")" "${PAYLOAD}/usr/share/doc/voco/copyri
   | cmp - "${ROOT_DIR}/LICENSE"
 cmp "${ROOT_DIR}/packaging/udev/70-voco-uinput.rules" "${PAYLOAD}/usr/lib/udev/rules.d/70-voco-uinput.rules"
 cmp "${ROOT_DIR}/packaging/udev/voco-uinput.conf" "${PAYLOAD}/usr/lib/modules-load.d/voco-uinput.conf"
+cmp "${ROOT_DIR}/packaging/polkit/com.sergiopesch.voco.update.policy" \
+  "${PAYLOAD}/usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy"
+if [[ -e "${PAYLOAD}/usr/bin/voco-update-helper" ]]; then
+  echo "RPM ships the update helper in /usr/bin." >&2
+  exit 1
+fi
 if [[ -e "${PAYLOAD}/usr/libexec/voco" || -e "${PAYLOAD}/usr/lib/systemd/user/voco-ydotoold.service" ]]; then
   echo "RPM still ships the retired ydotoold service or launcher." >&2
   exit 1

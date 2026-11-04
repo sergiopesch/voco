@@ -45,7 +45,8 @@ LICENSE_ENTRIES = ("copyright", "THIRD-PARTY-NOTICES.txt", "nvidia", "vendor")
 # rpm expands macros and globs in file lists, so listed paths stay plain.
 SAFE_PATH = re.compile(r"[A-Za-z0-9._@+/-]+")
 SPEECH = "usr/lib/voco/speech"
-APP_EXECUTABLES = ("usr/bin/voco", "usr/bin/voco-browser-host", "usr/libexec/voco-browser-host")
+APP_EXECUTABLES = ("usr/bin/voco", "usr/bin/voco-browser-host", "usr/libexec/voco-browser-host",
+                   "usr/libexec/voco-update-helper")
 
 # Each Debian dependency (tauri.conf.json's, then the three Tauri adds itself)
 # and the Fedora 44 package that provides the same files. voco.spec.in requires
@@ -57,7 +58,9 @@ DEBIAN_TO_FEDORA = {
     "libnotify-bin": "libnotify", "ibus": "ibus", "gir1.2-ibus-1.0": "ibus-libs", "python3": "python3",
     "python3-gi": "python3-gobject", "python3-numpy": "python3-numpy",
     "libsentencepiece0": "sentencepiece-libs",
-    "xclip": "xclip", "xdotool": "xdotool", "wl-clipboard": "wl-clipboard"}
+    "xclip": "xclip", "xdotool": "xdotool", "wl-clipboard": "wl-clipboard",
+    # Install update: pkexec runs its helper, and gpgv checks the release.
+    "pkexec": "polkit", "gpgv": "gnupg2-verify"}
 TAURI_IMPLIED_DEPENDS = ("libwebkit2gtk-4.1-0", "libgtk-3-0", "libayatana-appindicator3-1")
 FEDORA_REQUIRES = tuple(DEBIAN_TO_FEDORA.values())
 # What the private speech runtime needs from the system, and the explicit

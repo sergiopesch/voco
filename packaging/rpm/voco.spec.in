@@ -32,6 +32,8 @@ Requires:       sentencepiece-libs
 Requires:       xclip
 Requires:       xdotool
 Requires:       wl-clipboard
+Requires:       polkit
+Requires:       gnupg2-verify
 
 # Package the staged tree exactly as it is: no stripping, byte-compiling,
 # build-id links or debug packages. Zstandard level 9 as in the Debian package,

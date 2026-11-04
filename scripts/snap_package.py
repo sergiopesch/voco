@@ -45,6 +45,9 @@ EXCLUDED = (
     "etc/chromium/native-messaging-hosts/com.voco.exact_field.json",
     "etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json",
     "usr/share/voco/chromium",
+    # The Snap Store updates the snap, which has no Install update.
+    "usr/libexec/voco-update-helper",
+    "usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy",
 )
 
 # The Ubuntu programs the recipe stages, each in a private folder with its

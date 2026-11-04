@@ -300,7 +300,7 @@ class BasePackageTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.stage = self.root / "base"
-        for name in ("usr/bin/voco", "usr/libexec/voco-browser-host"):
+        for name in package.BASE_EXECUTABLES:
             path = self.stage / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"fixture executable")
@@ -309,8 +309,8 @@ class BasePackageTests(unittest.TestCase):
     def test_wrapper_executables_are_required(self):
         package.validate_base_executables(self.stage)
 
-    def test_missing_app_or_browser_host(self):
-        for name in ("usr/bin/voco", "usr/libexec/voco-browser-host"):
+    def test_missing_app_or_helper(self):
+        for name in package.BASE_EXECUTABLES:
             with self.subTest(name=name):
                 path = self.stage / name
                 path.rename(path.with_suffix(".saved"))
