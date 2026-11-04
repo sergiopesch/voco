@@ -561,11 +561,23 @@ impl RotatingWriter {
 mod tests {
     #[test]
     fn the_model_label_names_the_context_the_worker_runs() {
-        assert_eq!(model_label(None), "nemotron-speech-streaming-en-0.6b-q8-context6");
-        assert_eq!(model_label(Some("1")), "nemotron-speech-streaming-en-0.6b-q8-context1");
-        assert_eq!(model_label(Some("0")), "nemotron-speech-streaming-en-0.6b-q8-context0");
+        assert_eq!(
+            model_label(None),
+            "nemotron-speech-streaming-en-0.6b-q8-context6"
+        );
+        assert_eq!(
+            model_label(Some("1")),
+            "nemotron-speech-streaming-en-0.6b-q8-context1"
+        );
+        assert_eq!(
+            model_label(Some("0")),
+            "nemotron-speech-streaming-en-0.6b-q8-context0"
+        );
         for refused in ["", "2", "13", " 6", "six"] {
-            assert_eq!(model_label(Some(refused)), "nemotron-speech-streaming-en-0.6b-q8-unsupported-context");
+            assert_eq!(
+                model_label(Some(refused)),
+                "nemotron-speech-streaming-en-0.6b-q8-unsupported-context"
+            );
         }
     }
 
