@@ -34,6 +34,7 @@ mod single_instance;
 mod speech_stream;
 mod tray_icons;
 mod trigger_socket;
+mod update_verify;
 #[cfg(target_os = "linux")]
 mod virtual_keyboard;
 #[cfg(target_os = "linux")]
