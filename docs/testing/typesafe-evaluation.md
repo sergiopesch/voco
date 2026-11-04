@@ -24,7 +24,7 @@ node scripts/score-dictation-worker.mjs NEW-REPLAY/run.json NEW-score.json
 | --- | --- | --- |
 | `--split` | `development` | `development`, the eight [speech fixtures](../../tests/fixtures/speech/README.md); `held-out`, the four [held-out clips](../../tests/fixtures/speech/adversarial/README.md); or `all` |
 | `--packet-ms` | 100, as VOCO sends | 20, 40, 50 or 100 |
-| `--context` | 1, as the worker uses | 0, 1 or 6 (80, 160 or 560 ms), as `VOCO_NEMOTRON_CONTEXT` |
+| `--context` | The worker's own, 6 at this commit | 0, 1 or 6 (80, 160 or 560 ms), as `VOCO_NEMOTRON_CONTEXT` |
 | `--threads` | 4 | 1 to 8, as `NEMO_SPEECH_CPU_THREADS`; VOCO uses one fewer than the available CPUs, between 1 and 4 |
 | `--repeats` | 1 | 1 to 10, each in its own shuffled order, the same on every run |
 | `--paced` | Off | Sends each packet in real time and records how late each send was |

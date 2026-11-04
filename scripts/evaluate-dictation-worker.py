@@ -129,7 +129,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--context', type=int, choices=[0, 1, 6], default=1)
+    # No default: the evaluator leaves the worker's own default alone, so --against
+    # measures an older worker as it shipped (0.64's accepts only 0 and 1).
+    parser.add_argument('--context', type=int, choices=[0, 1, 6])
     parser.add_argument('--threads', type=int, choices=range(1, 9), default=4)
     parser.add_argument('--packet-ms', type=int, choices=[20, 40, 50, 100], default=100)
     parser.add_argument('--repeats', type=int, choices=range(1, 11), default=1)
@@ -155,11 +157,13 @@ def main():
                             words=start or None),
                 fixtures=[{k: v for k, v in x.items() if k != 'audio'} for x in items])
     write(args.output / 'plan.json', plan)
-    env = {**os.environ, 'VOCO_NEMOTRON_CONTEXT': str(args.context),
-           'NEMO_SPEECH_CPU_THREADS': str(args.threads), 'VOCO_PERFORMANCE_LOG': '0',
+    env = {**os.environ, 'NEMO_SPEECH_CPU_THREADS': str(args.threads), 'VOCO_PERFORMANCE_LOG': '0',
            'VOCO_NEMO_BACKEND': 'pool', 'VOCO_SILENCE_GATE': 'zero',
            'VOCO_NEMOTRON_MODEL': str(runtime / 'models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'),
            'LD_LIBRARY_PATH': str(runtime / 'lib'), 'PYTHONDONTWRITEBYTECODE': '1'}
+    env.pop('VOCO_NEMOTRON_CONTEXT', None)
+    if args.context is not None:
+        env['VOCO_NEMOTRON_CONTEXT'] = str(args.context)
     # API credentials are unnecessary in a local inference child.
     for name in list(env):
         if 'TYPESAFE' in name:

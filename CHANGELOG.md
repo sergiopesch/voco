@@ -8,6 +8,13 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Changed
+
+- Recognition looks 560 ms ahead instead of 160 ms. On VOCO's public test
+  clips it wrote a third fewer wrong words and used about a third less
+  processor time, and words show about 0.1 s later. Punctuation changed in both
+  directions, and sentence ends after a pause are unchanged.
+
 ## [2026.0.64] - 2026-10-29
 
 On GNOME Wayland the GNOME panel now presses VOCO's paste keys from inside GNOME

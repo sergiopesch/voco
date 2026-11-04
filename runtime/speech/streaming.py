@@ -67,12 +67,13 @@ class SilenceGate:
         self.pending.clear(); self.pending_n = 0
         return frames
 
-# The recognizer's look-ahead in 80 ms steps: VOCO dictates at 1, 160 ms. 0 and
-# 6 (80 and 560 ms) stay for research; 6 trades about 0.18 s more delay per word
-# for better punctuation (research/engine-benchmark-2026-10, #175).
+# The recognizer's look-ahead in 80 ms steps: VOCO dictates at 6, 560 ms, which
+# writes fewer wrong words and uses about a third less CPU than 1 (160 ms), for
+# words that show about 0.1 s later. 0 and 1 (80 and 160 ms) stay for research.
 CONTEXTS = {'0': 0, '1': 1, '6': 6}
+DEFAULT_CONTEXT = '6'
 def right_context():
-    value = os.environ.get('VOCO_NEMOTRON_CONTEXT', '1')
+    value = os.environ.get('VOCO_NEMOTRON_CONTEXT', DEFAULT_CONTEXT)
     if value not in CONTEXTS: raise ValueError('unsupported context')
     return CONTEXTS[value]
 

@@ -86,6 +86,11 @@ if its SHA-256 doesn't match the pinned value. That file is NVIDIA's GGUF plus
 one metadata entry, `asr.tokenizer.spm_model`: the SentencePiece tokenizer from
 NVIDIA's checkpoint, which NeMo-Speech.cpp needs to turn boost phrases into the
 model's pieces ([runtime provisioning](../linux-packaging.md#runtime-provisioning)).
+It streams with 560 ms of look-ahead: before it writes a word, it hears that
+much of what follows, which writes fewer wrong words and takes about a third
+less CPU than 160 ms, for words that show about 0.1 s later. `VOCO_NEMOTRON_CONTEXT`
+selects 0, 1 or 6 (80, 160 or 560 ms) for research, and any other value stops
+the worker ([engine benchmark](../../research/engine-benchmark-2026-10/README.md)).
 The worker sets `NEMO_SPEECH_CPU_THREADS`
 to one less than the CPUs it may run on, between 1 and 4. The default
 digital-silence gate skips long runs of exact zeros but keeps 640 ms before
