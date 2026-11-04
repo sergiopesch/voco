@@ -87,10 +87,12 @@ one metadata entry, `asr.tokenizer.spm_model`: the SentencePiece tokenizer from
 NVIDIA's checkpoint, which NeMo-Speech.cpp needs to turn boost phrases into the
 model's pieces ([runtime provisioning](../linux-packaging.md#runtime-provisioning)).
 It streams with 560 ms of look-ahead: before it writes a word, it hears that
-much of what follows, which writes fewer wrong words and takes about a third
-less CPU than 160 ms, for words that show about 0.1 s later. `VOCO_NEMOTRON_CONTEXT`
+much of what follows. On VOCO's public speech fixtures that writes fewer wrong
+words and takes about a third less CPU than 160 ms, for words that show about
+0.1 s later ([2026.0.65](../releases/2026.0.65.md)). `VOCO_NEMOTRON_CONTEXT`
 selects 0, 1 or 6 (80, 160 or 560 ms) for research, and any other value stops
-the worker ([engine benchmark](../../research/engine-benchmark-2026-10/README.md)).
+the worker. The [engine benchmark](../../research/engine-benchmark-2026-10/README.md)
+compares the steps.
 The worker sets `NEMO_SPEECH_CPU_THREADS`
 to one less than the CPUs it may run on, between 1 and 4. The default
 digital-silence gate skips long runs of exact zeros but keeps 640 ms before
@@ -205,8 +207,8 @@ the rest, usually the last letter, for the next hypothesis: "Hello" pastes as
 graphemes, so a paste never separates a letter from its combining marks or
 splits a ZWJ sequence. So the last letter doesn't stay hidden through a pause,
 the held text goes out on its own once 0.75 s of audio has brought no new words
-(`QUIET_RELEASE_S`); on public speech recognition adds words every 0.6 s or
-sooner 90% of the time, so in 100 ms packets this waits 0.8 s, and counting
+(`QUIET_RELEASE_S`); on the public speech fixtures recognition adds words every
+0.6 s or sooner about four times in five, so in 100 ms packets this waits 0.8 s, and counting
 audio rather than time keeps it from firing while the worker is behind. The
 release goes through `deliver()`, so it waits for a paste in flight, keeps a
 trailing space for the next words and never fires after Stop or cancel. The
@@ -431,8 +433,8 @@ only once it is, so a refusal logs no AppArmor denial at each poll. So
 `voco --check-desktop-input` sees the refusal, and a plug connected a moment
 ago counts at once.
 
-The store connects neither `login-session-observe` nor `audio-record` on its
-own. So before each recording, the voice test and Say it included, the snap
+Until the store auto-connects `login-session-observe` and `audio-record`, a user
+connects them. So before each recording, the voice test and Say it included, the snap
 asks `snapctl is-connected audio-record` (`microphone_access`): while the plug
 isn't connected, the recording fails before any microphone opens and names
 `snap connect voco:audio-record`. A `snapctl` that can't answer leaves the
