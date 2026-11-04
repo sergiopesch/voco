@@ -7,7 +7,8 @@
 //! already links, with the system's TLS and certificate store.
 
 use crate::update_verify::{PackageKind, Version};
-use soup3::prelude::*;
+use glib::translate::IntoGlib;
+use soup::prelude::*;
 use std::io::{self, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use webkit2gtk::gio;
-use webkit2gtk::gio::prelude::*;
 
 const RELEASES: &str = "https://github.com/sergiopesch/voco/releases/download";
 /// Where github.com redirects a release asset; nowhere else is followed.
@@ -58,9 +58,16 @@ impl std::fmt::Display for DownloadError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Cancelled => formatter.write_str("The download was cancelled."),
-            Self::Status(404) => formatter.write_str("This release has no package for this system yet."),
-            Self::Status(status) => write!(formatter, "GitHub answered the download with status {status}."),
-            Self::Redirect => formatter.write_str("The download was sent somewhere other than GitHub."),
+            Self::Status(404) => {
+                formatter.write_str("This release has no package for this system yet.")
+            }
+            Self::Status(status) => write!(
+                formatter,
+                "GitHub answered the download with status {status}."
+            ),
+            Self::Redirect => {
+                formatter.write_str("The download was sent somewhere other than GitHub.")
+            }
             Self::TooLarge => formatter.write_str("The download is larger than any VOCO release."),
             Self::Network(detail) => write!(formatter, "The download stopped: {detail}"),
             Self::Disk(detail) => write!(formatter, "VOCO couldn't save the download: {detail}"),
@@ -125,11 +132,16 @@ fn allowed_redirect(url: &str) -> bool {
 pub fn folder(state_home: &Path) -> io::Result<PathBuf> {
     use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
     let folder = state_home.join("voco").join("update");
-    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&folder)?;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&folder)?;
     let info = std::fs::symlink_metadata(&folder)?;
     // SAFETY: getuid has no preconditions.
     if !info.is_dir() || info.uid() != unsafe { libc::getuid() } {
-        return Err(io::Error::other("the update folder isn't a folder of this user's"));
+        return Err(io::Error::other(
+            "the update folder isn't a folder of this user's",
+        ));
     }
     std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o700))?;
     Ok(folder)
@@ -158,16 +170,16 @@ pub fn fetch(
     mut progress: impl FnMut(Progress),
 ) -> Result<u64, DownloadError> {
     let cancellable = cancel.arm();
-    let session = soup3::Session::new();
+    let session = soup::Session::new();
     session.set_user_agent(USER_AGENT);
     session.set_timeout(IDLE_TIMEOUT.as_secs() as u32);
     session.set_idle_timeout(IDLE_TIMEOUT.as_secs() as u32);
     let mut address = url.to_string();
     let mut redirects = 0;
     let (message, stream) = loop {
-        let message = soup3::Message::new("GET", &address)
+        let message = soup::Message::new("GET", &address)
             .map_err(|_| DownloadError::Network("not a download address".into()))?;
-        message.set_flags(soup3::MessageFlags::NO_REDIRECT);
+        message.set_flags(soup::MessageFlags::NO_REDIRECT);
         let stream = session
             .send(&message, Some(&cancellable))
             .map_err(|error| network_error(cancel, &error))?;
@@ -205,11 +217,20 @@ pub fn fetch(
         .custom_flags(libc::O_NOFOLLOW)
         .open(target)
         .map_err(|error| DownloadError::Disk(error.to_string()))?;
-    let result = copy(&stream, &mut file, limit, total, cancel, &cancellable, &mut progress);
+    let result = copy(
+        &stream,
+        &mut file,
+        limit,
+        total,
+        cancel,
+        &cancellable,
+        &mut progress,
+    );
     let _ = stream.close(gio::Cancellable::NONE);
     match result {
         Ok(received) => {
-            file.sync_all().map_err(|error| DownloadError::Disk(error.to_string()))?;
+            file.sync_all()
+                .map_err(|error| DownloadError::Disk(error.to_string()))?;
             Ok(received)
         }
         Err(error) => {
@@ -284,13 +305,21 @@ mod tests {
             asset_url(&version, &package),
             "https://github.com/sergiopesch/voco/releases/download/voco.2026.0.66/voco_2026.0.66_amd64.deb"
         );
-        assert_eq!((checksums.as_str(), signature.as_str()), ("voco_checksums.txt", "voco_checksums.txt.asc"));
-        assert_eq!(assets(PackageKind::Rpm, &version)[2], "voco-2026.0.66-1.x86_64.rpm");
+        assert_eq!(
+            (checksums.as_str(), signature.as_str()),
+            ("voco_checksums.txt", "voco_checksums.txt.asc")
+        );
+        assert_eq!(
+            assets(PackageKind::Rpm, &version)[2],
+            "voco-2026.0.66-1.x86_64.rpm"
+        );
     }
 
     #[test]
     fn only_githubs_asset_host_is_followed() {
-        assert!(allowed_redirect("https://release-assets.githubusercontent.com/github-production-release-asset/1/2?x=y"));
+        assert!(allowed_redirect(
+            "https://release-assets.githubusercontent.com/github-production-release-asset/1/2?x=y"
+        ));
         for refused in [
             "http://release-assets.githubusercontent.com/a",
             "https://release-assets.githubusercontent.com:8443/a",
@@ -312,7 +341,9 @@ mod tests {
         let address = format!("http://{}", listener.local_addr().unwrap());
         std::thread::spawn(move || {
             for response in responses {
-                let Ok((mut stream, _)) = listener.accept() else { return };
+                let Ok((mut stream, _)) = listener.accept() else {
+                    return;
+                };
                 let mut reader = BufReader::new(stream.try_clone().unwrap());
                 let mut line = String::new();
                 while reader.read_line(&mut line).is_ok_and(|read| read > 2) {
@@ -325,7 +356,11 @@ mod tests {
     }
 
     fn ok(body: &[u8]) -> Vec<u8> {
-        let mut response = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).into_bytes();
+        let mut response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
         response.extend_from_slice(body);
         response
     }
@@ -358,14 +393,35 @@ mod tests {
         let dir = Dir::new();
         let target = dir.0.join("package");
         let mut seen = Vec::new();
-        let received = fetch(&url, &target, 1 << 20, &Cancel::default(), |progress| seen.push(progress)).unwrap();
+        let received = fetch(&url, &target, 1 << 20, &Cancel::default(), |progress| {
+            seen.push(progress)
+        })
+        .unwrap();
         assert_eq!(received, body.len() as u64);
         let mut saved = Vec::new();
-        std::fs::File::open(&target).unwrap().read_to_end(&mut saved).unwrap();
+        std::fs::File::open(&target)
+            .unwrap()
+            .read_to_end(&mut saved)
+            .unwrap();
         assert_eq!(saved, body);
-        assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
-        assert_eq!(seen.first(), Some(&Progress { received: 0, total: Some(body.len() as u64) }));
-        assert_eq!(seen.last(), Some(&Progress { received: body.len() as u64, total: Some(body.len() as u64) }));
+        assert_eq!(
+            std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            seen.first(),
+            Some(&Progress {
+                received: 0,
+                total: Some(body.len() as u64)
+            })
+        );
+        assert_eq!(
+            seen.last(),
+            Some(&Progress {
+                received: body.len() as u64,
+                total: Some(body.len() as u64)
+            })
+        );
     }
 
     #[test]
@@ -373,61 +429,130 @@ mod tests {
         let url = serve(vec![ok(&[1u8; 4096])]);
         let dir = Dir::new();
         let target = dir.0.join("package");
-        assert_eq!(fetch(&url, &target, 1024, &Cancel::default(), |_| {}), Err(DownloadError::TooLarge));
+        assert_eq!(
+            fetch(&url, &target, 1024, &Cancel::default(), |_| {}),
+            Err(DownloadError::TooLarge)
+        );
         assert!(!target.exists());
         // Without a length announced, the limit still holds while reading.
-        let url = serve(vec![b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n".iter().chain([1u8; 4096].iter()).copied().collect()]);
-        assert_eq!(fetch(&url, &target, 1024, &Cancel::default(), |_| {}), Err(DownloadError::TooLarge));
+        let url = serve(vec![b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n"
+            .iter()
+            .chain([1u8; 4096].iter())
+            .copied()
+            .collect()]);
+        assert_eq!(
+            fetch(&url, &target, 1024, &Cancel::default(), |_| {}),
+            Err(DownloadError::TooLarge)
+        );
         assert!(!target.exists());
     }
 
     #[test]
     fn a_short_body_is_a_broken_download() {
-        let url = serve(vec![b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\nshort".to_vec()]);
+        let url = serve(vec![
+            b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\nshort".to_vec(),
+        ]);
         let dir = Dir::new();
         let target = dir.0.join("package");
-        assert!(matches!(fetch(&url, &target, 1024, &Cancel::default(), |_| {}), Err(DownloadError::Network(_))));
+        assert!(matches!(
+            fetch(&url, &target, 1024, &Cancel::default(), |_| {}),
+            Err(DownloadError::Network(_))
+        ));
         assert!(!target.exists());
     }
 
     #[test]
     fn a_redirect_anywhere_else_is_refused() {
-        for location in ["http://127.0.0.1:1/x", "https://example.com/x", "https://release-assets.githubusercontent.com.evil/x"] {
+        for location in [
+            "http://127.0.0.1:1/x",
+            "https://example.com/x",
+            "https://release-assets.githubusercontent.com.evil/x",
+        ] {
             let url = serve(vec![format!("HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").into_bytes()]);
             let dir = Dir::new();
-            assert_eq!(fetch(&url, &dir.0.join("p"), 1024, &Cancel::default(), |_| {}), Err(DownloadError::Redirect), "{location}");
+            assert_eq!(
+                fetch(&url, &dir.0.join("p"), 1024, &Cancel::default(), |_| {}),
+                Err(DownloadError::Redirect),
+                "{location}"
+            );
         }
-        let url = serve(vec![b"HTTP/1.1 302 Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec()]);
+        let url = serve(vec![
+            b"HTTP/1.1 302 Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
+        ]);
         let dir = Dir::new();
-        assert_eq!(fetch(&url, &dir.0.join("p"), 1024, &Cancel::default(), |_| {}), Err(DownloadError::Redirect));
+        assert_eq!(
+            fetch(&url, &dir.0.join("p"), 1024, &Cancel::default(), |_| {}),
+            Err(DownloadError::Redirect)
+        );
     }
 
     #[test]
     fn a_missing_asset_says_so() {
-        let url = serve(vec![b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec()]);
+        let url = serve(vec![
+            b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
+        ]);
         let dir = Dir::new();
         let error = fetch(&url, &dir.0.join("p"), 1024, &Cancel::default(), |_| {}).unwrap_err();
         assert_eq!(error, DownloadError::Status(404));
-        assert_eq!(error.to_string(), "This release has no package for this system yet.");
+        assert_eq!(
+            error.to_string(),
+            "This release has no package for this system yet."
+        );
     }
 
     #[test]
     fn a_cancelled_download_stops_and_leaves_nothing() {
-        let url = serve(vec![ok(&vec![1u8; 4 << 20])]);
+        // The server sends part of the body and then stalls, so the cancel
+        // from another thread has to interrupt a read that is waiting.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            while reader.read_line(&mut line).is_ok_and(|read| read > 2) {
+                line.clear();
+            }
+            let _ = stream.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 4194304\r\nConnection: close\r\n\r\n",
+            );
+            let _ = stream.write_all(&[1u8; 64 * 1024]);
+            std::thread::sleep(Duration::from_secs(10));
+        });
         let dir = Dir::new();
         let target = dir.0.join("package");
         let cancel = Cancel::default();
         let stop = cancel.clone();
-        let result = fetch(&url, &target, 8 << 20, &cancel, move |progress| {
-            if progress.received > 0 {
-                stop.cancel();
-            }
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            stop.cancel();
+        });
+        let started = Instant::now();
+        let mut received = 0;
+        let result = fetch(&url, &target, 8 << 20, &cancel, |progress| {
+            received = progress.received
         });
         assert_eq!(result, Err(DownloadError::Cancelled));
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the cancel waited for the stalled server"
+        );
+        assert!(received < 4 << 20);
         assert!(!target.exists());
         let cancel = Cancel::default();
         cancel.cancel();
-        assert_eq!(fetch(&serve(vec![ok(b"x")]), &dir.0.join("again"), 8, &cancel, |_| {}), Err(DownloadError::Cancelled));
+        assert_eq!(
+            fetch(
+                &serve(vec![ok(b"x")]),
+                &dir.0.join("again"),
+                8,
+                &cancel,
+                |_| {}
+            ),
+            Err(DownloadError::Cancelled)
+        );
     }
 
     #[test]
@@ -435,7 +560,16 @@ mod tests {
         let dir = Dir::new();
         let target = dir.0.join("package");
         std::fs::write(&target, b"earlier").unwrap();
-        assert!(matches!(fetch(&serve(vec![ok(b"new")]), &target, 8, &Cancel::default(), |_| {}), Err(DownloadError::Disk(_))));
+        assert!(matches!(
+            fetch(
+                &serve(vec![ok(b"new")]),
+                &target,
+                8,
+                &Cancel::default(),
+                |_| {}
+            ),
+            Err(DownloadError::Disk(_))
+        ));
         assert_eq!(std::fs::read(&target).unwrap(), b"earlier");
     }
 
@@ -445,13 +579,19 @@ mod tests {
         let dir = Dir::new();
         let folder = folder(&dir.0).unwrap();
         assert_eq!(folder, dir.0.join("voco/update"));
-        assert_eq!(std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
         std::fs::write(folder.join("old.deb"), b"x").unwrap();
         std::fs::create_dir(folder.join("partial")).unwrap();
         clear(&folder).unwrap();
         assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
         std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755)).unwrap();
         self::folder(&dir.0).unwrap();
-        assert_eq!(std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777, 0o700);
+        assert_eq!(
+            std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
     }
 }
