@@ -400,6 +400,18 @@ fn sha256_reader(mut reader: impl Read) -> io::Result<String> {
     }
 }
 
+/// The recognizer setting the worker runs: its look-ahead in 80 ms steps, 6
+/// (560 ms) unless `VOCO_NEMOTRON_CONTEXT` names another. A value the worker
+/// refuses is recorded as such, since that worker never starts.
+fn model_label(context: Option<&str>) -> &'static str {
+    match context.unwrap_or("6") {
+        "0" => "nemotron-speech-streaming-en-0.6b-q8-context0",
+        "1" => "nemotron-speech-streaming-en-0.6b-q8-context1",
+        "6" => "nemotron-speech-streaming-en-0.6b-q8-context6",
+        _ => "nemotron-speech-streaming-en-0.6b-q8-unsupported-context",
+    }
+}
+
 fn write_events(
     mut writer: RotatingWriter,
     receiver: mpsc::Receiver<Value>,
@@ -416,7 +428,7 @@ fn write_events(
         .and_then(|path| File::open(path).ok())
         .and_then(|file| sha256_reader(file).ok());
     let header = json!({"event":"run_metadata", "version":env!("CARGO_PKG_VERSION"),
-        "executable_sha256":executable_hash, "model":"nemotron-speech-streaming-en-0.6b-q8-context1",
+        "executable_sha256":executable_hash, "model":model_label(std::env::var("VOCO_NEMOTRON_CONTEXT").ok().as_deref()),
         "native_capture_compiled":cfg!(feature="native-capture"),
         "desktop_paste_enabled":crate::insertion::desktop_paste_enabled(),
         "desktop_stream_enabled":crate::insertion::desktop_stream_enabled(),
@@ -547,6 +559,16 @@ impl RotatingWriter {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_model_label_names_the_context_the_worker_runs() {
+        assert_eq!(model_label(None), "nemotron-speech-streaming-en-0.6b-q8-context6");
+        assert_eq!(model_label(Some("1")), "nemotron-speech-streaming-en-0.6b-q8-context1");
+        assert_eq!(model_label(Some("0")), "nemotron-speech-streaming-en-0.6b-q8-context0");
+        for refused in ["", "2", "13", " 6", "six"] {
+            assert_eq!(model_label(Some(refused)), "nemotron-speech-streaming-en-0.6b-q8-unsupported-context");
+        }
+    }
+
     #[test]
     fn executable_hash_streams_all_bytes_across_buffers() {
         let bytes: Vec<u8> = (0..200_003).map(|index| (index % 251) as u8).collect();

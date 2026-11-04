@@ -9,9 +9,9 @@ import sys
 import numpy as np
 from streaming import SilenceGate, Metrics, state_home, right_context
 class ContextTests(unittest.TestCase):
-    def test_the_worker_defaults_to_160_ms_and_admits_the_560_ms_research_step(self):
-        # 1 is VOCO's 160 ms step; 0 and 6 (80 and 560 ms) are research settings (#175).
-        with patch.dict(os.environ, {}, clear=True): self.assertEqual(right_context(), 1)
+    def test_the_worker_defaults_to_560_ms_and_admits_the_research_steps(self):
+        # 6 is VOCO's 560 ms step; 0 and 1 (80 and 160 ms) are research settings.
+        with patch.dict(os.environ, {}, clear=True): self.assertEqual(right_context(), 6)
         for value in ('0', '1', '6'):
             with patch.dict(os.environ, {'VOCO_NEMOTRON_CONTEXT': value}): self.assertEqual(right_context(), int(value))
         for value in ('2', '13', '-1', '', 'six', ' 6'):
