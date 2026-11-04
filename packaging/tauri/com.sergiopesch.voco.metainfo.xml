@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.65" date="2026-11-04">
+      <description>
+        <p>Speech recognition looks further ahead before it writes each word, so it writes fewer wrong words and uses about a third less processor time, and words appear about a tenth of a second later. A word you taught VOCO with Say it may come out differently now; check it again if it does.</p>
+      </description>
+    </release>
     <release version="2026.0.64" date="2026-10-29">
       <description>
         <p>On GNOME Wayland the GNOME panel presses VOCO's paste keys from inside GNOME Shell, and its menu can quit VOCO. The microphone setting shows the system default it uses, and on X11 a paste no longer swallows a shortcut pressed just then. After upgrading, run panel setup again, then sign out and back in.</p>
