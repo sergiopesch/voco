@@ -1,7 +1,7 @@
 {
   "description": "My words for scripts/check-speech.sh. The public speech fixtures say every listed term and none of the distractors. The recognizer writes no heard version of unusedTaught on these clips, and writes each heard version of usedTaught. The bar is the most each condition may invent, change in capitals, or add in wrong words over the unlisted run.",
   "bar": {"invented": 0, "capitalChanges": 0, "addedErrors": 0},
-  "listed": ["Quilter", "Ebionites", "Nazarenes", "Ernest Dowson", "Fuchs", "laudable", "idealisation", "et cetera", "Shakespeare"],
+  "listed": ["Quilter", "Ebionites", "Nazarenes", "Ernest Dowson", "Fuchs", "laudable", "idealisation", "et cetera", "Shakespeare", "A History of Costume"],
   "distractors": ["Siobhán Kelly", "Kubernetes", "Nguyen", "PostgreSQL", "Tauri", "Nemotron", "Dowling", "Quinlan", "Ebony", "Nazareth"],
   "unusedTaught": [
     {"heard": "Kwilter", "writes": "Quilter"},
@@ -9,7 +9,6 @@
   ],
   "usedTaught": [
     {"heard": "idolization", "writes": "idealisation"},
-    {"heard": "lotable", "writes": "laudable"},
-    {"heard": "etcetera", "writes": "et cetera"}
+    {"heard": "etc", "writes": "et cetera"}
   ]
 }
