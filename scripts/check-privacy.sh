@@ -5,6 +5,8 @@
 #   offline  no network, update checks off: no process may reach the internet or DNS
 #   online   a network, update checks on: only api.github.com may be resolved and
 #            reached, and the speech worker reaches nothing
+# Neither case chooses Install update, the only thing that downloads a release
+# (github.com and release-assets.githubusercontent.com, when the user asks).
 # In both, a microphone stream exists only while dictation runs.
 #
 # Usage: scripts/check-privacy.sh [--binary FILE] [--speech DIR] [--output DIR]
@@ -21,7 +23,7 @@ while [[ $# -gt 0 ]]; do
     --binary) BINARY=$(realpath "$2"); shift 2 ;;
     --speech) SPEECH=$(realpath "$2"); shift 2 ;;
     --output) OUTPUT=$(realpath -m "$2"); shift 2 ;;
-    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
   esac
 done
 # Ubuntu 26.04 (resolute) from Microsoft's mirror of Docker's official images,

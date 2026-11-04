@@ -23,13 +23,16 @@ This also means you can't dictate a new line or a tab.
 VOCO has no account and no subscription. It sends no telemetry and never sends
 your speech to a cloud service. Recognition runs on your computer.
 
-The speech worker can't open network sockets. VOCO's only network request asks
-GitHub which releases exist, and you can turn the automatic check off.
+The speech worker can't open network sockets. On its own, VOCO's only network
+request asks GitHub which releases exist, and you can turn the automatic check
+off.
 
-### VOCO doesn't download or install updates
+### VOCO never updates on its own
 
-VOCO tells you when a new release exists. It never downloads or installs
-anything. You upgrade with your package manager or the installer, when you
+VOCO tells you when a new release exists. Only when you choose
+**Install update** does it download that release from GitHub, and it installs
+it only after the signature and checksum verify, through your package manager,
+after your password. You can also upgrade with the installer, when you
 choose.
 
 Nothing is downloaded after installation, the speech model included.

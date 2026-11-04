@@ -479,11 +479,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   VOCO carries and its fingerprint, then the package's SHA-256 and its name,
   version and architecture. A failure installs nothing, deletes the download
   and says why. Only `pkexec` runs the packaged helper
-  `/usr/lib/voco/voco-update-helper`, with its own polkit action that always
-  asks for an administrator's password: it accepts only one path in that
-  folder, copies the file where VOCO's user can no longer change it, checks the
-  signature and checksum again, and runs exactly `apt-get install` or
-  `dnf install` on that copy, with no other argument from VOCO. The package
+  `/usr/libexec/voco-update-helper`, with its own polkit action that always
+  asks for an administrator's password: it accepts only that folder, owned by
+  the user who asked, and the release version, copies the three files the
+  version names where VOCO's user can no longer change them, checks the
+  signature and checksum again, refuses a release not newer than the installed
+  one, and runs exactly `apt-get install` or `dnf install` on that copy, with
+  no other argument from VOCO. The package
   manager must then report exactly that release. Never install while
   dictating, a recording is finishing or a Stop's text is still being pasted or
   copied; Review's journal survives the restart. Restart

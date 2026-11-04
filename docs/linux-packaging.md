@@ -63,6 +63,8 @@ Both packages install these paths:
 | `/usr/lib/udev/rules.d/70-voco-uinput.rules` | The [`/dev/uinput` rule](#wayland-paste-keys) for the active local session |
 | `/usr/lib/modules-load.d/voco-uinput.conf` | Loads the `uinput` module at boot |
 | `/usr/libexec/voco-browser-host` | The native messaging host for the [Chromium extension](../integrations/chromium/README.md) |
+| `/usr/libexec/voco-update-helper` | Install update's root helper, which only `pkexec` runs ([security](security/README.md#install-update)) |
+| `/usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy` | The polkit action that lets `pkexec` run that helper after an administrator's password |
 | `/usr/share/voco/chromium/` | The extension's `manifest.json`, `background.js` and `content.js` |
 | `/etc/opt/chrome/native-messaging-hosts/`, `/etc/chromium/native-messaging-hosts/` | `com.voco.exact_field.json`, which lets the extension start the host |
 | `/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/` | The [GNOME companion](../integrations/gnome/README.md) |

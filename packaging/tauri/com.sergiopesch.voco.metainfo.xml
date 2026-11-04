@@ -16,7 +16,7 @@
       <li>Local English speech recognition with NVIDIA Nemotron</li>
       <li>Words appear while you speak, in whichever app has keyboard focus</li>
       <li>Words VOCO cannot paste are copied to the clipboard when you stop, and Review recovers dictation after a crash</li>
-      <li>Update checks against GitHub Releases; VOCO never downloads or installs updates itself</li>
+      <li>Update checks against GitHub Releases, and Install update, which verifies a release's signature before your password installs it; VOCO never updates on its own</li>
     </ul>
   </description>
   <categories>

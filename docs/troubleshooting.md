@@ -279,6 +279,21 @@ gives the reason:
 | `VOCO is running but could not receive the launcher request` | The running VOCO didn't answer. This can happen with a copy started before an upgrade. Choose **Quit VOCO** in its tray or panel menu, or run `pkill -x voco`, then open VOCO again. |
 | `could not write the tray icons: …` | VOCO keeps its tray icons in `$XDG_RUNTIME_DIR/voco`, which is usually a small memory-backed folder. Free space there, or sign out and back in, then open VOCO again. |
 
+## Install update didn't install
+
+Nothing is installed unless every check passes, and VOCO deletes what it
+downloaded. The message says which step stopped:
+
+| Message | What to do |
+| --- | --- |
+| `This release has no package for this system yet.` | The release doesn't have this system's package yet. Try again later, or use the installer. |
+| `The download stopped: …` or `GitHub answered the download with status …` | Check your connection, then choose **Try again**. |
+| `The release's signature didn't verify with VOCO's release key.` | Don't install this download. Choose **Try again**; if it repeats, use the installer from the release page, which checks the same signature, and report it. |
+| `The password prompt was dismissed` | Choose **Try again** and enter an administrator's password. |
+| `This account isn't allowed to install updates` | Your account isn't an administrator, or the session isn't local and active. Ask an administrator, or run the installer. |
+| `The package manager couldn't install the update: …` | Another install may be running. Wait for it to finish, then try again. |
+| `VOCO … is installed, but VOCO couldn't restart itself.` | Choose **Quit VOCO** in its tray or panel menu, then open VOCO again. |
+
 ## The VOCO snap
 
 The snap, `voco` in the Snap Store, runs strictly confined, so these messages

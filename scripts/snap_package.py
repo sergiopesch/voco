@@ -71,7 +71,7 @@ EXTENSION_CONTENT_PLUGS = {"gtk-3-themes": "gtk-common-themes", "icon-themes": "
 SLOTS = {"panel": {"interface": "dbus", "bus": "session", "name": "org.voco.Panel"}}
 
 # The metainfo's update item; the snap replaces it with the store's updates.
-UPDATE_ITEM = "Update checks against GitHub Releases; VOCO never downloads or installs updates itself"
+UPDATE_ITEM = "Update checks against GitHub Releases, and Install update, which verifies a release's signature before your password installs it; VOCO never updates on its own"
 STORE_UPDATES = "The Snap Store keeps VOCO up to date"
 # What App Center's listing says about where the snap types, and the license
 # the license field can't name.

@@ -93,9 +93,11 @@ covers each system and how it is tested.
 
 - Recognition runs on your computer, in a worker that can't open network
   sockets. Audio never leaves it, and VOCO doesn't save audio in normal use.
-- VOCO has no account and no telemetry. Its only network request checks GitHub
-  for new releases, and you can turn the automatic check off. It never
-  downloads or installs updates.
+- VOCO has no account and no telemetry. On its own it only asks GitHub which
+  releases exist, and you can turn that automatic check off. Only
+  **Install update**, when you choose it, downloads a newer release from
+  GitHub, and VOCO installs it only after its signature and checksum verify
+  and you enter your password.
 - Each phrase passes through the clipboard, and the last one stays there.
   Clipboard managers may keep a copy.
 - While you dictate, VOCO keeps a private copy of the text so it can recover it
