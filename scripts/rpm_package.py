@@ -30,13 +30,14 @@ OWNED_TREES = ("usr/lib/voco", "usr/share/voco", "usr/share/doc/voco",
 SHARED_DIRECTORIES = ("etc/chromium", "etc/chromium/native-messaging-hosts", "etc/opt/chrome",
                       "etc/opt/chrome/native-messaging-hosts", "usr/share/gnome-shell",
                       "usr/share/gnome-shell/extensions")
-# Folders that filesystem, systemd-udev, hicolor-icon-theme or ibus own on
-# Fedora 44. VOCO never owns them.
+# Folders that filesystem, systemd-udev, hicolor-icon-theme, ibus or polkit own
+# on Fedora 44. VOCO never owns them.
 SYSTEM_DIRECTORIES = (
     "etc", "etc/opt", "usr", "usr/bin", "usr/lib", "usr/libexec", "usr/lib/udev",
     "usr/lib/udev/rules.d", "usr/lib/modules-load.d", "usr/share", "usr/share/applications",
     "usr/share/doc", "usr/share/metainfo", "usr/share/ibus", "usr/share/ibus/component",
-    "usr/share/icons", "usr/share/icons/hicolor",
+    "usr/share/icons", "usr/share/icons/hicolor", "usr/share/polkit-1",
+    "usr/share/polkit-1/actions",
     *(f"usr/share/icons/hicolor/{size}{apps}"
       for size in ("32x32", "128x128", "256x256@2") for apps in ("", "/apps")))
 DOC_ROOT = "usr/share/doc/voco"

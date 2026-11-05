@@ -44,6 +44,7 @@ def make_stage(root):
         "usr/share/icons/hicolor/256x256@2/apps/voco.png": "png",
         "usr/share/ibus/component/voco.xml": "<component/>",
         "usr/share/metainfo/com.sergiopesch.voco.metainfo.xml": "<component/>",
+        "usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy": "<policyconfig/>",
         "usr/share/voco/chromium/manifest.json": "{}",
     }
     for name, content in files.items():
