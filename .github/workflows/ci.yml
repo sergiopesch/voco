@@ -714,7 +714,10 @@ jobs:
           if command -v apt-get >/dev/null; then
             apt-get install -y --no-install-recommends $(python3 scripts/distro-dependencies.py debian)
           else
-            dnf install -y $(python3 scripts/distro-dependencies.py fedora)
+            # WebKit's GStreamer pulls in an H.264 codec, which Fedora's image takes
+            # from Cisco's own server; when that server stalls, the whole install
+            # fails. Fedora's noopenh264 stands in, and VOCO plays no video.
+            dnf install -y --disablerepo=fedora-cisco-openh264 $(python3 scripts/distro-dependencies.py fedora)
           fi
 
       - name: Provision checksum-pinned Nemotron runtime
