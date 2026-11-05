@@ -8,6 +8,31 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+## [2026.0.66] - 2026-11-05
+
+**Install update** now updates VOCO for you, after your password, and VOCO
+restarts on the new release. This release installs the usual way; the
+[release notes](docs/releases/2026.0.66.md) explain how.
+
+### Added
+
+- **Install update** in Settings, under Updates, for the `.deb` and the RPM. It
+  downloads the newer release's package and signed checksums from GitHub, checks
+  the signature with VOCO's release key and the package's SHA-256, name, version
+  and architecture, then installs it with APT or DNF through `pkexec` and a
+  packaged helper, after an administrator's password. VOCO then restarts. A
+  failure installs nothing and says why. It never runs on its own, never while
+  you dictate, and no dictation starts until VOCO restarts. The snap still
+  updates through the Snap Store.
+- The packages depend on `pkexec` and `gpgv` (`polkit` and `gnupg2-verify` on
+  Fedora) and carry the helper `/usr/libexec/voco-update-helper` with its polkit
+  action, `com.sergiopesch.voco.update`.
+
+### Changed
+
+- The notification about a new release says to open Settings, then Updates, to
+  install it.
+
 ## [2026.0.65] - 2026-11-04
 
 Recognition looks further ahead before it writes each word, so VOCO writes fewer
@@ -547,6 +572,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.66]: https://github.com/sergiopesch/voco/compare/voco.2026.0.65...voco.2026.0.66
 [2026.0.65]: https://github.com/sergiopesch/voco/compare/voco.2026.0.64...voco.2026.0.65
 [2026.0.64]: https://github.com/sergiopesch/voco/compare/voco.2026.0.63...voco.2026.0.64
 [2026.0.63]: https://github.com/sergiopesch/voco/compare/voco.2026.0.62...voco.2026.0.63
