@@ -12,7 +12,8 @@ local, and under your control. Today: private dictation. Speak, and VOCO pastes
 your words into the app you are typing in.
 
 - Recognition runs on your computer with NVIDIA's Nemotron model. There is no
-  account or cloud service, and nothing is downloaded after installation.
+  account or cloud service, and nothing is downloaded unless you choose
+  Install update.
 - Words arrive while you speak. VOCO puts each phrase on the clipboard and
   primary selection, then presses Shift+Insert. It never presses Enter.
 - If pasting is interrupted, VOCO keeps listening and copies the remaining words

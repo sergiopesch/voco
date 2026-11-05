@@ -35,7 +35,7 @@ it only after the signature and checksum verify, through your package manager,
 after your password. You can also upgrade with the installer, when you
 choose.
 
-Nothing is downloaded after installation, the speech model included.
+Nothing else is downloaded after installation, the speech model included.
 
 ### VOCO doesn't save your audio or keep a history
 

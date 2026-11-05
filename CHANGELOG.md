@@ -8,6 +8,17 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+## [2026.0.67] - 2026-11-05
+
+The first release that VOCO 2026.0.66 can install for you with **Install
+update**. The [release notes](docs/releases/2026.0.67.md) explain how.
+
+### Fixed
+
+- The release notes, the scope page and the brand guide said nothing is
+  downloaded after installation. **Install update** downloads a release when you
+  choose it, and they now say so.
+
 ## [2026.0.66] - 2026-11-05
 
 **Install update** now updates VOCO for you, after your password, and VOCO
@@ -572,6 +583,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.67]: https://github.com/sergiopesch/voco/compare/voco.2026.0.66...voco.2026.0.67
 [2026.0.66]: https://github.com/sergiopesch/voco/compare/voco.2026.0.65...voco.2026.0.66
 [2026.0.65]: https://github.com/sergiopesch/voco/compare/voco.2026.0.64...voco.2026.0.65
 [2026.0.64]: https://github.com/sergiopesch/voco/compare/voco.2026.0.63...voco.2026.0.64
