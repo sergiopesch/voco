@@ -48,10 +48,14 @@ export function UpdateInstall({ availableVersion, releaseUrl, dictating, onOpenR
   useEffect(() => {
     let stop: (() => void) | null = null;
     let disposed = false;
-    void getCurrentWindow()
-      .listen<UpdateInstallEvent>("voco:update-install", ({ payload }) => setState((current) => reduceInstall(current, payload)))
-      .then((unlisten) => { if (disposed) unlisten(); else stop = unlisten; })
-      .catch(() => {});
+    let listening: Promise<() => void>;
+    try {
+      listening = getCurrentWindow().listen<UpdateInstallEvent>("voco:update-install", ({ payload }) => setState((current) => reduceInstall(current, payload)));
+    } catch {
+      // No Tauri window, as in renderer fixtures: nothing reports progress.
+      return;
+    }
+    listening.then((unlisten) => { if (disposed) unlisten(); else stop = unlisten; }).catch(() => {});
     return () => { disposed = true; stop?.(); };
   }, []);
 
