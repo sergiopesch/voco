@@ -97,6 +97,8 @@ assert_entry /usr/lib/modules-load.d/voco-uinput.conf -rw-r--r--
 assert_entry /usr/share/doc/voco/THIRD-PARTY-NOTICES.txt -rw-r--r--
 assert_entry /usr/share/doc/voco/copyright -rw-r--r--
 assert_entry /usr/libexec/voco-browser-host -rwxr-xr-x
+assert_entry /usr/libexec/voco-update-helper -rwxr-xr-x
+assert_entry /usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy -rw-r--r--
 assert_entry /etc/opt/chrome/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
 assert_entry /etc/chromium/native-messaging-hosts/com.voco.exact_field.json -rw-r--r--
 for file in manifest.json background.js content.js; do
@@ -123,7 +125,7 @@ dpkg-deb -e "${DEB_PATH}" "${EXTRACT_ROOT}/DEBIAN"
 python3 "${ROOT_DIR}/scripts/debian_maintainer.py" "${EXTRACT_ROOT}/DEBIAN" "${EXTRACT_ROOT}"
 # A development binary may link Pulse directly; never rely on a desktop's
 # incidental transitive installation to satisfy that runtime dependency.
-for executable in /usr/bin/voco /usr/libexec/voco-browser-host; do
+for executable in /usr/bin/voco /usr/libexec/voco-browser-host /usr/libexec/voco-update-helper; do
   dynamic_dependencies="$(readelf -d "${EXTRACT_ROOT}${executable}")"
   if grep -Eq 'NEEDED.*\[libpulse\.so\.0\]' <<<"${dynamic_dependencies}" \
     && ! grep -Eq '(^|, )libpulse0( \([^)]*\))?(,|$)' <<<"${PACKAGE_DEPENDS}"; then
@@ -137,6 +139,13 @@ tail -n "$(wc -l < "${ROOT_DIR}/LICENSE")" "${EXTRACT_ROOT}/usr/share/doc/voco/c
   | cmp - "${ROOT_DIR}/LICENSE"
 cmp "${ROOT_DIR}/packaging/udev/70-voco-uinput.rules" "${EXTRACT_ROOT}/usr/lib/udev/rules.d/70-voco-uinput.rules"
 cmp "${ROOT_DIR}/packaging/udev/voco-uinput.conf" "${EXTRACT_ROOT}/usr/lib/modules-load.d/voco-uinput.conf"
+cmp "${ROOT_DIR}/packaging/polkit/com.sergiopesch.voco.update.policy" \
+  "${EXTRACT_ROOT}/usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy"
+# Install update's root helper lives only where its polkit action names it.
+if [[ -e "${EXTRACT_ROOT}/usr/bin/voco-update-helper" ]]; then
+  echo "Debian package ships the update helper in /usr/bin." >&2
+  exit 1
+fi
 if [[ -e "${EXTRACT_ROOT}/usr/libexec/voco" || -e "${EXTRACT_ROOT}/usr/lib/systemd/user/voco-ydotoold.service" ]]; then
   echo "Debian package still ships the retired ydotoold service or launcher." >&2
   exit 1

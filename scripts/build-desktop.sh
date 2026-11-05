@@ -16,19 +16,24 @@ trap 'rm -rf "${BUILD_STATE}"' EXIT
 # Cargo reports the actual executable location, including custom target dirs and
 # configured target triples. Never package a guessed or stale host path.
 cargo build --manifest-path "${APP_DIR}/src-tauri/Cargo.toml" --locked --release \
-  --features custom-protocol --bin voco-browser-host --message-format=json-render-diagnostics \
-  >"${BUILD_STATE}/host-artifacts.jsonl"
+  --features custom-protocol,update-helper --bin voco-browser-host --bin voco-update-helper \
+  --message-format=json-render-diagnostics >"${BUILD_STATE}/host-artifacts.jsonl"
 python3 - "${BUILD_STATE}" <<'PY'
 import json, os, pathlib, sys
 state = pathlib.Path(sys.argv[1])
-executables = []
+# Each helper goes to /usr/libexec only, from the path Cargo reports.
+helpers = {'voco-browser-host': [], 'voco-update-helper': []}
 for line in (state / 'host-artifacts.jsonl').read_text().splitlines():
     artifact = json.loads(line)
-    if artifact.get('reason') == 'compiler-artifact' and artifact.get('target', {}).get('name') == 'voco-browser-host' and artifact.get('executable'):
-        executables.append(artifact['executable'])
-if len(executables) != 1 or not os.access(executables[0], os.X_OK):
-    raise SystemExit('Cargo did not produce one executable native browser host')
-config = {'bundle': {'linux': {'deb': {'files': {'/usr/libexec/voco-browser-host': executables[0]}}}}}
+    name = artifact.get('target', {}).get('name')
+    if artifact.get('reason') == 'compiler-artifact' and name in helpers and artifact.get('executable'):
+        helpers[name].append(artifact['executable'])
+files = {}
+for name, executables in helpers.items():
+    if len(executables) != 1 or not os.access(executables[0], os.X_OK):
+        raise SystemExit(f'Cargo did not produce one executable {name}')
+    files[f'/usr/libexec/{name}'] = executables[0]
+config = {'bundle': {'linux': {'deb': {'files': files}}}}
 (state / 'browser-host-bundle.json').write_text(json.dumps(config))
 PY
 

@@ -18,6 +18,14 @@ crate-type = ["lib"]
 name = "voco"
 path = "src/main.rs"
 
+# Install update's root helper. The release build makes it on its own and the
+# packages place it at /usr/libexec only; the feature keeps Tauri's bundler,
+# which copies every other binary into /usr/bin, from shipping a second copy.
+[[bin]]
+name = "voco-update-helper"
+path = "src/bin/voco-update-helper.rs"
+required-features = ["update-helper"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 cc = "=1.10.0"
@@ -27,6 +35,7 @@ pkg-config = "=0.3.34"
 default = ["native-capture"]
 custom-protocol = ["tauri/custom-protocol"]
 native-capture = []
+update-helper = []
 
 [dependencies]
 tauri = { version = "=2.12.2", features = ["tray-icon"] }
@@ -50,6 +59,8 @@ strip = true
 [target.'cfg(target_os = "linux")'.dependencies]
 global-hotkey = "=0.8.0"
 webkit2gtk = { version = "2.0", features = ["v2_40"] }
+# Install update's download: the HTTP client WebKit already brings, with its TLS.
+soup3 = "=0.5.0"
 glib = "0.18"
 evdev = "0.13"
 inotify = "0.11"

@@ -60,7 +60,9 @@
           "xdotool",
           "wl-clipboard",
           "libc6 (>= 2.39)",
-          "libstdc++6 (>= 13.2.0)"
+          "libstdc++6 (>= 13.2.0)",
+          "pkexec",
+          "gpgv"
         ],
         "files": {
           "/usr/share/metainfo/com.sergiopesch.voco.metainfo.xml": "../../../packaging/tauri/com.sergiopesch.voco.metainfo.xml",
@@ -80,7 +82,8 @@
           "/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/stylesheet.css": "../../../integrations/gnome/voco-panel@sergiopesch.com/stylesheet.css",
           "/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/voco-symbol.png": "../../../integrations/gnome/voco-panel@sergiopesch.com/voco-symbol.png",
           "/usr/lib/udev/rules.d/70-voco-uinput.rules": "../../../packaging/udev/70-voco-uinput.rules",
-          "/usr/lib/modules-load.d/voco-uinput.conf": "../../../packaging/udev/voco-uinput.conf"
+          "/usr/lib/modules-load.d/voco-uinput.conf": "../../../packaging/udev/voco-uinput.conf",
+          "/usr/share/polkit-1/actions/com.sergiopesch.voco.update.policy": "../../../packaging/polkit/com.sergiopesch.voco.update.policy"
         }
       }
     }

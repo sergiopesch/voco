@@ -15,8 +15,9 @@ that already runs as you. Such a program can read VOCO's files, start and stop
 dictation, and send keys the same way VOCO does.
 
 VOCO has no account, telemetry or cloud service. Recognition runs in a local
-worker process, and audio and transcripts stay on the computer. The only network
-request is the [release check](#release-check).
+worker process, and audio and transcripts stay on the computer. On its own, VOCO's
+only network request is the [release check](#release-check); only
+[Install update](#install-update), when you choose it, downloads a release.
 
 ## What VOCO keeps
 
@@ -26,6 +27,7 @@ request is the [release check](#release-check).
 | Copy of the settings | `$XDG_CONFIG_HOME/voco/config.json.last` | The next save replaces it, or a reset deletes it |
 | Settings before a reset | `$XDG_CONFIG_HOME/voco/config.recovery-backup-*.json` | The next reset deletes it, or you do |
 | Release check | `$XDG_CONFIG_HOME/voco/update-cache.json` | The next check replaces it |
+| [Install update](#install-update)'s download | `$XDG_STATE_HOME/voco/update/` | The install finishes, fails or is cancelled |
 | Crash journal | `$XDG_STATE_HOME/voco/crash-recovery/active.json` | The recording finishes |
 | Review | `$XDG_STATE_HOME/voco/crash-recovery/recovered.json` | You discard the entry, or five newer entries push it out |
 | [Opt-in logs](../architecture/README.md#logs) | `performance/`, `stream-performance/` and `hotkey-trace.jsonl` in `$XDG_STATE_HOME/voco/` | They rotate at 8 MiB |
@@ -161,8 +163,8 @@ After startup, and when you change the update channel, VOCO asks the GitHub
 releases API for the 12 newest releases, unless its cached answer is younger
 than 6 hours. **Check for updates** in Settings always asks. The request
 carries no account or device identifier, though GitHub sees your IP address.
-VOCO only tells you a release exists; it never downloads or installs anything.
-To make no request unless you ask, open **Update settings** on the **Updates**
+The check only tells you a release exists; only [Install update](#install-update)
+downloads one. To make no request unless you ask, open **Update settings** on the **Updates**
 page and set **Update checks** to **Only when I choose**.
 
 `scripts/check-privacy.sh` checks this on a release build. With update checks
@@ -171,7 +173,50 @@ address, or asks DNS anything, idle or dictating. With them on, the only host re
 `api.github.com`, and the speech worker reaches nothing. In both runs a
 microphone stream exists only while dictation runs. It runs in a container on
 Linux, with no desktop, so it shows what VOCO itself contacts, not what a desktop
-around it does.
+around it does. It never chooses Install update.
+
+## Install update
+
+Only **Install update**, which you choose in Settings, downloads anything. It
+runs in the `.deb` and RPM, never in the snap or a source build, and only for a
+release newer than the one running.
+
+1. **Download.** VOCO builds each address from the release version itself,
+   never from the releases API's answer: the release's `voco_checksums.txt`,
+   its signature and this system's package (the `.deb` where `apt-get` and
+   `dpkg-query` exist, otherwise the RPM), from
+   `github.com/sergiopesch/voco/releases/download/`. It follows a redirect only
+   to `release-assets.githubusercontent.com` over HTTPS, at most three, and
+   refuses files larger than any release. The files go into
+   `$XDG_STATE_HOME/voco/update/`, a folder only you can open, each created new
+   and owner-only.
+2. **Verify.** `gpgv` checks the signature against the release key VOCO
+   carries, and only a good signature made by its fingerprint
+   (`B33C7C6AAEC8C20433A7A837540796453D8E3865`) counts. Then the package's
+   SHA-256 must match the signed list, and `dpkg-deb` or `rpm` must report
+   VOCO, that version and x86-64.
+3. **Install.** Only `pkexec` runs `/usr/libexec/voco-update-helper`, through
+   the polkit action `com.sergiopesch.voco.update`, which asks for an
+   administrator's password every time and refuses inactive and remote
+   sessions. The helper takes the download folder and the version, and nothing
+   else. It accepts the folder only if it belongs to the user who asked and no
+   one else can write to it, copies the three files into
+   `/var/cache/voco-update/`, where that user can't change them, and verifies
+   that copy again exactly as in step 2. It refuses a release that isn't newer
+   than the installed one, so an old signed release can't be put back. Then it
+   runs exactly `apt-get install` or `dnf install` on the copy, with a cleared
+   environment, and checks that the package manager reports exactly that
+   release. It removes its copy whatever happens.
+4. **Restart.** Once no dictation is running, VOCO starts `/usr/bin/voco` in a
+   new session with your desktop's environment, after the running VOCO has
+   exited, as the installer's launch does.
+
+VOCO refuses to start an install while you dictate, and checks again just
+before the password prompt. From then until it restarts, or the install fails,
+no dictation, voice test or Say it can start. A failure at any step installs nothing, deletes
+the download and says why; the release page's installer remains the way to
+update by hand. You can cancel during the download; once the password prompt is
+up, the system owns the install.
 
 ## Speech worker
 

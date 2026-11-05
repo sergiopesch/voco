@@ -233,8 +233,11 @@ VOCO's only network request asks GitHub which releases exist. It runs when VOCO
 starts, reusing an answer for up to six hours, and when you choose
 **Check for updates**. To check only when you choose, open **Update settings**
 on the **Updates** page and set **Update checks** to **Only when I choose**.
-VOCO never downloads or installs updates. To upgrade, see
-[Upgrade](install.md#upgrade).
+When a newer release exists, **Install update** on the **Updates** page
+downloads it from GitHub, checks it was signed with VOCO's release key, asks
+for your password and installs it, then restarts VOCO. You can cancel while it
+downloads. It waits while you dictate, and never runs on its own. The snap
+updates through the Snap Store instead. See [Upgrade](install.md#upgrade).
 
 After you [remove VOCO](install.md#remove), delete its folders to remove your
 data:

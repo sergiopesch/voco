@@ -1,5 +1,6 @@
 import { DeviceSelect } from "./DeviceSelect";
 import { StatusMark } from "./StatusMark";
+import { UpdateInstall } from "./UpdateInstall";
 import { Tooltip } from "./Tooltip";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
@@ -284,7 +285,7 @@ export function ControlPanel({
   const statusHeading = desktopSetupError ? "Setup needed" : statusLabel.startsWith("Ready") ? "Ready" : statusLabel;
   const updateInstallCopy = config.installChannel === "source"
     ? "You build VOCO from source. To update, check out the newer release tag and rebuild."
-    : "VOCO only checks for updates; it never downloads or installs them. To update, run the newer release's installer from its release page.";
+    : "Install update downloads the newer release from GitHub, checks its signature and installs it after your password. You can also run the release's installer from its release page.";
   const updateStatusCopy = useMemo(() => {
     switch (updateState.status) {
       case "checking":
@@ -956,6 +957,12 @@ export function ControlPanel({
                       <button className="voco-button voco-button--primary" disabled={updateState.status === "checking"} onClick={() => void onCheckForUpdates()}>{updateState.status === "checking" ? "Checking…" : "Check for updates"}</button>
                       {updateState.latestRelease?.url ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(updateState.latestRelease!.url)}>Open latest release</button> : null}
                     </div>
+                    <UpdateInstall
+                      availableVersion={updateState.status === "available" ? updateState.latestRelease?.version ?? null : null}
+                      releaseUrl={updateState.latestRelease?.url ?? null}
+                      dictating={dictationBusy}
+                      onOpenReleasePage={onOpenReleasePage}
+                    />
                   </div>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Update settings</summary>
                     <div className="voco-preferences__form">
@@ -966,7 +973,7 @@ export function ControlPanel({
                       <label className="voco-field voco-preferences__field-row"><span>Update channel</span><select value={config.updateChannel} onChange={(event) => void savePatch({ updateChannel: event.target.value as AppConfig["updateChannel"] })}><option value="stable">Stable</option><option value="beta">Beta</option></select></label>
                       <p className="voco-preferences__helper">{config.updateChannel === "beta" ? "Beta releases change more often." : "Recommended for everyday use."}</p>
                       <label className="voco-field voco-preferences__field-row"><span>Update checks</span><select value={config.automaticUpdateChecks ? "automatic" : "manual"} onChange={(event) => void savePatch({ automaticUpdateChecks: event.target.value === "automatic" })}><option value="automatic">When VOCO starts</option><option value="manual">Only when I choose</option></select></label>
-                      <p className="voco-preferences__helper">{config.automaticUpdateChecks ? "VOCO reads GitHub's public list of releases. It never downloads or installs anything." : "VOCO checks only when you choose Check for updates."}</p>
+                      <p className="voco-preferences__helper">{config.automaticUpdateChecks ? "The check only reads GitHub's public list of releases; it downloads nothing." : "VOCO checks only when you choose Check for updates."}</p>
                       <p><strong>Last checked:</strong> {lastCheckedLabel}</p>
                       {updateState.latestRelease ? <p><strong>Latest release:</strong> <code>{updateState.latestRelease.version}</code></p> : null}
                       {upgradePrompt ? <p><strong>Upgrade path:</strong> {upgradePrompt}</p> : null}

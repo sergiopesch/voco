@@ -399,10 +399,50 @@ writes. Otherwise it asks the GitHub releases API for the 12 newest releases,
 with a 15-second timeout. Both of those automatic checks happen only while
 `automaticUpdateChecks` is on: with **Only when I choose**, neither runs, and
 turning automatic checks back on checks at once. **Check for updates** in
-Settings always asks. VOCO
-only tells you a release exists; it never downloads or installs anything. In
+Settings always asks. The check only tells you a release exists. In
 the snap the Snap Store updates VOCO, so `store_updates` tells the renderer to
 check nothing, and Settings shows only the installed version.
+
+## Install update
+
+`update_install.rs` owns Install update; the renderer only shows its stages.
+`update_install_availability` offers it only where `/usr/bin/voco` is running
+outside the snap and APT or DNF is present. `install_update` takes the version
+the check found, refuses one that isn't newer than this build, and refuses
+while the tray state says dictation is starting, recording or processing. One
+install runs at a time, on its own thread, and reports each stage through
+`voco:update-install` events: `downloading` (file, bytes and size),
+`verifying`, `authorizing`, `installing`, `installed`, `restarting`,
+`cancelled` or `failed` with the reason.
+
+`update_download.rs` fetches the three assets with libsoup, the HTTP client
+WebKit already links, following redirects by hand (`allowed_redirect`), with a
+30-second idle timeout and size limits, into `$XDG_STATE_HOME/voco/update/`.
+`cancel_update_install` cancels the `gio::Cancellable` under a waiting read,
+and only until the download ends. `update_verify.rs` holds the checks shared
+with the root helper: the `gpgv` signature by the release key's fingerprint,
+the signed manifest, the SHA-256 and the package's identity.
+
+`speech_stream` passes every recognition `start` through a gate in
+`update_install.rs`, which remembers the open session until its `finish` or
+`cancel`. After verifying, VOCO closes the gate unless the tray reports
+dictation or a session started in the last 5 seconds (the renderer's report can
+lag its start), so from the password prompt until VOCO exits no recognition
+starts; a failure opens it again. Rust also keeps the last stage it reported,
+which `update_install_status` returns, so the Updates page shows a running or
+ended install when it opens again, until **Close** calls
+`dismiss_update_install`. Then VOCO runs
+`pkexec /usr/libexec/voco-update-helper <folder> <version>`. The helper
+(`src/bin/voco-update-helper.rs`, built with the `update-helper` feature)
+prints `VOCO-UPDATE` stage lines, which VOCO reads, and exits 10 when it
+refuses, 11 when the package manager fails and 12 when the package manager
+then reports another version; pkexec exits 126 when the prompt is dismissed and
+127 when the action isn't allowed. [Security](../security/README.md#install-update)
+lists what the helper checks. After a successful install, VOCO waits for any
+dictation to end, then starts a detached shell in a new session that waits up to
+10 seconds for this process to exit and runs `/usr/bin/voco`, and exits. The
+instance lock goes with the old process, so the new one starts rather than
+presenting the old.
 
 ## The snap
 

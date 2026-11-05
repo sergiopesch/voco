@@ -89,16 +89,20 @@ def normalize_payload_modes(directory):
                 raise ValueError(f"Unsupported payload object: {path.relative_to(directory)}")
 
 
+# The app and the helpers scripts/build-desktop.sh bundles beside it.
+BASE_EXECUTABLES = ("usr/bin/voco", "usr/libexec/voco-browser-host", "usr/libexec/voco-update-helper")
+
+
 def validate_base_executables(stage):
     """Reject incomplete direct Tauri bundles before copying the model payload."""
-    for name in ("usr/bin/voco", "usr/libexec/voco-browser-host"):
+    for name in BASE_EXECUTABLES:
         path = stage / name
         if (path.is_symlink() or not path.is_file()
                 or not path.resolve().is_relative_to(stage.resolve())
                 or path.stat().st_mode & 0o111 != 0o111):
             raise ValueError(
                 f"Base package is missing a regular executable /{name}; "
-                "run npm run build to bundle the matching application and browser host")
+                "run npm run build to bundle the matching application and its helpers")
 
 
 def write_copyright(source_root, doc):

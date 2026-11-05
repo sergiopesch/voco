@@ -292,7 +292,16 @@ upgrade, sign out and back in, or restart IBus, to load the new version.
 
 ## Upgrade
 
-VOCO checks GitHub for new releases but never installs them. To upgrade:
+When VOCO finds a newer release, open **Settings**, go to **Updates** and
+choose **Install update**. VOCO downloads the release's package for your
+system, with its signed checksums, from GitHub, and checks the signature with
+its release key and the package's SHA-256. Your system then asks for an
+administrator's password, and APT or DNF installs the package. VOCO restarts on
+the new release once no dictation is running. If anything fails, nothing is
+installed and VOCO says why. Install update isn't available in the snap, which
+the Snap Store updates, or in a source build.
+
+To upgrade by hand instead:
 
 1. Finish any dictation, and copy anything you need from **Review**.
 2. Quit VOCO. Choose **Quit VOCO** in the tray or panel menu. If your panel

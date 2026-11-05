@@ -115,7 +115,7 @@ class SnapPackageTest(unittest.TestCase):
             self.assertFalse((payload / name).exists(), name)
         # No folder survives that only held excluded files.
         for folder in ("etc", "usr/libexec", "usr/share/ibus", "usr/share/gnome-shell",
-                       "usr/share/voco", "usr/lib/udev", "usr/lib/modules-load.d"):
+                       "usr/share/voco", "usr/lib/udev", "usr/lib/modules-load.d", "usr/share/polkit-1"):
             self.assertFalse((payload / folder).exists(), folder)
         self.assertEqual(os.readlink(payload / "usr/lib/voco/speech/lib/libfixture.so.1"),
                          "libfixture.so.1.0")

@@ -1,0 +1,54 @@
+/* Install update's window. Rust reports each stage; motion only follows it. */
+.voco-update-offer { display: grid; gap: 6px; margin-top: 4px; }
+.voco-update-window {
+  position: relative; display: grid; gap: 14px; overflow: hidden; margin-top: 4px; padding: 16px;
+  border: 1px solid var(--voco-divider); border-radius: 18px;
+  background: linear-gradient(160deg, #dce5f012, #dce5f003), var(--voco-surface);
+  animation: voco-update-in var(--voco-motion-settle) var(--voco-motion-ease);
+}
+.voco-update-window[data-stage="failed"], .voco-update-window[data-stage="cancelled"] { border-color: #ff5c7a55; }
+.voco-update-window > h3 { position: relative; display: flex; align-items: center; gap: 9px; margin: 0; font-size: 14px; font-weight: 600; line-height: 1.45; outline: none; }
+.voco-update-window__glow {
+  position: absolute; inset: -40% -20% auto; height: 120px; pointer-events: none;
+  background: radial-gradient(closest-side, #e1e5ec1c, transparent);
+  opacity: 0; transition: opacity var(--voco-motion-settle);
+}
+.voco-update-window[data-stage="downloading"] .voco-update-window__glow,
+.voco-update-window[data-stage="installing"] .voco-update-window__glow { opacity: 1; animation: voco-update-breathe 2.4s ease-in-out infinite; }
+.voco-update-window__message { margin: 0; color: var(--voco-text-secondary); line-height: 1.55; }
+
+.voco-update-steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; padding: 0; list-style: none; }
+.voco-update-steps__step { position: relative; display: grid; justify-items: center; gap: 7px; color: var(--voco-text-muted); font-size: 12px; transition: color var(--voco-motion-fast); }
+/* The line to the next step fills once this one is done. */
+.voco-update-steps__step:not(:last-child)::after {
+  content: ""; position: absolute; top: 5px; left: calc(50% + 10px); right: calc(-50% + 10px); height: 2px; border-radius: 1px;
+  background: linear-gradient(var(--voco-accent-highlight), var(--voco-accent-highlight)) left / 0% 100% no-repeat var(--voco-divider);
+  transition: background-size var(--voco-motion-settle) var(--voco-motion-ease);
+}
+.voco-update-steps__step[data-status="done"]::after { background-size: 100% 100%; }
+.voco-update-steps__dot { width: 12px; height: 12px; border: 2px solid var(--voco-divider); border-radius: 50%; background: var(--voco-surface); transition: border-color var(--voco-motion-fast), background var(--voco-motion-fast), transform var(--voco-motion-settle) var(--voco-motion-ease); }
+.voco-update-steps__step[data-status="active"] { color: var(--voco-text); }
+.voco-update-steps__step[data-status="active"] .voco-update-steps__dot { border-color: var(--voco-accent-highlight); transform: scale(1.15); animation: voco-update-pulse 1.4s ease-out infinite; }
+.voco-update-steps__step[data-status="done"] { color: var(--voco-text-secondary); }
+.voco-update-steps__step[data-status="done"] .voco-update-steps__dot { border-color: var(--voco-accent-highlight); background: var(--voco-accent-highlight); }
+
+.voco-update-progress { display: grid; gap: 6px; }
+.voco-update-progress__track { position: relative; height: 6px; overflow: hidden; border-radius: 3px; background: var(--voco-divider); }
+.voco-update-progress__fill { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, var(--voco-accent), var(--voco-accent-highlight)); transform-origin: left; transition: transform 180ms linear; }
+.voco-update-progress__fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #ffffff55, transparent); transform: translateX(-100%); animation: voco-update-sheen 1.6s ease-in-out infinite; }
+.voco-update-progress__track[data-indeterminate="true"] .voco-update-progress__fill { opacity: .35; }
+
+@keyframes voco-update-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes voco-update-breathe { 50% { opacity: .45; } }
+@keyframes voco-update-pulse { 0% { box-shadow: 0 0 0 0 #e1e5ec55; } 100% { box-shadow: 0 0 0 7px #e1e5ec00; } }
+@keyframes voco-update-sheen { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .voco-update-window, .voco-update-window__glow, .voco-update-steps__dot, .voco-update-progress__fill::after { animation: none !important; }
+  .voco-update-steps__step::after, .voco-update-steps__dot, .voco-update-progress__fill, .voco-update-window__glow { transition: none; }
+  .voco-update-progress__fill::after { display: none; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .voco-update-window { background: var(--voco-surface); }
+  .voco-update-window__glow { display: none; }
+}

@@ -34,6 +34,9 @@ mod single_instance;
 mod speech_stream;
 mod tray_icons;
 mod trigger_socket;
+mod update_download;
+mod update_install;
+mod update_verify;
 #[cfg(target_os = "linux")]
 mod virtual_keyboard;
 #[cfg(target_os = "linux")]
@@ -2276,6 +2279,11 @@ pub fn run() -> Result<(), String> {
         })
         .invoke_handler(tauri::generate_handler![
             confinement::store_updates,
+            update_install::update_install_availability,
+            update_install::install_update,
+            update_install::cancel_update_install,
+            update_install::update_install_status,
+            update_install::dismiss_update_install,
             confinement::microphone_access,
             crash_recovery::list_crash_recovery,
             crash_recovery::get_crash_journal_epoch,

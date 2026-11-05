@@ -55,6 +55,9 @@ try {
             return {status:'restart',detail:'Panel enabled. Sign out and back in to load it; saving your work first is recommended.',canEnable:false};
           }
           if (command === 'trace_hotkey_event') return;
+          // Read-only: the fixture installs nothing, so Updates offers no Install update.
+          if (command === 'update_install_availability') return {available:false};
+          if (command === 'update_install_status') return null;
           if (command === 'get_desktop_input_status') return {available:true,detail:'Fixture desktop prerequisites ready'};
           window.__fixtureViolations.push(command); throw new Error('Fixture must not invoke native commands');
         } };

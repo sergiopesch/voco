@@ -19,6 +19,10 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the My words rules, the copy from the legacy `voice` directory and the update cache.
 - `confinement.rs` — Whether VOCO runs as its strict snap, which skips what confinement forbids and leaves updates to the Snap Store.
+- `update_install.rs` — Install update's commands: where it's offered, the download, verification, `pkexec` helper run and restart, reported as `voco:update-install` events.
+- `update_download.rs` — Install update's download: release asset addresses, the redirect allowlist, size limits and cancelling, with libsoup.
+- `update_verify.rs` — Checks shared with the root helper: the release key's signature, the signed manifest, SHA-256 and package identity.
+- `bin/voco-update-helper.rs` — The root helper `pkexec` runs: copies the download out of the user's reach, verifies it again, installs it with APT or DNF and checks the result.
 - `crash_recovery.rs` — Text-only crash journal and the Review store.
 - `tray.rs` — Tray icon, menu, status line and meter animation.
 - `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.
@@ -69,6 +73,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `ControlPanel.tsx` — Settings window with the Settings, Microphone, My words, Shortcut, Updates and Help sections.
 - `ControlPanel.test.tsx` — Settings guidance and controls.
+- `UpdateInstall.tsx`, `updateInstall.css` — Install update's button and its window: steps, download progress, Cancel, and a failure's reason with Try again.
+- `UpdateInstall.test.tsx` — What the window offers at each stage.
 - `recordedShortcuts.json` — Key presses, the shortcut **Record keys** makes of each and whether Rust accepts it; `ControlPanel.test.tsx` and `lib.rs` both check it.
 - `EnglishSpellingChoice.tsx` — Setup's spelling question, the Settings spelling cards and the popover note that earlier setups see until they choose.
 - `MyWords.tsx` — The My words page: adding and removing entries, Say it for each, and the versions VOCO learned.
@@ -151,6 +157,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `updates.test.ts` — Versions and channel selection.
 - `updateCheckCoordinator.ts` — Runs update checks, keeps only the latest request's result and notifies about a new release.
 - `updateCheckCoordinator.test.ts` — Coordinator behaviour.
+- `updateInstall.ts` — Install update's stages, steps and progress from Rust's events, and its command wrappers.
+- `updateInstall.test.ts` — Stages, progress and where a failure stopped.
 - `windowRemap.ts` — Shows interactive windows on Wayland without treating the remap as a blur.
 - `windowRemap.test.ts` — Window remap.
 - `popoverPlacement.ts` — Places the popover inside the work area, centred, because the tray never reports where its icon is.
@@ -334,6 +342,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-snap-package.py` — The snap's payload, store listing, recipe and build command, and each of its checks against deliberate mistakes.
 - `test-model-tokenizer.py` — The tokenizer graft adds one metadata entry, keeps every tensor byte, fetches one bounded range and replaces a model only with the pinned result.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
+- `test-install-update-app.sh`, `test-install-update-app.py` — Install update in the real app, from a build one version below a published release to that release, on a disposable machine.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
 - `fixtures/*` — Test-only helpers: synthetic fields, probe extensions, a `wl-copy` and an input-state relay through the private Shell probe, the [uinput bridge](../testing/README.md#the-uinput-bridge) that replays VOCO's virtual keyboard on a private Xvfb, and a fake logind whose session the full-application suite locks. None is installed.
 
