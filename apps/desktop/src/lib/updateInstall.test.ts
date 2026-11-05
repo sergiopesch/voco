@@ -65,8 +65,8 @@ describe("Install update's state", () => {
   });
 
   it("formats sizes as people read them", () => {
-    expect(formatBytes(2048)).toBe("2 KB");
-    expect(formatBytes(5.5 * 1024 * 1024)).toBe("5.5 MB");
-    expect(formatBytes(700 * 1024 * 1024)).toBe("700 MB");
+    expect(formatBytes(2048)).toBe("2 kB");
+    expect(formatBytes(5_500_000)).toBe("5.5 MB");
+    expect(formatBytes(672_313_266)).toBe("672 MB");
   });
 });

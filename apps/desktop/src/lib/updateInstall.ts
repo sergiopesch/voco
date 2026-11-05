@@ -136,9 +136,10 @@ export function stageHeadline(state: UpdateInstallState): string {
   }
 }
 
+/** Decimal units, as GitHub and GNOME show file sizes: a 672,313,266-byte package is 672 MB. */
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(bytes < 100 * 1024 * 1024 ? 1 : 0)} MB`;
+  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} kB`;
+  return `${(bytes / 1_000_000).toFixed(bytes < 100_000_000 ? 1 : 0)} MB`;
 }
 
 export interface UpdateInstallAvailability {

@@ -173,6 +173,15 @@ from the published tag in a desktop session, on Ubuntu or Debian and on Fedora:
 wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.<version>/install && bash voco-install
 ```
 
+Then check that Install update reaches the release, on a disposable Ubuntu 24.04
+machine as root: the script builds the tagged source one version below it,
+installs that build, and updates it to the published release through the app's
+own Settings window ([Testing](testing/README.md#suites-ci-doesnt-run)):
+
+```bash
+VOCO_DISPOSABLE_MACHINE=1 VOCO_UPDATE_TARGET=<version> scripts/test-install-update-app.sh
+```
+
 ### 9. Upload the snap
 
 Once the release is published and the snap tried on both, upload it to `edge`:

@@ -342,6 +342,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-snap-package.py` — The snap's payload, store listing, recipe and build command, and each of its checks against deliberate mistakes.
 - `test-model-tokenizer.py` — The tokenizer graft adds one metadata entry, keeps every tensor byte, fetches one bounded range and replaces a model only with the pinned result.
 - `test-install-apt.py`, `test-install-common.sh`, `test-install-journey.py`, `test-install-launch.py`, `test-install-performance.py`, `test-install-presentation.py` — Installer.
+- `test-install-update-app.sh`, `test-install-update-app.py` — Install update in the real app, from a build one version below a published release to that release, on a disposable machine.
 - `test-glib-variant.py`, `test-debian-maintainer.py`, `test-check-shell-syntax.py`, `test-report-dictation-quality-events.py`, `test-report-performance.py`, `test-report-speech-timing.py`, `test-typesafe-evaluation.py` — Other checks.
 - `fixtures/*` — Test-only helpers: synthetic fields, probe extensions, a `wl-copy` and an input-state relay through the private Shell probe, the [uinput bridge](../testing/README.md#the-uinput-bridge) that replays VOCO's virtual keyboard on a private Xvfb, and a fake logind whose session the full-application suite locks. None is installed.
 

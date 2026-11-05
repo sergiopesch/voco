@@ -100,7 +100,7 @@ try {
     assert.deepEqual(await page.evaluate(() => window.updateCalls), [['install_update', { version: '2026.0.66' }]]);
     // Rust remembers the last stage it reported, as update_install_status does.
     const report = payload => page.evaluate(payload => { window.updateStatus = payload; window.listeners['voco:update-install']({ payload }); }, payload);
-    await report({ stage: 'downloading', version: '2026.0.66', file: 3, files: 3, received: 350 * 1048576, total: 700 * 1048576 });
+    await report({ stage: 'downloading', version: '2026.0.66', file: 3, files: 3, received: 350000000, total: 700000000 });
     await page.getByText('350 MB of 700 MB').waitFor();
     assert.equal(await page.getByRole('progressbar', { name: 'Download' }).getAttribute('aria-valuenow'), '50');
     // The install outlives the page: leaving Updates and coming back shows it still.

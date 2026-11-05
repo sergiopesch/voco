@@ -22,7 +22,7 @@ describe("Install update's window", () => {
 
   it("shows the download's progress with a Cancel", () => {
     const state = reduceInstall(startingInstall("2026.0.66"),
-      { stage: "downloading", version: "2026.0.66", file: 3, files: 3, received: 350 * 1024 * 1024, total: 700 * 1024 * 1024 });
+      { stage: "downloading", version: "2026.0.66", file: 3, files: 3, received: 350_000_000, total: 700_000_000 });
     const markup = render(state);
     expect(markup).toContain("Downloading VOCO 2026.0.66…");
     expect(markup).toContain('aria-valuenow="50"');
