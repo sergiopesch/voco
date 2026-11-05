@@ -273,7 +273,14 @@ pub async fn speech_stream(request: Value) -> Result<Value, String> {
         crate::performance::speech_queue_failure(&request)?;
         return Ok(serde_json::json!({"logged":true}));
     }
-    tauri::async_runtime::spawn_blocking(move || {
+    // Install update refuses to install while a session runs, and no session
+    // starts while it installs.
+    let session = request["session"].as_str().unwrap_or_default().to_string();
+    let op = request["op"].as_str().unwrap_or_default().to_string();
+    if op == "start" {
+        crate::update_install::session_starting(&session)?;
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let request = with_configured_settings(
             request,
             crate::config::AppConfig::english_spelling_for_dictation,
@@ -286,7 +293,12 @@ pub async fn speech_stream(request: Value) -> Result<Value, String> {
         result
     })
     .await
-    .map_err(|_| "worker task failed")?
+    .map_err(|_| "worker task failed".to_string())
+    .and_then(|result| result);
+    if (op == "start" && result.is_err()) || op == "finish" || op == "cancel" {
+        crate::update_install::session_ended(&session);
+    }
+    result
 }
 #[cfg(test)]
 mod tests {

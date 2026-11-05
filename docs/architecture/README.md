@@ -423,7 +423,15 @@ and only until the download ends. `update_verify.rs` holds the checks shared
 with the root helper: the `gpgv` signature by the release key's fingerprint,
 the signed manifest, the SHA-256 and the package's identity.
 
-After verifying, VOCO checks dictation again and runs
+`speech_stream` passes every recognition `start` through a gate in
+`update_install.rs`, which remembers the open session until its `finish` or
+`cancel`. After verifying, VOCO closes the gate unless the tray reports
+dictation or a session started in the last 5 seconds (the renderer's report can
+lag its start), so from the password prompt until VOCO exits no recognition
+starts; a failure opens it again. Rust also keeps the last stage it reported,
+which `update_install_status` returns, so the Updates page shows a running or
+ended install when it opens again, until **Close** calls
+`dismiss_update_install`. Then VOCO runs
 `pkexec /usr/libexec/voco-update-helper <folder> <version>`. The helper
 (`src/bin/voco-update-helper.rs`, built with the `update-helper` feature)
 prints `VOCO-UPDATE` stage lines, which VOCO reads, and exits 10 when it

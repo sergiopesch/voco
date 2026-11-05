@@ -18,7 +18,7 @@ try {
     ({ server, browser, page, origin } = await openRenderer(errors));
     // Install update's commands are recorded in window.updateCalls; availability
     // follows window.updateAvailable.
-    await routeTauriModules(page, 'export async function invoke(name, args) { if (name === "native_capture_capabilities") return {enabled:false}; if(name === "get_crash_journal_epoch") return 1; if(name.endsWith("_crash_journal")) return; if (name === "update_install_availability") return window.updateAvailable ? {available:true} : {available:false, reason:"The Snap Store keeps VOCO up to date."}; if (name === "install_update" || name === "cancel_update_install") { (window.updateCalls ||= []).push([name, args ?? null]); return name === "cancel_update_install" ? true : undefined; } throw new Error("Unexpected native command: " + name); }');
+    await routeTauriModules(page, 'export async function invoke(name, args) { if (name === "native_capture_capabilities") return {enabled:false}; if(name === "get_crash_journal_epoch") return 1; if(name.endsWith("_crash_journal")) return; if (name === "update_install_availability") return window.updateAvailable ? {available:true} : {available:false, reason:"The Snap Store keeps VOCO up to date."}; if (name === "update_install_status") return window.updateStatus ?? null; if (name === "install_update" || name === "cancel_update_install" || name === "dismiss_update_install") { (window.updateCalls ||= []).push([name, args ?? null]); if (name === "dismiss_update_install") window.updateStatus = null; return name === "cancel_update_install" ? true : undefined; } throw new Error("Unexpected native command: " + name); }');
     await routeAppShell(page, shell);
     await installRendererMocks(page);
     // Registered last, so it answers before the fixture's own GitHub route.
@@ -98,10 +98,16 @@ try {
     assert.deepEqual(await page.evaluate(() => window.updateCalls ?? []), [], 'Nothing installs until the button is chosen');
     await install.click();
     assert.deepEqual(await page.evaluate(() => window.updateCalls), [['install_update', { version: '2026.0.66' }]]);
-    const report = payload => page.evaluate(payload => window.listeners['voco:update-install']({ payload }), payload);
+    // Rust remembers the last stage it reported, as update_install_status does.
+    const report = payload => page.evaluate(payload => { window.updateStatus = payload; window.listeners['voco:update-install']({ payload }); }, payload);
     await report({ stage: 'downloading', version: '2026.0.66', file: 3, files: 3, received: 350 * 1048576, total: 700 * 1048576 });
     await page.getByText('350 MB of 700 MB').waitFor();
     assert.equal(await page.getByRole('progressbar', { name: 'Download' }).getAttribute('aria-valuenow'), '50');
+    // The install outlives the page: leaving Updates and coming back shows it still.
+    await page.getByRole('button', { name: 'Help', exact: true }).click();
+    await page.getByRole('button', { name: 'Updates', exact: true }).click();
+    await page.getByText('350 MB of 700 MB').waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Install update' }).count(), 0, 'No second Install update while one runs');
     await page.getByRole('button', { name: 'Cancel' }).click();
     assert.deepEqual((await page.evaluate(() => window.updateCalls)).at(-1), ['cancel_update_install', null]);
     await report({ stage: 'verifying', version: '2026.0.66' });
@@ -110,6 +116,10 @@ try {
     assert.equal(await page.getByRole('button', { name: 'Cancel' }).count(), 0, 'No Cancel once the password prompt is up');
     await report({ stage: 'failed', version: '2026.0.66', message: 'The password prompt was dismissed, so nothing was installed. You can still update with the installer command on the release page.' });
     await page.getByText('The update didn’t install').waitFor();
+    await page.getByText('The password prompt was dismissed').waitFor();
+    // A failure that ended while the page was away is still there on return.
+    await page.getByRole('button', { name: 'Help', exact: true }).click();
+    await page.getByRole('button', { name: 'Updates', exact: true }).click();
     await page.getByText('The password prompt was dismissed').waitFor();
     await page.getByRole('button', { name: 'Try again' }).click();
     assert.deepEqual((await page.evaluate(() => window.updateCalls)).at(-1), ['install_update', { version: '2026.0.66' }]);

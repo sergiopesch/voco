@@ -2282,6 +2282,8 @@ pub fn run() -> Result<(), String> {
             update_install::update_install_availability,
             update_install::install_update,
             update_install::cancel_update_install,
+            update_install::update_install_status,
+            update_install::dismiss_update_install,
             confinement::microphone_access,
             crash_recovery::list_crash_recovery,
             crash_recovery::get_crash_journal_epoch,

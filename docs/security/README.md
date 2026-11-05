@@ -212,7 +212,8 @@ release newer than the one running.
    exited, as the installer's launch does.
 
 VOCO refuses to start an install while you dictate, and checks again just
-before the password prompt. A failure at any step installs nothing, deletes
+before the password prompt. From then until it restarts, or the install fails,
+no dictation, voice test or Say it can start. A failure at any step installs nothing, deletes
 the download and says why; the release page's installer remains the way to
 update by hand. You can cancel during the download; once the password prompt is
 up, the system owns the install.

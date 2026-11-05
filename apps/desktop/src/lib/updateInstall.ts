@@ -157,3 +157,12 @@ export function installUpdate(version: string): Promise<void> {
 export function cancelUpdateInstall(): Promise<boolean> {
   return invoke<boolean>("cancel_update_install");
 }
+
+/** Rust's last stage, so a window opened mid-install, or after one ended, shows it. */
+export function updateInstallStatus(): Promise<UpdateInstallEvent | null> {
+  return invoke<UpdateInstallEvent | null>("update_install_status");
+}
+
+export function dismissUpdateInstall(): Promise<void> {
+  return invoke("dismiss_update_install");
+}

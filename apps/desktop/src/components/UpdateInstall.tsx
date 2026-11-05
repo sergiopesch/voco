@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   canCancel,
   cancelUpdateInstall,
+  dismissUpdateInstall,
   formatBytes,
   IDLE_INSTALL,
   INSTALL_STEPS,
@@ -13,6 +14,7 @@ import {
   stageHeadline,
   startingInstall,
   updateInstallAvailability,
+  updateInstallStatus,
   type UpdateInstallAvailability,
   type UpdateInstallEvent,
   type UpdateInstallState,
@@ -42,6 +44,11 @@ export function UpdateInstall({ availableVersion, releaseUrl, dictating, onOpenR
     updateInstallAvailability()
       .then((result) => { if (active) setAvailability(result); })
       .catch(() => { if (active) setAvailability({ available: false }); });
+    // The install outlives this page: pick up where Rust is, unless an event
+    // already arrived since mounting.
+    updateInstallStatus()
+      .then((event) => { if (active && event) setState((current) => current.stage === "idle" ? reduceInstall(current, event) : current); })
+      .catch(() => {});
     return () => { active = false; };
   }, []);
 
@@ -81,7 +88,10 @@ export function UpdateInstall({ availableVersion, releaseUrl, dictating, onOpenR
       headlineRef={headline}
       onStart={start}
       onCancel={() => void cancelUpdateInstall()}
-      onClose={() => setState(IDLE_INSTALL)}
+      onClose={() => {
+        void dismissUpdateInstall().catch(() => {});
+        setState(IDLE_INSTALL);
+      }}
       onOpenReleasePage={onOpenReleasePage}
     />
   );

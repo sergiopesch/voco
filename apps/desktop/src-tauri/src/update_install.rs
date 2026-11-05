@@ -31,7 +31,7 @@ const HELPER_REFUSED: i32 = 10;
 const HELPER_INSTALL_FAILED: i32 = 11;
 const HELPER_NOT_INSTALLED: i32 = 12;
 /// The most of the helper's error output kept for the message.
-const HELPER_ERROR_BYTES: u64 = 4096;
+const HELPER_ERROR_BYTES: usize = 4096;
 const MANUAL: &str = "You can still update with the installer command on the release page.";
 
 /// What the renderer shows. `received` and `total` come with downloading.
@@ -82,6 +82,77 @@ static JOB: Mutex<Job> = Mutex::new(Job {
     running: false,
     cancel: None,
 });
+
+/// How long after its start a recognition session counts as live even before
+/// the renderer reports dictation, which can lag the start request.
+const FRESH_SESSION: Duration = Duration::from_secs(5);
+
+/// Recognition sessions and the install exclude each other (AGENTS.md: never
+/// install while dictating). Every recognition, dictation, the voice test, Say
+/// it and the browser field, starts with a speech `start`, so the gate sits there.
+#[derive(Debug, Default)]
+struct Gate {
+    /// The open session and when it started.
+    open: Option<(String, std::time::Instant)>,
+    installing: bool,
+}
+
+impl Gate {
+    fn start(&mut self, session: &str, now: std::time::Instant) -> Result<(), &'static str> {
+        if self.installing {
+            return Err(
+                "VOCO is installing an update and will restart. Dictate again once it has.",
+            );
+        }
+        self.open = Some((session.to_string(), now));
+        Ok(())
+    }
+
+    fn end(&mut self, session: &str) {
+        if self.open.as_ref().is_some_and(|(open, _)| open == session) {
+            self.open = None;
+        }
+    }
+
+    /// Close the gate for an install, unless a session may still be running:
+    /// the renderer reports dictation, or a session started moments ago. A
+    /// session the renderer abandoned without finishing doesn't block for ever.
+    fn close(&mut self, dictating: bool, now: std::time::Instant) -> bool {
+        let fresh = self
+            .open
+            .as_ref()
+            .is_some_and(|(_, started)| now.duration_since(*started) < FRESH_SESSION);
+        if dictating || fresh {
+            return false;
+        }
+        self.installing = true;
+        true
+    }
+
+    fn reopen(&mut self) {
+        self.installing = false;
+    }
+}
+
+static GATE: Mutex<Gate> = Mutex::new(Gate {
+    open: None,
+    installing: false,
+});
+
+fn with_gate<T>(action: impl FnOnce(&mut Gate) -> T) -> T {
+    let mut gate = GATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    action(&mut gate)
+}
+
+/// A recognition session is starting; refused while an update installs.
+pub fn session_starting(session: &str) -> Result<(), String> {
+    with_gate(|gate| gate.start(session, std::time::Instant::now())).map_err(String::from)
+}
+
+/// A recognition session finished, was cancelled, or failed to start.
+pub fn session_ended(session: &str) {
+    with_gate(|gate| gate.end(session));
+}
 
 /// Why Install update can't run here, if it can't: the snap and the source
 /// build update another way.
@@ -172,6 +243,13 @@ pub fn install_update(app: tauri::AppHandle, version: String) -> Result<(), Stri
         job.running = true;
         job.cancel = Some(cancel.clone());
     }
+    remember(&InstallEvent::Downloading {
+        version: version.to_string(),
+        file: 1,
+        files: 3,
+        received: 0,
+        total: None,
+    });
     let spawned = std::thread::Builder::new()
         .name("voco-update-install".into())
         .spawn(move || {
@@ -204,7 +282,35 @@ pub fn cancel_update_install() -> bool {
         .is_some()
 }
 
+/// The last stage reported, so a window opened later shows where the install
+/// is, or how it ended, until the user closes it.
+static LAST: Mutex<Option<InstallEvent>> = Mutex::new(None);
+
+fn remember(event: &InstallEvent) {
+    if let Ok(mut last) = LAST.lock() {
+        *last = Some(event.clone());
+    }
+}
+
+/// Where Install update is: its last stage, or nothing.
+#[tauri::command]
+pub fn update_install_status() -> Option<InstallEvent> {
+    LAST.lock().ok().and_then(|last| last.clone())
+}
+
+/// Forget an install that ended, once the user closes its window.
+#[tauri::command]
+pub fn dismiss_update_install() {
+    let running = JOB.lock().map(|job| job.running).unwrap_or(true);
+    if let Ok(mut last) = LAST.lock() {
+        if !running {
+            *last = None;
+        }
+    }
+}
+
 fn emit(app: &tauri::AppHandle, event: InstallEvent) {
+    remember(&event);
     if let Err(error) = app.emit_to("main", EVENT, &event) {
         log::warn!("Failed to report the update's progress: {error}");
     }
@@ -254,7 +360,9 @@ fn run(app: &tauri::AppHandle, kind: PackageKind, version: Version, cancel: &Can
     if let Ok(mut job) = JOB.lock() {
         job.cancel = None;
     }
-    if crate::tray::dictation_active(app) {
+    // From the password prompt until VOCO exits, no recognition may start.
+    let dictating = crate::tray::dictation_active(app);
+    if !with_gate(|gate| gate.close(dictating, std::time::Instant::now())) {
         return finish(failed(
             "A dictation started, so VOCO didn't install the update.".into(),
         ));
@@ -277,6 +385,7 @@ fn run(app: &tauri::AppHandle, kind: PackageKind, version: Version, cancel: &Can
             true
         }
         Err(message) => {
+            with_gate(Gate::reopen);
             emit(
                 app,
                 InstallEvent::Failed {
@@ -415,12 +524,26 @@ fn run_helper_with(
         .spawn()
         .map_err(|error| format!("VOCO couldn't ask for the administrator's password: {error}."))?;
     let stderr = child.stderr.take();
+    // Read to the end, so the package manager never writes into a closed
+    // pipe, and keep only the tail, where the helper's own reason is.
     let errors = std::thread::spawn(move || {
-        let mut text = String::new();
-        if let Some(stderr) = stderr {
-            let _ = stderr.take(HELPER_ERROR_BYTES).read_to_string(&mut text);
+        let mut tail: Vec<u8> = Vec::new();
+        if let Some(mut stderr) = stderr {
+            let mut buffer = [0u8; 8192];
+            loop {
+                match stderr.read(&mut buffer) {
+                    Ok(0) => break,
+                    Ok(read) => {
+                        tail.extend_from_slice(&buffer[..read]);
+                        let excess = tail.len().saturating_sub(HELPER_ERROR_BYTES);
+                        tail.drain(..excess);
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                    Err(_) => break,
+                }
+            }
         }
-        text
+        String::from_utf8_lossy(&tail).into_owned()
     });
     if let Some(stdout) = child.stdout.take() {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -596,6 +719,60 @@ mod tests {
         );
         assert!(run_helper_with("/bin/true", &[], &mut |_: &str| {}).is_ok());
         assert!(run_helper_with("/nonexistent/pkexec", &[], &mut |_: &str| {}).is_err());
+    }
+
+    #[test]
+    fn the_package_managers_long_output_is_drained_and_the_reason_kept() {
+        // 64 KiB of output, more than a pipe holds, then the helper's reason.
+        let script = "head -c 65536 /dev/zero | tr '\\0' x >&2; echo >&2; echo 'VOCO-UPDATE installed 2026.0.66'; echo 'voco-update-helper: apt-get exited with 100' >&2; exit 11";
+        let mut seen = Vec::new();
+        let result = run_helper_with(
+            "/bin/sh",
+            &["-c".as_ref(), script.as_ref()],
+            &mut |line: &str| {
+                seen.push(line.to_string());
+            },
+        );
+        assert_eq!(
+            seen,
+            ["VOCO-UPDATE installed 2026.0.66"],
+            "the helper ran to its end"
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            "The package manager couldn't install the update: apt-get exited with 100."
+        );
+    }
+
+    #[test]
+    fn no_recognition_starts_while_an_update_installs() {
+        let start = std::time::Instant::now();
+        let later = start + Duration::from_secs(60);
+        let mut gate = Gate::default();
+        gate.start("a", start).unwrap();
+        assert!(
+            !gate.close(false, start + Duration::from_secs(1)),
+            "a session that just started blocks the install"
+        );
+        assert!(
+            !gate.close(true, later),
+            "dictation the renderer reports blocks the install"
+        );
+        gate.end("a");
+        assert!(gate.close(false, later));
+        assert!(
+            gate.start("b", later).is_err(),
+            "no session starts during the install"
+        );
+        gate.reopen();
+        gate.start("b", later).unwrap();
+        // A session the renderer abandoned, once stale, doesn't block for ever.
+        assert!(gate.close(false, later + Duration::from_secs(10)));
+        // Ending another session leaves the open one.
+        let mut gate = Gate::default();
+        gate.start("c", start).unwrap();
+        gate.end("other");
+        assert!(!gate.close(false, start));
     }
 
     #[test]
