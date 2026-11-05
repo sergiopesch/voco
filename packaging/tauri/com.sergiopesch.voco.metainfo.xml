@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.67" date="2026-11-05">
+      <description>
+        <p>This release corrects what VOCO says about downloads: nothing is downloaded after installation unless you choose Install update. Choose Install update in VOCO 2026.0.66 to get it.</p>
+      </description>
+    </release>
     <release version="2026.0.66" date="2026-11-05">
       <description>
         <p>Install update in Settings now updates VOCO for you: it downloads the newer release from GitHub, checks it was signed with VOCO's release key, installs it with your system's package manager after your password, and restarts VOCO. It never updates on its own. This release itself installs the usual way; Install update works from this version on.</p>

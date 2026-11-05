@@ -25,7 +25,7 @@ Each pillar names only what is true today:
   telemetry or cloud transcription, and update checks only read GitHub's public
   releases.
 - **Local.** The speech model runs on the processor, with no GPU, and nothing is
-  downloaded after installation.
+  downloaded unless you choose **Install update**.
 - **Under your control.** VOCO acts in your apps only when you ask. Today that
   means it listens only when you start it, shows that it's listening and never
   presses Enter. The principle stays as VOCO grows; its proof grows with each
