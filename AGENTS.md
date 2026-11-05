@@ -15,9 +15,14 @@ setup and pull requests.
   first changes this contract in its own reviewed pull request, with its safety
   rules, before any code.
 - No account, subscription, telemetry or cloud transcription. Update checks read
-  GitHub's public releases API and never download or install anything. The
-  automatic check at startup has an off switch. The snap has no network access
-  at all: the Snap Store updates it, so it never checks.
+  GitHub's public releases API and download nothing. The automatic check at
+  startup has an off switch. Only **Install update**, which the user chooses,
+  downloads: the newer release's package for this installation and its signed
+  checksums, from that release on GitHub. VOCO installs it only after the
+  signature verifies with its release key and the package's SHA-256 matches,
+  through the system package manager, after the system's own password prompt,
+  and then restarts itself. It never updates on its own. The snap has no
+  network access at all: the Snap Store updates it, so it never checks.
 - One output path: streaming dictation pasted into whatever has keyboard focus.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.
@@ -466,6 +471,25 @@ and the update check. [The snap](#the-snap) lists its rules.
   never launch a GUI from root or package hooks. Distinguish a launch request from
   readiness and keep the manual guidance when launching fails. The installer checks
   `/usr/bin/voco`, not an earlier PATH entry.
+- **Install update** follows the installer's verification, in VOCO's own code:
+  download the release's `voco_checksums.txt`, its signature and the one
+  package for this system (the `.deb` where `apt-get` and `dpkg-query` exist,
+  otherwise the RPM), only from that release's GitHub assets, into an
+  owner-only folder; check the signature with `gpgv` against the release key
+  VOCO carries and its fingerprint, then the package's SHA-256 and its name,
+  version and architecture. A failure installs nothing, deletes the download
+  and says why. Only `pkexec` runs the packaged helper
+  `/usr/lib/voco/voco-update-helper`, with its own polkit action that always
+  asks for an administrator's password: it accepts only one path in that
+  folder, copies the file where VOCO's user can no longer change it, checks the
+  signature and checksum again, and runs exactly `apt-get install` or
+  `dnf install` on that copy, with no other argument from VOCO. The package
+  manager must then report exactly that release. Never install while
+  dictating, a recording is finishing or a Stop's text is still being pasted or
+  copied; Review's journal survives the restart. Restart
+  only after the install succeeds, through the same detached launch as the
+  installer, and keep the manual upgrade guidance when anything fails. The
+  source build and the snap have no Install update.
 - Source excludes model weights and compiled runtime payloads. Follow
   [runtime provisioning](docs/linux-packaging.md#runtime-provisioning) and never
   replace missing pinned artifacts with mutable downloads. A base Tauri `.deb` is
