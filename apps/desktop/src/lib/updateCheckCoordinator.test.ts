@@ -87,7 +87,7 @@ describe("UpdateCheckCoordinator", () => {
     expect(states).toHaveLength(stateCountAfterBeta);
     expect(writes).toEqual([{ channel: "beta", state: betaState }]);
     expect(notifications).toEqual([
-      "VOCO 2026.0.22-beta.1 is available on the beta channel.",
+      "VOCO 2026.0.22-beta.1 is available on the beta channel. Open VOCO's Settings, then Updates, to install it.",
     ]);
     expect(coordinator.lastCheckedChannel).toBe("beta");
     // A later check that finds the same release does not notify again.
