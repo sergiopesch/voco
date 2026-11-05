@@ -307,7 +307,7 @@ export function ControlPanel({
 
     return config.installChannel === "source"
       ? `Check out voco.${updateState.latestRelease.version} and rebuild.`
-      : `Run the ${updateState.latestRelease.version} installer from its release page. It upgrades VOCO in place and keeps your settings.`;
+      : `Install update installs ${updateState.latestRelease.version} for you. You can also run its installer from the release page, which upgrades VOCO in place and keeps your settings.`;
   }, [config.installChannel, updateState.latestRelease, updateState.status]);
   const lastCheckedLabel = useMemo(() => {
     if (!updateState.lastCheckedAt) {

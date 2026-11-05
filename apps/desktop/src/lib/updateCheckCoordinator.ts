@@ -102,7 +102,7 @@ export class UpdateCheckCoordinator {
         await this.dependencies
           .showNotification(
             "Update available",
-            `VOCO ${nextUpdateState.latestRelease.version} is available on the ${channel} channel.`,
+            `VOCO ${nextUpdateState.latestRelease.version} is available on the ${channel} channel. Open VOCO's Settings, then Updates, to install it.`,
           )
           .catch(() => {});
       }
