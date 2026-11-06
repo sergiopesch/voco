@@ -63,6 +63,8 @@ export const glossary = [
   ["Packet", "A small piece of audio on its way to the speech worker. VOCO’s packets hold 100 ms of sound at any sample rate."],
   ["Phrase queue", "This guide’s name for the line of 100 ms audio packets waiting for the speech worker. Only one request is in flight at a time, and VOCO stops transcribing when more than three seconds of audio wait."],
   ["PCM", "Pulse-code modulation: a way to represent audio as a list of sample values."],
+  ["pkexec", "A system program that runs one approved command as root after polkit allows it. Install update uses it to run VOCO’s update helper."],
+  ["polkit", "The system service that decides which actions need an administrator’s password. VOCO’s update action always asks for it."],
   ["Preroll", "Audio kept from just before sound starts. VOCO’s gate keeps 640 ms, so the start of the first word isn’t lost."],
   ["PRIMARY selection", "Linux’s second clipboard, which usually holds the last selected text. Terminals paste it on Shift+Insert, so VOCO fills it too."],
   ["Q8", "A quantized model representation with 8-bit values. It describes how model values are stored, not an accuracy percentage."],
