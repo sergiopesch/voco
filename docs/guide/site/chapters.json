@@ -6,7 +6,7 @@
     "story": [
       "Press the shortcut and VOCO starts listening. It turns your speech into words on your own computer and pastes them at your cursor while you are still talking. Press the shortcut again and VOCO finishes the last words.",
       "Each part of VOCO does one job and passes small messages to the next. Sound travels in packets of one tenth of a second, so words can appear before you finish a sentence.",
-      "Nothing you say leaves the computer. The speech model runs on the processor, and the only network request asks GitHub whether a new release exists. Later chapters open each box and show the real code inside."
+      "Nothing you say leaves the computer. The speech model runs on the processor, and the only network request VOCO makes by itself asks GitHub whether a new release exists. Later chapters open each box and show the real code inside."
     ],
     "steps": [
       {
@@ -1172,8 +1172,16 @@
         "text": "VOCO checks after startup and when you change the update channel, unless Update checks is set to Only when I choose. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks. The snap never checks: Settings shows its version and \"The Snap Store keeps VOCO up to date.\""
       },
       {
-        "title": "Only a notice",
-        "text": "When a newer release exists, VOCO shows an \"Update available\" notification once for that release, and Settings offers Open latest release. VOCO never downloads or installs anything."
+        "title": "A notice, then your choice",
+        "text": "When a newer release exists, VOCO shows an \"Update available\" notification once for that release: \"Open VOCO's Settings, then Updates, to install it.\" A check only reads. Nothing downloads or installs until you choose Install update."
+      },
+      {
+        "title": "Install update",
+        "text": "The .deb and the RPM have it; the snap and a source build don't. VOCO downloads voco_checksums.txt, its signature and the one package for this system from that release on GitHub into a private folder, following at most three redirects and only to release-assets.githubusercontent.com. It checks the signature with gpgv against the release key it carries, then the package's SHA-256, name, version and architecture. A failure installs nothing, deletes the download and says why."
+      },
+      {
+        "title": "The root helper",
+        "text": "Only pkexec runs /usr/libexec/voco-update-helper, through a polkit action that always asks for an administrator's password. It takes just the folder and the version, copies the three files into /var/cache/voco-update, checks them again, refuses a release that isn't newer than the installed one, and runs apt-get install or dnf install on that copy. VOCO then restarts. You can cancel only the download, and from the password prompt until VOCO exits no recording can start."
       },
       {
         "title": "Two channels",
@@ -1218,6 +1226,30 @@
         "why": "Decides when to check and when to reuse the cached answer."
       },
       {
+        "path": "apps/desktop/src-tauri/src/update_install.rs",
+        "why": "Runs Install update: download, verify, the helper, then the restart."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/update_download.rs",
+        "why": "Downloads a release's three files, only from GitHub's release assets."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/update_verify.rs",
+        "why": "Checks the signature, the checksum and the package's identity."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/bin/voco-update-helper.rs",
+        "why": "The root helper that installs a verified release."
+      },
+      {
+        "path": "packaging/polkit/com.sergiopesch.voco.update.policy",
+        "why": "The polkit action that always asks for an administrator's password."
+      },
+      {
+        "path": "apps/desktop/src/components/UpdateInstall.tsx",
+        "why": "The window that shows Download, Verify, Install and Restart."
+      },
+      {
         "path": "apps/desktop/src/store/useStore.ts",
         "why": "The window's in-memory state."
       },
@@ -1239,7 +1271,7 @@
         "Rust drops that field and saves the rest"
       ],
       "correct": 0,
-      "why": "Rust owns the file and accepts only the five fields it knows. A patch with an unknown field is refused, so nothing unexpected reaches the file."
+      "why": "Rust owns the file and accepts only the fields it knows. A patch with an unknown field is refused, so nothing unexpected reaches the file."
     },
     "lab": "journey"
   },
@@ -1415,7 +1447,7 @@
       },
       {
         "label": "Network",
-        "detail": "The only request asks GitHub's API about new releases, and the snap makes none."
+        "detail": "The only request VOCO makes by itself asks GitHub's API about new releases, and the snap makes none. Install update downloads a release only when you choose it."
       }
     ],
     "facts": [
@@ -1471,7 +1503,7 @@
       },
       {
         "path": "apps/desktop/src/lib/updates.ts",
-        "why": "The single network request."
+        "why": "The update check, the one request VOCO makes by itself."
       },
       {
         "path": "apps/desktop/src-tauri/tauri.conf.json",
@@ -1528,14 +1560,14 @@
     ],
     "caution": "Local processing protects your audio. It doesn't protect the clipboard, which other apps can read.",
     "quiz": {
-      "question": "What is VOCO's only network request?",
+      "question": "What is the only network request VOCO makes by itself?",
       "answers": [
         "It uploads audio for better recognition",
         "It sends usage statistics",
         "It asks GitHub's API about new releases"
       ],
       "correct": 2,
-      "why": "Speech runs on the computer, and the content security policy allows only VOCO itself, Tauri's message channel and api.github.com. The update check is the only request."
+      "why": "Speech runs on the computer, and the content security policy allows only VOCO itself, Tauri's message channel and api.github.com. The update check is the only request VOCO makes by itself, and Install update downloads a release only when you choose it."
     },
     "lab": "journey"
   },
