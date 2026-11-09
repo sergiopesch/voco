@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Install update end to end in the real app, on a disposable Ubuntu 24.04 machine
-# run as root (VOCO_DISPOSABLE_MACHINE=1): it installs packages and replaces the
+# Install update end to end in the real app, on a disposable Ubuntu machine run
+# as root (VOCO_DISPOSABLE_MACHINE=1): it installs packages and replaces the
 # system's voco package.
 #
 # It builds this checkout one version below a published release (VOCO_UPDATE_TARGET,
@@ -11,7 +11,8 @@
 # restarts as that release. Root's pkexec needs no password; the prompt itself
 # needs a desktop session. VOCO starts with umask 0002, as in an Ubuntu or Fedora
 # desktop session. pkexec 126 and later pass it on to the helper; Ubuntu 24.04's
-# pkexec 124 resets it, so only a newer guest catches a helper that relies on it. The build's own version and the version check in
+# pkexec 124 resets it, so only a newer guest, such as Ubuntu 26.04, catches a
+# helper that relies on it. The build's own version and the version check in
 # verify:versions are untouched: the build happens in a temporary worktree.
 #
 # Usage: VOCO_DISPOSABLE_MACHINE=1 scripts/test-install-update-app.sh [EVIDENCE_DIR]
