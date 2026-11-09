@@ -130,7 +130,7 @@ export default class VocoPanel extends Extension {
         // The panel packs fractional widths unevenly, which jolts every indicator
         // on this side; the meter eases through whole pixels only.
         this._reveal = new St.Adjustment({actor: this._clip, upper: 1000});
-        this._reveal.connect('notify::value', () => {
+        this._revealId = this._reveal.connect('notify::value', () => {
             this._clip.width = Math.round(this._reveal.value);
             // A fixed-width actor already awaiting layout passes no relayout up,
             // so widths the panel measured this frame would stay cached.
@@ -372,7 +372,7 @@ export default class VocoPanel extends Extension {
             if (target) this._detail.show();
             this._reveal.ease(target, {duration: motion && this._clip.mapped ? 220 : 0,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
-                onComplete: () => { if (!target) this._detail.hide(); }});
+                onComplete: () => { if (!target) this._detail?.hide(); }});
         }
     }
 
@@ -470,6 +470,9 @@ export default class VocoPanel extends Extension {
                 Gio.DBusCallFlags.NO_AUTO_START, 1000, null, null);
     }
 
+    // Undoes everything enable() did. _disconnect() removes the poll, request
+    // and shortcut sources and releases the grab; destroying the indicator
+    // destroys every actor below it, so only the references remain to drop.
     disable() {
         this._cancelPaste();
         this._keyboard = null;
@@ -478,11 +481,18 @@ export default class VocoPanel extends Extension {
         this._disconnect();
         if (this._shortcutSignal) { global.display.disconnect(this._shortcutSignal); this._shortcutSignal = 0; }
         this._cancellable?.cancel();
-        if (this._watch) Gio.bus_unwatch_name(this._watch);
-        if (this._sizeId) Main.panel.disconnect(this._sizeId);
-        if (this._motionId) this._settings.disconnect(this._motionId);
+        this._cancellable = null;
+        if (this._watch) { Gio.bus_unwatch_name(this._watch); this._watch = 0; }
+        this._owner = null;
+        if (this._sizeId) { Main.panel.disconnect(this._sizeId); this._sizeId = 0; }
+        if (this._motionId) { this._settings.disconnect(this._motionId); this._motionId = 0; }
+        if (this._revealId) { this._reveal.disconnect(this._revealId); this._revealId = 0; }
         this._indicator?.destroy();
         this._indicator = null;
+        this._button = this._box = this._clip = this._reveal = this._detail = null;
+        this._wave = this._bars = this._label = null;
+        this._settingsItem = this._reviewItem = this._stopItem = null;
+        this._quitSeparator = this._quitItem = null;
         this._settings = null;
     }
 }
