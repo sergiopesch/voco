@@ -1477,7 +1477,7 @@
       },
       {
         "title": "The snap's sandbox",
-        "text": "The snap plugs no network, home folder or input device, so it can't reach the internet, read your home folder outside its own folders or open /dev/uinput. The Snap Store updates it. On the session bus it owns org.voco.Panel through a dbus slot, which lets it answer GNOME Shell but never call it."
+        "text": "The snap plugs no network, home folder or input device, so it can't reach the internet, read your home folder outside its own folders or open /dev/uinput. The Snap Store updates it. On the session bus it owns com.sergiopesch.voco.Panel, a name under the maintainer's own domain, through a dbus slot, which lets it answer GNOME Shell but never call it."
       },
       {
         "title": "Same user, not same program",
@@ -1717,7 +1717,7 @@
     "facts": [
       {
         "title": "Nine CI jobs",
-        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns org.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work."
+        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns com.sergiopesch.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work."
       },
       {
         "title": "Private sessions",
@@ -2297,11 +2297,11 @@
       },
       {
         "title": "Keys released",
-        "text": "When VOCO can't read the keyboards, it asks the companion whether the shortcut's keys are up before a Wayland paste, and waits at most 150 ms for its ModifiersState report. A copy from before NextRequest answers ModifiersClear instead."
+        "text": "When VOCO can't read the keyboards, it asks the companion whether the shortcut's keys are up before a Wayland paste, and waits at most 150 ms for its ModifiersState report."
       },
       {
         "title": "VOCO never calls the Shell",
-        "text": "A strict snap may answer GNOME Shell but never call it, so from companion version 17 the companion asks VOCO for work. It keeps one NextRequest call waiting, for up to 30 seconds, and calls again as soon as VOCO answers: with a paste, a modifier check, a change of state, or idle after 20 seconds."
+        "text": "A strict snap may answer GNOME Shell but never call it, so the companion asks VOCO for work, on com.sergiopesch.voco.Panel. A copy from before companion version 19 speaks only the old name, org.voco.Panel, and never reaches this VOCO. It keeps one NextRequest call waiting, for up to 30 seconds, and calls again as soon as VOCO answers: with a paste, a modifier check, a change of state, or idle after 20 seconds."
       },
       {
         "title": "Paste keys from the Shell",
@@ -2347,7 +2347,7 @@
       },
       {
         "path": "integrations/gnome/voco-panel@sergiopesch.com/metadata.json",
-        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 18 as its version-name, which extensions.gnome.org keeps."
+        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 19 as its version-name, which extensions.gnome.org keeps."
       },
       {
         "path": "apps/desktop/src-tauri/src/panel.rs",

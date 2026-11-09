@@ -1073,7 +1073,7 @@ lesson(
         ),
         (
             "The snap's sandbox",
-            "The snap plugs no network, home folder or input device, so it can't reach the internet, read your home folder outside its own folders or open /dev/uinput. The Snap Store updates it. On the session bus it owns org.voco.Panel through a dbus slot, which lets it answer GNOME Shell but never call it.",
+            "The snap plugs no network, home folder or input device, so it can't reach the internet, read your home folder outside its own folders or open /dev/uinput. The Snap Store updates it. On the session bus it owns com.sergiopesch.voco.Panel, a name under the maintainer's own domain, through a dbus slot, which lets it answer GNOME Shell but never call it.",
         ),
         (
             "Same user, not same program",
@@ -1226,7 +1226,7 @@ lesson(
     [
         (
             "Nine CI jobs",
-            "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns org.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work.",
+            "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns com.sergiopesch.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work.",
         ),
         (
             "Private sessions",
@@ -1581,11 +1581,11 @@ lesson(
         ),
         (
             "Keys released",
-            "When VOCO can't read the keyboards, it asks the companion whether the shortcut's keys are up before a Wayland paste, and waits at most 150 ms for its ModifiersState report. A copy from before NextRequest answers ModifiersClear instead.",
+            "When VOCO can't read the keyboards, it asks the companion whether the shortcut's keys are up before a Wayland paste, and waits at most 150 ms for its ModifiersState report.",
         ),
         (
             "VOCO never calls the Shell",
-            "A strict snap may answer GNOME Shell but never call it, so from companion version 17 the companion asks VOCO for work. It keeps one NextRequest call waiting, for up to 30 seconds, and calls again as soon as VOCO answers: with a paste, a modifier check, a change of state, or idle after 20 seconds.",
+            "A strict snap may answer GNOME Shell but never call it, so the companion asks VOCO for work, on com.sergiopesch.voco.Panel. A copy from before companion version 19 speaks only the old name, org.voco.Panel, and never reaches this VOCO. It keeps one NextRequest call waiting, for up to 30 seconds, and calls again as soon as VOCO answers: with a paste, a modifier check, a change of state, or idle after 20 seconds.",
         ),
         (
             "Paste keys from the Shell",
@@ -1623,7 +1623,7 @@ lesson(
             "The companion: the pill, the bars, the menu, the Wayland grab and the paste keys.",
         ),
         ("integrations/gnome/voco-panel@sergiopesch.com/model.js", "The bar weights and height formula."),
-        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 18 as its version-name, which extensions.gnome.org keeps."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 19 as its version-name, which extensions.gnome.org keeps."),
         (B + "panel.rs", "VOCO's D-Bus service for the companion: Attach, state, the shortcut lease and the work it hands out through NextRequest."),
         (B + "panel_setup.rs", "Checks and enables the companion, and caches the result."),
         (B + "tray.rs", "The tray icon, hidden while the companion is attached."),
