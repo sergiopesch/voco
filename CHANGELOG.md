@@ -8,13 +8,21 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+## [2026.0.68] - 2026-11-09
+
+VOCO and its GNOME panel get ready for the Snap Store and extensions.gnome.org.
+The [release notes](docs/releases/2026.0.68.md) explain the upgrade: on GNOME,
+sign out and back in afterwards.
+
 ### Changed
 
 - VOCO and its GNOME companion now talk over `com.sergiopesch.voco.Panel`
   instead of `org.voco.Panel`, a name under the maintainer's own domain, as the
-  Snap Store asks of the snap's D-Bus slot. After upgrading, run panel setup
-  again and sign out and back in: until then the companion stays detached, and
-  VOCO pastes and takes the shortcut as it does without it.
+  Snap Store asks of the snap's D-Bus slot. After upgrading, sign out and back
+  in: until then the companion stays detached, and VOCO pastes and takes the
+  shortcut as it does without it.
+- The GNOME panel now releases everything it holds when it's turned off, as
+  extensions.gnome.org asks of every extension.
 
 ### Removed
 
@@ -597,6 +605,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.68]: https://github.com/sergiopesch/voco/compare/voco.2026.0.67...voco.2026.0.68
 [2026.0.67]: https://github.com/sergiopesch/voco/compare/voco.2026.0.66...voco.2026.0.67
 [2026.0.66]: https://github.com/sergiopesch/voco/compare/voco.2026.0.65...voco.2026.0.66
 [2026.0.65]: https://github.com/sergiopesch/voco/compare/voco.2026.0.64...voco.2026.0.65

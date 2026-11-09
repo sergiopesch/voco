@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.68" date="2026-11-09">
+      <description>
+        <p>VOCO and its GNOME panel now talk over a new name, ready for the Snap Store and extensions.gnome.org. After upgrading, sign out and back in so GNOME loads the new panel. Dictation works as before.</p>
+      </description>
+    </release>
     <release version="2026.0.67" date="2026-11-05">
       <description>
         <p>This release corrects what VOCO says about downloads: nothing is downloaded after installation unless you choose Install update. Choose Install update in VOCO 2026.0.66 to get it.</p>
