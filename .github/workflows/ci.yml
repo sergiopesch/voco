@@ -353,7 +353,7 @@ jobs:
 
       - name: Cargo test
         working-directory: apps/desktop/src-tauri
-        run: cargo test --locked --all-targets
+        run: cargo test --locked --all-targets --features update-helper
 
       - name: Native capture C callback lifecycle (no audio server)
         run: npm run test:native-capture-callbacks

@@ -291,6 +291,7 @@ downloaded. The message says which step stopped:
 | `The release's signature didn't verify with VOCO's release key.` | Don't install this download. Choose **Try again**; if it repeats, use the installer from the release page, which checks the same signature, and report it. |
 | `The password prompt was dismissed` | Choose **Try again** and enter an administrator's password. |
 | `This account isn't allowed to install updates` | Your account isn't an administrator, or the session isn't local and active. Ask an administrator, or run the installer. |
+| `The update was refused: can't prepare /var/cache/voco-update: not a folder only root can change.` | VOCO 2026.0.66 to 2026.0.68 can't install updates from most desktop sessions, and an update runs the installed VOCO's helper. Upgrade once with the installer command from the release page; later versions update normally. |
 | `The package manager couldn't install the update: …` | Another install may be running. Wait for it to finish, then try again. |
 | `VOCO … is installed, but VOCO couldn't restart itself.` | Choose **Quit VOCO** in its tray or panel menu, then open VOCO again. |
 
