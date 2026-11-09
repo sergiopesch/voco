@@ -77,6 +77,32 @@ class PanelSetupTests(unittest.TestCase):
         for major in panel.SUPPORTED_SHELLS:
             self.assertTrue(panel.classify(major + '.0', True, {}, False, False)['canEnable'], major)
 
+    def test_a_per_user_copy_of_another_version_is_named_and_kept(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as data:
+            folder = Path(data) / 'gnome-shell/extensions' / panel.UUID
+            self.assertIsNone(panel.other_user_copy(data))
+            folder.mkdir(parents=True)
+            self.assertEqual(panel.other_user_copy(data), folder, 'a copy without metadata')
+            for name, expected in [(str(panel.COMPANION_VERSION - 1), folder), (str(panel.COMPANION_VERSION + 1), folder),
+                                   (panel.COMPANION_VERSION, folder), (str(panel.COMPANION_VERSION), None)]:
+                (folder / 'metadata.json').write_text(json.dumps({'uuid': panel.UUID, 'version-name': name}))
+                self.assertEqual(panel.other_user_copy(data), expected, name)
+            (folder / 'metadata.json').write_text('[')
+            self.assertEqual(panel.other_user_copy(data), folder)
+            self.assertTrue(folder.is_dir(), 'setup never removes it')
+        # GNOME may still report the current version loaded: the next login loads the other copy.
+        current = {'state': 1, 'version-name': str(panel.COMPANION_VERSION)}
+        for info, enabled in [(current, True), ({'state': 1, 'version-name': '18'}, True), ({}, False)]:
+            status = panel.classify('50.1', True, info, enabled, False, Path.home() / '.local/share/gnome-shell/extensions' / panel.UUID)
+            self.assertEqual(status['status'], 'blocked', info)
+            self.assertFalse(status['canEnable'], 'enabling would load the other copy')
+            self.assertIn(f'~/.local/share/gnome-shell/extensions/{panel.UUID}', status['detail'])
+            self.assertIn('Remove that folder', status['detail'])
+        self.assertIn('/srv/data/', panel.classify('50.1', True, {}, True, False, Path('/srv/data/x'))['detail'])
+        self.assertEqual(panel.classify('50.1', False, {}, True, False, Path('/x'))['status'], 'missing')
+
     def test_debian_maps_every_runtime_extension_file(self):
         import json
         import subprocess

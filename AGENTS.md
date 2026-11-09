@@ -379,7 +379,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   keeps `version-name`. After an upgrade, users re-run panel setup and sign
   out and back in. A copy Shell marked out of date at login (after a
   distribution upgrade, for example) awaits that login: setup may enable it and
-  reports `restart`, never a load error.
+  reports `restart`, never a load error. GNOME loads a per-user copy of the
+  UUID in place of the package's, so setup reports one whose `version-name`
+  isn't the current one as `blocked`, naming its folder; it never removes it.
 - The diagnostics poll, the setup input check and the once-per-launch shortcut
   notice may reuse a companion check for up to 20 s, or 2 s after a failed or
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;

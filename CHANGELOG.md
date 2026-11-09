@@ -10,6 +10,10 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- Panel setup names an older or newer copy of the VOCO panel in your home
+  folder, such as one from extensions.gnome.org, which GNOME loads instead of
+  the one the package installed. It used to ask you to sign out and back in
+  every time, while GNOME kept loading that copy.
 - Install update works on Debian 13, Ubuntu 26.04 and Fedora 44. Their pkexec
   passes the desktop session's umask, usually `0002`, on to VOCO's helper, so
   the folder it copies the release into came out group-writable, and its own
