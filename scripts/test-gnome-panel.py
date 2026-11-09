@@ -26,20 +26,26 @@ report = {'passed': False, 'suite': suite, 'scope': f'GNOME {shell_version.split
 state = dict(version=1, token='1:1', stopSession='1:1', status='idle', description='Ready', canStop=False, canOpen=True, level=0)
 actions = []; attached = []; detached = []; fail_next = []; stalled = []; stall_state = []
 # The companion's pending NextRequest calls, and what it reports back (AGENTS.md, Delivery).
-requests = []; reports = []
-reservations = []; held = []; hold_reservation = []; fail_reservation = []; stop_reservations = []
+requests = []; reports = []; queued = []
+reservations = []; held = []; hold_reservation = []; fail_reservation = []
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 # The synthetic service serves the app's own interface, so it can't drift from panel.rs.
 panel_rs = (Path(__file__).resolve().parents[1] / 'apps/desktop/src-tauri/src/panel.rs').read_text()
 xml = re.search(r'const XML: &str = r#"(.*?)"#;', panel_rs, re.S).group(1)
 SUPPORTED = ('<Alt>d', '<Alt><Shift>d')
-def shortcut_token():
-    # Stop-only field the native app still publishes for a loaded v10 companion.
-    if state['status'] in ('starting','recording','processing') and state.get('stopSession') and state.get('stopAccelerator') in SUPPORTED:
-        return state['stopSession'] + '/' + state['stopAccelerator']
-    return None
 def snapshot():
-    return json.dumps({**state, 'stopShortcutToken': shortcut_token()})
+    return json.dumps(state)
+def give(kind, request_id=0):
+    # As panel.rs: the newest pending NextRequest, the current attachment's,
+    # takes the work, or the next call does; changes coalesce.
+    if requests:
+        invocation = requests.pop()
+        while requests: requests.pop().return_value(GLib.Variant('(su)', ('idle', 0)))
+        invocation.return_value(GLib.Variant('(su)', (kind, request_id)))
+    elif kind not in queued: queued.append(kind)
+def changed():
+    # VOCO tells the companion of a change through its pending call (AGENTS.md).
+    give('changed')
 def method(connection, sender, path, interface, name, params, invocation):
     if name == 'Attach':
         attached.append(sender); invocation.return_value(GLib.Variant('(b)', (True,)))
@@ -58,9 +64,6 @@ def method(connection, sender, path, interface, name, params, invocation):
         accepted = accelerator in SUPPORTED and accelerator == state.get('shortcutAccelerator')
         reservations.append((time.monotonic(), accelerator, accepted))
         invocation.return_value(GLib.Variant('(b)', (accepted,)))
-    elif name == 'ReserveStopShortcut':
-        stop_reservations.append(params.unpack()[0])
-        invocation.return_value(GLib.Variant('(b)', (params.unpack()[0] == shortcut_token(),)))
     elif name == 'Action':
         action, token = params.unpack()
         # A consumed chord is the plain toggle; the native app decides Start or Stop.
@@ -70,11 +73,12 @@ def method(connection, sender, path, interface, name, params, invocation):
     elif name == 'Detach':
         detached.append(sender); invocation.return_value(None)
     elif name == 'NextRequest':
-        requests.append(invocation)
+        if queued: invocation.return_value(GLib.Variant('(su)', (queued.pop(0), 0)))
+        else: requests.append(invocation)
     elif name in ('PasteDone', 'PasteRefused', 'ModifiersState'):
         reports.append((name, params.unpack())); invocation.return_value(None)
-registration = bus.register_object('/org/voco/Panel', Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0], method, None, None)
-owner = Gio.bus_own_name_on_connection(bus, 'org.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
+registration = bus.register_object('/com/sergiopesch/voco/Panel', Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0], method, None, None)
+owner = Gio.bus_own_name_on_connection(bus, 'com.sergiopesch.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
 def pump(seconds):
     end = time.monotonic() + seconds
     while time.monotonic() < end:
@@ -228,7 +232,7 @@ try:
         assert checked.returncode == 0 and 'active' in checked.stdout, checked
         report['freshPanelSetup']['afterSessionRestart'] = checked.stdout
     def native_bridge():
-        # The real app takes over org.voco.Panel from the synthetic service.
+        # The real app takes over com.sergiopesch.voco.Panel from the synthetic service.
         global owner, app
         Gio.bus_unown_name(owner); owner=None; pump(.3)
         assert not inspect()['indicator']['visible'], 'The synthetic service stayed attached'
@@ -249,24 +253,25 @@ try:
         report['staleTrayIconsRemoved'] = True
         native = json.loads(call('NativeState').unpack()[0])
         assert native['version'] == 1 and not native['canStop'], native
-        assert native.get('shortcutAccelerator') == '<Alt>d' and native.get('stopShortcutToken') is None, native
+        # Only a companion from before v17 read the Stop-only fields.
+        assert native.get('shortcutAccelerator') == '<Alt>d', native
+        assert 'stopAccelerator' not in native and 'stopShortcutToken' not in native, native
         report['nativeBridgeState'] = native
         try:
-            bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
+            bus.call_sync('com.sergiopesch.voco.Panel','/com/sergiopesch/voco/Panel','com.sergiopesch.voco.Panel1','GetState',None,None,Gio.DBusCallFlags.NONE,1500,None)
             raise AssertionError('Unattached client read native panel state')
         except GLib.Error as error:
             assert 'NotAttached' in str(error), error
         report['unattachedClientRejected'] = True
         for name, params in (('ReserveShortcut', GLib.Variant('(s)', ('<Alt>d',))),
-                             ('ReserveStopShortcut', GLib.Variant('(s)', (native['token'],))),
                              ('Action', GLib.Variant('(ss)', ('shortcut', '')))):
             try:
-                bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
+                bus.call_sync('com.sergiopesch.voco.Panel','/com/sergiopesch/voco/Panel','com.sergiopesch.voco.Panel1',name,params,None,Gio.DBusCallFlags.NONE,1500,None)
                 raise AssertionError(f'Unattached client called {name}')
             except GLib.Error as error:
                 assert 'NotAttached' in str(error), error
         report['unattachedShortcutReservationRejected'] = True
-        attach = bus.call_sync('org.voco.Panel','/org/voco/Panel','org.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
+        attach = bus.call_sync('com.sergiopesch.voco.Panel','/com/sergiopesch/voco/Panel','com.sergiopesch.voco.Panel1','Attach',None,None,Gio.DBusCallFlags.NONE,1500,None).unpack()[0]
         assert attach is False
         report['nonShellAttachRejected'] = True
         screenshot('native-bridge')
@@ -341,7 +346,7 @@ try:
         if animated: call('SlowDown', GLib.Variant('(d)', (8.0,)))
         state.update(token=f'1:{i+1}',status=status,description=status,canStop=status in ('starting','recording'),canOpen=status not in ('starting','recording','processing'),canQuit=status not in ('starting','recording','processing'),level=.8 if status=='recording' else 0)
         if attached:
-            bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
+            changed()
         if animated:
             settled = report['states'][f'{i-1}-{sequence[i-1]}']['indicator']['width']
             for _ in range(400):
@@ -408,11 +413,11 @@ try:
                 call('Menu'); pump(.1)
             # A VOCO that sends no canQuit can't quit from the menu, which then offers no Quit.
             quit_flag = state.pop('canQuit'); state['token'] += 'q'
-            bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None); pump(.3)
+            changed(); pump(.3)
             older = {item['text']: item for item in inspect()['menu']['items']}
             assert not older['Quit VOCO']['visible'], older
             state['canQuit'] = quit_flag; state['token'] = state['token'][:-1]
-            bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None); pump(.3)
+            changed(); pump(.3)
         elif status == 'recording':
             screenshot('recording-menu')
             call('MenuAction', GLib.Variant('(s)', ('Stop dictation',))); pump(.2)
@@ -486,7 +491,7 @@ try:
     subprocess.run(['gsettings','set','org.gnome.desktop.interface','gtk-theme','HighContrast'],check=True)
     pump(.5); screenshot('high-contrast')
     fail_next.append(True)
-    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
+    changed()
     pump(.2)
     assert not inspect()['indicator']['visible']
     pump(2.5)
@@ -495,7 +500,7 @@ try:
     Gio.bus_unown_name(owner); owner=None; pump(.3)
     assert not inspect()['indicator']['visible']
     report['disconnectHidden']=True
-    owner = Gio.bus_own_name_on_connection(bus, 'org.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
+    owner = Gio.bus_own_name_on_connection(bus, 'com.sergiopesch.voco.Panel', Gio.BusNameOwnerFlags.NONE, None, None)
     pump(.5)
     assert inspect()['indicator']['visible']
     report['reconnectVisible'] = True
@@ -526,38 +531,53 @@ try:
         ids=subprocess.check_output(['xdotool','search','--pid',str(shell.pid)],env=xenv,text=True).splitlines()
         subprocess.run(['xdotool','windowfocus',ids[0]],env=xenv,check=True)
         def keys(*args): subprocess.run(['xdotool',*args],env=xenv,check=True,timeout=3)
-    def modifiers_clear():
-        return bus.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1',
-            'ModifiersClear', None, None, Gio.DBusCallFlags.NO_AUTO_START, 1500, None).unpack()[0]
-    unauthorized = Gio.DBusConnection.new_for_address_sync(os.environ['DBUS_SESSION_BUS_ADDRESS'],
-        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
-    try:
-        unauthorized.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1',
-            'ModifiersClear', None, None, Gio.DBusCallFlags.NO_AUTO_START, 1500, None)
-        raise AssertionError('Unattached application read compositor input state')
-    except GLib.Error as error:
-        assert 'NotAttached' in str(error), error
-    finally: unauthorized.close_sync(None)
-    # This fixture answers the companion only while it pumps. Loading GTK can
-    # outlast the companion's 1.5-second call timeout; the companion then
-    # detaches and attaches again 2 seconds later, as it would from a stalled app.
-    deadline = time.monotonic() + 5
-    while True:
-        try: ready = modifiers_clear(); break
-        except GLib.Error as error:
-            if 'NotAttached' not in str(error) or time.monotonic() > deadline: raise
-            pump(.05)
-    report['reattachedAfterFixtureStall'] = len(detached) > detaches
-    assert ready
     def wait_for(predicate, seconds):
         end = time.monotonic() + seconds
         while not predicate() and time.monotonic() < end: pump(.01)
         return predicate()
+    request_ids = iter(range(1, 1_000_000))
+    def take_request():
+        # Work goes to the newest call, the current attachment's, as VOCO answers
+        # it; earlier ones belong to attachments that are gone.
+        assert wait_for(lambda: requests, 2), 'the companion must ask for work'
+        invocation = requests.pop()
+        while requests: requests.pop().return_value(GLib.Variant('(su)', ('idle', 0)))
+        return invocation
+    def hand_out(kind):
+        request_id = next(request_ids)
+        invocation = take_request(); started = time.monotonic()
+        invocation.return_value(GLib.Variant('(su)', (kind, request_id)))
+        return request_id, started
+    def report_on(request_id, timeout=2):
+        found = lambda: [r for r in reports if r[1][0] == request_id]
+        return found()[0] if wait_for(found, timeout) else None
+    # The companion keeps no interface for a VOCO from before NextRequest,
+    # which owned only org.voco.Panel and can't attach to this copy.
+    try:
+        bus.call_sync('org.gnome.Shell', '/org/voco/PanelInput', 'org.voco.PanelInput1',
+            'ModifiersClear', None, None, Gio.DBusCallFlags.NO_AUTO_START, 1500, None)
+        raise AssertionError('The companion still answers ModifiersClear')
+    except GLib.Error as error:
+        assert Gio.DBusError.get_remote_error(error) in ('org.freedesktop.DBus.Error.UnknownMethod',
+            'org.freedesktop.DBus.Error.UnknownObject', 'org.freedesktop.DBus.Error.UnknownInterface'), error
+    report['legacyModifiersClearGone'] = True
+    # This fixture answers the companion only while it pumps. Loading GTK can
+    # outlast the companion's 1.5-second call timeout; the companion then
+    # detaches and attaches again 2 seconds later, as it would from a stalled app.
+    # A call from an attachment that is gone takes the work and reports nothing.
+    deadline = time.monotonic() + 5
+    while True:
+        ready = None
+        if wait_for(lambda: requests, 1):
+            request_id, _ = hand_out('modifiers'); ready = report_on(request_id, 1)
+        if ready or time.monotonic() > deadline: break
+    report['reattachedAfterFixtureStall'] = len(detached) > detaches
+    assert ready and ready[0] == 'ModifiersState' and ready[1][1] is True, ready
     def shortcut_state(status, accelerator='<Alt>d'):
         state.update(token='2:'+str(time.monotonic_ns()),status=status,canStop=status in ('starting','recording'),
                      stopSession='2:1',canOpen=status=='idle',
-                     shortcutAccelerator=accelerator,stopAccelerator=accelerator)
-        bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None);pump(.3)
+                     shortcutAccelerator=accelerator)
+        changed();pump(.3)
     def press(combo):
         # (reached the focused field, panel actions sent) for one tapped chord.
         leaked.clear();entry.select_region(-1,-1);before=len(actions)
@@ -585,7 +605,7 @@ try:
     for status in ('starting', 'recording', 'processing', 'attention', 'idle'):
         shortcut_state(status)
         assert press('alt+d') == consumed, status
-    # Renewal is a heartbeat, independent of state polling and Changed signals.
+    # Renewal is a heartbeat, independent of state polling and 'changed' work.
     mark=len(reservations);pump(2.5)
     renewals=reservations[mark:]
     renewal_gaps=[round(later[0]-earlier[0],3) for earlier,later in zip(renewals,renewals[1:])]
@@ -610,7 +630,7 @@ try:
     hold_reservation.append(True)
     assert wait_for(lambda: held, 1.3), 'fixture must hold a renewal'
     stall_state.append(True)
-    bus.emit_signal(attached[-1], '/org/voco/Panel', 'org.voco.Panel1', 'Changed', None)
+    changed()
     assert wait_for(lambda: stalled, .5), 'fixture must hold a state read'
     for pending in held: pending.return_value(GLib.Variant('(b)', (False,)))
     held.clear();hold_reservation.clear();pump(.03)
@@ -641,7 +661,7 @@ try:
     assert press('alt+shift+d') == consumed, 'an attached companion must regrab'
     Gio.bus_unown_name(owner);owner=None;pump(.2)
     assert press('alt+shift+d') == released, 'disconnect must release the compositor shortcut'
-    owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None);pump(.5)
+    owner=Gio.bus_own_name_on_connection(bus,'com.sergiopesch.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None);pump(.5)
     assert press('alt+shift+d') == consumed, 'reconnect must regrab'
     before_detach=len(detached)
     subprocess.run(['gnome-extensions','disable','voco-panel@sergiopesch.com'],check=True);pump(.3)
@@ -651,7 +671,6 @@ try:
     assert press('alt+shift+d') == consumed, 'enable must regrab'
     shortcut_state('idle', None)
     assert press('alt+shift+d') == released and press('alt+d') == released, 'no supported chord must release the grab'
-    assert not stop_reservations, 'the companion must not use the v10 Stop reservation'
     assert entry.get_text() == 'Keep my dictated words', entry.get_text()
     # Paste: VOCO's keys typed from inside the Shell (AGENTS.md, Delivery). A field
     # in its own process times each Insert press as the compositor delivers it,
@@ -682,22 +701,6 @@ try:
         def close(self):
             self.process.terminate(); self.process.wait(timeout=5); pump(.3)
     SHIFT_KEY, INSERT_KEY = 42, 110
-    request_ids = iter(range(1, 1_000_000))
-    def take_request():
-        # Work goes to the newest call, the current attachment's, as VOCO answers
-        # it; earlier ones belong to attachments that are gone.
-        assert wait_for(lambda: requests, 2), 'the companion must ask for work'
-        invocation = requests.pop()
-        while requests: requests.pop().return_value(GLib.Variant('(su)', ('idle', 0)))
-        return invocation
-    def hand_out(kind):
-        request_id = next(request_ids)
-        invocation = take_request(); started = time.monotonic()
-        invocation.return_value(GLib.Variant('(su)', (kind, request_id)))
-        return request_id, started
-    def report_on(request_id, timeout=2):
-        found = lambda: [r for r in reports if r[1][0] == request_id]
-        return found()[0] if wait_for(found, timeout) else None
     class MutterKeys:
         """Mutter's RemoteDesktop API, which GNOME Remote Desktop and the portal use:
         the baseline Paste must keep up with."""
@@ -823,8 +826,8 @@ try:
         assert modifiers_clear(), f'{modifier} release must restore paste readiness'
     Gio.bus_unown_name(owner);owner=None;call('Overview');pump(.4)
     window.destroy();pump(.2)
-    owner=Gio.bus_own_name_on_connection(bus,'org.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
-    state.pop('stopAccelerator',None);state.pop('shortcutAccelerator',None);pump(.4)
+    owner=Gio.bus_own_name_on_connection(bus,'com.sergiopesch.voco.Panel',Gio.BusNameOwnerFlags.NONE,None,None)
+    state.pop('shortcutAccelerator',None);pump(.4)
     report['shortcutProtection']={'realCompositorKeys':True,'idleConsumed':True,'heldChordTogglesOnce':True,'heldModifierWait':True,
         'everyStatusConsumed':True,'renewalGaps':renewal_gaps,'changedChordRegrabbed':True,'staleRepliesIsolated':True,
         'rejectedRenewalReleased':True,'unresponsiveAppReleasedAfter':unresponsive_released,'failedRenewalReattached':True,

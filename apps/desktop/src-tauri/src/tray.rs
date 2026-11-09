@@ -718,12 +718,8 @@ pub fn panel_snapshot(app: &tauri::AppHandle) -> Option<serde_json::Value> {
     let state = state.lock().ok()?;
     let mut presentation = panel_presentation(&state.runtime);
     let accelerator = panel_accelerator(crate::is_wayland_session(), &state.current_hotkey);
-    // The companion grabs shortcutAccelerator whenever attached; an older companion still
-    // loaded in the Shell reads only the Stop fields until the session restarts.
+    // The companion grabs shortcutAccelerator whenever attached.
     presentation["shortcutAccelerator"] = serde_json::json!(accelerator);
-    presentation["stopAccelerator"] = serde_json::json!(accelerator);
-    presentation["stopShortcutToken"] =
-        serde_json::json!(crate::panel::stop_shortcut_token(&presentation));
     Some(presentation)
 }
 

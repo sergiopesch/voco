@@ -182,8 +182,8 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
    the new helper, shows CLIPBOARD has switched; PRIMARY, which nothing reads
    that way, has only its head start.
 5. It waits up to 1.5 seconds for the shortcut's modifier keys to be released.
-   On Wayland it reads evdev, or asks the GNOME companion through
-   `ModifiersClear`; unknown state doesn't block. On X11 VOCO's grab receives
+   On Wayland it reads evdev, or asks the GNOME companion with a `modifiers`
+   request; unknown state doesn't block. On X11 VOCO's grab receives
    every key while the chord is held, so the paste waits for the release. It
    also waits while the X server reports Shift, Control, Alt, Super or AltGr
    held: the Shift of Shift+Insert would turn a shortcut someone is pressing,
@@ -242,9 +242,9 @@ removes the device and releases any key it still held.
 
 On GNOME with the companion attached, the companion types the keys instead.
 VOCO never calls the Shell, because a confined VOCO can't: snapd's `dbus` slot
-lets a snap receive from unconfined peers, never send to them. So from version
-17 the companion asks VOCO for work. It keeps one `org.voco.Panel1.NextRequest`
-call pending, and VOCO answers it with each paste, modifier check and change of
+lets a snap receive from unconfined peers, never send to them. So the companion
+asks VOCO for work. It keeps one `com.sergiopesch.voco.Panel1.NextRequest` call
+pending, and VOCO answers it with each paste, modifier check and change of
 its state, in order, or with nothing after 20 seconds. The call stays on the
 thread that serves the panel, because gio's invocations can't cross threads;
 the paste thread hands it work through that thread's main context, and takes
@@ -258,9 +258,8 @@ monotonic time with `PasteDone`, which VOCO reads as the press for step 7. VOCO
 accepts a report only from the attached Shell and only for its open request, and
 waits up to 1 second for it. GNOME disables the companion at the lock screen,
 and disabling it mid-gesture releases any key it holds and reports the paste
-cut short. A Shell still running a copy from before version 17 keeps VOCO's own
-keyboard, and VOCO sends it `Changed` and asks it `ModifiersClear` as before.
-The screen lock and origin checks run on this route too.
+cut short. Until the attached companion's first `NextRequest`, the `.deb` and
+RPM keep VOCO's own keyboard. The screen lock and origin checks run on this route too.
 
 A failed paste has one of three outcomes:
 
@@ -331,14 +330,16 @@ Shell without it as Wayland. A primary click on the pill stops or opens
 Settings, and other buttons, Menu and Shift+F10 open the menu; from GNOME 50 the
 panel button's click gesture leaves primary presses and touches to the pill.
 
-The companion talks to `org.voco.Panel1` on the session bus at `/org/voco/Panel`.
+The companion talks to `com.sergiopesch.voco.Panel1` on the session bus at
+`/com/sergiopesch/voco/Panel`. The name sits under the maintainer's own domain,
+as the Snap Store requires of the snap's `dbus` slot. A VOCO or companion from
+before version 19 speaks only `org.voco.Panel`, so neither reaches the other: a
+companion GNOME loaded before an upgrade stays detached until the next login.
 `Attach` succeeds only for the current owner of `org.gnome.Shell` and hides the
 tray. When the companion calls `Detach`, or stops calling `GetState` for more
-than 5 seconds, VOCO drops the lease and shows the tray again. From version 17
-the companion also asks VOCO for work with `NextRequest`, which VOCO answers with
-pastes, modifier checks and state changes (see [Delivery](#delivery)). For an
-earlier companion VOCO calls back into its `org.voco.PanelInput1.ModifiersClear`
-before a Wayland paste when evdev can't read the keyboards.
+than 5 seconds, VOCO drops the lease and shows the tray again. The companion
+also asks VOCO for work with `NextRequest`, which VOCO answers with pastes,
+modifier checks and state changes (see [Delivery](#delivery)).
 The [GNOME companion guide](../../integrations/gnome/README.md) describes the
 full interface.
 

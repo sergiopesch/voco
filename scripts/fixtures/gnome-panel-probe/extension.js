@@ -88,7 +88,7 @@ export default class Probe extends Extension {
         });
     }
     NativeState() {
-        return Gio.DBus.session.call_sync('org.voco.Panel', '/org/voco/Panel', 'org.voco.Panel1',
+        return Gio.DBus.session.call_sync('com.sergiopesch.voco.Panel', '/com/sergiopesch/voco/Panel', 'com.sergiopesch.voco.Panel1',
             'GetState', null, null, Gio.DBusCallFlags.NO_AUTO_START, 1500, null).deep_unpack()[0];
     }
     Overview() { Main.overview.hide(); }

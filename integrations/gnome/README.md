@@ -79,20 +79,23 @@ nothing, because VOCO's own grab consumes the chord.
 
 ## D-Bus interface
 
-VOCO owns `org.voco.Panel` on the session bus and serves `org.voco.Panel1` at
-`/org/voco/Panel`.
+VOCO owns `com.sergiopesch.voco.Panel` on the session bus and serves
+`com.sergiopesch.voco.Panel1` at `/com/sergiopesch/voco/Panel`. The name sits
+under the maintainer's own domain, as the Snap Store requires of the snap's
+`dbus` slot. A VOCO or companion from before version 19 speaks only
+`org.voco.Panel`, so neither reaches the other: after an upgrade, a companion
+GNOME loaded earlier stays detached until you sign out and back in.
 
 | Member | Behaviour |
 | --- | --- |
 | `Attach() → b` | True only when the caller owns `org.gnome.Shell`. Hides VOCO's tray and clears any lease. |
 | `GetState() → s` | The state as JSON. Each call keeps the attachment alive. |
 | `ReserveShortcut(s) → b` | Holds the 2.5-second lease when the argument is the configured accelerator. |
-| `ReserveStopShortcut(s) → b` | Holds a 250 ms Stop lease for a `stopSession/accelerator` token, for an earlier companion copy that Shell keeps loaded until the next login. |
 | `Action(s, s) → b` | `shortcut` with an empty token, `stop` with `stopSession`, or `settings`, `open`, `review` or `quit` with `token`. Each Stop token works once. |
 | `Detach()` | Drops the lease and shows the tray. |
-| `Changed` | Signal sent only to the attached connection when the state changes. |
 
-Every method but `Attach` returns `org.voco.NotAttached` to anyone other than
+Every method but `Attach` and `CompanionAsking` returns
+`com.sergiopesch.voco.NotAttached` to anyone other than
 the attached connection. VOCO also drops the lease and shows its tray when no
 `GetState` arrives for more than 5 seconds, and shows its tray when it loses its
 bus name.
@@ -101,13 +104,12 @@ bus name.
 `recording`, `processing`, `attention` or `idle`), `description` (the tray
 menu's status line), `token`, `stopSession`, `canStop`, `canOpen`, `canQuit`, `level` (0
 to 1, only while recording, 0 after 250 ms without a new level),
-`shortcutAccelerator`, `stopAccelerator` and `stopShortcutToken`. The
-accelerators are `<Alt>d`, `<Alt><Shift>d` or null, and null on X11. The
-companion polls every 50 ms while recording, every 1.5 seconds otherwise, and
-at each `Changed`.
+and `shortcutAccelerator`. The accelerator is `<Alt>d`, `<Alt><Shift>d` or
+null, and null on X11. The companion polls every 50 ms while recording, every
+1.5 seconds otherwise, and at each `changed` request below.
 
-From version 17 the companion asks VOCO for work, because a confined VOCO can
-answer GNOME Shell but not call it. After `Attach` it keeps one
+The companion asks VOCO for work, because a confined VOCO can answer GNOME
+Shell but not call it. After `Attach` it keeps one
 `NextRequest() → (s, u)` call pending, with a 30-second timeout, and calls it
 again as soon as VOCO answers. VOCO answers with a kind and a request id, or
 with `idle` after 20 seconds:
@@ -133,10 +135,9 @@ with `idle` after 20 seconds:
 VOCO accepts a report only from the attached Shell and only for its open
 request. `CompanionAsking() → b`, true while the attached companion asks for
 work, is the one method any caller may use: the snap's
-`voco --check-desktop-input` and `--check-panel` run apart from VOCO and ask it. An earlier VOCO, which doesn't know `NextRequest`, answers it with
-`UnknownMethod`, and the companion then stops asking. For it the companion still
-serves `org.voco.PanelInput1.ModifiersClear() → b` at `/org/voco/PanelInput`,
-for the attached VOCO only, and still polls at each `Changed`.
+`voco --check-desktop-input` and `--check-panel` run apart from VOCO and ask
+it. Until the attached companion's first `NextRequest`, the `.deb` and RPM
+paste through VOCO's own uinput keyboard, and the snap refuses the paste.
 
 ## Files and tests
 

@@ -1,4 +1,4 @@
-# Test only: a strict snap that owns org.voco.Panel through a session dbus
+# Test only: a strict snap that owns com.sergiopesch.voco.Panel through a session dbus
 # slot, as a confined VOCO would. scripts/test-snap-dbus-probe.py drives it.
 name: voco-dbus-probe
 base: core24
@@ -20,7 +20,7 @@ slots:
   panel:
     interface: dbus
     bus: session
-    name: org.voco.Panel
+    name: com.sergiopesch.voco.Panel
 
 apps:
   probe:

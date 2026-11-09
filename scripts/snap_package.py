@@ -68,7 +68,7 @@ EXTENSION_APP_PLUGS = ("desktop", "desktop-legacy", "gsettings", "opengl", "wayl
 EXTENSION_CONTENT_PLUGS = {"gtk-3-themes": "gtk-common-themes", "icon-themes": "gtk-common-themes",
                            "sound-themes": "gtk-common-themes", "gnome-46-2404": "gnome-46-2404",
                            "gpu-2404": "mesa-2404"}
-SLOTS = {"panel": {"interface": "dbus", "bus": "session", "name": "org.voco.Panel"}}
+SLOTS = {"panel": {"interface": "dbus", "bus": "session", "name": "com.sergiopesch.voco.Panel"}}
 
 # The metainfo's update item; the snap replaces it with the store's updates.
 UPDATE_ITEM = "Update checks against GitHub Releases, and Install update, which verifies a release's signature before your password installs it; VOCO never updates on its own"
@@ -88,7 +88,7 @@ LICENSE = "MIT AND Apache-2.0"
 # GNOME extension, VOCO's own plugs and the panel slot on the session bus.
 RECIPE_LINES = ("base: core24", "confinement: strict", "grade: stable", "    extensions: [gnome]",
                 f"    plugs: [{', '.join(VOCO_PLUGS)}]", "    slots: [panel]", "  panel:",
-                "    interface: dbus", "    bus: session", "    name: org.voco.Panel")
+                "    interface: dbus", "    bus: session", "    name: com.sergiopesch.voco.Panel")
 # Plugs a reviewer would have to approve, which VOCO never needs.
 UNREVIEWED_PLUGS = ("network", "network-bind", "home", "removable-media", "personal-files",
                     "system-files", "hardware-observe", "system-observe", "raw-usb", "uinput",

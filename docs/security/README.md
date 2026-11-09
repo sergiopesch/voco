@@ -69,10 +69,10 @@ runs. No daemon, socket or service stands between VOCO and the kernel.
 
 On GNOME with the companion attached, the companion presses VOCO's paste keys
 instead, from inside GNOME Shell. It asks the application attached as
-`org.voco.Panel` for its work (`NextRequest`) and takes it from no one else,
-sends only Shift+Insert, never while a modifier is held, and GNOME disables it
-at the lock screen. A program of yours that owned `org.voco.Panel` before VOCO
-started could hand it a Shift+Insert; your access to `/dev/uinput` already lets
+`com.sergiopesch.voco.Panel` for its work (`NextRequest`) and takes it from no
+one else, sends only Shift+Insert, never while a modifier is held, and GNOME
+disables it at the lock screen. A program of yours that owned
+`com.sergiopesch.voco.Panel` before VOCO started could hand it a Shift+Insert; your access to `/dev/uinput` already lets
 any of your programs do that.
 
 The package's udev rule tags `/dev/uinput` with `uaccess`, so logind gives the
@@ -132,8 +132,7 @@ denials.
 | `$XDG_RUNTIME_DIR/voco-activate.sock` | A second `voco` launch, such as a click on VOCO's launcher | The same directory, mode and peer check as the trigger socket. Each connection only presents VOCO's window; it never starts or stops dictation. |
 | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` | VOCO, talking to its IBus engine | Directory 0700, socket 0600, peer checks on both sides, 1-second timeout, requests up to 65,536 bytes and replies up to 64,000. Protocol 6 rejects every text operation. |
 | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` | `voco-browser-host` | Directory 0700 and a socket owned by you with no group or other access; peer user ID must match. |
-| `org.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. `CompanionAsking` tells any caller whether the attached companion asks for work, for the snap's `voco --check-desktop-input` and `--check-panel`. Every other method answers only the attached connection, and VOCO accepts the companion's paste and modifier reports only for the request it has open. |
-| `org.voco.PanelInput1` in GNOME Shell | A VOCO from before `NextRequest`, attached as `org.voco.Panel` | The companion answers only the attached application. `ModifiersClear` reads the compositor's held modifiers. |
+| `com.sergiopesch.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. `CompanionAsking` tells any caller whether the attached companion asks for work, for the snap's `voco --check-desktop-input` and `--check-panel`. Every other method answers only the attached connection, and VOCO accepts the companion's paste and modifier reports only for the request it has open. |
 
 Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger and
 activation sockets move to `voco-<uid>` in the temporary directory, which must
@@ -271,7 +270,7 @@ GNOME extension, which a desktop app needs, it plugs only `audio-playback`,
 device plug, it can't reach the internet, read your home folder outside its own
 folders or open `/dev/uinput` and `/dev/input`. Its settings, journal and logs
 live in `$SNAP_USER_DATA`, and it never reads a package's settings. On the
-session bus it owns `org.voco.Panel` through a `dbus` slot: confinement lets it
+session bus it owns `com.sergiopesch.voco.Panel` through a `dbus` slot: confinement lets it
 answer GNOME Shell's calls but never call the Shell, so the companion asks it
 for work. On Wayland only the companion types for it; on X11 `xdotool` does, as
 for the packages. Until `login-session-observe` is connected, logind refuses
