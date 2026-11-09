@@ -28,7 +28,7 @@ required-features = ["update-helper"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-cc = "=1.10.0"
+cc = "=1.11.1"
 pkg-config = "=0.3.34"
 
 [features]
