@@ -10,7 +10,8 @@
 # downloads from GitHub, verifies, installs through pkexec and APT, and that VOCO
 # restarts as that release. Root's pkexec needs no password; the prompt itself
 # needs a desktop session. VOCO starts with umask 0002, as in an Ubuntu or Fedora
-# desktop session, because pkexec passes it on to the helper. The build's own version and the version check in
+# desktop session. pkexec 126 and later pass it on to the helper; Ubuntu 24.04's
+# pkexec 124 resets it, so only a newer guest catches a helper that relies on it. The build's own version and the version check in
 # verify:versions are untouched: the build happens in a temporary worktree.
 #
 # Usage: VOCO_DISPOSABLE_MACHINE=1 scripts/test-install-update-app.sh [EVIDENCE_DIR]

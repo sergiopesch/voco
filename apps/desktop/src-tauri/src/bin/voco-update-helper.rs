@@ -70,8 +70,8 @@ fn run(arguments: Vec<std::ffi::OsString>) -> Outcome {
     if unsafe { libc::geteuid() } != 0 {
         return Err(refuse("runs only as root, through pkexec"));
     }
-    // pkexec keeps the caller's umask, and a desktop session's is often 0002,
-    // which would leave what the helper creates writable by its group.
+    // pkexec 126 and later keep the caller's umask, and a desktop session's is
+    // often 0002, which would leave what the helper creates writable by its group.
     // SAFETY: umask has no preconditions.
     unsafe { libc::umask(0o022) };
     let owner: libc::uid_t = std::env::var("PKEXEC_UID")
