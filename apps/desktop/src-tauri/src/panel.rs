@@ -8,35 +8,37 @@ use std::time::{Duration, Instant};
 use tauri::Manager;
 use webkit2gtk::gio;
 
-const PATH: &str = "/org/voco/Panel";
-const INTERFACE: &str = "org.voco.Panel1";
-const XML: &str = r#"<node><interface name="org.voco.Panel1">
+// Under the maintainer's own domain, as the Snap Store requires of the snap's
+// dbus slot. A companion from before this name speaks only org.voco.Panel and
+// never attaches here (AGENTS.md).
+const NAME: &str = "com.sergiopesch.voco.Panel";
+const PATH: &str = "/com/sergiopesch/voco/Panel";
+const INTERFACE: &str = "com.sergiopesch.voco.Panel1";
+const XML: &str = r#"<node><interface name="com.sergiopesch.voco.Panel1">
 <method name="Attach"><arg type="b" direction="out"/></method>
 <method name="GetState"><arg type="s" direction="out"/></method>
 <method name="ReserveShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
-<method name="ReserveStopShortcut"><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
 <method name="Action"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="b" direction="out"/></method>
-<method name="Detach"/><signal name="Changed"/>
+<method name="Detach"/>
 <method name="NextRequest"><arg type="s" direction="out"/><arg type="u" direction="out"/></method>
 <method name="PasteDone"><arg type="u" direction="in"/><arg type="t" direction="in"/></method>
 <method name="PasteRefused"><arg type="u" direction="in"/><arg type="s" direction="in"/></method>
 <method name="ModifiersState"><arg type="u" direction="in"/><arg type="b" direction="in"/></method>
 <method name="CompanionAsking"><arg type="b" direction="out"/></method>
 </interface></node>"#;
+const NOT_ATTACHED: &str = "com.sergiopesch.voco.NotAttached";
+const UNAVAILABLE: &str = "com.sergiopesch.voco.Unavailable";
+const UNKNOWN_REQUEST: &str = "com.sergiopesch.voco.UnknownRequest";
+const UNKNOWN_METHOD: &str = "com.sergiopesch.voco.UnknownMethod";
 /// ReserveShortcut: the companion holds its grab at every status and renews it about
 /// once a second.
 const SHORTCUT_LEASE: Duration = Duration::from_millis(2500);
-/// ReserveStopShortcut: an older companion still loaded in the Shell renews its Stop-only
-/// grab on every active poll.
-const STOP_LEASE: Duration = Duration::from_millis(250);
-static BUS: Mutex<Option<gio::DBusConnection>> = Mutex::new(None);
 static OWNER: Mutex<Option<String>> = Mutex::new(None);
 static LEVEL: Mutex<Option<(u64, f64, Instant)>> = Mutex::new(None);
-// The attached Shell's latest proven grab: a ReserveShortcut accelerator or a
-// ReserveStopShortcut "session/accelerator" token. The two key spaces cannot collide.
+// The attached Shell's latest proven grab: a ReserveShortcut accelerator.
 static SHORTCUT_UNTIL: Mutex<Option<(String, Instant)>> = Mutex::new(None);
 // The attached Shell once its companion asks for work with NextRequest: it
-// takes the paste keys. A Shell still running an older copy keeps uinput.
+// takes the paste keys. Until its first call, VOCO pastes through uinput.
 static ASKING: Mutex<Option<String>> = Mutex::new(None);
 // The request VOCO waits on, its next id, and the serving thread's context,
 // where the companion's pending call waits.
@@ -46,7 +48,7 @@ static SERVE_CONTEXT: Mutex<Option<glib::MainContext>> = Mutex::new(None);
 // The companion reports a paste once its 36 ms gesture is out; longer means the
 // Shell is stuck, and its keys may or may not have gone.
 const PASTE_TIMEOUT: Duration = Duration::from_millis(1000);
-// A modifier check answers within ModifiersClear's 150 ms.
+// A modifier check waits at most this long; the companion reads its state at once.
 const MODIFIERS_TIMEOUT: Duration = Duration::from_millis(150);
 // How long withdrawing a request waits for the serving thread.
 const WITHDRAW_TIMEOUT: Duration = Duration::from_millis(500);
@@ -61,9 +63,7 @@ pub(crate) fn reserves_current_shortcut(app: &tauri::AppHandle) -> bool {
 }
 
 fn reserves(state: &serde_json::Value) -> bool {
-    is_attached()
-        && (holds_shortcut(state)
-            || stop_shortcut_token(state).is_some_and(|token| lease_matches(&token)))
+    is_attached() && holds_shortcut(state)
 }
 
 /// One fresh reservation decides both routes: while it suppresses passive evdev,
@@ -125,58 +125,21 @@ fn set_owner(sender: Option<String>) {
 }
 
 /// Sample the authenticated compositor, not an asynchronously polled shortcut
-/// flag. An ordinary streaming paste may race the physical Stop chord. A
-/// companion that asks for work answers a modifier request; an earlier one
-/// answers ModifiersClear itself.
+/// flag. An ordinary streaming paste may race the physical Stop chord. Only a
+/// companion that asks for work can answer.
 pub(crate) fn paste_modifiers_clear() -> Result<bool, String> {
-    if companion_asks_for_work() {
-        let id = next_request_id();
-        return match ask(Request::Modifiers(id), id, MODIFIERS_TIMEOUT) {
-            Ok(Report::Modifiers(clear)) => Ok(clear),
-            _ => {
-                Err("Could not verify released keyboard modifiers; no paste keys were sent.".into())
-            }
-        };
+    if !companion_asks_for_work() {
+        return Err("The GNOME panel isn't asking for work; no paste keys were sent.".into());
     }
-    let owner = OWNER
-        .lock()
-        .ok()
-        .and_then(|owner| owner.clone())
-        .ok_or("The GNOME panel is unavailable; no paste keys were sent.")?;
-    let bus = BUS
-        .lock()
-        .ok()
-        .and_then(|bus| bus.clone())
-        .ok_or("The GNOME panel connection is unavailable; no paste keys were sent.")?;
-    let clear = bus
-        .call_sync(
-            Some(&owner),
-            "/org/voco/PanelInput",
-            "org.voco.PanelInput1",
-            "ModifiersClear",
-            None,
-            None,
-            gio::DBusCallFlags::NO_AUTO_START,
-            150,
-            gio::Cancellable::NONE,
-        )
-        .ok()
-        .and_then(|value| value.get::<(bool,)>())
-        .map(|(clear,)| clear)
-        .ok_or_else(|| {
-            "Could not verify released keyboard modifiers; no paste keys were sent.".to_string()
-        })?;
-    if !OWNER
-        .lock()
-        .is_ok_and(|current| current.as_ref() == Some(&owner))
-    {
-        return Err("The GNOME panel changed; no paste keys were sent.".into());
+    let id = next_request_id();
+    match ask(Request::Modifiers(id), id, MODIFIERS_TIMEOUT) {
+        Ok(Report::Modifiers(clear)) => Ok(clear),
+        _ => Err("Could not verify released keyboard modifiers; no paste keys were sent.".into()),
     }
-    Ok(clear)
 }
 
 /// Whether the attached Shell's companion asks VOCO for work, so it takes the
-/// paste keys: version 17 and later, from its first NextRequest.
+/// paste keys: from its first NextRequest in this attachment.
 pub(crate) fn companion_asks_for_work() -> bool {
     let Some(owner) = OWNER.lock().ok().and_then(|owner| owner.clone()) else {
         return false;
@@ -187,7 +150,7 @@ pub(crate) fn companion_asks_for_work() -> bool {
 }
 
 /// Whether the companion asks VOCO for work. The VOCO that serves
-/// org.voco.Panel knows; another process, such as `voco --check-desktop-input`,
+/// the bridge knows; another process, such as `voco --check-desktop-input`,
 /// asks that VOCO. None when no VOCO answers.
 pub(crate) fn companion_asks_for_voco() -> Option<bool> {
     if SERVE_CONTEXT.lock().is_ok_and(|context| context.is_some()) {
@@ -196,11 +159,11 @@ pub(crate) fn companion_asks_for_voco() -> Option<bool> {
     ask_running_voco()
 }
 
-/// The answer of the VOCO that serves org.voco.Panel, within half a second.
+/// The answer of the VOCO that serves the bridge, within half a second.
 pub(crate) fn ask_running_voco() -> Option<bool> {
     let bus = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE).ok()?;
     bus.call_sync(
-        Some("org.voco.Panel"),
+        Some(NAME),
         PATH,
         INTERFACE,
         "CompanionAsking",
@@ -322,7 +285,7 @@ fn end_requests() {
         work.queue.clear();
         if let Some((invocation, timer)) = work.pending.take() {
             timer.remove();
-            invocation.return_dbus_error("org.voco.NotAttached", "The VOCO panel detached");
+            invocation.return_dbus_error(NOT_ATTACHED, "The VOCO panel detached");
         }
     });
 }
@@ -379,14 +342,14 @@ fn ask(request: Request, id: u32, timeout: Duration) -> Result<Report, Unanswere
 /// A report from the attached Shell, accepted only for VOCO's open request.
 fn report_for(id: u32, report: Report) -> Reply {
     let Ok(open) = OPEN.lock() else {
-        return Err(("org.voco.Unavailable", "Panel unavailable"));
+        return Err((UNAVAILABLE, "Panel unavailable"));
     };
     match open.as_ref() {
         Some(open) if open.id == id => {
             let _ = open.report.send(report);
             Ok(None)
         }
-        _ => Err(("org.voco.UnknownRequest", "No such request is open")),
+        _ => Err((UNKNOWN_REQUEST, "No such request is open")),
     }
 }
 
@@ -457,46 +420,19 @@ pub fn clear_shortcut() {
     }
 }
 
-/// ReserveStopShortcut token: follows a capture and its configured chord, not UI revisions.
-pub(crate) fn stop_shortcut_token(state: &serde_json::Value) -> Option<String> {
-    if !matches!(
-        state["status"].as_str(),
-        Some("starting" | "recording" | "processing")
-    ) {
-        return None;
-    }
-    let session = state["stopSession"]
-        .as_str()
-        .filter(|value| !value.is_empty())?;
-    let accelerator = state["stopAccelerator"]
-        .as_str()
-        .filter(|value| is_preset_accelerator(value))?;
-    Some(format!("{session}/{accelerator}"))
-}
-
-fn valid_shortcut_reservation(state: &serde_json::Value, token: &str) -> bool {
-    stop_shortcut_token(state).as_deref() == Some(token)
-}
-
-/// Wake only the attached shell when authoritative state changes; meter frames
-/// remain bounded polling and no state is broadcast to unrelated bus clients.
-/// A companion that asks for work hears of it through its pending call; an
-/// earlier one listens for Changed.
+/// Wake only the attached shell when authoritative state changes, through its
+/// pending call; meter frames remain bounded polling and no state is broadcast
+/// to unrelated bus clients.
 pub fn publish() {
-    if companion_asks_for_work() {
-        if let Some(context) = SERVE_CONTEXT
-            .lock()
-            .ok()
-            .and_then(|context| context.clone())
-        {
-            context.invoke(|| give(Request::Changed));
-        }
+    if !companion_asks_for_work() {
         return;
     }
-    if let (Ok(bus), Ok(owner)) = (BUS.lock(), OWNER.lock()) {
-        if let (Some(bus), Some(owner)) = (bus.as_ref(), owner.as_ref()) {
-            let _ = bus.emit_signal(Some(owner), PATH, INTERFACE, "Changed", None);
-        }
+    if let Some(context) = SERVE_CONTEXT
+        .lock()
+        .ok()
+        .and_then(|context| context.clone())
+    {
+        context.invoke(|| give(Request::Changed));
     }
 }
 
@@ -606,23 +542,13 @@ fn handle(
         return Ok(Some((companion_asks_for_work(),).to_variant()));
     }
     if !lease.admits(sender) {
-        return Err(("org.voco.NotAttached", "Attach from GNOME Shell first"));
+        return Err((NOT_ATTACHED, "Attach from GNOME Shell first"));
     }
     let accepted = match method {
         "ReserveShortcut" => {
             let (accelerator,) = parameters.get::<(String,)>().unwrap_or_default();
             host.snapshot()
                 .is_some_and(|state| reserve_shortcut(&state, &accelerator))
-        }
-        "ReserveStopShortcut" => {
-            let (token,) = parameters.get::<(String,)>().unwrap_or_default();
-            let accepted = host
-                .snapshot()
-                .is_some_and(|state| valid_shortcut_reservation(&state, &token));
-            if accepted {
-                reserve(&token, STOP_LEASE);
-            }
-            accepted
         }
         "Action" => {
             let (action, token) = parameters.get::<(String, String)>().unwrap_or_default();
@@ -669,7 +595,7 @@ fn handle(
             let (id, clear) = parameters.get::<(u32, bool)>().unwrap_or_default();
             return report_for(id, Report::Modifiers(clear));
         }
-        _ => return Err(("org.voco.UnknownMethod", "Unknown panel method")),
+        _ => return Err((UNKNOWN_METHOD, "Unknown panel method")),
     };
     Ok(Some((accepted,).to_variant()))
 }
@@ -678,7 +604,7 @@ pub fn setup(app: &tauri::AppHandle) {
     serve(app.clone());
 }
 
-/// Owns org.voco.Panel and answers the attached Shell for host. Its calls run
+/// Owns the bridge's name and answers the attached Shell for host. Its calls run
 /// on the thread-default main context of the caller.
 fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
     if let Ok(mut context) = SERVE_CONTEXT.lock() {
@@ -701,12 +627,9 @@ fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
     let lost_app = app.clone();
     gio::bus_own_name(
         gio::BusType::Session,
-        "org.voco.Panel",
+        NAME,
         gio::BusNameOwnerFlags::DO_NOT_QUEUE,
         move |connection, _| {
-            if let Ok(mut bus) = BUS.lock() {
-                *bus = Some(connection.clone());
-            }
             let info = gio::DBusNodeInfo::for_xml(XML).expect("static panel interface");
             let interface = info.lookup_interface(INTERFACE).expect("panel interface");
             let app = app.clone();
@@ -716,7 +639,7 @@ fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
                 &interface,
                 move |connection, sender, _, _, method, parameters, invocation| {
                     let Ok(mut lease) = lease.lock() else {
-                        invocation.return_dbus_error("org.voco.Unavailable", "Panel unavailable");
+                        invocation.return_dbus_error(UNAVAILABLE, "Panel unavailable");
                         return;
                     };
                     if method == "Attach" {
@@ -752,10 +675,8 @@ fn serve<H: Host + Clone + Send + Sync + 'static>(app: H) {
                     // VOCO can only answer the Shell (AGENTS.md).
                     if method == "NextRequest" {
                         if !lease.admits(sender) {
-                            invocation.return_dbus_error(
-                                "org.voco.NotAttached",
-                                "Attach from GNOME Shell first",
-                            );
+                            invocation
+                                .return_dbus_error(NOT_ATTACHED, "Attach from GNOME Shell first");
                             return;
                         }
                         if let Ok(mut asking) = ASKING.lock() {
@@ -874,7 +795,7 @@ mod tests {
 
     fn idle(accelerator: Option<&str>) -> serde_json::Value {
         serde_json::json!({"token":"3:7", "status":"idle", "canStop":false,
-            "shortcutAccelerator":accelerator, "stopAccelerator":accelerator})
+            "shortcutAccelerator":accelerator})
     }
 
     /// Start from an empty bridge with `sender` attached as the Shell.
@@ -975,7 +896,7 @@ mod tests {
                     "ReserveShortcut",
                     reserve_call("<Alt>d")
                 ),
-                Err("org.voco.NotAttached")
+                Err(NOT_ATTACHED)
             );
         }
         assert!(!reserves(&idle(Some("<Alt>d"))));
@@ -1029,7 +950,7 @@ mod tests {
                 "ReserveShortcut",
                 reserve_call("<Alt>d")
             ),
-            Err("org.voco.NotAttached")
+            Err(NOT_ATTACHED)
         );
     }
 
@@ -1051,7 +972,7 @@ mod tests {
         for (sender, lease) in [(":1.9", &mut lease), (":1.5", &mut Lease::default())] {
             assert_eq!(
                 call(&host, lease, sender, "Action", shortcut_call()),
-                Err("org.voco.NotAttached")
+                Err(NOT_ATTACHED)
             );
         }
         assert_eq!(host.toggles.get(), 0);
@@ -1083,105 +1004,40 @@ mod tests {
     }
 
     #[test]
-    fn loaded_v10_companion_keeps_its_stop_reservation_and_explicit_stop() {
-        let _serial = serial();
-        let state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":"recording",
-            "canStop":true, "stopAccelerator":"<Alt>d", "shortcutAccelerator":"<Alt>d"});
-        let host = fake(state.clone());
-        let mut lease = attach(":1.5");
-        assert_eq!(
-            call(
-                &host,
-                &mut lease,
-                ":1.5",
-                "ReserveStopShortcut",
-                reserve_call("3:1/<Alt>d")
-            ),
-            Ok(true)
-        );
-        assert!(reserves(&state));
-        let mut finished = state.clone();
-        finished["status"] = "idle".into();
-        assert!(!reserves(&finished));
-        // A ReserveStopShortcut token authorizes no plain toggle.
-        assert_eq!(
-            call(&host, &mut lease, ":1.5", "Action", shortcut_call()),
-            Ok(false)
-        );
-        for accepted in [true, false] {
-            assert_eq!(
-                call(
-                    &host,
-                    &mut lease,
-                    ":1.5",
-                    "Action",
-                    ("stop", "3:1").to_variant()
-                ),
-                Ok(accepted)
-            );
-        }
-        assert_eq!(
-            *host.actions.borrow(),
-            vec![("stop".to_owned(), "3:1".to_owned())]
-        );
-        assert_eq!(host.toggles.get(), 0);
-        clear_shortcut();
-        set_owner(None);
-    }
-
-    #[test]
     fn released_or_expired_reservation_does_not_suppress_passive_start() {
         let _serial = serial();
         *SHORTCUT_UNTIL.lock().unwrap() =
-            Some(("3:1/<Alt>d".into(), Instant::now() + Duration::from_secs(1)));
-        assert!(lease_matches("3:1/<Alt>d"));
-        assert!(!lease_matches("3:2/<Alt>d"));
+            Some(("<Alt>d".into(), Instant::now() + Duration::from_secs(1)));
+        assert!(lease_matches("<Alt>d"));
+        assert!(!lease_matches("<Alt><Shift>d"));
         clear_shortcut();
-        assert!(!lease_matches("3:1/<Alt>d"));
-        *SHORTCUT_UNTIL.lock().unwrap() = Some((
-            "3:1/<Alt>d".into(),
-            Instant::now() - Duration::from_millis(1),
-        ));
-        assert!(!lease_matches("3:1/<Alt>d"));
+        assert!(!lease_matches("<Alt>d"));
+        *SHORTCUT_UNTIL.lock().unwrap() =
+            Some(("<Alt>d".into(), Instant::now() - Duration::from_millis(1)));
+        assert!(!lease_matches("<Alt>d"));
         clear_shortcut();
     }
 
     #[test]
-    fn stop_shortcut_requires_current_active_state_and_supported_accelerator() {
-        for status in ["starting", "recording", "processing", "idle", "attention"] {
-            let state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":status, "stopAccelerator":"<Alt>d"});
-            assert_eq!(
-                valid_shortcut_reservation(&state, "3:1/<Alt>d"),
-                matches!(status, "starting" | "recording" | "processing")
-            );
-            assert!(!valid_shortcut_reservation(&state, "3:6"));
-            assert!(!valid_shortcut_reservation(&state, "2:7"));
-        }
-        for accelerator in [None, Some("<Control>v"), Some("")] {
-            let state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":"recording", "stopAccelerator":accelerator});
-            assert!(!valid_shortcut_reservation(&state, "3:1/<Alt>d"));
-        }
-    }
-    #[test]
-    fn reservation_survives_presentation_changes_but_not_authority_changes() {
-        let mut state = serde_json::json!({"token":"3:7", "stopSession":"3:1", "status":"starting", "stopAccelerator":"<Alt>d"});
-        let token = stop_shortcut_token(&state).unwrap();
-        state["token"] = "3:8".into();
-        state["status"] = "recording".into();
-        assert!(valid_shortcut_reservation(&state, &token));
-        for (field, value) in [
-            ("stopSession", "3:2"),
-            ("stopSession", "4:1"),
-            ("stopSession", ""),
-            ("stopAccelerator", "<Alt><Shift>d"),
-            ("status", "idle"),
+    fn the_bridge_lives_under_the_maintainers_domain() {
+        // The Snap Store reviews the snap's dbus slot by its name (#256).
+        for name in [
+            NAME,
+            INTERFACE,
+            NOT_ATTACHED,
+            UNAVAILABLE,
+            UNKNOWN_REQUEST,
+            UNKNOWN_METHOD,
         ] {
-            let mut changed = state.clone();
-            changed[field] = value.into();
-            assert!(!valid_shortcut_reservation(&changed, &token));
+            assert!(name.starts_with("com.sergiopesch.voco."), "{name}");
         }
-        state.as_object_mut().unwrap().remove("stopSession");
-        assert!(!valid_shortcut_reservation(&state, &token));
+        assert!(PATH.starts_with("/com/sergiopesch/voco/"), "{PATH}");
+        // No companion from before the name can attach, so its members are gone.
+        let info = gio::DBusNodeInfo::for_xml(XML).unwrap();
+        let interface = info.lookup_interface(INTERFACE).unwrap();
+        assert!(interface.lookup_method("ReserveStopShortcut").is_none());
+        assert!(interface.lookup_signal("Changed").is_none());
+        assert!(interface.lookup_method("NextRequest").is_some());
     }
 
     #[test]
@@ -1216,7 +1072,7 @@ mod tests {
         *OPEN.lock().unwrap() = Some(Open { id: 5, report });
         assert_eq!(
             report_for(4, Report::Pasted(9)),
-            Err(("org.voco.UnknownRequest", "No such request is open"))
+            Err((UNKNOWN_REQUEST, "No such request is open"))
         );
         assert_eq!(report_for(5, Report::Pasted(9)), Ok(None));
         assert_eq!(reports.try_recv(), Ok(Report::Pasted(9)));

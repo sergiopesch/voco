@@ -8,6 +8,20 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Changed
+
+- VOCO and its GNOME companion now talk over `com.sergiopesch.voco.Panel`
+  instead of `org.voco.Panel`, a name under the maintainer's own domain, as the
+  Snap Store asks of the snap's D-Bus slot. After upgrading, run panel setup
+  again and sign out and back in: until then the companion stays detached, and
+  VOCO pastes and takes the shortcut as it does without it.
+
+### Removed
+
+- The compatibility paths for a companion older than version 17
+  (`ReserveStopShortcut`, the `Changed` signal and `ModifiersClear`). Neither
+  side can reach a copy from before the new name, so they could no longer run.
+
 ## [2026.0.67] - 2026-11-05
 
 The first release that VOCO 2026.0.66 can install for you with **Install

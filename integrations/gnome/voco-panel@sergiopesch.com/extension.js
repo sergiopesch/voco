@@ -11,14 +11,12 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {presentation, barScales} from './model.js';
 
-const NAME = 'org.voco.Panel';
-const PATH = '/org/voco/Panel';
-const INTERFACE = 'org.voco.Panel1';
-const INPUT_PATH = '/org/voco/PanelInput';
-// For a VOCO from before NextRequest, which asks here before a uinput paste.
-const INPUT_XML = '<node><interface name="org.voco.PanelInput1">' +
-    '<method name="ModifiersClear"><arg type="b" direction="out"/></method>' +
-    '</interface></node>';
+// Under the maintainer's own domain, as the Snap Store requires of the snap's
+// dbus slot. A VOCO from before this name owns only org.voco.Panel, so this
+// copy never attaches to it.
+const NAME = 'com.sergiopesch.voco.Panel';
+const PATH = '/com/sergiopesch/voco/Panel';
+const INTERFACE = 'com.sergiopesch.voco.Panel1';
 // A paste sends only these, evdev codes as VOCO's uinput keyboard declares
 // them, with VOCO's 12 ms between events.
 const KEY_SHIFT = 42;
@@ -54,8 +52,6 @@ const Reveal = GObject.registerClass(class VocoReveal extends St.Widget {
 export default class VocoPanel extends Extension {
     enable() {
         this._alive = true;
-        this._inputGuard = Gio.DBusExportedObject.wrapJSObject(INPUT_XML, this);
-        this._inputGuard.export(Gio.DBus.session, INPUT_PATH);
         // A paste types through one Clutter keyboard per enable, inside the
         // Shell: no device to settle, portal dialog or screen-sharing indicator.
         // GNOME disables this extension at the lock screen, so it can't type there.
@@ -69,7 +65,6 @@ export default class VocoPanel extends Extension {
         this._state = null;
         this._polling = false;
         this._refreshQueued = false;
-        this._signal = 0;
         this._attached = false;
         this._timer = 0;
         this._shortcut = 0;
@@ -168,14 +163,6 @@ export default class VocoPanel extends Extension {
             }, () => { this._owner = null; this._disconnect(); });
     }
 
-    ModifiersClearAsync(_parameters, invocation) {
-        if (!this._alive || !this._attached || invocation.get_sender() !== this._owner) {
-            invocation.return_dbus_error('org.voco.NotAttached', 'Only the attached application can check input readiness');
-            return;
-        }
-        invocation.return_value(new GLib.Variant('(b)', [this._modifiersClear()]));
-    }
-
     // A paste can be ready while the consumed shortcut is still held.
     // Observe compositor state; never synthesize releases of the user's keys.
     _modifiersClear() {
@@ -184,7 +171,7 @@ export default class VocoPanel extends Extension {
 
     // A confined VOCO can answer the Shell but not call it, so the companion
     // asks VOCO for work: one NextRequest stays pending, re-armed as soon as
-    // VOCO answers. A VOCO from before NextRequest keeps its own keyboard.
+    // VOCO answers.
     _armRequest() {
         if (!this._alive || !this._attached || this._requesting) return;
         this._requesting = true;
@@ -197,8 +184,7 @@ export default class VocoPanel extends Extension {
                 let request;
                 try {
                     request = connection.call_finish(result).deep_unpack();
-                } catch (error) {
-                    if (error.matches(Gio.DBusError, Gio.DBusError.UNKNOWN_METHOD)) return;
+                } catch (_error) {
                     this._requestTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
                         this._requestTimer = 0;
                         this._armRequest();
@@ -297,16 +283,9 @@ export default class VocoPanel extends Extension {
         this._call('Attach', null, result => {
             this._attached = result.deep_unpack()[0] === true;
             if (!this._attached) return;
-            this._beginPolling();
+            this._poll();
             this._armRequest();
         });
-    }
-
-    _beginPolling() {
-        if (this._signal) Gio.DBus.session.signal_unsubscribe(this._signal);
-        this._signal = Gio.DBus.session.signal_subscribe(this._owner, INTERFACE,
-            'Changed', PATH, null, Gio.DBusSignalFlags.NONE, () => this._poll());
-        this._poll();
     }
 
     _poll() {
@@ -321,7 +300,7 @@ export default class VocoPanel extends Extension {
             this._syncShortcut();
             this._indicator.show();
             this._render();
-            // Only recording streams levels; statuses arrive through Changed.
+            // Only recording streams levels; statuses arrive as 'changed' work.
             const delay = this._refreshQueued ? 1 : this._state.status === 'recording' ? 50 : 1500;
             this._refreshQueued = false;
             this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
@@ -473,7 +452,6 @@ export default class VocoPanel extends Extension {
         this._refreshQueued = false;
         this._requesting = false;
         if (this._requestTimer) { GLib.source_remove(this._requestTimer); this._requestTimer = 0; }
-        if (this._signal) { Gio.DBus.session.signal_unsubscribe(this._signal); this._signal = 0; }
         this._state = null;
         this._barsKey = null;
         this._target = null;
@@ -495,8 +473,6 @@ export default class VocoPanel extends Extension {
     disable() {
         this._cancelPaste();
         this._keyboard = null;
-        this._inputGuard?.unexport();
-        this._inputGuard = null;
         this._detach();
         this._alive = false;
         this._disconnect();

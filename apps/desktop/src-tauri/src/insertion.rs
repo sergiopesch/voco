@@ -448,10 +448,10 @@ pub fn copy_desktop_text(text: &str) -> Result<(), InsertionError> {
 }
 
 /// Unknown state never blocks delivery: evdev may lack permission, and other
-/// desktops have no companion to ask.
+/// desktops, or a companion that hasn't asked for work yet, give no answer.
 fn shortcut_modifiers_held() -> Option<bool> {
     crate::evdev_modifiers_held().or_else(|| {
-        crate::panel::is_attached()
+        crate::panel::companion_asks_for_work()
             .then(crate::panel::paste_modifiers_clear)
             .and_then(Result::ok)
             .map(|clear| !clear)

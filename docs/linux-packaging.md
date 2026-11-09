@@ -190,7 +190,7 @@ package's version in the snap's `snap/manifest.yaml`.
   extension, which brings GNOME 46's libraries, WebKitGTK and the desktop
   plugs. The app also plugs `audio-playback`, `audio-record` and
   `login-session-observe`, and has one slot, a session `dbus` slot for
-  `org.voco.Panel`. It plugs neither `network` nor `home`.
+  `com.sergiopesch.voco.Panel`. It plugs neither `network` nor `home`.
 - **Programs from Ubuntu.** The snap runs four programs from Ubuntu 24.04's
   archive: Python 3.12 with NumPy and SentencePiece for the speech worker, and
   xclip, xdotool and notify-send. Each lives with its libraries in a private

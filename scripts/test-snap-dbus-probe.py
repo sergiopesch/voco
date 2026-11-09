@@ -6,7 +6,7 @@ scripts/fixtures/snap-dbus-probe is installed. It uses the runner's own
 session bus when there is one, as a desktop's is, and otherwise starts one
 that requires AppArmor mediation. This process plays
 GNOME Shell, unconfined: it keeps a NextRequest call pending on the probe,
-which owns org.voco.Panel through a dbus slot, and reports back with
+which owns com.sergiopesch.voco.Panel through a dbus slot, and reports back with
 PasteDone, as the companion would. The probe then calls this process and
 emits a signal, which snapd's slot rules should refuse. Prints a JSON report
 and fails unless the pull direction works and the push direction doesn't."""
@@ -54,7 +54,7 @@ try:
     node = Gio.DBusNodeInfo.new_for_xml(CALLER)
     bus.register_object('/org/voco/ProbeCaller', node.interfaces[0],
                         lambda *args: (pings.append(args[1]), args[-1].return_value(None)), None, None)
-    bus.signal_subscribe(None, 'org.voco.Panel1', 'Changed', '/org/voco/Panel', None,
+    bus.signal_subscribe(None, 'com.sergiopesch.voco.Panel1', 'Changed', '/com/sergiopesch/voco/Panel', None,
                          Gio.DBusSignalFlags.NONE, lambda *args: signals.append(args[1]))
     probe = subprocess.Popen(['snap', 'run', 'voco-dbus-probe.probe'], env=env, stdout=subprocess.PIPE,
                              stderr=(folder / 'probe.log').open('w'), text=True)
@@ -78,18 +78,18 @@ try:
             pump(.02)
         return None
 
-    assert wait_line(lambda line: line == 'ready', 20), 'The probe never owned org.voco.Panel'
+    assert wait_line(lambda line: line == 'ready', 20), 'The probe never owned com.sergiopesch.voco.Panel'
 
     started = time.monotonic()
     reply = {}
-    bus.call('org.voco.Panel', '/org/voco/Panel', 'org.voco.Panel1', 'NextRequest', None,
+    bus.call('com.sergiopesch.voco.Panel', '/com/sergiopesch/voco/Panel', 'com.sergiopesch.voco.Panel1', 'NextRequest', None,
              GLib.VariantType('(su)'), Gio.DBusCallFlags.NO_AUTO_START, 5000, None,
              lambda connection, task: reply.update(value=connection.call_finish(task).unpack(),
                                                    after_ms=round((time.monotonic() - started) * 1000)))
     while 'value' not in reply and time.monotonic() - started < 5:
         pump(.01)
     report['nextRequest'] = reply
-    bus.call_sync('org.voco.Panel', '/org/voco/Panel', 'org.voco.Panel1', 'PasteDone',
+    bus.call_sync('com.sergiopesch.voco.Panel', '/com/sergiopesch/voco/Panel', 'com.sergiopesch.voco.Panel1', 'PasteDone',
                   GLib.Variant('(ut)', (7, 12345)), None, Gio.DBusCallFlags.NO_AUTO_START, 2000, None)
     line = wait_line(lambda line: line.startswith('{'), 10)
     report['probe'] = json.loads(line) if line else None

@@ -30,7 +30,7 @@ slots:
   panel:
     interface: dbus
     bus: session
-    name: org.voco.Panel
+    name: com.sergiopesch.voco.Panel
 
 apps:
   voco:
