@@ -26,13 +26,41 @@ def result(status, detail, can_enable=False):
 SUPPORTED_SHELLS = ('46', '48', '50', '51')
 
 
-def classify(version, installed, info, enabled, globally_disabled):
+def other_user_copy(data_dir):
+    """A per-user copy of the companion that isn't this version, or None.
+
+    GNOME Shell loads a UUID from the user's data folder in preference to the
+    system's, so such a copy, from extensions.gnome.org or installed by hand,
+    takes the package's place at every login."""
+    folder = Path(data_dir) / 'gnome-shell' / 'extensions' / UUID
+    if not folder.is_dir():
+        return None
+    try:
+        metadata = json.loads((folder / 'metadata.json').read_text())
+    except (OSError, ValueError):
+        return folder
+    if isinstance(metadata, dict) and metadata.get('version-name') == str(COMPANION_VERSION):
+        return None
+    return folder
+
+
+def shown(folder):
+    try:
+        return '~/' + str(Path(folder).relative_to(Path.home()))
+    except ValueError:
+        return str(folder)
+
+
+def classify(version, installed, info, enabled, globally_disabled, user_copy=None):
     if version.split('.')[0] not in SUPPORTED_SHELLS:
         return result('unsupported', 'The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
     if not installed:
         return result('missing', 'The VOCO panel files are missing. Reinstall the complete VOCO package.')
     if globally_disabled:
         return result('blocked', 'GNOME extensions are turned off. Turn them on in Extensions, then check again.')
+    # Never removed here: the folder is the user's, and only they know where it came from.
+    if user_copy is not None:
+        return result('blocked', f"Another copy of the VOCO panel, in {shown(user_copy)}, takes the place of the one VOCO installed, and it isn't the version this VOCO needs. Remove that folder, then save your work and sign out and back in.")
     if info.get('state') == 1:
         if info.get('version-name') != str(COMPANION_VERSION):
             return result('restart', 'Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.')
@@ -77,7 +105,8 @@ def check(enable=False):
     enabled = list(settings.get_strv('enabled-extensions'))
     installed = all((PACKAGE / name).is_file() for name in FILES)
     status = classify(version, installed, info, UUID in enabled,
-                      settings.get_boolean('disable-user-extensions'))
+                      settings.get_boolean('disable-user-extensions'),
+                      other_user_copy(GLib.get_user_data_dir()))
     if enable and status['canEnable']:
         if not settings.is_writable('enabled-extensions'):
             return result('blocked', 'Your desktop policy prevents enabling extensions. Contact your administrator.')

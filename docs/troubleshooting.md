@@ -210,6 +210,11 @@ when the panel needs a step.
   GNOME loads the panel, and any update to it, when you sign in.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
+- If it names another copy of the panel in your home folder, usually
+  `~/.local/share/gnome-shell/extensions/voco-panel@sergiopesch.com` from
+  extensions.gnome.org, remove that folder, then sign out and back in. GNOME
+  loads that copy instead of the one the package installed, and it isn't the
+  version your VOCO needs.
 - If the panel files are missing, reinstall the VOCO package.
 - On other GNOME versions, `voco --check-panel` says that the panel supports
   GNOME 46, 48, 50 and 51. There and on other desktops, use the tray menu.

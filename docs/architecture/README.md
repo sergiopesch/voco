@@ -324,7 +324,10 @@ icon is an AppIndicator, which GNOME shows only through an AppIndicator
 extension: Ubuntu turns one on, Debian 13 and Fedora 44 don't.
 
 The companion loads on GNOME 46, 48, 50 and 51, the majors in its metadata, and
-`voco_gnome_panel.py` reports any other as unsupported. From GNOME 50 there is
+`voco_gnome_panel.py` reports any other as unsupported. GNOME Shell loads a copy
+of the UUID in the user's data folder in place of the package's, so the helper
+reports one that isn't the current version, with its folder, and leaves it to
+the user to remove. From GNOME 50 there is
 no X11 session and no `Meta.is_wayland_compositor()`, so the companion treats a
 Shell without it as Wayland. A primary click on the pill stops or opens
 Settings, and other buttons, Menu and Shift+F10 open the menu; from GNOME 50 the
