@@ -70,6 +70,10 @@ fn run(arguments: Vec<std::ffi::OsString>) -> Outcome {
     if unsafe { libc::geteuid() } != 0 {
         return Err(refuse("runs only as root, through pkexec"));
     }
+    // pkexec 126 and later keep the caller's umask, and a desktop session's is
+    // often 0002, which would leave what the helper creates writable by its group.
+    // SAFETY: umask has no preconditions.
+    unsafe { libc::umask(0o022) };
     let owner: libc::uid_t = std::env::var("PKEXEC_UID")
         .ok()
         .and_then(|uid| uid.parse().ok())
@@ -266,7 +270,7 @@ impl Staging {
             Err(error) => return Err(error),
         }
         let info = std::fs::symlink_metadata(root)?;
-        if !info.is_dir() || info.uid() != 0 || info.mode() & 0o022 != 0 {
+        if !info.is_dir() || !only_root_can_change(info.uid(), info.gid(), info.mode()) {
             return Err(io::Error::other("not a folder only root can change"));
         }
         // Readable by everyone, as the release files are public: APT's
@@ -281,6 +285,12 @@ impl Staging {
         std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o755))?;
         Ok(Self { path })
     }
+}
+
+/// Owned by root, and writable by no one else. Group root counts as root: a
+/// helper from before the umask fix left STAGING `root:root 0775` behind.
+fn only_root_can_change(uid: libc::uid_t, gid: libc::gid_t, mode: u32) -> bool {
+    uid == 0 && mode & 0o002 == 0 && (mode & 0o020 == 0 || gid == 0)
 }
 
 impl Drop for Staging {
@@ -377,6 +387,18 @@ mod tests {
 
     fn arguments(values: &[&str]) -> Vec<std::ffi::OsString> {
         values.iter().map(Into::into).collect()
+    }
+
+    #[test]
+    fn staging_must_be_root_s_alone() {
+        // What the helper makes itself, and what an older helper left under
+        // a desktop's umask 0002.
+        assert!(only_root_can_change(0, 0, 0o40755));
+        assert!(only_root_can_change(0, 0, 0o40775));
+        // Another group could write to it, or anyone, or it isn't root's.
+        assert!(!only_root_can_change(0, 1000, 0o40775));
+        assert!(!only_root_can_change(0, 0, 0o40777));
+        assert!(!only_root_can_change(1000, 0, 0o40755));
     }
 
     #[test]

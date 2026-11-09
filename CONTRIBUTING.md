@@ -104,7 +104,7 @@ npm --workspace @voco/desktop run build:frontend
 cd apps/desktop/src-tauri
 cargo fmt --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
-cargo test --locked --all-targets
+cargo test --locked --all-targets --features update-helper
 ```
 
 The renderer, desktop and speech-model suites run separately. The desktop suites

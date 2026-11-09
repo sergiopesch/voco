@@ -200,7 +200,8 @@ release newer than the one running.
    sessions. The helper takes the download folder and the version, and nothing
    else. It accepts the folder only if it belongs to the user who asked and no
    one else can write to it, copies the three files into
-   `/var/cache/voco-update/`, where that user can't change them, and verifies
+   `/var/cache/voco-update/`, where that user can't change them (it sets its
+   own umask, so this doesn't depend on the session's), and verifies
    that copy again exactly as in step 2. It refuses a release that isn't newer
    than the installed one, so an old signed release can't be put back. Then it
    runs exactly `apt-get install` or `dnf install` on the copy, with a cleared

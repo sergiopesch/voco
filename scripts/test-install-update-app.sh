@@ -9,7 +9,9 @@
 # Settings from its tray menu, chooses Install update, and checks that the release
 # downloads from GitHub, verifies, installs through pkexec and APT, and that VOCO
 # restarts as that release. Root's pkexec needs no password; the prompt itself
-# needs a desktop session. The build's own version and the version check in
+# needs a desktop session. VOCO starts with umask 0002, as in an Ubuntu or Fedora
+# desktop session. pkexec 126 and later pass it on to the helper; Ubuntu 24.04's
+# pkexec 124 resets it, so only a newer guest catches a helper that relies on it. The build's own version and the version check in
 # verify:versions are untouched: the build happens in a temporary worktree.
 #
 # Usage: VOCO_DISPOSABLE_MACHINE=1 scripts/test-install-update-app.sh [EVIDENCE_DIR]
@@ -85,6 +87,7 @@ Xvfb :91 -screen 0 1280x900x24 -nolisten tcp >"$EVIDENCE/xvfb.log" 2>&1 &
 XVFB=$!
 trap 'kill $XVFB 2>/dev/null || true; cleanup' EXIT
 sleep 1
+umask 0002
 dbus-run-session -- bash -c '/usr/libexec/at-spi-bus-launcher --launch-immediately >"$1/atspi.log" 2>&1 & sleep 1; exec "$2" "$3" "$1" "$4" "$5"' \
   _ "$EVIDENCE" "$PYTHON" "$ROOT/scripts/test-install-update-app.py" "$FROM" "$TARGET"
 echo "Passed. Evidence: $EVIDENCE"

@@ -596,7 +596,7 @@ npm --workspace @voco/desktop run build:frontend
 cargo clippy --locked --all-targets --all-features --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output "$(mktemp -d)/voco-glib-check"
-cargo test --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo test --locked --all-targets --features update-helper --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run build
 ```
 
