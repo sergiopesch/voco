@@ -234,8 +234,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   version that asks VOCO for work, the companion types the paste keys. VOCO never
   calls the Shell, because a confined VOCO can't: snapd's `dbus` slot lets a snap
   receive from unconfined peers on classic systems, never send to them. So the
-  companion keeps one `org.voco.Panel1.NextRequest` call pending and re-arms it
-  as soon as VOCO answers. VOCO answers it with each paste, modifier check and
+  companion keeps one `com.sergiopesch.voco.Panel1.NextRequest` call pending
+  and re-arms it as soon as VOCO answers. VOCO answers it with each paste, modifier check and
   change of its state, in order, or with nothing after 20 s. For a paste the
   companion types from inside the Shell with one Clutter virtual keyboard per
   enable: no device to settle, no portal dialog and no screen-sharing indicator.
@@ -249,9 +249,7 @@ and the update check. [The snap](#the-snap) lists its rules.
   uncertain; disabling releases any key it holds. GNOME disables the companion
   at the lock screen, since its metadata names no session modes and
   `ScreenShield.activate()` pushes `unlock-dialog`. VOCO's origin and lock checks
-  still run before the copy and before the request. Outside the snap, VOCO also
-  emits `Changed` and calls `ModifiersClear` for a companion loaded before this
-  protocol, which pastes through uinput.
+  still run before the copy and before the request.
 - Otherwise Wayland keys go through VOCO's own uinput device, "VOCO virtual
   keyboard" (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per
   process, created at startup and reused for the process lifetime, never one per
@@ -341,7 +339,6 @@ and the update check. [The snap](#the-snap) lists its rules.
   chord and the action toggles through the `gnome_panel` backend; otherwise the
   action is refused and evdev toggles. Release the grab on rejection, disconnect or
   disable; late replies about an earlier grab never act on a newer one.
-  `ReserveStopShortcut` remains for older loaded companions.
 - A completed IBus decision differs from a poll in flight. Consuming X11 callbacks
   go through the debounce; passive evdev keeps its duplicate guard. The listener
   posts fallback arbitration only when the config revision or the decision changes,
@@ -368,6 +365,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   setup opens the companion's page on extensions.gnome.org through the portal and
   reports the companion active once it attaches. Keep "sign out and back in"
   feedback distinct from active status.
+- VOCO owns `com.sergiopesch.voco.Panel` on the session bus, under the
+  maintainer's own domain as the Snap Store requires of a slot's bus name, and
+  every interface, object path and error the two sides use sits under it. A
+  VOCO or companion from before this name speaks only `org.voco.Panel`, so
+  neither reaches the other, and neither side keeps code for one. After an
+  upgrade, a companion GNOME loaded earlier stays detached until the next
+  login, and VOCO pastes and takes the shortcut as it does without one.
 - Bump the companion metadata's `version-name` and the setup contract together
   when loaded code must change, and compare GNOME's loaded metadata so an
   in-place upgrade can't report old code as current. The metadata has no
@@ -518,7 +522,7 @@ and the update check. [The snap](#the-snap) lists its rules.
   IBus engine and its component, the companion, and `voco-browser-host` with its
   manifests and the Chromium extension. It plugs only what it uses, never
   `network` or `home`, and has one slot, a session `dbus` slot for
-  `org.voco.Panel`; `check-devops.sh` checks both lists.
+  `com.sergiopesch.voco.Panel`; `check-devops.sh` checks both lists.
 - The Ubuntu programs the snap runs, Python 3.12 with NumPy and SentencePiece
   for the worker, and xclip, xdotool and notify-send, live with their libraries
   in private folders under `/usr/lib/voco/snap` and run through the reviewed
@@ -530,8 +534,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   X11. Elsewhere Start is refused, and setup names the build that supports that
   desktop. Only the running VOCO knows whether the companion asks it for work, so
   `voco --check-desktop-input` and `--check-panel` ask it with
-  `org.voco.Panel1.CompanionAsking`, the one method any caller may use, and with
-  no VOCO to ask they claim neither. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
+  `com.sergiopesch.voco.Panel1.CompanionAsking`, the one method any caller
+  may use, and with no VOCO to ask they claim neither. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
   X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus route.
 - logind's session signals don't reach a snap, because `login-session-observe`
   receives only the manager's, and `GetSessionByPID` is out of its reach. So the
