@@ -551,6 +551,11 @@ try:
     def report_on(request_id, timeout=2):
         found = lambda: [r for r in reports if r[1][0] == request_id]
         return found()[0] if wait_for(found, timeout) else None
+    def modifiers_clear():
+        # VOCO's check before a paste: a 'modifiers' request through the pending call.
+        request_id, _ = hand_out('modifiers'); reported = report_on(request_id)
+        assert reported and reported[0] == 'ModifiersState', reported
+        return reported[1][1]
     # The companion keeps no interface for a VOCO from before NextRequest,
     # which owned only org.voco.Panel and can't attach to this copy.
     try:
