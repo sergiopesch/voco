@@ -195,8 +195,8 @@ store reviews each upload. Its automated review holds VOCO's for a person until
 the snap has a declaration for its `panel` slot, the session `dbus` slot that
 owns `com.sergiopesch.voco.Panel`, since the base declaration refuses connections
 to a named `dbus` slot. Reviewers expect a slot's bus name under a domain the
-publisher owns, here `sergiopesch.com`. Before uploading, `snap-review` from the `review-tools` snap shows
-that one item and passes the rest. The declaration and auto-connection of
+publisher owns, here `sergiopesch.com`. Before uploading, `snap-review` from the
+`review-tools` snap shows that one item and passes the rest. The declaration and auto-connection of
 `audio-record` and `login-session-observe` are asked for in the Snapcraft
 forum's store-requests category; until the store auto-connects them, VOCO's
 setup shows their `snap connect` commands. The store reviews one upload at a
