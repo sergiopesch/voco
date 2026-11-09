@@ -8,6 +8,21 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Fixed
+
+- Panel setup names an older or newer copy of the VOCO panel in your home
+  folder, such as one from extensions.gnome.org, which GNOME loads instead of
+  the one the package installed. It used to ask you to sign out and back in
+  every time, while GNOME kept loading that copy.
+- Install update works on Debian 13, Ubuntu 26.04 and Fedora 44. Their pkexec
+  passes the desktop session's umask, usually `0002`, on to VOCO's helper, so
+  the folder it copies the release into came out group-writable, and its own
+  check refused it. Ubuntu 24.04's pkexec resets the umask, so it wasn't
+  affected. The helper now sets its umask itself, and accepts the folder an
+  older helper left behind. VOCO 2026.0.66 to 2026.0.68 still run their own
+  helper, so on those three systems upgrading from them takes the installer
+  command once.
+
 ## [2026.0.68] - 2026-11-09
 
 VOCO and its GNOME panel get ready for the Snap Store and extensions.gnome.org.

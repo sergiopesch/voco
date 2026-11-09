@@ -48,7 +48,7 @@ lesson(
     [
         "Press the shortcut and VOCO starts listening. It turns your speech into words on your own computer and pastes them at your cursor while you are still talking. Press the shortcut again and VOCO finishes the last words.",
         "Each part of VOCO does one job and passes small messages to the next. Sound travels in packets of one tenth of a second, so words can appear before you finish a sentence.",
-        "Nothing you say leaves the computer. The speech model runs on the processor, and the only network request asks GitHub whether a new release exists. Later chapters open each box and show the real code inside.",
+        "Nothing you say leaves the computer. The speech model runs on the processor, and the only network request VOCO makes by itself asks GitHub whether a new release exists. Later chapters open each box and show the real code inside.",
     ],
     [
         (
@@ -883,8 +883,16 @@ lesson(
             "VOCO checks after startup and when you change the update channel, unless Update checks is set to Only when I choose. It reuses an answer younger than 6 hours, and otherwise asks GitHub for the 12 newest releases, with a 15-second timeout. Check for updates in Settings always asks. The snap never checks: Settings shows its version and \"The Snap Store keeps VOCO up to date.\"",
         ),
         (
-            "Only a notice",
-            "When a newer release exists, VOCO shows an \"Update available\" notification once for that release, and Settings offers Open latest release. VOCO never downloads or installs anything.",
+            "A notice, then your choice",
+            "When a newer release exists, VOCO shows an \"Update available\" notification once for that release: \"Open VOCO's Settings, then Updates, to install it.\" A check only reads. Nothing downloads or installs until you choose Install update.",
+        ),
+        (
+            "Install update",
+            "The .deb and the RPM have it; the snap and a source build don't. VOCO downloads voco_checksums.txt, its signature and the one package for this system from that release on GitHub into a private folder, following at most three redirects and only to release-assets.githubusercontent.com. It checks the signature with gpgv against the release key it carries, then the package's SHA-256, name, version and architecture. A failure installs nothing, deletes the download and says why.",
+        ),
+        (
+            "The root helper",
+            "Only pkexec runs /usr/libexec/voco-update-helper, through a polkit action that always asks for an administrator's password. It takes just the folder and the version, copies the three files into /var/cache/voco-update, checks them again, refuses a release that isn't newer than the installed one, and runs apt-get install or dnf install on that copy. VOCO then restarts. You can cancel only the download, and from the password prompt until VOCO exits no recording can start.",
         ),
         (
             "Two channels",
@@ -907,6 +915,12 @@ lesson(
         (F + "components/ConfigRecoveryPanel.tsx", "The three ways out when settings can't load."),
         (F + "lib/updates.ts", "Asks GitHub for releases and filters them by channel."),
         (F + "lib/updateCheckCoordinator.ts", "Decides when to check and when to reuse the cached answer."),
+        (B + "update_install.rs", "Runs Install update: download, verify, the helper, then the restart."),
+        (B + "update_download.rs", "Downloads a release's three files, only from GitHub's release assets."),
+        (B + "update_verify.rs", "Checks the signature, the checksum and the package's identity."),
+        (B + "bin/voco-update-helper.rs", "The root helper that installs a verified release."),
+        ("packaging/polkit/com.sergiopesch.voco.update.policy", "The polkit action that always asks for an administrator's password."),
+        (F + "components/UpdateInstall.tsx", "The window that shows Download, Verify, Install and Restart."),
         (F + "store/useStore.ts", "The window's in-memory state."),
         (F + "lib/configSnapshot.ts", "Ignores a settings snapshot older than the one in use."),
         (F + "App.tsx", "Pauses dictation only while the settings can't load at startup."),
@@ -919,7 +933,7 @@ lesson(
         "Rust drops that field and saves the rest",
     ],
     0,
-    "Rust owns the file and accepts only the five fields it knows. A patch with an unknown field is refused, so nothing unexpected reaches the file.",
+    "Rust owns the file and accepts only the fields it knows. A patch with an unknown field is refused, so nothing unexpected reaches the file.",
 )
 
 lesson(
@@ -1030,7 +1044,7 @@ lesson(
             "VOCO's sockets are owner-only, and the trigger, activation, IBus and browser sockets check the caller's user ID through one shared helper.",
         ),
         ("Files", "Settings, the journal and logs are private to your user."),
-        ("Network", "The only request asks GitHub's API about new releases, and the snap makes none."),
+        ("Network", "The only request VOCO makes by itself asks GitHub's API about new releases, and the snap makes none. Install update downloads a release only when you choose it."),
     ],
     [
         (
@@ -1059,7 +1073,7 @@ lesson(
         ),
         (
             "The snap's sandbox",
-            "The snap plugs no network, home folder or input device, so it can't reach the internet, read your home folder outside its own folders or open /dev/uinput. The Snap Store updates it. On the session bus it owns org.voco.Panel through a dbus slot, which lets it answer GNOME Shell but never call it.",
+            "The snap plugs no network, home folder or input device, so it can't reach the internet, read your home folder outside its own folders or open /dev/uinput. The Snap Store updates it. On the session bus it owns com.sergiopesch.voco.Panel, a name under the maintainer's own domain, through a dbus slot, which lets it answer GNOME Shell but never call it.",
         ),
         (
             "Same user, not same program",
@@ -1074,7 +1088,7 @@ lesson(
         (B + "performance.rs", "The opt-in metadata log and its fixed fields."),
         (B + "hotkey_trace.rs", "The opt-in shortcut trace."),
         (B + "crash_recovery.rs", "The owner-only journal."),
-        (F + "lib/updates.ts", "The single network request."),
+        (F + "lib/updates.ts", "The update check, the one request VOCO makes by itself."),
         ("apps/desktop/src-tauri/tauri.conf.json", "The content security policy."),
         ("apps/desktop/src-tauri/capabilities/default.json", "The window's permissions."),
         (B + "trigger_socket.rs", "Checks the caller's user ID."),
@@ -1090,14 +1104,14 @@ lesson(
         ("integrations/chromium/content.js", "The field rules inside web pages."),
     ],
     "Local processing protects your audio. It doesn't protect the clipboard, which other apps can read.",
-    "What is VOCO's only network request?",
+    "What is the only network request VOCO makes by itself?",
     [
         "It uploads audio for better recognition",
         "It sends usage statistics",
         "It asks GitHub's API about new releases",
     ],
     2,
-    "Speech runs on the computer, and the content security policy allows only VOCO itself, Tauri's message channel and api.github.com. The update check is the only request.",
+    "Speech runs on the computer, and the content security policy allows only VOCO itself, Tauri's message channel and api.github.com. The update check is the only request VOCO makes by itself, and Install update downloads a release only when you choose it.",
 )
 
 lesson(
@@ -1212,7 +1226,7 @@ lesson(
     [
         (
             "Nine CI jobs",
-            "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns org.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work.",
+            "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns com.sergiopesch.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work.",
         ),
         (
             "Private sessions",
@@ -1567,11 +1581,11 @@ lesson(
         ),
         (
             "Keys released",
-            "When VOCO can't read the keyboards, it asks the companion whether the shortcut's keys are up before a Wayland paste, and waits at most 150 ms for its ModifiersState report. A copy from before NextRequest answers ModifiersClear instead.",
+            "When VOCO can't read the keyboards, it asks the companion whether the shortcut's keys are up before a Wayland paste, and waits at most 150 ms for its ModifiersState report.",
         ),
         (
             "VOCO never calls the Shell",
-            "A strict snap may answer GNOME Shell but never call it, so from companion version 17 the companion asks VOCO for work. It keeps one NextRequest call waiting, for up to 30 seconds, and calls again as soon as VOCO answers: with a paste, a modifier check, a change of state, or idle after 20 seconds.",
+            "A strict snap may answer GNOME Shell but never call it, so the companion asks VOCO for work, on com.sergiopesch.voco.Panel. A copy from before companion version 19 speaks only the old name, org.voco.Panel, and never reaches this VOCO. It keeps one NextRequest call waiting, for up to 30 seconds, and calls again as soon as VOCO answers: with a paste, a modifier check, a change of state, or idle after 20 seconds.",
         ),
         (
             "Paste keys from the Shell",
@@ -1609,7 +1623,7 @@ lesson(
             "The companion: the pill, the bars, the menu, the Wayland grab and the paste keys.",
         ),
         ("integrations/gnome/voco-panel@sergiopesch.com/model.js", "The bar weights and height formula."),
-        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 18 as its version-name, which extensions.gnome.org keeps."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 19 as its version-name, which extensions.gnome.org keeps."),
         (B + "panel.rs", "VOCO's D-Bus service for the companion: Attach, state, the shortcut lease and the work it hands out through NextRequest."),
         (B + "panel_setup.rs", "Checks and enables the companion, and caches the result."),
         (B + "tray.rs", "The tray icon, hidden while the companion is attached."),

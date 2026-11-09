@@ -379,7 +379,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   keeps `version-name`. After an upgrade, users re-run panel setup and sign
   out and back in. A copy Shell marked out of date at login (after a
   distribution upgrade, for example) awaits that login: setup may enable it and
-  reports `restart`, never a load error.
+  reports `restart`, never a load error. GNOME loads a per-user copy of the
+  UUID in place of the package's, so setup reports one whose `version-name`
+  isn't the current one as `blocked`, naming its folder; it never removes it.
 - The diagnostics poll, the setup input check and the once-per-launch shortcut
   notice may reuse a companion check for up to 20 s, or 2 s after a failed or
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;
@@ -596,7 +598,7 @@ npm --workspace @voco/desktop run build:frontend
 cargo clippy --locked --all-targets --all-features --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 python3 scripts/verify-glib-backport.py
 python3 scripts/test-glib-variant.py --output "$(mktemp -d)/voco-glib-check"
-cargo test --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo test --locked --all-targets --features update-helper --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run build
 ```
 
@@ -642,7 +644,7 @@ repository.
 
 ## Release
 
-- Source version: **2026.0.68**. Latest published release: **2026.0.67**.
+- Source version: **2026.0.68**. Latest published release: **2026.0.68**.
   GitHub Releases is authoritative for publication and the package manager for the
   installed version; a version in source proves neither.
 - `packaging/published-release.json` records the published version. Keep the README

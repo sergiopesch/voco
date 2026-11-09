@@ -19,6 +19,11 @@ updates:
       # would build a second copy; move both together when global-hotkey does.
       - dependency-name: x11rb
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Install update downloads with the soup3 webkit2gtk depends on, so its
+      # gio types are WebKit's. Another minor builds a second glib, which the
+      # single patched glib forbids; move it only with webkit2gtk.
+      - dependency-name: soup3
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: npm
     directory: /
     schedule:

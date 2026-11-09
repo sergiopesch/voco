@@ -210,6 +210,11 @@ when the panel needs a step.
   GNOME loads the panel, and any update to it, when you sign in.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
+- If it names another copy of the panel in your home folder, usually
+  `~/.local/share/gnome-shell/extensions/voco-panel@sergiopesch.com` from
+  extensions.gnome.org, remove that folder, then sign out and back in. GNOME
+  loads that copy instead of the one the package installed, and it isn't the
+  version your VOCO needs.
 - If the panel files are missing, reinstall the VOCO package.
 - On other GNOME versions, `voco --check-panel` says that the panel supports
   GNOME 46, 48, 50 and 51. There and on other desktops, use the tray menu.
@@ -291,6 +296,7 @@ downloaded. The message says which step stopped:
 | `The release's signature didn't verify with VOCO's release key.` | Don't install this download. Choose **Try again**; if it repeats, use the installer from the release page, which checks the same signature, and report it. |
 | `The password prompt was dismissed` | Choose **Try again** and enter an administrator's password. |
 | `This account isn't allowed to install updates` | Your account isn't an administrator, or the session isn't local and active. Ask an administrator, or run the installer. |
+| `The update was refused: can't prepare /var/cache/voco-update: not a folder only root can change.` | On Debian 13, Ubuntu 26.04 and Fedora 44, VOCO 2026.0.66 to 2026.0.68 can't install updates, and an update runs the installed VOCO's helper. Upgrade once with the installer command from the release page; later versions update normally. |
 | `The package manager couldn't install the update: …` | Another install may be running. Wait for it to finish, then try again. |
 | `VOCO … is installed, but VOCO couldn't restart itself.` | Choose **Quit VOCO** in its tray or panel menu, then open VOCO again. |
 
