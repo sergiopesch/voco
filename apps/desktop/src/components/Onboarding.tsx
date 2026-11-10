@@ -112,8 +112,8 @@ export function Onboarding({ microphone, status, passed,
     {handoff ? <div className="voco-setup__handoff">
       {/* While the focused app also acts on the shortcut, as before a fresh install's panel loads at the next login, the fix comes first. */}
       {shortcutNote ? <PanelSetup disabled={busy || blocked} note={shortcutNote} /> : null}
-      <p>{shortcutNote ? "Then click" : "Click"} where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
-      <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
+      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
+      <p>VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher.</p>
       {shortcutNote ? null : <PanelSetup disabled={busy || blocked} />}
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}
     </div> : testing ? <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p> : null}

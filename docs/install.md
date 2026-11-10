@@ -99,9 +99,15 @@ Install update. It is strictly confined, which decides where it can type:
 
 - **GNOME on Wayland:** through the
   [VOCO panel](https://extensions.gnome.org/extension/11710/voco/), which a snap
-  can't install. VOCO's setup opens its page: choose Install there, then sign out
-  and back in.
-- **X11 sessions:** with `xdotool`, without the panel.
+  can't install. VOCO's setup opens its page: choose Install there, and GNOME
+  asks you to confirm. The panel works at once and setup continues by itself.
+  The site's Install button needs GNOME's browser integration. Without it,
+  choose **Install without the website** in setup, copy its command into
+  Terminal and choose Install in GNOME's prompt. Or add the browser extension
+  the page offers, run `sudo apt install gnome-browser-connector`, and reload
+  the page.
+- **X11 sessions:** with `xdotool`. The panel is optional there: it adds live
+  microphone bars and Stop to the top bar.
 - **Other Wayland desktops:** it can't type, and setup says so. Use the Debian
   package or the RPM.
 
@@ -109,6 +115,14 @@ The snap also leaves out the IBus input source and the Chromium extension. Its
 settings live in `~/snap/voco`, apart from the packages', so moving between the
 snap and a package starts setup again. Install only one of them: both claim the
 same name on the session bus. Remove the snap with `sudo snap remove voco`.
+
+The Snap Store updates the snap in the background. While VOCO runs, snapd holds
+an update back and notifies you that it is pending: choose **Quit VOCO** in the
+tray or panel menu so the update can apply, then open VOCO again.
+
+If you turn off the microphone or session permission, VOCO says which one it
+needs. Turn it back on in Ubuntu's **Settings** → **Apps** → **VOCO**, or run
+`snap connect voco:audio-record` or `snap connect voco:login-session-observe`.
 
 ## Manual install
 
@@ -329,7 +343,7 @@ its release key and the package's SHA-256. Your system then asks for an
 administrator's password, and APT or DNF installs the package. VOCO restarts on
 the new release once no dictation is running. If anything fails, nothing is
 installed and VOCO says why. Install update isn't available in the snap, which
-the Snap Store updates, or in a source build.
+the [Snap Store](#snap-store) updates, or in a source build.
 
 To upgrade by hand instead:
 
@@ -361,7 +375,10 @@ This also removes the package's `/dev/uinput` rule, but the access the rule
 gave lasts until you restart the computer.
 
 For the snap, run `sudo snap remove voco`, and remove the VOCO panel in the
-Extensions app if you installed it from extensions.gnome.org.
+Extensions app if you installed it from extensions.gnome.org. snapd keeps a
+snapshot of the snap's data, including My words and any text saved for Review,
+for about 31 days. To remove the data at once, run
+`sudo snap remove --purge voco` instead.
 
 On GNOME, also turn off the VOCO panel in the Extensions app, or run
 `gnome-extensions disable voco-panel@sergiopesch.com`. Remove the

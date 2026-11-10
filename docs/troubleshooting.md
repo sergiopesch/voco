@@ -16,10 +16,13 @@ voco --check-panel
 
 They show the installed version, whether your session is `x11` or `wayland`,
 whether VOCO can paste or what is missing, and what the GNOME panel needs. The
-two checks send no keys, leave the clipboard alone and change no settings. On
-Wayland, `getfacl /dev/uinput` shows whether your login may use `/dev/uinput`,
-which VOCO needs to press the paste keys; see
-[Access to /dev/uinput](platform/README.md#access-to-devuinput).
+two checks send no keys, leave the clipboard alone and change no settings.
+With the `.deb` or RPM on Wayland, `getfacl /dev/uinput` shows whether your
+login may use `/dev/uinput`, which VOCO needs to press the paste keys; see
+[Access to /dev/uinput](platform/README.md#access-to-devuinput). The snap
+doesn't use `/dev/uinput`: on GNOME on Wayland it types through the VOCO panel,
+and only the running VOCO can tell whether the panel is connected, so open VOCO
+before you run the checks.
 
 In VOCO, open **Settings** and choose **Help**. The sections
 **My microphone is not working**, **My shortcut is not working** and
@@ -110,19 +113,25 @@ events for a bug report, see [Shortcut traces](#shortcut-traces).
 
 ## The shortcut also reaches your app, or does nothing
 
-On Wayland without the GNOME panel, VOCO watches for `Alt+D` and `Alt+Shift+D`
-but can't stop your app from receiving them. Browsers jump to the address bar,
-so your words land there, and terminals delete a word. VOCO warns once per
-launch with **Your shortcut also reached the app**. If VOCO can't read any
-keyboard either, the shortcut does nothing, and shortly after VOCO starts it
-says **Your shortcut can't reach VOCO yet**. Fix either one of these ways:
+On Wayland without the GNOME panel, the `.deb` and RPM watch for `Alt+D` and
+`Alt+Shift+D` but can't stop your app from receiving them. Browsers jump to the
+address bar, so your words land there, and terminals delete a word. VOCO warns
+once per launch with **Your shortcut also reached the app**. If VOCO can't read
+any keyboard either, the shortcut does nothing, and shortly after VOCO starts
+it says **Your shortcut can't reach VOCO yet**. The snap can't read keyboards,
+so on Wayland without the panel its shortcut does nothing. Fix either one of
+these ways:
 
-- On GNOME 46, 48, 50 or 51, choose **Enable live panel** on the **Help** page, or
-  run `voco --setup-panel`. Then sign out and back in.
+- On GNOME 46, 48, 50 or 51 with the `.deb` or RPM, choose **Enable live panel**
+  on the **Help** page, or run `voco --setup-panel`. Then sign out and back in.
+- With the snap on GNOME, choose **Get the VOCO panel** on the **Help** page and
+  install the panel from extensions.gnome.org. GNOME loads a first install at
+  once.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
-- Add the [VOCO Dictation input source](install.md#ibus-input-source). It keeps
-  the shortcut from supported text fields.
+- With the `.deb` or RPM, add the
+  [VOCO Dictation input source](install.md#ibus-input-source). It keeps the
+  shortcut from supported text fields.
 
 ## Words don't appear
 
@@ -132,8 +141,9 @@ says **Your shortcut can't reach VOCO yet**. Fix either one of these ways:
 - Let go of the shortcut and other modifier keys, such as Alt, Ctrl and Super,
   while VOCO types. VOCO waits up to 1.5 seconds for them before it pastes,
   then stops typing.
-- On Wayland, if VOCO reports that it can't open `/dev/uinput`, sign out and
-  back in once, then check again.
+- With the `.deb` or RPM on Wayland, if VOCO reports that it can't open
+  `/dev/uinput`, sign out and back in once, then check again. The snap types on
+  Wayland only through the VOCO panel; see [The VOCO snap](#the-voco-snap).
 - Apps that remap Shift+Insert, remote desktops and virtual machines may ignore
   the paste, and VOCO can't tell when they do.
 
@@ -208,15 +218,20 @@ when the panel needs a step.
 
 - If the panel isn't enabled, choose **Enable live panel** on the **Help** page,
   or run `voco --setup-panel`. Then save your work and sign out and back in.
-  GNOME loads the panel, and any update to it, when you sign in.
+  GNOME loads the panel, and any update to it, when you sign in. The snap can't
+  enable the panel: choose **Get the VOCO panel** on the **Help** page and
+  install it from extensions.gnome.org, which loads a first install at once.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
-- If it names another copy of the panel in your home folder, usually
+- With the `.deb` or RPM, if it names another copy of the panel in your home
+  folder, usually
   `~/.local/share/gnome-shell/extensions/voco-panel@sergiopesch.com` from
   extensions.gnome.org, remove that folder, then sign out and back in. GNOME
   loads that copy instead of the one the package installed, and it isn't the
-  version your VOCO needs.
-- If the panel files are missing, reinstall the VOCO package.
+  version your VOCO needs. With the snap, that copy is the only panel, so keep
+  it.
+- With the `.deb` or RPM, if the panel files are missing, reinstall the VOCO
+  package. With the snap, install the panel again from extensions.gnome.org.
 - On other GNOME versions, `voco --check-panel` says that the panel supports
   GNOME 46, 48, 50 and 51. There and on other desktops, use the tray menu.
 
@@ -231,16 +246,17 @@ VOCO panel to the left. This is expected.
 ## VOCO settings need attention
 
 VOCO pauses dictation and shows **VOCO settings need attention** when it can't
-safely load `~/.config/voco/config.json`. This happens when the file isn't
-valid JSON or has a value VOCO doesn't accept, or when the file or its folder
-is a symbolic link or belongs to another user. VOCO fixes their permissions
-itself. On a first start VOCO copies an older `~/.config/voice/config.json` if
+safely load `~/.config/voco/config.json`, or in the snap
+`~/snap/voco/current/.config/voco/config.json`. This happens when the file
+isn't valid JSON or has a value VOCO doesn't accept, or when the file or its
+folder is a symbolic link or belongs to another user. VOCO fixes their
+permissions itself. On a first start VOCO copies an older `~/.config/voice/config.json` if
 it finds one, and shows the panel when that file is a symbolic link, isn't a
 regular file or belongs to another user. A **Dictation paused** notification
 may ask you to open VOCO.
 
 - **Retry loading settings** tries again after you correct the file.
-- **Open config directory** opens `~/.config/voco/`.
+- **Open config directory** opens the folder that holds the file.
 - **Reset to defaults**, then **Confirm reset**, renames the file to
   `config.recovery-backup-<numbers>.json` in the same folder and writes default
   settings. Your shortcut returns to `Alt+D`, and VOCO runs the voice test
@@ -249,6 +265,8 @@ may ask you to open VOCO.
   backups of earlier resets.
 
 ## Chromium extension problems
+
+The Chromium extension comes with the `.deb` and RPM, not the snap.
 
 | Toolbar button tooltip | What to do |
 | --- | --- |
@@ -264,6 +282,8 @@ the field is one VOCO accepts, as described in
 [Browser fields](everyday-use.md#browser-fields).
 
 ## IBus input source problems
+
+The input source comes with the `.deb` and RPM, not the snap.
 
 Open **Help**, then **Technical details**, and read **IBus shortcut (optional)**:
 
@@ -303,16 +323,22 @@ downloaded. The message says which step stopped:
 
 ## The VOCO snap
 
-The snap, `voco` in the Snap Store, runs strictly confined, so these messages
-come only from it:
+The snap, `voco` in the Snap Store, runs strictly confined. The store turns on
+its microphone and session permissions when you install it. If one was turned
+off, turn it back on in Ubuntu's **Settings** → **Apps** → **VOCO**, or with the
+`snap connect` command below. These messages come only from the snap:
 
 | Message | What to do |
 | --- | --- |
-| `The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.` | Run `snap connect voco:audio-record`, which asks for your password, then start dictation again. |
-| `… Run snap connect voco:audio-record, then quit VOCO and open it again.` | In an X11 session VOCO lists microphones once, at startup. Run `snap connect voco:audio-record`, quit VOCO and open it again. |
-| `The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. …` | Run `snap connect voco:login-session-observe`, then dictate again. VOCO checks the session before each paste. |
-| `On Wayland, the VOCO snap types through the VOCO panel. …` | Install the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/) from extensions.gnome.org, then sign out and back in. |
+| `The VOCO snap can't use the microphone yet. …, then try again.` | In Settings, open **Apps**, then **VOCO**, and allow the microphone. Or run `snap connect voco:audio-record`, which asks for your password. Then start dictation again. |
+| `The VOCO snap can't use the microphone yet. … Then quit VOCO and open it again.` | In an X11 session VOCO lists microphones once, at startup. Allow the microphone in Settings, under **Apps**, then **VOCO**, or run `snap connect voco:audio-record`. Then quit VOCO and open it again. |
+| `The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. …` | Allow it in Settings, under **Apps**, then **VOCO**, or run `snap connect voco:login-session-observe`. Then dictate again. VOCO checks the session before each paste. |
+| `On Wayland, the VOCO snap types through the VOCO panel. …` | Install the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/) from extensions.gnome.org; it works at once. If the site's Install button asks for GNOME's browser integration, add its browser extension and run `sudo apt install gnome-browser-connector`. If the panel is already installed, sign out and back in. |
 | `The VOCO snap types only on GNOME and in X11 sessions. …` | The snap can't type on other Wayland desktops. Install the `.deb` or RPM from VOCO's [GitHub releases](https://github.com/sergiopesch/voco/releases) instead. |
+
+The Snap Store updates the snap. While VOCO runs, snapd holds an update back and
+notifies you that it is pending. Choose **Quit VOCO** in the tray or panel menu
+so the update can apply, then open VOCO again.
 
 ## Performance logs
 
@@ -326,7 +352,8 @@ VOCO_PERFORMANCE_LOG=1 voco
 
 VOCO writes `performance/performance.jsonl` and
 `stream-performance/worker.jsonl` in `~/.local/state/voco`, or in
-`$XDG_STATE_HOME/voco` if you set it. Only your account can read them. At
+`$XDG_STATE_HOME/voco` if you set it. The snap writes them in
+`~/snap/voco/current/.local/state/voco`. Only your account can read them. At
 8 MiB, VOCO starts a new file. It keeps one older performance file and up to
 three older worker files.
 
@@ -344,6 +371,14 @@ python3 /usr/share/doc/voco/report-performance.py
 python3 /usr/share/doc/voco/report-speech-performance.py ~/.local/state/voco
 ```
 
+The snap carries them in `/snap/voco/current/usr/share/doc/voco`. Give each
+one the snap's folder:
+
+```bash
+python3 /snap/voco/current/usr/share/doc/voco/report-performance.py ~/snap/voco/current/.local/state/voco/performance
+python3 /snap/voco/current/usr/share/doc/voco/report-speech-performance.py ~/snap/voco/current/.local/state/voco
+```
+
 `report-performance.py` summarizes the latest run. Add `--run` with a run ID to
 pick another, or `--json` for the full report.
 
@@ -351,8 +386,9 @@ pick another, or `--json` for the full report.
 
 To record shortcut events, start VOCO with `VOCO_HOTKEY_TRACE=1 voco`. VOCO
 writes event names, timings, the shortcut route and your session type to
-`~/.local/state/voco/hotkey-trace.jsonl`. At 8 MiB, it renames the file to
-`hotkey-trace.previous.jsonl` and starts a new one.
+`~/.local/state/voco/hotkey-trace.jsonl`, or in the snap
+`~/snap/voco/current/.local/state/voco/hotkey-trace.jsonl`. At 8 MiB, it
+renames the file to `hotkey-trace.previous.jsonl` and starts a new one.
 
 ## Report a bug
 

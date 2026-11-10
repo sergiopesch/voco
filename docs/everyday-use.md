@@ -225,19 +225,27 @@ until you discard them.
 | `~/.local/state/voco/` | Diagnostic logs, only if you turn them on (see [Performance logs](troubleshooting.md#performance-logs)) |
 | `~/.local/share/com.sergiopesch.voco/` | Data and cache for VOCO's window |
 
+The snap keeps the same files in its own folder, `~/snap/voco`: for example,
+its settings are in `~/snap/voco/current/.config/voco/config.json` and its logs
+in `~/snap/voco/current/.local/state/voco/`. It never reads the packages'
+folders, and they never read its.
+
 Only your account can read VOCO's settings and recovery files. VOCO doesn't
 save audio in normal use. It also uses private sockets in your session's runtime
 folder, which your system clears when you sign out.
 
-VOCO's only network request asks GitHub which releases exist. It runs when VOCO
-starts, reusing an answer for up to six hours, and when you choose
-**Check for updates**. To check only when you choose, open **Update settings**
-on the **Updates** page and set **Update checks** to **Only when I choose**.
-When a newer release exists, **Install update** on the **Updates** page
-downloads it from GitHub, checks it was signed with VOCO's release key, asks
-for your password and installs it, then restarts VOCO. You can cancel while it
-downloads. It waits while you dictate, and never runs on its own. The snap
-updates through the Snap Store instead. See [Upgrade](install.md#upgrade).
+With the `.deb` or RPM, VOCO's only network request asks GitHub which releases
+exist. It runs when VOCO starts, reusing an answer for up to six hours, and
+when you choose **Check for updates**. To check only when you choose, open
+**Update settings** on the **Updates** page and set **Update checks** to
+**Only when I choose**. When a newer release exists, **Install update** on the
+**Updates** page downloads it from GitHub, checks it was signed with VOCO's
+release key, asks for your password and installs it, then restarts VOCO. You
+can cancel while it downloads. It waits while you dictate, and never runs on
+its own. See
+[Upgrade](install.md#upgrade). The snap makes no network requests at all: it
+has no network access, and the Snap Store updates it instead (see
+[Snap Store](install.md#snap-store)).
 
 After you [remove VOCO](install.md#remove), delete its folders to remove your
 data:
@@ -245,6 +253,8 @@ data:
 ```bash
 rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
 ```
+
+`sudo snap remove --purge voco` removes the snap and its data together.
 
 ## Limits
 
@@ -264,6 +274,7 @@ rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
   already given, VOCO stops transcribing and shows **Dictation interrupted**.
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
   the user of the active local session. Outside GNOME 46, 48, 50 and 51, the
-  shortcut also needs a desktop binding.
+  shortcut also needs a desktop binding. The snap types on Wayland only on
+  GNOME, through the VOCO panel.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.

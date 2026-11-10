@@ -1162,9 +1162,14 @@ fn reload_when_web_process_stops(app: &tauri::App) {
 /// and its anchor names a heading of docs/platform/README.md; a test checks both.
 const DESKTOP_SETUP_GUIDE: &str =
     "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
+/// The snap's: its section of docs/install.md, since the packages' guide is
+/// about /dev/uinput, which the snap doesn't use.
+const SNAP_SETUP_GUIDE: &str =
+    "https://github.com/sergiopesch/voco/blob/master/docs/install.md#snap-store";
 
 fn is_allowed_external_url(url: &str) -> bool {
     url == DESKTOP_SETUP_GUIDE
+        || url == SNAP_SETUP_GUIDE
         || url == panel_setup::COMPANION_PAGE
         || url
             .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
@@ -2143,7 +2148,9 @@ fn notify_missing_top_bar_presence() {
         if panel::is_attached() || status_notifier_host_present() != Some(false) {
             return;
         }
-        let detail = if is_gnome_desktop(&current_desktop()) {
+        let detail = if is_gnome_desktop(&current_desktop()) && confinement::is_snap() {
+            "Open VOCO from the app menu and choose Get the VOCO panel in Help."
+        } else if is_gnome_desktop(&current_desktop()) {
             "Open VOCO from the app menu, choose Enable live panel in Help, then sign out and back in."
         } else {
             "Your desktop shows no tray icons. Open VOCO from the app menu for Settings and Review."
@@ -2559,6 +2566,17 @@ mod tests {
         assert!(!is_allowed_external_url(
             "http://github.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
         ));
+    }
+
+    #[test]
+    fn snap_setup_guide_matches_the_renderer_and_the_install_guide() {
+        assert!(is_allowed_external_url(SNAP_SETUP_GUIDE));
+        let renderer = include_str!("../../src/components/ControlPanel.tsx");
+        assert!(renderer.contains(&format!("const SNAP_SETUP_GUIDE = \"{SNAP_SETUP_GUIDE}\";")));
+        assert!(include_str!("../../../../docs/install.md")
+            .lines()
+            .any(|line| line == "## Snap Store"));
+        assert!(SNAP_SETUP_GUIDE.ends_with("/docs/install.md#snap-store"));
     }
 
     #[test]

@@ -8,7 +8,7 @@ fn main() {
                     println!("{}", status.detail);
                     if !matches!(
                         status.status.as_str(),
-                        "active" | "other-desktop" | "unsupported"
+                        "active" | "other-desktop" | "unsupported" | "optional"
                     ) {
                         std::process::exit(2);
                     }
