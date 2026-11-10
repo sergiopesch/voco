@@ -78,6 +78,8 @@ interface ControlPanelProps {
 }
 
 const DESKTOP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md#wayland-paste-keys";
+// The snap's own section: the packages' guide is about /dev/uinput, which the snap doesn't use.
+const SNAP_SETUP_GUIDE = "https://github.com/sergiopesch/voco/blob/master/docs/install.md#snap-store";
 const noWordsCheck = async () => "Say it isn't available here.";
 const noop = () => {};
 // Setup's steps, for its progress: spelling, the voice test, your words, ready.
@@ -231,6 +233,7 @@ export function ControlPanel({
   const previousMicrophone = useRef(nativeMicrophone?.selected?.selectionToken ?? selectedDeviceId);
   const desktopInput = isOnboarding ? inputReadiness ?? runtimeDiagnostics?.desktopInput : runtimeDiagnostics?.desktopInput;
   const desktopSetupError = desktopInput?.available === false ? desktopInput.detail : null;
+  const setupGuide = updatesByStore ? SNAP_SETUP_GUIDE : DESKTOP_SETUP_GUIDE;
   // The once-a-second diagnostics follow a panel change, such as Enable live
   // panel or the companion attaching, without another setup check.
   const shortcutInput = runtimeDiagnostics?.desktopInput ?? desktopInput;
@@ -645,6 +648,17 @@ export function ControlPanel({
   }, []);
 
   useEffect(() => () => { inputCheckRequest.current += 1; checkedVoiceTest.current = false; }, []);
+  // Setup's own check answers once; the runtime poll keeps asking. When the
+  // poll turns ready, as when the snap's panel attaches after setup sent the
+  // user to install it, setup checks again by itself, so a failure it found
+  // still stands until its own check passes.
+  const liveInputReady = runtimeDiagnostics?.desktopInput?.available === true;
+  const wasLiveInputReady = useRef(liveInputReady);
+  useEffect(() => {
+    const turnedReady = liveInputReady && !wasLiveInputReady.current;
+    wasLiveInputReady.current = liveInputReady;
+    if (turnedReady && isOnboarding && !checkingInput && inputReadiness?.available === false) void checkDesktopSetup();
+  }, [liveInputReady, isOnboarding, checkingInput, inputReadiness, checkDesktopSetup]);
   useEffect(() => {
     if (!testPassed) {
       checkedVoiceTest.current = false;
@@ -822,7 +836,7 @@ export function ControlPanel({
             desktopSetupError={desktopSetupError}
             desktopSetupPanel={desktopInput?.available === false && desktopInput.setupArea === "panel"}
             onCheckDesktopSetup={() => void checkDesktopSetup()}
-            onOpenDesktopSetupGuide={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}
+            onOpenDesktopSetupGuide={() => void onOpenReleasePage(setupGuide)}
             checkingDesktopSetup={checkingInput}
             preparing={testPreparing || finishingTest}
             saving={saving}
@@ -988,26 +1002,26 @@ export function ControlPanel({
                 <section className="voco-preferences__page">
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Help</h2></div>
                   <PanelSetup disabled={saving || dictationBusy} />
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Click where you want your words and press <kbd>{config.hotkey}</kbd>. VOCO’s bars move once it is listening. Press again to finish.</p><p>VOCO pastes into whichever app has keyboard focus, including terminals and browsers. It replaces clipboard text and never presses Enter.</p><p>In a terminal, don’t dictate while a program waits for an answer, such as a permission prompt: it may read your words as typed keys.</p><p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>How to dictate</summary><p>Click where you want your words and press <kbd>{config.hotkey}</kbd>. VOCO’s bars move once it is listening. Press again to finish.</p><p>VOCO pastes into whichever app has keyboard focus, including terminals and browsers. It replaces clipboard text and never presses Enter.</p><p>In a terminal, don’t dictate while a program waits for an answer, such as a permission prompt: it may read your words as typed keys.</p>{updatesByStore ? null : <p>In an enabled Chromium tab, use <kbd>Alt+Shift+V</kbd> for direct delivery to a plain text field.</p>}</details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My microphone is not working</summary><p>Check the selected microphone and allow access for this session.</p><button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Audio")}>Microphone settings</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>My shortcut is not working</summary><p>{shortcut.detail}</p>{shortcut.setup ? <p>{shortcut.setup}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => setActiveSection("Hotkeys")}>Shortcut settings</button></details>
-                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep the app you’re dictating into focused. If VOCO can’t paste there, it copies the rest of your words to the clipboard when you stop; check the field, then paste with Shift+Insert or Ctrl+V. If the copy fails too, or VOCO exits unexpectedly, choose Review in VOCO’s menu to get your words back.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button></details>
+                  <details className="voco-preferences__card voco-preferences__disclosure"><summary>My words are not appearing</summary><p>Keep the app you’re dictating into focused. If VOCO can’t paste there, it copies the rest of your words to the clipboard when you stop; check the field, then paste with Shift+Insert or Ctrl+V. If the copy fails too, or VOCO exits unexpectedly, choose Review in VOCO’s menu to get your words back.</p>{desktopSetupError ? <p role="status">{desktopSetupError}</p> : null}<button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(setupGuide)}>Open setup instructions</button></details>
                   <details className="voco-preferences__card voco-preferences__disclosure"><summary>Technical details</summary>
                   <div className="voco-preferences__group"><h3 className="voco-preferences__group-title">Runtime checks</h3>
                     <div className="voco-preferences__card">
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Session</strong></span><span className="voco-preferences__row-value">{runtimeSessionLabel}</span></div>
-                      <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus shortcut (optional)</strong></span><span className="voco-preferences__row-value">{ibusShortcutLabel}</span></div>
+                      {updatesByStore ? null : <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>IBus shortcut (optional)</strong></span><span className="voco-preferences__row-value">{ibusShortcutLabel}</span></div>}
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Paste keys</strong></span><span className="voco-preferences__row-value">{typeSimulationLabel}</span></div>
                       <div className="voco-preferences__row"><span className="voco-preferences__row-copy"><strong>Clipboard</strong></span><span className="voco-preferences__row-value">{clipboardLabel}</span></div>
                     </div>
                   </div>
                   {runtimeDiagnostics ? <details className="voco-preferences__card voco-preferences__disclosure"><summary>Diagnostic details</summary>
-                    <div className="voco-preferences__form"><p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ibusShortcut.detail}</p><p><strong>Paste keys:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
+                    <div className="voco-preferences__form">{updatesByStore ? null : <p><strong>IBus shortcut (optional):</strong> {runtimeDiagnostics.ibusShortcut.detail}</p>}<p><strong>Paste keys:</strong> {runtimeDiagnostics.typeSimulation.detail}</p><p><strong>Clipboard:</strong> {runtimeDiagnostics.clipboard.detail}</p></div>
                   </details> : null}
                   </details>
                   <div className="voco-preferences__actions">
                     <button className="voco-button voco-button--secondary" onClick={() => void onRefreshRuntimeDiagnostics()}>Refresh runtime checks</button>
-                    {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(DESKTOP_SETUP_GUIDE)}>Open setup instructions</button> : null}
+                    {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(setupGuide)}>Open setup instructions</button> : null}
                     <button className="voco-button voco-button--ghost" disabled={saving || hotkeyDirty} title={hotkeyDirty ? "Apply or cancel your shortcut before restarting setup." : undefined}
                       onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) onSurfaceChange("onboarding"); }}>Run setup again</button>
                   </div>

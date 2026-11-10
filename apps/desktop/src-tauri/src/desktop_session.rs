@@ -17,7 +17,7 @@ const MAX_SESSIONS: usize = 16;
 const KEYBOARD_SEAT: &str = "seat0";
 const REFUSED: &str = "This desktop session isn't the active local session for VOCO's keyboard, so VOCO sent no paste keys.";
 pub const LOCKED_DETAIL: &str = "The screen is locked, so VOCO sent no paste keys.";
-pub const LOGIND_DENIED_DETAIL: &str = "The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. Run snap connect voco:login-session-observe, then try again.";
+pub const LOGIND_DENIED_DETAIL: &str = "The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. Allow it in Settings, under Apps, then VOCO, or run snap connect voco:login-session-observe. Then try again.";
 /// A snap receives no session signals, so it reads LockedHint this often.
 const LOCK_POLL: Duration = Duration::from_secs(1);
 /// The originating login's LockedHint, as logind last reported it.

@@ -900,6 +900,10 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 /* The panel step: its line, then its buttons spaced as setup's own. */
 .voco-panel-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .voco-panel-setup > p { flex-basis: 100%; margin: 0; }
+.voco-panel-setup__terminal { flex-basis: 100%; }
+.voco-panel-setup__terminal > summary { cursor: pointer; width: fit-content; }
+.voco-panel-setup__terminal p { margin: 10px 0; }
+.voco-panel-setup__terminal code { display: block; margin: 0 0 10px; padding: 10px 12px; border-radius: var(--voco-radius-control); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--voco-divider); font-family: "Geist Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; user-select: all; }
 .voco-setup__microphone .voco-preferences__disclosure > summary { padding: 10px 0; font-size: 13px; }
 /* Keep the completion action painted while its scroll container is resized. */
 .voco-panel[data-surface="onboarding"] .voco-setup__actions .voco-button--primary { -webkit-backdrop-filter: none; backdrop-filter: none; }

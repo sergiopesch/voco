@@ -127,12 +127,15 @@ it("leads the handoff with the fix while the shortcut also reaches the focused a
   const leaky = renderToStaticMarkup(<Onboarding {...props} shortcutNote={note} />);
   expect(leaky.split(note)).toHaveLength(2);
   expect(leaky.indexOf(note)).toBeLessThan(leaky.indexOf("where you want the text"));
-  expect(leaky).toContain("Then click where you want the text");
+  expect(leaky).toContain("Then choose Done, click where you want the text");
   // The note replaces the panel's own status line, so the step reads once.
   expect(leaky).not.toContain("Checking your panel");
   expect(leaky).toContain(">Done</button>");
   const ready = renderToStaticMarkup(<Onboarding {...props} shortcutNote={null} />);
-  expect(ready).toContain("Click where you want the text");
+  expect(ready).toContain("Choose Done, click where you want the text");
+  // VOCO doesn't start at login, so the last step doesn't promise it stays.
+  expect(ready).toContain("After you sign in again, open it from your app launcher.");
+  expect(ready).not.toContain("stays in your tray");
   expect(ready).not.toContain("Then click");
   expect(ready).toContain("Checking your panel");
 });
