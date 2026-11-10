@@ -20,11 +20,11 @@ fn names_voco(snap_name: Option<&std::ffi::OsStr>) -> bool {
 /// Until the store connects the snap's audio-record plug on its own, setup
 /// names the command that does (AGENTS.md).
 pub const MICROPHONE_DETAIL: &str =
-    "The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.";
+    "The VOCO snap can't use the microphone yet. Allow it in Settings, under Apps, then VOCO, or run snap connect voco:audio-record. Then try again.";
 /// WebKit, which captures on X11, lists its microphones once, through a
 /// PipeWire connection that keeps what the snap could record when it opened.
 /// So there a plug connected after VOCO started needs a restart.
-pub const MICROPHONE_RESTART_DETAIL: &str = "The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then quit VOCO and open it again.";
+pub const MICROPHONE_RESTART_DETAIL: &str = "The VOCO snap can't use the microphone yet. Allow it in Settings, under Apps, then VOCO, or run snap connect voco:audio-record. Then quit VOCO and open it again.";
 pub const MICROPHONE_RECONNECTED_DETAIL: &str =
     "VOCO can use the microphone you connected once it restarts. Quit VOCO and open it again.";
 
