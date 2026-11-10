@@ -13,21 +13,18 @@ export class Shortcut {
         this._onPressed = onPressed;
         this._reserve = reserve;
         this._onLost = onLost;
-        this._action = 0;
-        this._accelerator = null;
-        this._heartbeatId = 0;
-        this._reserving = false;
-        // Late replies about an earlier grab must never act on a newer one.
-        this._generation = 0;
+        // The grab held now: {accelerator, action, heartbeatId, reserving}, or null.
+        this._grab = null;
         this._activatedId = global.display.connect('accelerator-activated', (_display, action) => {
-            if (this._action && action === this._action)
+            if (this._grab && action === this._grab.action)
                 this._onPressed();
         });
     }
 
     // Grabs accelerator, or releases the grab for null.
     hold(accelerator) {
-        if (accelerator === this._accelerator)
+        const held = this._grab ? this._grab.accelerator : null;
+        if (accelerator === held)
             return;
         this.release();
         if (!accelerator)
@@ -35,52 +32,45 @@ export class Shortcut {
         const action = global.display.grab_accelerator(accelerator, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT);
         if (action === Meta.KeyBindingAction.NONE)
             return;
-        this._action = action;
-        this._accelerator = accelerator;
+        const grab = {accelerator, action, heartbeatId: 0, reserving: false};
+        this._grab = grab;
         // Ordinary and fullscreen windows and the overview; Shell modals filter it.
         Main.wm.allowKeybinding(Meta.external_binding_name_for_action(action),
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW);
-        this._renew();
-        if (this._heartbeatId)
-            GLib.Source.remove(this._heartbeatId);
-        this._heartbeatId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
-            this._renew();
+        this._renew(grab);
+        grab.heartbeatId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
+            this._renew(grab);
             return GLib.SOURCE_CONTINUE;
         });
     }
 
     // VOCO mutes its passive listener only while renewals arrive. One is in
-    // flight at a time, so a hung app times out and the grab is released.
-    _renew() {
-        if (this._reserving)
+    // flight at a time, so a hung app times out and the grab is released. A
+    // reply about a grab that is no longer held never acts on a newer one.
+    _renew(grab) {
+        if (grab.reserving)
             return;
-        this._reserving = true;
-        const generation = this._generation;
-        this._reserve(this._accelerator, accepted => {
-            if (generation !== this._generation)
+        grab.reserving = true;
+        this._reserve(grab.accelerator, accepted => {
+            if (grab !== this._grab)
                 return;
-            this._reserving = false;
+            grab.reserving = false;
             if (!accepted)
                 this.release();
         }, () => {
-            if (generation === this._generation)
+            if (grab === this._grab)
                 this._onLost();
         });
     }
 
     release() {
-        this._generation++;
-        this._reserving = false;
-        if (this._heartbeatId) {
-            GLib.Source.remove(this._heartbeatId);
-            this._heartbeatId = 0;
-        }
-        if (this._action) {
-            Main.wm.allowKeybinding(Meta.external_binding_name_for_action(this._action), Shell.ActionMode.NONE);
-            global.display.ungrab_accelerator(this._action);
-        }
-        this._action = 0;
-        this._accelerator = null;
+        const grab = this._grab;
+        if (!grab)
+            return;
+        this._grab = null;
+        GLib.Source.remove(grab.heartbeatId);
+        Main.wm.allowKeybinding(Meta.external_binding_name_for_action(grab.action), Shell.ActionMode.NONE);
+        global.display.ungrab_accelerator(grab.action);
     }
 
     destroy() {
