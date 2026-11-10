@@ -37,6 +37,8 @@ The [release process](docs/release-process.md) describes how a release is made.
   longer lists the IBus input source or the Chromium shortcut, which the snap
   doesn't have, and the notice for a missing top bar icon points to **Get the
   VOCO panel**.
+- The snap's messages about a turned-off permission also name where to allow it
+  in Settings: **Apps**, then **VOCO**, beside the `snap connect` command.
 - In the snap on GNOME, when the VOCO panel is missing, setup shows only the
   panel step: what's needed, **Get the VOCO panel** and **Check panel again**.
   It used to add a general setup guide and a Details note repeating it. The
