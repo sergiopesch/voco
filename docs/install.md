@@ -1,8 +1,8 @@
 # Install VOCO
 
-VOCO 2026.0.68 comes as a Debian package for Ubuntu and Debian and an RPM for
-Fedora. Both include the English speech model and everything needed to run it,
-so VOCO needs no downloads after installation.
+VOCO 2026.0.68 comes as a Debian package for Ubuntu and Debian, an RPM for
+Fedora and a snap in the Snap Store. Each includes the English speech model and
+everything needed to run it, so VOCO needs no downloads after installation.
 
 ## Requirements
 
@@ -79,6 +79,32 @@ bash voco-install
 
 Each installer installs only its own release and carries the release key's
 fingerprint.
+
+## Snap Store
+
+VOCO is in the Snap Store as [`voco`](https://snapcraft.io/voco). Install it
+from the App Center, or run:
+
+```bash
+sudo snap install voco
+```
+
+The store connects the microphone (`audio-record`) and the session checks
+(`login-session-observe`) itself, and keeps VOCO up to date, so the snap has no
+Install update. It is strictly confined, which decides where it can type:
+
+- **GNOME on Wayland:** through the
+  [VOCO panel](https://extensions.gnome.org/extension/11710/voco/), which a snap
+  can't install. VOCO's setup opens its page: choose Install there, then sign out
+  and back in.
+- **X11 sessions:** with `xdotool`, without the panel.
+- **Other Wayland desktops:** it can't type, and setup says so. Use the Debian
+  package or the RPM.
+
+The snap also leaves out the IBus input source and the Chromium extension. Its
+settings live in `~/snap/voco`, apart from the packages', so moving between the
+snap and a package starts setup again. Install only one of them: both claim the
+same name on the session bus. Remove the snap with `sudo snap remove voco`.
 
 ## Manual install
 
@@ -329,6 +355,9 @@ sudo dnf remove voco
 
 This also removes the package's `/dev/uinput` rule, but the access the rule
 gave lasts until you restart the computer.
+
+For the snap, run `sudo snap remove voco`, and remove the VOCO panel in the
+Extensions app if you installed it from extensions.gnome.org.
 
 On GNOME, also turn off the VOCO panel in the Extensions app, or run
 `gnome-extensions disable voco-panel@sergiopesch.com`. Remove the
