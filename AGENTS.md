@@ -58,8 +58,15 @@ setup and pull requests.
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
 - Settings are the microphone, the shortcut, English spelling, My words with
-  its taught versions, the update channel and whether VOCO checks for updates at startup. Onboarding state and the installation method
-  are stored alongside them. The snap has no update settings.
+  its taught versions, whether VOCO starts at login, the update channel and
+  whether VOCO checks for updates at startup. Onboarding state and the
+  installation method are stored alongside them. The snap has no update
+  settings.
+- VOCO starts at login unless the user turns it off, and only once setup is
+  complete. It keeps one XDG autostart entry in `$XDG_CONFIG_HOME/autostart` in
+  step with that setting, with `TryExec` so a removed package leaves no failing
+  entry. In the snap `XDG_CONFIG_HOME` is the snap's own folder, where snapd's
+  `autostart:` app key finds the entry. A login start stays in the tray.
 - A normal session keeps nothing. Review only holds text that survived a crash, or
   that a Stop could neither paste nor copy.
 
@@ -89,8 +96,9 @@ desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
 The config (`config.rs`) holds the shortcut, the microphone, English spelling
 (null until someone chooses; dictation then spells British), My words and its
-taught versions (empty until the user adds one), onboarding state,
-the update channel, the startup update check and the installation method. Retired keys are ignored on read
+taught versions (empty until the user adds one), onboarding state, whether
+VOCO starts at login (on until the user turns it off), the update channel, the
+startup update check and the installation method. Retired keys are ignored on read
 and dropped on the next save, and patches that name them are rejected. Retired
 package channels read as GitHub Release. Each save also writes `config.json.last`,
 keeping the keys a later VOCO left in it, and a start rewrites it when it is

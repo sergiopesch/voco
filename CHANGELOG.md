@@ -30,6 +30,10 @@ The [release process](docs/release-process.md) describes how a release is made.
   snap and a package installed with APT or DNF skip the installer's check, so
   this is where they learn it. The store and package descriptions name the
   requirement too.
+- In the snap on GNOME, when the VOCO panel is missing, setup shows only the
+  panel step: what's needed, **Get the VOCO panel** and **Check panel again**.
+  It used to add a general setup guide and a Details note repeating it. The
+  panel step's buttons are spaced like setup's own.
 - Panel setup names an older or newer copy of the VOCO panel in your home
   folder, such as one from extensions.gnome.org, which GNOME loads instead of
   the one the package installed. It used to ask you to sign out and back in

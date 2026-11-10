@@ -897,6 +897,9 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 .voco-setup__transcript > span { opacity: .5; }
 .voco-setup__privacy { font-size: 12px; }
 .voco-setup__actions { display: flex; gap: 12px; flex-wrap: wrap; }
+/* The panel step: its line, then its buttons spaced as setup's own. */
+.voco-panel-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.voco-panel-setup > p { flex-basis: 100%; margin: 0; }
 .voco-setup__microphone .voco-preferences__disclosure > summary { padding: 10px 0; font-size: 13px; }
 /* Keep the completion action painted while its scroll container is resized. */
 .voco-panel[data-surface="onboarding"] .voco-setup__actions .voco-button--primary { -webkit-backdrop-filter: none; backdrop-filter: none; }
