@@ -9,7 +9,9 @@ export function presentation(state) {
         ...state,
         label: labels[state.status],
         active: ['starting', 'recording', 'processing'].includes(state.status),
-        canStop: state.canStop === true && ['starting', 'recording'].includes(state.status),
+        // Stop names the session it ends; VOCO has none to name until capture starts.
+        canStop: state.canStop === true && typeof state.stopSession === 'string' &&
+            ['starting', 'recording'].includes(state.status),
         canOpen: state.canOpen === true && !['starting', 'recording', 'processing'].includes(state.status),
         // A VOCO that sends no canQuit can't quit from the menu, so it gets no Quit item.
         quitOffered: typeof state.canQuit === 'boolean',

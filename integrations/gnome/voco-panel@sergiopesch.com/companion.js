@@ -29,13 +29,11 @@ export class Companion {
         this._polling = false;
         this._refreshQueued = false;
         this._requesting = false;
-        this._pollId = 0;
-        this._requestId = 0;
-        this._retryId = 0;
-        // Every call carries this and the attachment generation, so a reply that
-        // arrives after a detach, a new owner or destroy() is dropped unread.
+        // The poll, request and retry timeouts, by name.
+        this._sources = new Map();
+        // Every call of the current attachment carries this. It is cancelled and
+        // replaced when the attachment ends, so no late reply is ever read.
         this._cancellable = new Gio.Cancellable();
-        this._generation = 0;
         this._indicator = new VocoIndicator(extensionPath, action => this._action(action));
         Main.panel.addToStatusArea(uuid, this._indicator, 0, 'right');
         this._paster = new Paster((method, parameters) => this._call(method, parameters, () => {}, () => {}));
@@ -49,7 +47,6 @@ export class Companion {
         this._watchId = Gio.bus_watch_name(Gio.BusType.SESSION, NAME, Gio.BusNameWatcherFlags.NONE,
             (_connection, _name, owner) => {
                 this._owner = owner;
-                this._generation++;
                 this._attach();
             }, () => {
                 this._owner = null;
@@ -80,16 +77,18 @@ export class Companion {
     _call(method, parameters, done, failed = () => this._retry()) {
         // Pinned to the unique owner, so an in-flight call can't reach a replacement app.
         const cancellable = this._cancellable;
-        const generation = this._generation;
         Gio.DBus.session.call(this._owner, PATH, INTERFACE, method, parameters, null,
             Gio.DBusCallFlags.NO_AUTO_START, 1500, cancellable, (connection, result) => {
-                if (cancellable !== this._cancellable || generation !== this._generation)
+                if (cancellable.is_cancelled())
                     return;
+                let reply;
                 try {
-                    done(connection.call_finish(result));
+                    reply = connection.call_finish(result);
                 } catch (error) {
                     failed(error);
+                    return;
                 }
+                done(reply);
             });
     }
 
@@ -104,8 +103,12 @@ export class Companion {
     _attach() {
         this._call('Attach', null, result => {
             this._attached = result.deep_unpack()[0] === true;
-            if (!this._attached)
+            // VOCO refuses when its own check that the caller is the Shell fails,
+            // which a busy session bus can time out, so a refusal is retried.
+            if (!this._attached) {
+                this._retry();
                 return;
+            }
             this._poll();
             this._armRequest();
         });
@@ -119,23 +122,16 @@ export class Companion {
             return;
         this._requesting = true;
         const cancellable = this._cancellable;
-        const generation = this._generation;
         Gio.DBus.session.call(this._owner, PATH, INTERFACE, 'NextRequest', null, new GLib.VariantType('(su)'),
             Gio.DBusCallFlags.NO_AUTO_START, REQUEST_TIMEOUT_MS, cancellable, (connection, result) => {
-                if (cancellable !== this._cancellable || generation !== this._generation)
+                if (cancellable.is_cancelled())
                     return;
                 this._requesting = false;
                 let request;
                 try {
                     request = connection.call_finish(result).deep_unpack();
                 } catch (_error) {
-                    if (this._requestId)
-                        GLib.Source.remove(this._requestId);
-                    this._requestId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
-                        this._requestId = 0;
-                        this._armRequest();
-                        return GLib.SOURCE_REMOVE;
-                    });
+                    this._schedule('request', 1000, () => this._armRequest());
                     return;
                 }
                 this._armRequest();
@@ -158,15 +154,18 @@ export class Companion {
         }
         this._polling = true;
         // This read replaces a scheduled one: a 'changed' request polls at once.
-        if (this._pollId) {
-            GLib.Source.remove(this._pollId);
-            this._pollId = 0;
-        }
+        this._unschedule('poll');
         this._call('GetState', null, result => {
             if (!this._attached)
                 return;
             this._polling = false;
-            const state = presentation(JSON.parse(result.deep_unpack()[0]));
+            let state;
+            try {
+                state = presentation(JSON.parse(result.deep_unpack()[0]));
+            } catch (_error) {
+                this._retry();
+                return;
+            }
             this._state = state;
             // Consumed whenever attached, idle included, so the focused app never
             // also acts on it. X11 keeps VOCO's own exclusive global shortcut.
@@ -175,13 +174,7 @@ export class Companion {
             // Only recording streams levels; statuses arrive as 'changed' work.
             const delay = this._refreshQueued ? 1 : state.status === 'recording' ? 50 : 1500;
             this._refreshQueued = false;
-            if (this._pollId)
-                GLib.Source.remove(this._pollId);
-            this._pollId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
-                this._pollId = 0;
-                this._poll();
-                return GLib.SOURCE_REMOVE;
-            });
+            this._schedule('poll', delay, () => this._poll());
         });
     }
 
@@ -196,31 +189,39 @@ export class Companion {
     _retry() {
         this._send('Detach', null);
         this._disconnect();
-        if (!this._owner)
-            return;
-        if (this._retryId)
-            GLib.Source.remove(this._retryId);
-        this._retryId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
-            this._retryId = 0;
-            this._attach();
+        if (this._owner)
+            this._schedule('retry', 2000, () => this._attach());
+    }
+
+    // Runs callback once after delayMs, in place of what key had scheduled.
+    _schedule(key, delayMs, callback) {
+        this._unschedule(key);
+        this._sources.set(key, GLib.timeout_add(GLib.PRIORITY_DEFAULT, delayMs, () => {
+            this._sources.delete(key);
+            callback();
             return GLib.SOURCE_REMOVE;
-        });
+        }));
+    }
+
+    _unschedule(key) {
+        if (this._sources.has(key)) {
+            GLib.Source.remove(this._sources.get(key));
+            this._sources.delete(key);
+        }
     }
 
     _disconnect() {
         this._shortcut.release();
-        this._generation++;
+        this._cancellable.cancel();
+        this._cancellable = new Gio.Cancellable();
         this._attached = false;
         this._polling = false;
         this._refreshQueued = false;
         this._requesting = false;
         this._state = null;
-        for (const field of ['_pollId', '_requestId', '_retryId']) {
-            if (this[field]) {
-                GLib.Source.remove(this[field]);
-                this[field] = 0;
-            }
-        }
+        for (const sourceId of this._sources.values())
+            GLib.Source.remove(sourceId);
+        this._sources.clear();
         this._indicator.reset();
     }
 }

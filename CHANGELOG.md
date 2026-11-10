@@ -10,10 +10,14 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Changed
 
-- The GNOME panel, now version 21, is split into small modules, each of
-  which cleans up after itself, as extensions.gnome.org's reviewers ask. It
+- The GNOME panel, now version 22 and on
+  [extensions.gnome.org](https://extensions.gnome.org/extension/11710/voco/),
+  is split into small modules, each of which cleans up after itself, as its
+  reviewers ask. It
   reads reduced motion from GNOME Shell itself, so it also stays still while
-  the Shell holds animations back. It behaves as before. After upgrading, sign
+  the Shell holds animations back. It tries again when VOCO turns it away
+  because the desktop was too busy to confirm it, where it used to stay hidden
+  until VOCO restarted, and offers Stop only once there's a dictation to stop. After upgrading, sign
   out and back in to load it.
 
 ### Fixed
