@@ -152,8 +152,10 @@ export default class VocoPanel extends Extension {
         this._label = new St.Label({style_class: 'voco-panel-status', y_align: Clutter.ActorAlign.CENTER});
         this._detail.add_child(this._label);
         Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
-        this._settings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
-        this._motionId = this._settings.connect('changed::enable-animations', () => this._render());
+        // The Shell's own view of reduced motion: the desktop's setting, and off
+        // while the Shell inhibits animations.
+        this._settings = St.Settings.get();
+        this._motionId = this._settings.connect('notify::enable-animations', () => this._render());
         this._sizeId = Main.panel.connect('notify::width', () => this._render());
         this._watch = Gio.bus_watch_name(Gio.BusType.SESSION, NAME, Gio.BusNameWatcherFlags.NONE,
             (_connection, _name, owner) => {
@@ -314,7 +316,7 @@ export default class VocoPanel extends Extension {
     _render() {
         if (!this._state || !this._alive) return;
         const state = this._state;
-        const motion = this._settings.get_boolean('enable-animations');
+        const motion = this._settings.enable_animations;
         const action = state.canStop ? 'Stop dictation' : state.canOpen ? 'Open settings' : '';
         this._button.accessible_name = [state.description, action].filter(Boolean).join('. ');
         const wave = state.active;
@@ -489,10 +491,19 @@ export default class VocoPanel extends Extension {
         if (this._revealId) { this._reveal.disconnect(this._revealId); this._revealId = 0; }
         this._indicator?.destroy();
         this._indicator = null;
-        this._button = this._box = this._clip = this._reveal = this._detail = null;
-        this._wave = this._bars = this._label = null;
-        this._settingsItem = this._reviewItem = this._stopItem = null;
-        this._quitSeparator = this._quitItem = null;
+        this._button = null;
+        this._box = null;
+        this._clip = null;
+        this._reveal = null;
+        this._detail = null;
+        this._wave = null;
+        this._bars = null;
+        this._label = null;
+        this._settingsItem = null;
+        this._reviewItem = null;
+        this._stopItem = null;
+        this._quitSeparator = null;
+        this._quitItem = null;
         this._settings = null;
     }
 }
