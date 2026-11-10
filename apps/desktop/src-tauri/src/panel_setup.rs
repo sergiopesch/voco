@@ -12,8 +12,9 @@ const FAILED_CHECK_TTL: Duration = Duration::from_secs(2);
 
 type CheckResult = Result<PanelSetupStatus, String>;
 
-/// Where the snap's companion comes from, since the snap can't ship it.
-pub const COMPANION_PAGE: &str = "https://extensions.gnome.org/#q=VOCO";
+/// Where the snap's companion comes from, since the snap can't ship it: its own
+/// page on extensions.gnome.org, which opens only on an exact match.
+pub const COMPANION_PAGE: &str = "https://extensions.gnome.org/extension/11710/voco/";
 
 #[derive(Default)]
 struct CheckCache {

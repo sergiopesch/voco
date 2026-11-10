@@ -2533,6 +2533,9 @@ mod tests {
             "https://extensions.gnome.org/#q=elsewhere"
         ));
         assert!(!is_allowed_external_url(
+            "https://extensions.gnome.org/extension/11710/voco/?redirect=elsewhere"
+        ));
+        assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco/blob/master/docs/platform/README.md?redirect=elsewhere"
         ));
         assert!(is_allowed_external_url(
