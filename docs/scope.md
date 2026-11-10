@@ -127,7 +127,7 @@ Until something ships, VOCO doesn't describe it as a feature.
 
 VOCO supports Ubuntu 24.04 and 26.04, Debian 13 and Fedora 44 on GNOME, on
 64-bit Intel and AMD processors with AVX2, FMA and F16C. Recognition can't run
-on a processor without those features. Debian 13 and Fedora 44 have not been
+on a processor without those features, and VOCO says so when it starts. Debian 13 and Fedora 44 have not been
 tested on a real desktop yet.
 
 Other systems that meet the package dependencies may run VOCO, but nobody tests

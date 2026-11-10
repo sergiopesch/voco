@@ -379,6 +379,9 @@ pub(crate) fn worker_error_code(error: &str) -> &'static str {
         "worker spawn failed" => "spawn_failed",
         "worker lost" => "worker_lost",
         error if error.ends_with(" must name an absolute local file") => "runtime_missing",
+        error if error.starts_with("VOCO's speech recognition needs a processor") => {
+            "processor_unsupported"
+        }
         _ => "transport_failed",
     }
 }
@@ -657,6 +660,10 @@ mod tests {
             "runtime_missing"
         );
         assert_eq!(worker_error_code("worker spawn failed"), "spawn_failed");
+        assert_eq!(
+            worker_error_code(crate::processor::tests::LACKS_F16C),
+            "processor_unsupported"
+        );
         assert_eq!(
             worker_error_code("PRIVATE_SENTINEL ready"),
             "transport_failed"

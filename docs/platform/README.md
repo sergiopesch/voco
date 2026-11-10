@@ -21,6 +21,12 @@ The [GNOME panel](../install.md#gnome-panel) works on all four, and the guided
 installer turns it on; after you sign out and back in, it replaces the tray icon
 while VOCO runs. Without the panel or a tray icon, open VOCO from your app menu.
 
+On Ubuntu, VOCO also comes as a strictly confined [snap](../install.md#snap-store).
+It types on GNOME on Wayland through the panel from extensions.gnome.org, and in
+X11 sessions with `xdotool`; on other Wayland desktops it can't type. It has no
+`/dev/uinput` access, passive evdev or IBus input source, so on Wayland its
+shortcut is the panel's or a `voco --toggle` binding.
+
 The two packages hold the same files and need glibc 2.39 or later: they are
 built on Ubuntu 24.04, whose glibc 2.39 and GCC 13 runtime set their floors.
 Other systems that meet the package dependencies may run VOCO, but nothing here
@@ -50,7 +56,7 @@ describes the suites.
 
 | Area | Requirement |
 | --- | --- |
-| Processor | x86-64 with AVX2, FMA and F16C. Recognition can't run without them. The guided installer refuses a processor that lacks one, but APT and DNF don't check. |
+| Processor | x86-64 with AVX2, FMA and F16C. Recognition can't run without them. The guided installer refuses a processor that lacks one, but APT, DNF and the Snap Store don't check. On such a processor VOCO says so when it starts, names what's missing and records nothing. |
 | System | One of the [supported systems](#supported-systems). The Debian package needs `libc6 (>= 2.39)` and `libstdc++6 (>= 13.2.0)`, and the RPM `glibc >= 2.39` and `libstdc++ >= 13.2`. |
 | Audio | On Wayland, PipeWire with its PulseAudio service (`pipewire-pulse`). VOCO names each microphone by PipeWire's object serial, which PulseAudio itself doesn't provide. On X11, either. |
 | Session | Wayland or X11. GNOME 50 has no X11 session, so on Ubuntu 26.04 and Fedora 44 VOCO runs on Wayland. |

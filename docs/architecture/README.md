@@ -78,6 +78,12 @@ worker doesn't start. The worker gets only the variables it reads (`ENVIRONMENT`
 in `worker_sandbox.rs`), none of the session's bus, display or agent addresses;
 the full-application test checks the running worker's environment and filter. The worker has 30 seconds to report ready and 10 seconds for each response, and a response line
 may be at most 1 MiB. VOCO warms the worker at startup before it reports ready.
+The runtime needs AVX2, FMA and F16C, so `processor.rs` reads the first
+`flags` line of `/proc/cpuinfo` once. When one is missing, no worker starts:
+startup notifies once, the tray and panel read **Processor not supported**, and
+every start, the voice test and Say it included, is refused with the message
+that names what's missing before a microphone opens. A file without a `flags`
+line, or none at all, counts as capable, as in the installer.
 A worker that died while idle is replaced at the next warmup or start, never
 during a recording.
 
