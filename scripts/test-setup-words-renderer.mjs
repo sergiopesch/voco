@@ -37,6 +37,8 @@ try {
         window.saves = [];
         window.accountName = new URLSearchParams(location.search).get('name');
         window.nativeHandlers.getAccountName = () => window.accountName;
+        // Rust says whether this VOCO can start at login: a package or the snap.
+        if (new URLSearchParams(location.search).get('login') === '1') window.nativeHandlers.loginStartAvailable = () => true;
         window.nativeHandlers.getDesktopInputStatus = () => ({ available: true, detail: '' });
         window.nativeHandlers.getPanelSetupStatus = () => ({ status: 'other-desktop', detail: 'Use the VOCO tray menu for status and Stop.', canEnable: false });
         window.nativeHandlers.saveConfigPatch = ([patch]) => {
@@ -66,9 +68,10 @@ try {
             }
         };
     });
-    const load = async ({ config = {}, name = 'Siobhán Kelly', passedShot = null, desktopInput = null, panel = null } = {}) => {
+    const load = async ({ config = {}, name = 'Siobhán Kelly', passedShot = null, desktopInput = null, panel = null, login = false } = {}) => {
         const query = new URLSearchParams({ config: JSON.stringify({ onboardingCompleted: false, englishSpelling: 'british', myWords: [], ...config }) });
         if (name !== null) query.set('name', name);
+        if (login) query.set('login', '1');
         await page.goto(origin + '/app-microphone-check?' + query);
         await page.waitForFunction(() => window.store?.getState().config);
         // Setup checks desktop input once the voice test passes.
@@ -207,8 +210,29 @@ try {
     assert.equal(await page.getByRole('button', { name: 'Test again', exact: true }).count(), 0);
     await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
     assert.equal(await page.locator('.voco-panel__eyebrow').textContent(), 'Setup, step 4 of 4');
+    // A source build can't start at login, so the last screen says where to reopen VOCO.
+    const handoffCopy = () => page.locator('.voco-setup__handoff').innerText();
+    assert.match(await handoffCopy(), /from your app launcher/);
+    assert.doesNotMatch(await handoffCopy(), /starts when you sign in/);
     await shot('setup-ready');
     results.push({ case: 'continue-reaches-the-handoff', passed: true });
+
+    // A package or the snap starts at login once setup is done, unless the
+    // setting is off; setup itself saves nothing about it.
+    const startsAtLogin = 'VOCO starts when you sign in. You can turn this off in Settings.';
+    await load({ login: true });
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
+    await page.locator('.voco-setup__handoff').getByText(startsAtLogin, { exact: true }).waitFor();
+    assert.doesNotMatch(await handoffCopy(), /from your app launcher/);
+    assert.deepEqual(await saves(), []);
+    await shot('setup-ready-starts-at-login');
+    await load({ login: true, config: { startAtLogin: false } });
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
+    assert.match(await handoffCopy(), /from your app launcher/);
+    assert.doesNotMatch(await handoffCopy(), /starts when you sign in/);
+    results.push({ case: 'the-handoff-says-voco-starts-at-login-where-it-will', passed: true });
 
     // A failed save while teaching keeps setup able to finish: Continue saves
     // again before it hands over.

@@ -22,7 +22,9 @@ use tauri::Emitter;
 pub const EVENT: &str = "voco:update-install";
 const PKEXEC: &str = "/usr/bin/pkexec";
 const HELPER: &str = "/usr/libexec/voco-update-helper";
-const INSTALLED_APP: &str = "/usr/bin/voco";
+/// The packages' VOCO: the one Install update restarts, and the one a login
+/// start's `Exec=voco` finds (`login_start.rs`).
+pub(crate) const INSTALLED_APP: &str = "/usr/bin/voco";
 /// pkexec's own exit codes: the prompt dismissed, or the action not allowed.
 const PKEXEC_DISMISSED: i32 = 126;
 const PKEXEC_NOT_AUTHORIZED: i32 = 127;

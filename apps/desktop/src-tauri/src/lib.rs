@@ -21,6 +21,7 @@ mod hotkey_state;
 mod hotkey_trace;
 mod ibus_shortcut;
 mod insertion;
+mod login_start;
 #[cfg(all(target_os = "linux", feature = "native-capture"))]
 mod native_capture;
 mod native_capture_commands;
@@ -562,8 +563,10 @@ fn config_writer() -> Result<std::sync::MutexGuard<'static, ()>, String> {
 }
 
 /// Call only after a committed write, while still holding `config_writer()`, so
-/// the config and its revision come from the same write.
+/// the config and its revision come from the same write. It also keeps the
+/// login start entry in step with that config.
 fn publish_config(app: &tauri::AppHandle, config: AppConfig, kind: &str) -> ConfigSnapshot {
+    keep_login_start_in_step(&config);
     let snapshot = ConfigSnapshot {
         revision: CONFIG_REVISION.fetch_add(1, Ordering::SeqCst) + 1,
         config,
@@ -572,6 +575,32 @@ fn publish_config(app: &tauri::AppHandle, config: AppConfig, kind: &str) -> Conf
         warn!("Failed to emit {kind} configuration update: {error}");
     }
     snapshot
+}
+
+/// Writes or removes the login start entry for `config`. Only turning the
+/// setting on or off reports a failure (`persist_config_patch`); otherwise it
+/// warns, and the next start or save tries again.
+fn keep_login_start_in_step(config: &AppConfig) {
+    match login_start::sync(config) {
+        Ok(login_start::Change::Unchanged) => {}
+        Ok(login_start::Change::Written) => info!("VOCO now starts when you sign in"),
+        Ok(login_start::Change::Removed) => info!("VOCO no longer starts when you sign in"),
+        Err(error) => warn!("{error}"),
+    }
+}
+
+/// At startup, off the startup path: an entry an earlier VOCO, a Reset or a
+/// failed write left out of step comes back in step with the settings. A
+/// config VOCO can't read leaves the entry as it is.
+fn keep_login_start_in_step_at_startup() {
+    std::thread::spawn(|| {
+        let Ok(_guard) = config_writer() else {
+            return;
+        };
+        if let Ok(config) = AppConfig::load() {
+            keep_login_start_in_step(&config);
+        }
+    });
 }
 
 /// Rebinds `previous` after a failed change and returns the error to report. It
@@ -689,13 +718,28 @@ fn persist_config_patch(
         apply_hotkey_runtime_state(app, &config.hotkey)
             .map_err(|error| restore_hotkey(&previous.hotkey, error, rebind))?;
     }
+    let restore_after = |error: String| {
+        if hotkey_changed {
+            restore_hotkey(&previous.hotkey, error, rebind)
+        } else {
+            error
+        }
+    };
+
+    // Turning the switch on or off changes the entry first, so a failure keeps
+    // the setting and the entry as they were. Any other save only keeps the
+    // entry in step afterwards, so an unwritable autostart folder never stops
+    // setup or another setting from saving.
+    let login_start_changed = previous.start_at_login != config.start_at_login;
+    if login_start_changed {
+        login_start::sync(&config).map_err(restore_after)?;
+    }
 
     if let Err(error) = config.save() {
-        return Err(if hotkey_changed {
-            restore_hotkey(&previous.hotkey, error.to_string(), rebind)
-        } else {
-            error.to_string()
-        });
+        if login_start_changed {
+            keep_login_start_in_step(&previous);
+        }
+        return Err(restore_after(error.to_string()));
     }
 
     let snapshot = publish_config(app, config, "authoritative");
@@ -2294,6 +2338,7 @@ pub fn run() -> Result<(), String> {
         })
         .invoke_handler(tauri::generate_handler![
             confinement::store_updates,
+            login_start::login_start_available,
             update_install::update_install_availability,
             update_install::install_update,
             update_install::cancel_update_install,
@@ -2400,6 +2445,7 @@ pub fn run() -> Result<(), String> {
                 start_ibus_shortcut_listener(app.handle().clone());
             }
             let configured_hotkey = configured_hotkey();
+            keep_login_start_in_step_at_startup();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
             EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);

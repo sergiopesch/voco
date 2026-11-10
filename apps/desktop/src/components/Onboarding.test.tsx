@@ -133,9 +133,25 @@ it("leads the handoff with the fix while the shortcut also reaches the focused a
   expect(leaky).toContain(">Done</button>");
   const ready = renderToStaticMarkup(<Onboarding {...props} shortcutNote={null} />);
   expect(ready).toContain("Choose Done, click where you want the text");
-  // VOCO doesn't start at login, so the last step doesn't promise it stays.
+  // Where VOCO won't start at login, the last step doesn't promise it stays.
   expect(ready).toContain("After you sign in again, open it from your app launcher.");
   expect(ready).not.toContain("stays in your tray");
   expect(ready).not.toContain("Then click");
   expect(ready).toContain("Checking your panel");
+});
+
+it("says VOCO starts when you sign in only where it will", () => {
+  const props = {
+    microphone: "System default", status: "idle" as const, passed: true, failed: false, attempted: true,
+    setupError: null, desktopSetupError: null, checkingDesktopSetup: false, preparing: false, saving: false,
+    blocked: false, hotkey: "Alt+D", desktopReady: true, onStart: vi.fn(), onStop: vi.fn(), onFinish: vi.fn(async () => {}),
+    wordsDone: true, wordsChecked: true,
+  };
+  const starts = renderToStaticMarkup(<Onboarding {...props} startsAtLogin />);
+  expect(starts).toContain("VOCO starts when you sign in. You can turn this off in Settings.");
+  expect(starts).not.toContain("from your app launcher");
+  // The setting is off, or a source build, which can't start at login.
+  const reopens = renderToStaticMarkup(<Onboarding {...props} />);
+  expect(reopens).toContain("After you sign in again, open it from your app launcher.");
+  expect(reopens).not.toContain("starts when you sign in");
 });

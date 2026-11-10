@@ -235,6 +235,10 @@ only show your words in the VOCO window.
 To dictate, click where you want the text, press `Alt+D` and speak. Press
 `Alt+D` again to finish. See [Everyday use](everyday-use.md).
 
+From then on, the packages and the snap start VOCO when you sign in, without
+opening a window. To turn that off, see
+[Start when you sign in](everyday-use.md#start-when-you-sign-in).
+
 ## Desktop input
 
 VOCO types by pasting. It puts each phrase on the clipboard and presses
@@ -387,6 +391,12 @@ On GNOME, also turn off the VOCO panel in the Extensions app, or run
 Removing the package keeps your settings and any text saved for Review. See
 [What VOCO keeps](everyday-use.md#what-voco-keeps) for the folders to delete if
 you want them gone.
+
+It also keeps the entry that starts VOCO when you sign in,
+`~/.config/autostart/voco-login.desktop`. Your desktop skips it once `voco` is
+gone, so it does nothing; delete it with
+`rm ~/.config/autostart/voco-login.desktop`. Removing the snap deletes the
+snap's own entry with the rest of `~/snap/voco`.
 
 ## Installer output
 

@@ -17,6 +17,10 @@ pub struct AppConfig {
     pub selected_mic: Option<String>,
     #[serde(default)]
     pub onboarding_completed: bool,
+    /// Start VOCO when the user signs in, once setup is complete
+    /// (`login_start.rs`). On until the user turns it off.
+    #[serde(default = "default_start_at_login")]
+    pub start_at_login: bool,
     #[serde(default)]
     pub update_channel: UpdateChannel,
     /// Check GitHub's public release list at startup. Off, VOCO checks only
@@ -63,6 +67,8 @@ pub struct AppConfigPatch {
     pub selected_mic: PatchField<Option<String>>,
     #[serde(default)]
     pub onboarding_completed: PatchField<bool>,
+    #[serde(default)]
+    pub start_at_login: PatchField<bool>,
     #[serde(default)]
     pub update_channel: PatchField<UpdateChannel>,
     #[serde(default)]
@@ -118,6 +124,9 @@ impl AppConfigPatch {
         if let PatchField::Set(value) = self.onboarding_completed {
             config.onboarding_completed = value;
         }
+        if let PatchField::Set(value) = self.start_at_login {
+            config.start_at_login = value;
+        }
         if let PatchField::Set(value) = self.update_channel {
             config.update_channel = value;
         }
@@ -168,6 +177,10 @@ pub struct ReleaseInfo {
 
 fn default_hotkey() -> String {
     "Alt+D".to_string()
+}
+
+fn default_start_at_login() -> bool {
+    true
 }
 
 fn default_automatic_update_checks() -> bool {
@@ -232,6 +245,7 @@ impl Default for AppConfig {
             hotkey: default_hotkey(),
             selected_mic: None,
             onboarding_completed: false,
+            start_at_login: default_start_at_login(),
             update_channel: UpdateChannel::default(),
             automatic_update_checks: default_automatic_update_checks(),
             install_channel: InstallChannel::default(),
@@ -242,22 +256,26 @@ impl Default for AppConfig {
     }
 }
 
+/// `$XDG_CONFIG_HOME`, or `~/.config` without it: VOCO's settings folder and
+/// its login start entry (`login_start.rs`) live there. In the snap it is the
+/// snap's own `$SNAP_USER_DATA/.config`.
+pub fn xdg_config_home() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    Ok(dirs::config_dir().ok_or("Cannot find config directory (XDG_CONFIG_HOME)")?)
+}
+
 impl AppConfig {
     /// The private settings directory, without copying a legacy `voice` config
     /// into it. The recovery panel's Open and Reset use it, and so does the update
     /// cache, which is read and written without the config lock.
     pub fn config_dir_without_migration() -> Result<PathBuf, Box<dyn std::error::Error>> {
-        let base_dir =
-            dirs::config_dir().ok_or("Cannot find config directory (XDG_CONFIG_HOME)")?;
-        let config_dir = base_dir.join(APP_DIR_NAME);
+        let config_dir = xdg_config_home()?.join(APP_DIR_NAME);
         fs::create_dir_all(&config_dir)?;
         secure_private_directory(&config_dir)?;
         Ok(config_dir)
     }
 
     pub fn config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
-        let base_dir =
-            dirs::config_dir().ok_or("Cannot find config directory (XDG_CONFIG_HOME)")?;
+        let base_dir = xdg_config_home()?;
         let config_dir = Self::config_dir_without_migration()?;
         migrate_legacy_config(&base_dir, &config_dir)?;
         Ok(config_dir)
@@ -853,7 +871,10 @@ pub fn save_cached_update_check(
     Ok(())
 }
 
-fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), std::io::Error> {
+/// Replaces `path` with an owner-only file holding `content`: a new file, synced,
+/// then renamed over it, so a reader sees the old file or the new one and a link
+/// at `path` is replaced rather than followed.
+pub(crate) fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), std::io::Error> {
     let parent = path.parent().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -1127,11 +1148,12 @@ mod tests {
         directory
     }
 
-    /// Settings that 0.61 and 0.62 don't all know.
+    /// Settings that 0.61 to 0.68 don't all know.
     fn settings_with_my_words() -> AppConfig {
         AppConfig {
             hotkey: "Super+D".to_string(),
             onboarding_completed: true,
+            start_at_login: false,
             automatic_update_checks: false,
             english_spelling: Some(EnglishSpelling::American),
             my_words: vec!["Siobhán Kelly".to_string(), "Niamh".to_string()],
@@ -1149,8 +1171,10 @@ mod tests {
         }
     }
 
-    /// What 0.61 drops when it first starts; 0.62 drops only the taught versions.
-    const UNKNOWN_TO_0_61: [&str; 4] = [
+    /// What 0.61 drops when it first starts; 0.62 drops the taught versions, and
+    /// every VOCO up to 0.68 drops whether it starts at login.
+    const UNKNOWN_TO_0_61: [&str; 5] = [
+        "startAtLogin",
         "automaticUpdateChecks",
         "englishSpelling",
         "myWords",
@@ -1666,6 +1690,7 @@ mod tests {
                 "hotkey": "Super+D",
                 "selectedMic": "usb-mic",
                 "onboardingCompleted": true,
+                "startAtLogin": true,
                 "updateChannel": "beta",
                 "automaticUpdateChecks": true,
                 "installChannel": "github-release",
@@ -2158,6 +2183,46 @@ mod tests {
         assert!(
             serde_json::from_str::<AppConfigPatch>(r#"{"automaticUpdateChecks":null}"#).is_err()
         );
+    }
+
+    #[test]
+    fn start_at_login_starts_on_and_only_a_patch_that_names_it_turns_it_off() {
+        // A config from before the setting, as an upgrade reads it.
+        let mut config: AppConfig =
+            serde_json::from_str(r#"{"hotkey":"Super+D","onboardingCompleted":true}"#).unwrap();
+        assert!(config.start_at_login);
+        assert!(AppConfig::default().start_at_login);
+        let off: AppConfigPatch = serde_json::from_str(r#"{"startAtLogin":false}"#).unwrap();
+        off.apply_to(&mut config);
+        let other: AppConfigPatch = serde_json::from_str(r#"{"hotkey":"Alt+D"}"#).unwrap();
+        other.apply_to(&mut config);
+        assert!(!config.start_at_login);
+        let saved = serde_json::to_value(&config).unwrap();
+        assert_eq!(saved["startAtLogin"], false);
+        assert!(
+            !serde_json::from_value::<AppConfig>(saved)
+                .unwrap()
+                .start_at_login
+        );
+        assert!(serde_json::from_str::<AppConfigPatch>(r#"{"startAtLogin":null}"#).is_err());
+    }
+
+    #[test]
+    fn an_earlier_voco_keeps_start_at_login_off() {
+        let directory = test_directory("earlier-login-start");
+        let path = directory.join("config.json");
+        let settings = AppConfig {
+            onboarding_completed: true,
+            start_at_login: false,
+            ..AppConfig::default()
+        };
+        save_at(&settings, &path).unwrap();
+        // An earlier VOCO rewrites the file without the key, which reads as on.
+        atomic_write(&path, &saved_by_earlier_voco(&settings, &["startAtLogin"])).unwrap();
+
+        assert!(!load_at(&path).unwrap().start_at_login);
+        assert_eq!(read_json(&path)["startAtLogin"], false);
+        let _ = fs::remove_dir_all(&directory);
     }
 
     #[test]

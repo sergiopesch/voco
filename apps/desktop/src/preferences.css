@@ -123,6 +123,19 @@
 .voco-preferences .voco-field:has(textarea) > span { padding-top: 10px; }
 .voco-preferences__field-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .voco-preferences__field-row .voco-field { flex: 1 1 280px; }
+/* A switch keeps the checkbox's semantics and keys, beside its label at every width. */
+.voco-preferences .voco-field:has(> input[role="switch"]) { grid-template-columns: minmax(0,1fr) auto; cursor: pointer; }
+.voco-preferences .voco-field input[role="switch"] { width: 44px; height: 24px; min-height: 0; padding: 0; border: 1px solid #d2dff44d; border-radius: 999px; background: #111720bd; place-content: center start; cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.voco-preferences .voco-field input[role="switch"]::before { content: ""; width: 18px; height: 18px; margin-left: 2px; border: 0; border-radius: 50%; background: #d2dbe6; transform: none; transition: transform .15s ease; }
+.voco-preferences .voco-field input[role="switch"]:checked { background: var(--voco-accent-highlight); border-color: var(--voco-accent-highlight); }
+.voco-preferences .voco-field input[role="switch"]:checked::before { width: 18px; height: 18px; border: 0; background: var(--voco-bg); transform: translateX(20px); }
+@media (prefers-reduced-motion: reduce) {
+  .voco-preferences .voco-field input[role="switch"], .voco-preferences .voco-field input[role="switch"]::before { transition: none; }
+}
+@media (forced-colors: active) {
+  .voco-preferences .voco-field input[role="switch"]::before { background: CanvasText; }
+  .voco-preferences .voco-field input[role="switch"]:checked::before { background: HighlightText; }
+}
 .voco-preferences__helper, .voco-preferences .voco-inline-note { font-size: 14px; line-height: 1.5; color: var(--preferences-muted); }
 .voco-preferences__form .voco-inline-note--error { color: #ffb5c3; }
 .voco-preferences .voco-meter { padding: 4px 0; }

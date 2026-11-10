@@ -191,6 +191,11 @@ package's version in the snap's `snap/manifest.yaml`.
   plugs. The app also plugs `audio-playback`, `audio-record` and
   `login-session-observe`, and has one slot, a session `dbus` slot for
   `com.sergiopesch.voco.Panel`. It plugs neither `network` nor `home`.
+- **Login start.** The app's `autostart: voco-login.desktop` key names the
+  entry VOCO keeps in `$SNAP_USER_DATA/.config/autostart` while it starts at
+  login, so snapd's session agent starts the app at sign-in
+  ([Start at login](architecture/README.md#start-at-login)). The packages ship
+  no autostart entry; VOCO writes the user's own.
 - **Programs from Ubuntu.** The snap runs four programs from Ubuntu 24.04's
   archive: Python 3.12 with NumPy and SentencePiece for the speech worker, and
   xclip, xdotool and notify-send. Each lives with its libraries in a private
@@ -210,8 +215,9 @@ unsquashfs, dpkg-deb, readelf, python3 with PyYAML (`python3-yaml`) and the
 - the file name `voco_<version>_amd64.snap`;
 - with `snap_package.py verify-snap`: the name, version, `core24`, strict
   confinement, the `stable` grade and amd64; one app, `voco`, that runs
-  `usr/bin/voco` as `com.sergiopesch.voco` with exactly VOCO's plugs and the
-  GNOME extension's, the extension's content providers and only the panel slot;
+  `usr/bin/voco` as `com.sergiopesch.voco`, starts at login from
+  `voco-login.desktop`, with exactly VOCO's plugs and the GNOME extension's,
+  the extension's content providers and only the panel slot;
   the worker's paths; the wrappers and the helpers' links to them; that the
   worker's Python finds its standard library and NumPy inside the snap; that no
   library sits on the app's search path; and that the snap holds the Debian
@@ -228,8 +234,8 @@ unsquashfs, dpkg-deb, readelf, python3 with PyYAML (`python3-yaml`) and the
 `npm run test:speech-package` includes `scripts/test-snap-package.py`, which
 tests the payload, the description, the recipe and each check against
 deliberate mistakes. `npm run verify:devops` fails unless the recipe declares
-strict confinement on `core24`, the GNOME extension, VOCO's three plugs and the
-panel slot, and names no other plug, and it fails if `ci.yml` builds VOCO's
+strict confinement on `core24`, the GNOME extension, VOCO's three plugs, the
+panel slot and the login start entry, and names no other plug, and it fails if `ci.yml` builds VOCO's
 snap: hosted CI builds only the probe snaps in `scripts/fixtures`.
 
 ## Wayland paste keys

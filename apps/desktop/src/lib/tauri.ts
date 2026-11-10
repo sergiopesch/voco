@@ -32,6 +32,12 @@ export async function storeUpdates(): Promise<boolean> {
   return invoke<boolean>("store_updates");
 }
 
+/** Whether this VOCO can start at login: the packages and the snap can, a
+ * source build can't. */
+export async function loginStartAvailable(): Promise<boolean> {
+  return invoke<boolean>("login_start_available");
+}
+
 export interface MicrophoneAccess {
   allowed: boolean;
   /** What to do about it, when not allowed. */

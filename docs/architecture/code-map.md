@@ -20,6 +20,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the My words rules, the copy from the legacy `voice` directory and the update cache.
 - `confinement.rs` — Whether VOCO runs as its strict snap, which skips what confinement forbids and leaves updates to the Snap Store.
+- `login_start.rs` — The XDG autostart entry `voco-login.desktop` that starts the packages or the snap at login, kept in step with `startAtLogin` once setup is complete.
 - `update_install.rs` — Install update's commands: where it's offered, the download, verification, `pkexec` helper run and restart, reported as `voco:update-install` events.
 - `update_download.rs` — Install update's download: release asset addresses, the redirect allowlist, size limits and cancelling, with libsoup.
 - `update_verify.rs` — Checks shared with the root helper: the release key's signature, the signed manifest, SHA-256 and package identity.

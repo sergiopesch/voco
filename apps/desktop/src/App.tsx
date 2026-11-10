@@ -27,6 +27,7 @@ import {
   traceHotkeyEvent,
   takeLauncherActivation,
   storeUpdates,
+  loginStartAvailable,
 } from "@/lib/tauri";
 import {
   checkForUpdates,
@@ -216,6 +217,11 @@ export function App() {
   const [updatesByStore, setUpdatesByStore] = useState<boolean | null>(null);
   useEffect(() => {
     void storeUpdates().then(setUpdatesByStore, () => setUpdatesByStore(false));
+  }, []);
+  // Whether this VOCO can start at login; a source build can't.
+  const [canStartAtLogin, setCanStartAtLogin] = useState(false);
+  useEffect(() => {
+    void loginStartAvailable().then(setCanStartAtLogin, () => setCanStartAtLogin(false));
   }, []);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState<RuntimeDiagnostics | null>(null);
   const [runtimeDiagnosticsFailed, setRuntimeDiagnosticsFailed] = useState(false);
@@ -1258,6 +1264,7 @@ export function App() {
         onRefreshDevices={refreshDevices}
         onRequestMicrophoneAccess={requestMicrophoneAccess}
         updatesByStore={updatesByStore === true}
+        loginStartAvailable={canStartAtLogin}
         onCheckForUpdates={() => runUpdateCheck(config.updateChannel, undefined, true)}
         onOpenReleasePage={(url) => openExternalUrl(url)}
         onRefreshRuntimeDiagnostics={refreshRuntimeDiagnostics}

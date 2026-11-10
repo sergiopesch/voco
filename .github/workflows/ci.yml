@@ -185,7 +185,7 @@ jobs:
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-setup-words-renderer
 
-      - name: Update checks off switch regression
+      - name: Update checks and login start switches regression
         run: npm run test:update-checks-renderer
         env:
           VOCO_RENDERER_EVIDENCE_DIR: ${{ runner.temp }}/voco-update-checks-renderer

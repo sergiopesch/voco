@@ -29,7 +29,7 @@ appear where you are typing, while you speak.
   and VOCO writes them as you typed them, with their capitals and accents. Say a
   word to check it, and if VOCO hears it wrong, teach VOCO how you say it.
 - **Stays out of the way** in the system tray, or in the GNOME top bar with live
-  microphone bars.
+  microphone bars. It starts when you sign in, unless you turn that off.
 - **Keeps your words.** If a paste fails, VOCO copies the rest of your words to
   the clipboard. If VOCO closes unexpectedly, Review gives your text back.
 
