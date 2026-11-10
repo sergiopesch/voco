@@ -123,8 +123,9 @@ these ways:
 
 - On GNOME 46, 48, 50 or 51 with the `.deb` or RPM, choose **Enable live panel**
   on the **Help** page, or run `voco --setup-panel`. Then sign out and back in.
-- With the snap on GNOME, choose **Get the VOCO panel** on the **Help** page,
-  install the panel from extensions.gnome.org, then sign out and back in.
+- With the snap on GNOME, choose **Get the VOCO panel** on the **Help** page and
+  install the panel from extensions.gnome.org. GNOME loads a first install at
+  once.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
 - With the `.deb` or RPM, add the
@@ -217,8 +218,8 @@ when the panel needs a step.
 - If the panel isn't enabled, choose **Enable live panel** on the **Help** page,
   or run `voco --setup-panel`. Then save your work and sign out and back in.
   GNOME loads the panel, and any update to it, when you sign in. The snap can't
-  enable the panel: choose **Get the VOCO panel** on the **Help** page, install
-  it from extensions.gnome.org, then sign out and back in.
+  enable the panel: choose **Get the VOCO panel** on the **Help** page and
+  install it from extensions.gnome.org, which loads a first install at once.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
 - With the `.deb` or RPM, if it names another copy of the panel in your home
