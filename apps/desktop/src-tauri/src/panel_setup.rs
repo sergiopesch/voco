@@ -130,7 +130,9 @@ fn snap_status(desktop: &str, asking: Option<bool>) -> PanelSetupStatus {
         },
         Some(false) => PanelSetupStatus {
             status: "extensions-site".into(),
-            detail: "Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.".into(),
+            // GNOME loads a first install from extensions.gnome.org at once; only an
+            // older copy already loaded waits for the next login.
+            detail: "The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it's already installed, sign out and back in.".into(),
             can_enable: false,
             url: Some(COMPANION_PAGE.into()),
         },

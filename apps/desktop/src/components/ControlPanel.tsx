@@ -645,6 +645,15 @@ export function ControlPanel({
   }, []);
 
   useEffect(() => () => { inputCheckRequest.current += 1; checkedVoiceTest.current = false; }, []);
+  // Setup's own check answers once; the runtime poll keeps asking. When the
+  // poll finds desktop input ready, as when the snap's panel attaches after
+  // setup sent the user to install it, setup moves on without a click.
+  const liveDesktopInput = runtimeDiagnostics?.desktopInput;
+  useEffect(() => {
+    if (!isOnboarding || checkingInput || inputReadiness?.available !== false || liveDesktopInput?.available !== true) return;
+    inputCheckRequest.current += 1;
+    setInputReadiness(liveDesktopInput);
+  }, [isOnboarding, checkingInput, inputReadiness, liveDesktopInput]);
   useEffect(() => {
     if (!testPassed) {
       checkedVoiceTest.current = false;

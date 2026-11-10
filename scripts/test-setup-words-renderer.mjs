@@ -276,19 +276,37 @@ try {
 
     // The snap types on GNOME Wayland only through the companion, which it
     // can't install: setup stops there and points to the companion's page.
-    const companionPage = 'https://extensions.gnome.org/#q=VOCO';
+    const companionPage = 'https://extensions.gnome.org/extension/11710/voco/';
+    const needsPanel = 'On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it\'s already installed, sign out and back in.';
     await load({
-        desktopInput: { available: false, setupArea: 'panel',
-            detail: 'On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.' },
+        desktopInput: { available: false, setupArea: 'panel', detail: needsPanel },
         panel: { status: 'extensions-site', canEnable: false, url: companionPage,
-            detail: 'Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.' } });
+            detail: 'The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it\'s already installed, sign out and back in.' } });
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     const setup = page.getByRole('region', { name: 'Voice setup' }).or(page.locator('.voco-setup'));
     await setup.getByRole('button', { name: 'Get the VOCO panel', exact: true }).click();
     await page.waitForFunction(url => window.calls.some(([name, target]) => name === 'openExternalUrl' && target === url), companionPage);
     assert.equal(await setup.getByRole('button', { name: 'Enable live panel', exact: true }).count(), 0, 'The snap enables no extension');
     assert.equal(await handoff.count(), 0, 'Setup stops until the snap can type');
+    assert.equal(await setup.getByText('Open setup instructions').count(), 0, 'The panel step is the only remedy');
     results.push({ case: 'the-snap-points-to-the-companion-page', passed: true });
+
+    // GNOME loads a first install at once, the panel attaches, and the runtime
+    // poll finds desktop input ready: setup moves on with no click.
+    await page.evaluate(() => {
+        const ready = { available: true, detail: '' };
+        const earlier = window.nativeHandlers.getRuntimeDiagnostics;
+        window.nativeHandlers.getDesktopInputStatus = () => ready;
+        window.nativeHandlers.getRuntimeDiagnostics = (args) => ({ ...(earlier ? earlier(args) : window.nativeCallDefaults?.getRuntimeDiagnostics),
+            sessionType: 'wayland', typeSimulation: { available: true, missingCommands: [] }, clipboard: { available: true, missingCommands: [] },
+            ibusShortcut: { setupState: 'not-installed', available: false }, desktopInput: ready,
+            desktopPaste: { enabled: true, available: true, detail: '' }, shortcut: { hotkey: 'Alt+D', route: 'gnome_panel', state: 'available', detail: '' } });
+        window.callsBeforeAttach = window.calls.length;
+    });
+    await handoff.waitFor({ timeout: 5000 });
+    await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
+    assert.equal(await setup.getByRole('group', { name: 'Panel setup' }).count(), 0, 'The panel step is gone once it works');
+    results.push({ case: 'the-snap-continues-once-the-panel-attaches', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();
