@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {presentation, barScales} from '../integrations/gnome/voco-panel@sergiopesch.com/model.js';
-const state = {version: 1, token: '1:1', status: 'idle', canStop: true, canOpen: true, level: 0.8};
+const state = {version: 1, token: '1:1', stopSession: '1:1', status: 'idle', canStop: true, canOpen: true, level: 0.8};
 test('idle cannot accidentally offer Stop or a live meter', () => {
     const p = presentation(state);
     assert.equal(p.canStop, false);
@@ -15,6 +15,11 @@ test('active states block opening settings and processing blocks Stop', () => {
         assert.equal(p.canStop, status !== 'processing');
         assert.equal(p.label, '');
     }
+});
+test('Stop is offered only with a session to stop', () => {
+    for (const stopSession of [null, undefined, 3])
+        assert.equal(presentation({...state, status: 'starting', stopSession}).canStop, false);
+    assert.equal(presentation({...state, status: 'starting'}).canStop, true);
 });
 test('meter is finite and bounded even for malformed inputs', () => {
     for (const [level, expected] of [[Infinity, 0], [NaN, 0], [-1, 0], [4, 1], [0.3, 0.3]]) {

@@ -47,7 +47,6 @@ export class Companion {
         this._watchId = Gio.bus_watch_name(Gio.BusType.SESSION, NAME, Gio.BusNameWatcherFlags.NONE,
             (_connection, _name, owner) => {
                 this._owner = owner;
-                this._cancelCalls();
                 this._attach();
             }, () => {
                 this._owner = null;
@@ -82,11 +81,14 @@ export class Companion {
             Gio.DBusCallFlags.NO_AUTO_START, 1500, cancellable, (connection, result) => {
                 if (cancellable.is_cancelled())
                     return;
+                let reply;
                 try {
-                    done(connection.call_finish(result));
+                    reply = connection.call_finish(result);
                 } catch (error) {
                     failed(error);
+                    return;
                 }
+                done(reply);
             });
     }
 
@@ -101,8 +103,12 @@ export class Companion {
     _attach() {
         this._call('Attach', null, result => {
             this._attached = result.deep_unpack()[0] === true;
-            if (!this._attached)
+            // VOCO refuses when its own check that the caller is the Shell fails,
+            // which a busy session bus can time out, so a refusal is retried.
+            if (!this._attached) {
+                this._retry();
                 return;
+            }
             this._poll();
             this._armRequest();
         });
@@ -153,7 +159,13 @@ export class Companion {
             if (!this._attached)
                 return;
             this._polling = false;
-            const state = presentation(JSON.parse(result.deep_unpack()[0]));
+            let state;
+            try {
+                state = presentation(JSON.parse(result.deep_unpack()[0]));
+            } catch (_error) {
+                this._retry();
+                return;
+            }
             this._state = state;
             // Consumed whenever attached, idle included, so the focused app never
             // also acts on it. X11 keeps VOCO's own exclusive global shortcut.
@@ -198,14 +210,10 @@ export class Companion {
         }
     }
 
-    _cancelCalls() {
-        this._cancellable.cancel();
-        this._cancellable = new Gio.Cancellable();
-    }
-
     _disconnect() {
         this._shortcut.release();
-        this._cancelCalls();
+        this._cancellable.cancel();
+        this._cancellable = new Gio.Cancellable();
         this._attached = false;
         this._polling = false;
         this._refreshQueued = false;
