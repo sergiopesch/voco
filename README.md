@@ -95,11 +95,15 @@ and F16C:
 
 † Not tested on a real desktop
 
-You also need a microphone. On Wayland, VOCO needs access to `/dev/uinput`,
-which the package gives the user of the active local session. On GNOME 46, 48,
-50 and 51 the VOCO panel handles the shortcut; on other Wayland desktops, bind a
-keyboard shortcut to `voco --toggle`. [Platform support](docs/platform/README.md)
-covers each system and how it is tested.
+On Ubuntu, the [snap](docs/install.md#snap-store) is another way to install
+VOCO: it types on GNOME on Wayland through the VOCO panel, and in X11 sessions.
+
+You also need a microphone. On Wayland, the packages need access to
+`/dev/uinput`, which they give the user of the active local session. On GNOME
+46, 48, 50 and 51 the VOCO panel handles the shortcut; on other Wayland
+desktops, bind a keyboard shortcut to `voco --toggle`.
+[Platform support](docs/platform/README.md) covers each system and how it is
+tested.
 
 ## Privacy
 
@@ -109,7 +113,7 @@ covers each system and how it is tested.
   releases exist, and you can turn that automatic check off. Only
   **Install update**, when you choose it, downloads a newer release from
   GitHub, and VOCO installs it only after its signature and checksum verify
-  and you enter your password.
+  and you enter your password. The snap has no network access at all.
 - Each phrase passes through the clipboard, and the last one stays there.
   Clipboard managers may keep a copy.
 - While you dictate, VOCO keeps a private copy of the text so it can recover it
