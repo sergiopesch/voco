@@ -50,7 +50,7 @@ def metadata(version="2026.0.64"):
         "name": "voco", "version": version, "base": "core24", "confinement": "strict",
         "grade": "stable", "architectures": ["amd64"], "license": "MIT AND Apache-2.0",
         "apps": {"voco": {
-            "command": "usr/bin/voco", "common-id": "com.sergiopesch.voco",
+            "command": "usr/bin/voco", "common-id": "com.sergiopesch.voco", "autostart": "voco-login.desktop",
             "command-chain": ["snap/command-chain/gpu-2404-wrapper", "snap/command-chain/desktop-launch"],
             "plugs": [*snap.VOCO_PLUGS, *snap.EXTENSION_APP_PLUGS], "slots": ["panel"],
             "environment": {"VOCO_STREAM_PYTHON": "$SNAP/usr/lib/voco/snap/python3",
@@ -168,11 +168,17 @@ class SnapPackageTest(unittest.TestCase):
             "a top-level plug": ("slots:\n  panel:", "plugs:\n  home:\nslots:\n  panel:"),
             "the system bus": ("    bus: session", "    bus: system"),
             "a second slot": ("    slots: [panel]", "    slots: [panel, spare]"),
+            "no login start": ("    autostart: voco-login.desktop\n", ""),
+            "another autostart entry": ("autostart: voco-login.desktop", "autostart: voco.desktop"),
         }
         for name, (old, new) in changes.items():
             self.assertIn(old, template, name)
             with self.assertRaises(ValueError, msg=name):
                 snap.check_recipe(template.replace(old, new, 1))
+
+    def test_the_autostart_key_names_the_entry_voco_writes(self):
+        source = (ROOT / "apps/desktop/src-tauri/src/login_start.rs").read_text()
+        self.assertIn(f'pub const ENTRY_NAME: &str = "{snap.AUTOSTART}";', source)
 
     def test_snap_versions_follow_snapd(self):
         for version in ("2026.0.64", "2026.0.64+local1", "1"):
@@ -240,6 +246,8 @@ class SnapPackageTest(unittest.TestCase):
             "another worker": lambda data: data["apps"]["voco"]["environment"].update(
                 VOCO_STREAM_PYTHON="/usr/bin/python3"),
             "a hook with plugs": lambda data: data["hooks"]["configure"].update(plugs=["desktop", "home"]),
+            "no login start": lambda data: data["apps"]["voco"].pop("autostart"),
+            "another autostart entry": lambda data: data["apps"]["voco"].update(autostart="VOCO.desktop"),
         }
         for name, change in changes.items():
             data = metadata()

@@ -27,6 +27,7 @@ only network request is the [release check](#release-check); only
 | Copy of the settings | `$XDG_CONFIG_HOME/voco/config.json.last` | The next save replaces it, or a reset deletes it |
 | Settings before a reset | `$XDG_CONFIG_HOME/voco/config.recovery-backup-*.json` | The next reset deletes it, or you do |
 | Release check | `$XDG_CONFIG_HOME/voco/update-cache.json` | The next check replaces it |
+| [Login start](../architecture/README.md#start-at-login) entry | `$XDG_CONFIG_HOME/autostart/voco-login.desktop` | You turn off **Start VOCO when you sign in**, run setup again or reset the settings |
 | [Install update](#install-update)'s download | `$XDG_STATE_HOME/voco/update/` | The install finishes, fails or is cancelled |
 | Crash journal | `$XDG_STATE_HOME/voco/crash-recovery/active.json` | The recording finishes |
 | Review | `$XDG_STATE_HOME/voco/crash-recovery/recovered.json` | You discard the entry, or five newer entries push it out |
@@ -37,7 +38,10 @@ The directories that hold this data are 0700 and the files 0600, owned by you.
 VOCO refuses symbolic links and files that another account owns. It writes
 settings through a private temporary file and a rename, and opens journal files
 without following links and only when they have a single hard link. When a file
-can't be opened safely, VOCO reports it rather than using it.
+can't be opened safely, VOCO reports it rather than using it. The login start
+entry's folder is the one exception: it is the desktop's shared startup folder,
+whose permissions VOCO leaves alone. The entry itself is 0600, written the same
+way, and VOCO replaces or removes it only when it is a regular file you own.
 
 The crash journal and Review hold dictated text, in plain form, up to 256 KiB
 per entry. The opt-in logs hold timings and counters, with no dictated text,
@@ -270,7 +274,8 @@ GNOME extension, which a desktop app needs, it plugs only `audio-playback`,
 `audio-record` and `login-session-observe`. Without `network`, `home` or a
 device plug, it can't reach the internet, read your home folder outside its own
 folders or open `/dev/uinput` and `/dev/input`. Its settings, journal and logs
-live in `$SNAP_USER_DATA`, and it never reads a package's settings. On the
+live in `$SNAP_USER_DATA`, as does its login start entry, and it never reads a
+package's settings. On the
 session bus it owns `com.sergiopesch.voco.Panel` through a `dbus` slot: confinement lets it
 answer GNOME Shell's calls but never call the Shell, so the companion asks it
 for work. On Wayland only the companion types for it; on X11 `xdotool` does, as

@@ -77,6 +77,7 @@ describe("useStore", () => {
       hotkey: "Alt+D",
       selectedMic: null,
       onboardingCompleted: false,
+      startAtLogin: true,
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
@@ -94,6 +95,7 @@ describe("useStore", () => {
       hotkey: "Alt+D",
       selectedMic: null,
       onboardingCompleted: true,
+      startAtLogin: true,
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
@@ -121,6 +123,7 @@ describe("useStore", () => {
       hotkey: "Alt+D",
       selectedMic: null,
       onboardingCompleted: false,
+      startAtLogin: true,
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
@@ -162,6 +165,7 @@ describe("useStore", () => {
       hotkey: "Alt+D",
       selectedMic: null,
       onboardingCompleted: false,
+      startAtLogin: true,
       updateChannel: "stable" as const,
       automaticUpdateChecks: true,
       installChannel: "github-release" as const,
@@ -187,7 +191,7 @@ describe("useStore", () => {
 
   it("offers My words every time setup runs, and remembers whether a word was said", () => {
     const base = {
-      hotkey: "Alt+D", selectedMic: null, onboardingCompleted: false, updateChannel: "stable" as const,
+      hotkey: "Alt+D", selectedMic: null, onboardingCompleted: false, startAtLogin: true, updateChannel: "stable" as const,
       automaticUpdateChecks: true, installChannel: "github-release" as const, englishSpelling: "british" as const,
       myWords: ["Siobhán"], myWordsHeard: [],
     };

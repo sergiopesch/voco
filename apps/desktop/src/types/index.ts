@@ -9,6 +9,9 @@ export interface AppConfig {
   hotkey: string;
   selectedMic: string | null;
   onboardingCompleted: boolean;
+  /** Start VOCO when the user signs in, once setup is complete; on until they
+   * turn it off. Only the packages and the snap can. */
+  startAtLogin: boolean;
   updateChannel: UpdateChannel;
   automaticUpdateChecks: boolean;
   installChannel: InstallChannel;

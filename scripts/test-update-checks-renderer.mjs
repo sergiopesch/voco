@@ -3,9 +3,10 @@ import { prepareEvidence, productionShell, openRenderer, routeTauriModules, rout
 // The startup update check's off switch in the actual App. With "Only when I
 // choose", VOCO asks GitHub nothing at startup or when the channel changes;
 // turning automatic checks back on asks at once, and Check for updates always
-// asks. The snap asks nothing: the Snap Store updates it. Install update starts
-// only from its button, and its window follows the stages Rust reports. Every
-// native boundary is mocked; nothing leaves the test.
+// asks. The snap asks nothing: the Snap Store updates it. The switch for
+// starting at login shows only where Rust says VOCO can, and saves only when
+// used. Install update starts only from its button, and its window follows the
+// stages Rust reports. Every native boundary is mocked; nothing leaves the test.
 const { out, save } = await prepareEvidence(import.meta.url, [
     'src/App.tsx', 'src/lib/updates.ts', 'src/lib/updateCheckCoordinator.ts', 'src/components/ControlPanel.tsx',
     'src/lib/updateInstall.ts', 'src/components/UpdateInstall.tsx',
@@ -30,13 +31,17 @@ try {
         window.config = { ...window.config, ...JSON.parse(new URLSearchParams(location.search).get('config') || '{}') };
         if (new URLSearchParams(location.search).get('store') === '1') window.nativeHandlers.storeUpdates = () => true;
         window.updateAvailable = new URLSearchParams(location.search).get('install') === '1';
+        // Rust says whether this VOCO can start at login: a package or the snap.
+        if (new URLSearchParams(location.search).get('login') === '1') window.nativeHandlers.loginStartAvailable = () => true;
         window.nativeHandlers.saveConfigPatch = ([patch]) => {
+            // A refused save rejects with Rust's reason and changes nothing.
+            if (window.refuseSave) throw window.refuseSave;
             window.config = { ...window.config, ...patch };
             return { revision: 3, config: window.config };
         };
     });
-    const load = async (config, store = false, install = false) => {
-        await page.goto(origin + '/app-microphone-check?' + (store ? 'store=1&' : '') + (install ? 'install=1&' : '') + 'config=' + encodeURIComponent(JSON.stringify(config)));
+    const load = async (config, store = false, install = false, login = false) => {
+        await page.goto(origin + '/app-microphone-check?' + (store ? 'store=1&' : '') + (install ? 'install=1&' : '') + (login ? 'login=1&' : '') + 'config=' + encodeURIComponent(JSON.stringify(config)));
         await page.waitForFunction(() => window.calls.some(([name, event]) => name === 'traceHotkeyEvent' && event === 'frontend_init_complete'));
     };
     const patch = config => page.evaluate(config => {
@@ -76,6 +81,49 @@ try {
     assert.equal(await page.getByRole('button', { name: 'Check for updates' }).count(), 0, 'No check button in the snap');
     assert.equal(await page.getByText('Update settings').count(), 0, 'No update settings in the snap');
     results.push({ case: 'the-snap-asks-nothing-and-shows-no-update-controls', passed: true, requests: requests.length });
+
+    // Start at login: a switch in Settings where Rust says VOCO can, saved by
+    // its own patch. A refused save puts the saved setting back and says why.
+    const patches = () => page.evaluate(() => window.calls.filter(([name]) => name === 'saveConfigPatch').map(([, patch]) => patch));
+    const loginSwitch = page.getByRole('switch', { name: 'Start VOCO when you sign in' });
+    await load({ onboardingCompleted: true, startAtLogin: true });
+    await page.evaluate(() => window.store.getState().setSurface('settings'));
+    await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
+    assert.equal(await loginSwitch.count(), 0, 'A source build has no switch');
+    results.push({ case: 'login-start-hidden-where-unavailable', passed: true });
+
+    await load({ onboardingCompleted: true, startAtLogin: true }, false, false, true);
+    await page.evaluate(() => window.store.getState().setSurface('settings'));
+    await loginSwitch.waitFor();
+    assert.equal(await loginSwitch.isChecked(), true, 'On until the user turns it off');
+    await page.getByText('VOCO starts without opening a window, ready for your shortcut.').waitFor();
+    assert.deepEqual(await patches(), [], 'Opening Settings saves nothing');
+    await loginSwitch.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400); // Let the page's entrance settle.
+    await page.screenshot({ path: out + '/login-start-on.png' });
+    await loginSwitch.click();
+    await page.getByText('After you sign in, open VOCO from your app launcher before you dictate.').waitFor();
+    assert.equal(await loginSwitch.isChecked(), false);
+    assert.deepEqual(await patches(), [{ startAtLogin: false }]);
+    assert.equal(await page.evaluate(() => window.store.getState().config.startAtLogin), false);
+    await loginSwitch.click();
+    await page.getByText('VOCO starts without opening a window, ready for your shortcut.').waitFor();
+    assert.deepEqual((await patches()).at(-1), { startAtLogin: true });
+    results.push({ case: 'login-start-switch-saves-the-setting', passed: true, patches: await patches() });
+
+    const refusal = "VOCO couldn't stop itself from starting when you sign in: /home/u/.config/autostart/voco-login.desktop must be a regular file";
+    await page.evaluate(refusal => { window.refuseSave = refusal; }, refusal);
+    await loginSwitch.click();
+    await page.getByRole('alert').filter({ hasText: refusal }).waitFor();
+    assert.equal(await loginSwitch.isChecked(), true, 'A refused save keeps the saved setting');
+    assert.equal(await page.evaluate(() => window.store.getState().config.startAtLogin), true);
+    await page.getByRole('alert').filter({ hasText: refusal }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: out + '/login-start-refused.png' });
+    await page.evaluate(() => { window.refuseSave = null; });
+    await loginSwitch.click();
+    await page.getByText('After you sign in, open VOCO from your app launcher before you dictate.').waitFor();
+    assert.equal(await page.getByRole('alert').filter({ hasText: refusal }).count(), 0, 'A saved choice clears the reason');
+    results.push({ case: 'login-start-refused-save-keeps-the-setting', passed: true });
 
     // Install update: offered only for a newer release where Rust says it can
     // run, started only by its button, and its window follows Rust's stages.

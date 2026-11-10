@@ -47,7 +47,8 @@ pub fn start(app: &tauri::AppHandle) -> Result<(), String> {
 /// A click on VOCO's own launcher opens VOCO even when it wasn't running, as a
 /// second launch does. GIO names the desktop entry it launched and that process's
 /// ID. A program started from a terminal inherits the terminal's entry and ID, and
-/// a login autostart carries DESKTOP_AUTOSTART_ID or an autostart entry, so those
+/// a login autostart, from VOCO's own `voco-login.desktop` (`login_start.rs`) or
+/// another, carries DESKTOP_AUTOSTART_ID, an autostart entry or neither, so those
 /// leave VOCO in the tray. Call it before GTK starts, which removes
 /// DESKTOP_AUTOSTART_ID.
 pub fn note_launch() {
@@ -121,6 +122,32 @@ mod tests {
         assert!(opened_by_launcher(snapd, pid, false, 4242, true));
         assert!(!opened_by_launcher(snapd, pid, false, 4242, false));
         assert!(!opened_by_launcher(snapd, pid, true, 4242, true));
+    }
+
+    #[test]
+    fn vocos_login_start_stays_in_the_tray() {
+        let entry = crate::login_start::ENTRY_NAME;
+        let pid = Some(OsStr::new("4242"));
+        // Even if GIO named the entry and this process, its name isn't the
+        // launcher's, and it lives in an autostart folder: the packages' and
+        // the snap's, which snapd reads through the current revision.
+        for (folder, confined) in [
+            ("/home/u/.config/autostart", false),
+            ("/home/u/snap/voco/current/.config/autostart", true),
+            ("/home/u/snap/voco/3/.config/autostart", true),
+        ] {
+            let path = format!("{folder}/{entry}");
+            for autostart in [false, true] {
+                assert!(!opened_by_launcher(
+                    Some(OsStr::new(&path)),
+                    pid,
+                    autostart,
+                    4242,
+                    confined
+                ));
+            }
+            assert!(!launcher_entry(OsStr::new(entry), confined));
+        }
     }
 
     #[test]

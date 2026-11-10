@@ -55,6 +55,9 @@ interface ControlPanelProps {
   updateState: UpdateCheckState;
   /** The snap: the Snap Store updates VOCO, so Settings has no update controls. */
   updatesByStore?: boolean;
+  /** The packages and the snap can start at login; a source build can't, so
+   * Settings has no switch and setup doesn't say it does. */
+  loginStartAvailable?: boolean;
   runtimeDiagnostics: RuntimeDiagnostics | null;
   dictationStatus: DictationStatus;
   captureNotice?: string | null;
@@ -162,6 +165,7 @@ export function ControlPanel({
   statusLabel,
   updateState,
   updatesByStore = false,
+  loginStartAvailable = false,
   runtimeDiagnostics,
   dictationStatus,
   captureNotice,
@@ -250,6 +254,11 @@ export function ControlPanel({
   const [spelling, setSpelling] = useState(() => englishSpelling(config));
   const [spellingSaveError, setSpellingSaveError] = useState<string | null>(null);
   const spellingSaveRequest = useRef(0);
+  // The switch moves at once; a failed save puts the saved setting back.
+  const [loginStartChoice, setLoginStartChoice] = useState<boolean | null>(null);
+  const [loginStartError, setLoginStartError] = useState<string | null>(null);
+  const loginStartRequest = useRef(0);
+  const startsAtLogin = loginStartChoice ?? config.startAtLogin;
   const askedSpelling = useRef(false);
   // The popover's note for earlier setups stays until they choose, then says
   // what they chose until the popover closes.
@@ -565,6 +574,16 @@ export function ControlPanel({
     return result.ok;
   }
 
+  async function chooseLoginStart(value: boolean) {
+    const request = ++loginStartRequest.current;
+    setLoginStartChoice(value);
+    setLoginStartError(null);
+    const result = await savePatch({ startAtLogin: value });
+    if (request !== loginStartRequest.current) return;
+    setLoginStartChoice(null);
+    if (!result.ok) setLoginStartError(result.message);
+  }
+
   async function confirmSpelling() {
     // After a failed save, saving the shown choice again clears that error, or
     // keeps the person here with its reason.
@@ -842,6 +861,7 @@ export function ControlPanel({
             saving={saving}
             blocked={!onStartTest || nativeMicrophone?.mode === "pending"}
             desktopReady={inputReadiness?.available === true}
+            startsAtLogin={loginStartAvailable && config.startAtLogin}
             shortcutNote={shortcutNote}
             microphoneControls={onSelected => nativePreviewDisabled && nativeMicrophone
               ? <NativeMicrophoneSettings controls={nativeMicrophone} disabled={dictationBusy || testPreparing} onSelected={onSelected} />
@@ -914,6 +934,21 @@ export function ControlPanel({
                       {spellingSaveError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{spellingSaveError}</div> : null}
                     </div>
                   </div>
+                  {loginStartAvailable ? <>
+                    <h3 className="voco-preferences__group-title">Startup</h3>
+                    <div className="voco-preferences__group">
+                      <div className="voco-preferences__card voco-preferences__form">
+                        <label className="voco-field voco-preferences__field-row"><span>Start VOCO when you sign in</span>
+                          <input type="checkbox" role="switch" checked={startsAtLogin} aria-describedby="voco-login-start-helper"
+                            onChange={(event) => void chooseLoginStart(event.target.checked)} /></label>
+                        <p className="voco-preferences__helper" id="voco-login-start-helper">{!startsAtLogin
+                          ? "After you sign in, open VOCO from your app launcher before you dictate."
+                          : config.onboardingCompleted ? "VOCO starts without opening a window, ready for your shortcut."
+                          : "Once you finish setup, VOCO starts when you sign in, without opening a window."}</p>
+                        {loginStartError ? <div className="voco-inline-note voco-inline-note--error" role="alert">{loginStartError}</div> : null}
+                      </div>
+                    </div>
+                  </> : null}
                 </section>
               ) : null}
 

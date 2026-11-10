@@ -71,7 +71,8 @@ On GNOME the tray icon needs an AppIndicator extension. Ubuntu includes one;
 Debian 13 and Fedora 44 don't turn one on, so there the GNOME panel is VOCO's
 place in the top bar.
 
-Settings has five pages: **Settings** for your microphone and spelling, **My words**,
+Settings has five pages: **Settings** for your microphone, spelling and
+[whether VOCO starts when you sign in](#start-when-you-sign-in), **My words**,
 **Shortcut**, **Updates** and **Help**, which has setup steps and runtime checks. Opening
 VOCO from your app menu shows the popover, even when VOCO wasn't running, except
 while you dictate. Started from a terminal or by your desktop's startup apps,
@@ -118,6 +119,23 @@ dictation.
   recognizer's spelling: British English leaves hemoglobin and the other hem-
   words, mustache and willful as recognised, and American English leaves
   aetiology and callisthenics.
+
+## Start when you sign in
+
+Once setup is complete, VOCO starts when you sign in, without opening a window,
+so your shortcut works straight away. To open VOCO yourself instead, turn off
+**Start VOCO when you sign in** on the **Settings** page.
+
+While the switch is on, VOCO keeps one startup entry,
+`~/.config/autostart/voco-login.desktop`. It removes the entry when you turn the
+switch off, and until setup is complete again after **Run setup again** or a
+reset. The snap keeps its entry in `~/snap/voco/current/.config/autostart`,
+where snapd finds it. A VOCO built from source has no switch and never starts
+at login.
+
+GNOME, KDE Plasma and other desktops that run startup apps start VOCO from the
+entry. Sway and Hyprland don't run them, so start VOCO from their
+configuration instead: `exec voco` in Sway, `exec-once = voco` in Hyprland.
 
 ## My words
 
@@ -221,6 +239,7 @@ until you discard them.
 | Location | Contents |
 | --- | --- |
 | `~/.config/voco/` | Settings and a copy of them, the last update check, and a backup of old settings if you reset them |
+| `~/.config/autostart/voco-login.desktop` | The entry that starts VOCO when you sign in, while that's on |
 | `~/.local/state/voco/crash-recovery/` | A copy of the text while you dictate, deleted when the dictation ends normally, and Review entries |
 | `~/.local/state/voco/` | Diagnostic logs, only if you turn them on (see [Performance logs](troubleshooting.md#performance-logs)) |
 | `~/.local/share/com.sergiopesch.voco/` | Data and cache for VOCO's window |
@@ -244,6 +263,7 @@ data:
 
 ```bash
 rm -rf ~/.config/voco ~/.local/state/voco ~/.local/share/com.sergiopesch.voco
+rm -f ~/.config/autostart/voco-login.desktop
 ```
 
 ## Limits

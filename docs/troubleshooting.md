@@ -96,6 +96,8 @@ it, before DNF started. After a manual install, the checks in
 ## The shortcut does nothing
 
 1. Check that VOCO is running. Its tray icon or GNOME panel shows when it is.
+   If VOCO didn't start when you signed in, check
+   [Start when you sign in](everyday-use.md#start-when-you-sign-in).
 2. Start dictation from the tray menu, or run `voco --toggle` in a terminal. If
    dictation starts, the problem is the shortcut.
 3. Open **Help**, then **My shortcut is not working**. It says how the shortcut

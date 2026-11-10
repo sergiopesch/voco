@@ -24,6 +24,7 @@ const config: AppConfig = {
   hotkey: "Alt+D",
   selectedMic: null,
   onboardingCompleted: true,
+  startAtLogin: true,
   updateChannel: "stable",
   automaticUpdateChecks: true,
   installChannel: "github-release",
@@ -403,5 +404,30 @@ describe("English spelling", () => {
     const chosen = renderPanel({ config: { ...config, englishSpelling: "british" } });
     expect(chosen).not.toContain("VOCO now spells in British English.");
     expect(chosen).toContain('class="voco-lens"');
+  });
+});
+
+describe("Start at login", () => {
+  const loginSwitch = (markup: string) => /<input type="checkbox" role="switch"[^>]*>/.exec(markup)?.[0] ?? null;
+
+  it("has no switch where VOCO can't start at login, as in a source build", () => {
+    const markup = renderPanel({ surface: "settings" });
+    expect(markup).not.toContain("Start VOCO when you sign in");
+    expect(loginSwitch(markup)).toBeNull();
+  });
+
+  it("shows the setting as a switch on the main settings page", () => {
+    const on = renderPanel({ surface: "settings", loginStartAvailable: true });
+    expect(on).toContain(">Startup</h3>");
+    expect(on).toContain("<span>Start VOCO when you sign in</span>");
+    expect(loginSwitch(on)).toContain('checked=""');
+    expect(loginSwitch(on)).toContain('aria-describedby="voco-login-start-helper"');
+    expect(on).toContain("VOCO starts without opening a window, ready for your shortcut.");
+    const off = renderPanel({ surface: "settings", loginStartAvailable: true, config: { ...config, startAtLogin: false } });
+    expect(loginSwitch(off)).not.toContain("checked");
+    expect(off).toContain("After you sign in, open VOCO from your app launcher before you dictate.");
+    // It waits for setup, and says so.
+    const unfinished = renderPanel({ surface: "settings", loginStartAvailable: true, config: { ...config, onboardingCompleted: false } });
+    expect(unfinished).toContain("Once you finish setup, VOCO starts when you sign in, without opening a window.");
   });
 });

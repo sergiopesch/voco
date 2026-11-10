@@ -213,6 +213,7 @@ export const installRendererMocks = (page, { worklet = false } = {}) => page.add
         hotkey: 'Alt+D',
         selectedMic: null,
         onboardingCompleted: false,
+        startAtLogin: true,
         updateChannel: 'stable',
         automaticUpdateChecks: true,
         installChannel: 'github-release',

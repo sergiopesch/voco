@@ -38,6 +38,9 @@ apps:
     # The packages' entry. Snapcraft points its icon at the snap's own, and
     # snapd installs it as voco_voco.desktop.
     desktop: usr/share/applications/VOCO.desktop
+    # VOCO writes this entry in $SNAP_USER_DATA/.config/autostart while it
+    # starts at login (login_start.rs), and snapd starts the app from it.
+    autostart: voco-login.desktop
     common-id: com.sergiopesch.voco
     extensions: [gnome]
     plugs: [audio-playback, audio-record, login-session-observe]

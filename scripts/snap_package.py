@@ -84,9 +84,15 @@ MODEL_LICENSE = ("VOCO is MIT-licensed, and its speech runtime Apache-2.0. The s
 LICENSE = "MIT AND Apache-2.0"
 
 
+# The entry VOCO keeps in the snap's autostart folder while it starts at login
+# (login_start.rs), which the app's autostart key names for snapd.
+AUTOSTART = "voco-login.desktop"
+
 # The template's reviewed lines (check-devops.sh): strict on core24 with the
-# GNOME extension, VOCO's own plugs and the panel slot on the session bus.
+# GNOME extension, VOCO's own plugs, the panel slot on the session bus, and the
+# login start entry.
 RECIPE_LINES = ("base: core24", "confinement: strict", "grade: stable", "    extensions: [gnome]",
+                f"    autostart: {AUTOSTART}",
                 f"    plugs: [{', '.join(VOCO_PLUGS)}]", "    slots: [panel]", "  panel:",
                 "    interface: dbus", "    bus: session", "    name: com.sergiopesch.voco.Panel")
 # Plugs a reviewer would have to approve, which VOCO never needs.
@@ -239,7 +245,7 @@ def build_snap(stage, work, version):
 
 def verify_metadata(snap, version):
     """meta/snap.yaml, parsed: strict, core24, amd64, one app with the reviewed
-    plugs, one slot, and no other plug."""
+    plugs and login start entry, one slot, and no other plug."""
     expected = {"name": "voco", "version": version, "base": "core24", "confinement": "strict",
                 "grade": "stable", "architectures": [ARCH], "license": LICENSE}
     for key, value in expected.items():
@@ -251,6 +257,8 @@ def verify_metadata(snap, version):
     app = apps["voco"]
     if app.get("command") != "usr/bin/voco" or app.get("common-id") != "com.sergiopesch.voco":
         raise ValueError("The voco app must run usr/bin/voco as com.sergiopesch.voco")
+    if app.get("autostart") != AUTOSTART:
+        raise ValueError(f"The voco app must start at login from {AUTOSTART}: {app.get('autostart')!r}")
     if sorted(app.get("plugs", [])) != sorted(VOCO_PLUGS + EXTENSION_APP_PLUGS):
         raise ValueError(f"Unexpected app plugs: {sorted(app.get('plugs', []))}")
     if app.get("slots") != ["panel"]:

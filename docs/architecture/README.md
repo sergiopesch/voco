@@ -367,9 +367,10 @@ that itself, and asks you to quit and open VOCO again.
 
 ## Configuration
 
-Settings live in `$XDG_CONFIG_HOME/voco/config.json` with nine fields:
+Settings live in `$XDG_CONFIG_HOME/voco/config.json` with ten fields:
 `hotkey` (default `Alt+D`), `selectedMic`, `onboardingCompleted`,
-`updateChannel` (`stable` or `beta`), `automaticUpdateChecks`, `installChannel`,
+`startAtLogin` (on until the user turns it off), `updateChannel` (`stable` or
+`beta`), `automaticUpdateChecks`, `installChannel`,
 `englishSpelling` (`british`, `american` or `as-recognised`, and `null`
 until someone chooses, which spells British), `myWords`, the My words list,
 empty until the user adds one, and `myWordsHeard`, its taught versions, each a
@@ -394,6 +395,33 @@ exist, VOCO copies `$XDG_CONFIG_HOME/voice/config.json` when present. When the
 file can't be read, the recovery panel offers Retry, Open and Reset, and the
 copy never replaces it. Only Reset keeps a backup copy, and it deletes
 `config.json.last` and the backups of earlier resets.
+
+## Start at login
+
+`login_start.rs` keeps one XDG autostart entry, `voco-login.desktop`, in
+`$XDG_CONFIG_HOME/autostart`: present while `startAtLogin` is on and
+`onboardingCompleted` is true, absent otherwise. It runs `voco` with no
+arguments, with `TryExec=voco`, so a session skips it once the package is
+removed. Only the packages' `/usr/bin/voco` and the snap keep one;
+`login_start_available` tells the renderer, which otherwise hides the switch
+and doesn't say at setup's end that VOCO starts at login. A source build's
+entry would start the packaged VOCO, or nothing.
+
+Rust brings the entry in step at startup, on a thread that takes the
+configuration lock, and after every committed write. It rewrites nothing that
+is already right, removes only its own file name, and touches the entry only
+when it is a regular file the user owns. A patch that changes `startAtLogin`
+changes the entry before the save and fails without saving when it can't, and
+puts the entry back if the save then fails. Any other write, such as setup's
+completion, only warns on a failure, so a broken autostart folder never blocks
+setup; the next start tries again.
+
+In the snap `XDG_CONFIG_HOME` is `$SNAP_USER_DATA/.config`, and the recipe's
+`autostart: voco-login.desktop` app key tells snapd's session agent to start
+the app from that entry; snapd ignores the program in `Exec` and keeps its
+arguments, of which there are none. A login start is never a launcher click
+(`activation.rs`): the entry isn't `VOCO.desktop` and lives in an `autostart`
+folder, so VOCO stays in the tray.
 
 ## Update checks
 

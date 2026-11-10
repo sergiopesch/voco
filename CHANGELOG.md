@@ -8,6 +8,16 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Added
+
+- VOCO starts when you sign in, without opening a window, so the shortcut works
+  straight after a restart. It does so once setup is complete, in the packages
+  and the snap, and that includes setups finished with an earlier VOCO. To open
+  it yourself instead, turn off **Start VOCO when you sign in** on the
+  **Settings** page. VOCO keeps one entry, `voco-login.desktop`, in your startup
+  apps folder, and the snap's recipe names it for snapd. Setup's last step says
+  VOCO starts when you sign in. A source build doesn't.
+
 ### Changed
 
 - The GNOME panel, now version 22 and on
@@ -30,9 +40,10 @@ The [release process](docs/release-process.md) describes how a release is made.
   a command that opens GNOME's own install prompt.
 - On X11 the snap calls the VOCO panel optional, since it types without it. It
   used to say it types through the panel.
-- Setup's last step says to choose **Done** before pressing the shortcut, and
-  that VOCO doesn't start again by itself after you sign out. It used to say
-  VOCO stays in the tray, which it doesn't while the panel shows it.
+- Setup's last step says to choose **Done** before pressing the shortcut, and,
+  where VOCO won't start when you sign in, to open it from your app launcher
+  then. It used to say VOCO stays in the tray, which it doesn't while the panel
+  shows it.
 - In the snap, Help's setup instructions open the snap's own guide, Help no
   longer lists the IBus input source or the Chromium shortcut, which the snap
   doesn't have, and the notice for a missing top bar icon points to **Get the
