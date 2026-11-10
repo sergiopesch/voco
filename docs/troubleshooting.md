@@ -310,7 +310,7 @@ come only from it:
 | `The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.` | Run `snap connect voco:audio-record`, which asks for your password, then start dictation again. |
 | `… Run snap connect voco:audio-record, then quit VOCO and open it again.` | In an X11 session VOCO lists microphones once, at startup. Run `snap connect voco:audio-record`, quit VOCO and open it again. |
 | `The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. …` | Run `snap connect voco:login-session-observe`, then dictate again. VOCO checks the session before each paste. |
-| `On Wayland, the VOCO snap types through the VOCO panel. …` | Install the VOCO panel from extensions.gnome.org, then sign out and back in. |
+| `On Wayland, the VOCO snap types through the VOCO panel. …` | Install the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/) from extensions.gnome.org, then sign out and back in. |
 | `The VOCO snap types only on GNOME and in X11 sessions. …` | The snap can't type on other Wayland desktops. Install the `.deb` or RPM from VOCO's [GitHub releases](https://github.com/sergiopesch/voco/releases) instead. |
 
 ## Performance logs
