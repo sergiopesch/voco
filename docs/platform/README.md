@@ -21,6 +21,12 @@ The [GNOME panel](../install.md#gnome-panel) works on all four, and the guided
 installer turns it on; after you sign out and back in, it replaces the tray icon
 while VOCO runs. Without the panel or a tray icon, open VOCO from your app menu.
 
+On Ubuntu, VOCO also comes as a strictly confined [snap](../install.md#snap-store).
+It types on GNOME on Wayland through the panel from extensions.gnome.org, and in
+X11 sessions with `xdotool`; on other Wayland desktops it can't type. It has no
+`/dev/uinput` access, passive evdev or IBus input source, so on Wayland its
+shortcut is the panel's or a `voco --toggle` binding.
+
 The two packages hold the same files and need glibc 2.39 or later: they are
 built on Ubuntu 24.04, whose glibc 2.39 and GCC 13 runtime set their floors.
 Other systems that meet the package dependencies may run VOCO, but nothing here
