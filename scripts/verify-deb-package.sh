@@ -89,7 +89,7 @@ assert_entry /usr/libexec/voco-ibus-engine -rwxr-xr-x
 assert_entry /usr/lib/voco/ibus/voco_ibus_engine.py -rw-r--r--
 assert_entry /usr/lib/voco/ibus/voco_ibus_protocol.py -rw-r--r--
 assert_entry /usr/bin/voco -rwxr-xr-x
-for file in metadata.json extension.js model.js stylesheet.css voco-symbol.png; do
+for file in metadata.json extension.js companion.js indicator.js paster.js shortcut.js version.js model.js stylesheet.css voco-symbol.png; do
   assert_entry "/usr/share/gnome-shell/extensions/voco-panel@sergiopesch.com/${file}" -rw-r--r--
 done
 assert_entry /usr/lib/udev/rules.d/70-voco-uinput.rules -rw-r--r--

@@ -26,7 +26,7 @@ export default class Probe extends Extension {
         const indicator = Main.panel.statusArea['voco-panel@sergiopesch.com'];
         const actors = indicator ? children(indicator) : [];
         // The companion eases its meter through an adjustment, not an actor property.
-        const reveal = Main.extensionManager.lookup('voco-panel@sergiopesch.com')?.stateObj?._reveal;
+        const reveal = indicator?._reveal;
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
             indicatorFocus: indicator ? indicator.has_style_pseudo_class('focus') : null,
             revealing: Boolean(reveal?.get_transition('value')),
