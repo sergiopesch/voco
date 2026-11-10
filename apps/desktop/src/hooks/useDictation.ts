@@ -32,6 +32,7 @@ import {
   releaseBrowserRecording,
   saveDebugNativeRetainedSource,
   showNotification,
+  speechProcessorProblem,
   traceHotkeyEvent
 } from "@/lib/tauri";
 import { useStore } from "@/store/useStore";
@@ -475,6 +476,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       beginNativeCapture,
       releaseBrowserRecording,
       microphoneAccess,
+      speechProcessorProblem,
     });
   }
   const recording = recordingRef.current;

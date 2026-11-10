@@ -21,6 +21,10 @@ To check the processor, run this command. It must print all three names.
 grep -o -w -E 'avx2|fma|f16c' /proc/cpuinfo | sort -u
 ```
 
+The guided installer checks this for you; APT, DNF and the Snap Store don't.
+On a processor without them, VOCO shows **Processor not supported** when it
+starts, names what's missing, and doesn't record.
+
 ## Guided install
 
 Open a terminal in your desktop session and run the installer as your normal

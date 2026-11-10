@@ -132,6 +132,7 @@ class SnapPackageTest(unittest.TestCase):
         self.assertEqual(summary, "The voice layer for Linux, starting with dictation")
         self.assertTrue(text.startswith("Dictation is the first step."))
         self.assertIn("- Local English speech recognition with NVIDIA Nemotron", text)
+        self.assertIn("processor with AVX2, FMA and F16C.", text)
         self.assertIn(f"- {snap.STORE_UPDATES}", text)
         self.assertNotIn("GitHub Releases", text)
         self.assertTrue(text.endswith(snap.SNAP_TYPING + "\n\n" + snap.MODEL_LICENSE))

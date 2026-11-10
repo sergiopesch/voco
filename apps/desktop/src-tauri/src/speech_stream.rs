@@ -188,6 +188,10 @@ fn with_configured_settings(
 }
 
 fn exchange(request: Value) -> Result<Value, String> {
+    // Never start a worker the processor can't run.
+    if let Some(problem) = crate::processor::speech_problem() {
+        return Err(problem.into());
+    }
     let mut guard = WORKER.lock().map_err(|_| "worker lock failed")?;
     exchange_with_worker(request, &mut guard, Worker::start)
 }

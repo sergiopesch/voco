@@ -22,6 +22,14 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Fixed
 
+- On a processor without AVX2, FMA or F16C, VOCO now says so when it starts and
+  names what's missing, with the guided installer's words, instead of
+  **Speech model needs attention** or a voice test that couldn't finish. The
+  tray and panel read **Processor not supported**, and dictation, the voice test
+  and Say it explain why they can't start, without opening the microphone. The
+  snap and a package installed with APT or DNF skip the installer's check, so
+  this is where they learn it. The store and package descriptions name the
+  requirement too.
 - Panel setup names an older or newer copy of the VOCO panel in your home
   folder, such as one from extensions.gnome.org, which GNOME loads instead of
   the one the package installed. It used to ask you to sign out and back in

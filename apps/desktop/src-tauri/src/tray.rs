@@ -68,6 +68,14 @@ pub enum ModelDownloadStatus {
     Checking,
     Ready,
     Failed,
+    /// The processor lacks what the speech runtime needs; no worker starts.
+    UnsupportedProcessor,
+}
+
+impl ModelDownloadStatus {
+    fn needs_attention(self) -> bool {
+        matches!(self, Self::Failed | Self::UnsupportedProcessor)
+    }
 }
 
 /// The renderer's runtime status as the tray last accepted it; the default is
@@ -156,6 +164,9 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 TrayVisualState::NotReady,
                 "VOCO — Speech model needs attention",
             ),
+            ModelDownloadStatus::UnsupportedProcessor => {
+                (TrayVisualState::NotReady, "VOCO — Processor not supported")
+            }
             // Every launch passes through here: busy, not a warning.
             ModelDownloadStatus::Checking | ModelDownloadStatus::Ready => {
                 (TrayVisualState::Processing, "VOCO — Initializing…")
@@ -179,6 +190,12 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
                 }
             }
             DictationStatus::Processing => (TrayVisualState::Processing, "VOCO — Transcribing"),
+            // Nothing else can make dictation work here, so it goes first.
+            DictationStatus::Idle | DictationStatus::Error
+                if snapshot.model_download_status == ModelDownloadStatus::UnsupportedProcessor =>
+            {
+                (TrayVisualState::NotReady, "VOCO — Processor not supported")
+            }
             DictationStatus::Idle | DictationStatus::Error if snapshot.configuration_error => {
                 (TrayVisualState::NotReady, "VOCO — Settings need attention")
             }
@@ -253,9 +270,7 @@ fn derive_tray_presentation(snapshot: &RuntimeStatusSnapshot) -> TrayPresentatio
     // Only states that need the user carry a label beside the icon. Ready and
     // dictating share the bare icon, so toggling never shifts the panel.
     let title = match snapshot.dictation_status {
-        _ if !snapshot.runtime_initialized
-            && snapshot.model_download_status == ModelDownloadStatus::Failed =>
-        {
+        _ if !snapshot.runtime_initialized && snapshot.model_download_status.needs_attention() => {
             "Check setup"
         }
         _ if !snapshot.runtime_initialized => "Starting VOCO",
@@ -734,9 +749,7 @@ fn panel_accelerator(wayland: bool, hotkey: &str) -> Option<&'static str> {
 fn panel_presentation(snapshot: &RuntimeStatusSnapshot) -> serde_json::Value {
     let presentation = derive_tray_presentation(snapshot);
     let status = match snapshot.dictation_status {
-        _ if !snapshot.runtime_initialized
-            && snapshot.model_download_status != ModelDownloadStatus::Failed =>
-        {
+        _ if !snapshot.runtime_initialized && !snapshot.model_download_status.needs_attention() => {
             "initializing"
         }
         DictationStatus::Starting => "starting",
@@ -1505,6 +1518,63 @@ mod tests {
         assert_eq!(failed.visual_state, TrayVisualState::NotReady);
         assert_eq!(failed.status_text, "VOCO — Speech model needs attention");
         assert_eq!(failed.dictation_action, TrayDictationAction::Toggle);
+    }
+
+    #[test]
+    fn an_unsupported_processor_is_named_before_any_other_setup() {
+        let launch = RuntimeStatusSnapshot {
+            model_download_status: ModelDownloadStatus::UnsupportedProcessor,
+            ..RuntimeStatusSnapshot::default()
+        };
+        let starting = derive_tray_presentation(&launch);
+        assert_eq!(starting.visual_state, TrayVisualState::NotReady);
+        assert_eq!(starting.status_text, "VOCO — Processor not supported");
+        assert_eq!(starting.title, "Check setup");
+
+        // Missing desktop setup, a refused start or an unready microphone
+        // would each be fixed in vain, so the processor stays the reason.
+        let mut snapshot = ready_snapshot();
+        snapshot.model_download_status = ModelDownloadStatus::UnsupportedProcessor;
+        let changes: [fn(&mut RuntimeStatusSnapshot); 5] = [
+            |s| {
+                s.cursor_required = true;
+                s.cursor_setup_state = "missing".into();
+            },
+            |s| s.dictation_status = DictationStatus::Error,
+            |s| s.native_microphone_ready = Some(false),
+            |s| s.configuration_error = true,
+            |_| {},
+        ];
+        for change in changes {
+            let mut snapshot = snapshot.clone();
+            change(&mut snapshot);
+            let presentation = derive_tray_presentation(&snapshot);
+            assert_eq!(presentation.visual_state, TrayVisualState::NotReady);
+            assert_eq!(presentation.status_text, "VOCO — Processor not supported");
+            assert_eq!(presentation.title, "Check setup");
+        }
+        // Start stays offered, so the shortcut or menu says why it can't.
+        assert_eq!(
+            derive_tray_presentation(&snapshot).dictation_action,
+            TrayDictationAction::Toggle
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn panel_reads_attention_on_an_unsupported_processor() {
+        let mut snapshot = RuntimeStatusSnapshot {
+            model_download_status: ModelDownloadStatus::UnsupportedProcessor,
+            ..RuntimeStatusSnapshot::default()
+        };
+        let launch = panel_presentation(&snapshot);
+        assert_eq!(launch["status"], "attention");
+        assert_eq!(launch["description"], "VOCO — Processor not supported");
+        snapshot = RuntimeStatusSnapshot {
+            model_download_status: ModelDownloadStatus::UnsupportedProcessor,
+            ..ready_snapshot()
+        };
+        assert_eq!(panel_presentation(&snapshot)["status"], "attention");
     }
 
     #[test]

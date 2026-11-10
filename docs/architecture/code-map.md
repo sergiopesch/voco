@@ -12,6 +12,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `lib.rs` — App setup and most Tauri commands: startup order (on Wayland, warming the virtual keyboard and retiring the old `voco-ydotoold.service` link), shortcut routes, `admit_toggle` and its 120 ms debounce, the evdev listener and the CLI checks.
 - `main.rs` — Command-line entry point; see [Command line](#command-line).
 - `speech_stream.rs` — The speech worker process and the `speech_stream` command: NDJSON requests, deadlines, size limits and restarting a dead idle worker.
+- `processor.rs` — Whether the processor has the AVX2, FMA and F16C the speech runtime needs, read once from `/proc/cpuinfo`, and the message that names what's missing.
 - `worker_sandbox.rs` — Confines the speech worker before its Python starts: only the variables it reads, close-on-exec descriptors, no-new-privileges and a seccomp filter that refuses network sockets and io_uring.
 - `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
 - `selection_owner.rs` — GNOME's paste helpers: foreground xclip owners that keep their selection, report each request they answer, and are reaped when replaced.
