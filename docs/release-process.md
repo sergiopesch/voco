@@ -138,8 +138,9 @@ computer with SELinux enforcing. Copy `voco-<version>-1.x86_64.rpm` there, then:
 
 With the snap built, try it on Ubuntu 24.04 and on the latest Ubuntu. Install
 it with `sudo snap install --dangerous ~/voco-release/snap/voco_<version>_amd64.snap`,
-connect `audio-record` and `login-session-observe` with `sudo snap connect` while
-the store doesn't connect them automatically, install the VOCO panel from
+connect `audio-record` and `login-session-observe` with `sudo snap connect`,
+since a `--dangerous` install doesn't get the store's automatic connections,
+install the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/) from
 extensions.gnome.org on GNOME, sign out and back in, and run the voice test and a
 dictation.
 
@@ -190,19 +191,35 @@ Once the release is published and the snap tried on both, upload it to `edge`:
 snapcraft upload --release=edge ~/voco-release/snap/voco_<version>_amd64.snap
 ```
 
-Promote it past `edge` only after trying the store's copy on both systems. The
-store reviews each upload. Its automated review holds VOCO's for a person until
-the snap has a declaration for its `panel` slot, the session `dbus` slot that
-owns `com.sergiopesch.voco.Panel`, since the base declaration refuses connections
-to a named `dbus` slot. Reviewers expect a slot's bus name under a domain the
-publisher owns, here `sergiopesch.com`. Before uploading, `snap-review` from the
-`review-tools` snap shows that one item and passes the rest. The declaration and auto-connection of
-`audio-record` and `login-session-observe` are asked for in the Snapcraft
-forum's store-requests category; until the store auto-connects them, VOCO's
-setup shows their `snap connect` commands. The store reviews one upload at a
-time, so a new revision waits until the one before it is approved or rejected.
+Promote it past `edge` only after trying the store's copy on both systems, from
+`sudo snap install voco --edge` with the VOCO panel from extensions.gnome.org:
+`snapcraft release voco <revision> candidate`, then `stable`.
 
-### 10. Point the docs at the release
+The store reviews each upload automatically. VOCO's snap declaration allows its
+`panel` slot, the session `dbus` slot that owns `com.sergiopesch.voco.Panel`,
+which the base declaration would refuse, and auto-connects `audio-record` and
+`login-session-observe`. So an upload that asks for the same plugs and slot
+passes in minutes. A new plug or slot, or another bus name, holds the upload for
+a person: ask for it first in the Snapcraft forum's store-requests category, with
+any bus name under a domain the publisher owns, here `sergiopesch.com`. Before
+uploading, `snap-review` from the `review-tools` snap passes everything but the
+`panel` slot, since it can't see the store's declaration. The store reviews one
+upload at a time, so a new revision waits until the one before it is approved or
+rejected, and rejecting one by hand rejects the next with the same finding too.
+
+### 10. Upload the panel, if it changed
+
+If the companion's `version-name` changed since the version on
+[extensions.gnome.org](https://extensions.gnome.org/extension/11710/voco/),
+upload the release's `voco-panel@sergiopesch.com.shell-extension.zip` at
+<https://extensions.gnome.org/upload/>, then answer the reviewers on its review
+page. Every upload is reviewed, and until one is approved the site serves the
+version before, which is the one the snap's users have. The `.deb` and RPM carry
+their own copy and don't wait for it. `scripts/package-gnome-panel.py` builds the
+same zip from any checkout, which is how a fix for a reviewer reaches the site
+between releases.
+
+### 11. Point the docs at the release
 
 After publishing, update in one pull request `version` in
 `packaging/published-release.json`, the version and install command in
