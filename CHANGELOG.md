@@ -10,10 +10,11 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ### Changed
 
-- The GNOME panel, now version 20, reads reduced motion from GNOME Shell
-  itself, so it also stays still while the Shell holds animations back. It no
-  longer opens a settings schema, which extensions.gnome.org's checks flagged.
-  After upgrading, sign out and back in to load it.
+- The GNOME panel, now version 21, is split into small modules, each of
+  which cleans up after itself, as extensions.gnome.org's reviewers ask. It
+  reads reduced motion from GNOME Shell itself, so it also stays still while
+  the Shell holds animations back. It behaves as before. After upgrading, sign
+  out and back in to load it.
 
 ### Fixed
 

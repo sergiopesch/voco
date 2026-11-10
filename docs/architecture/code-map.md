@@ -231,7 +231,12 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 ## GNOME companion: `integrations/gnome/`
 
-- `voco-panel@sergiopesch.com/extension.js` — Panel pill, meter, menu, shortcut grab and the D-Bus client.
+- `voco-panel@sergiopesch.com/extension.js` — Entry point: creates the companion on enable and destroys it on disable.
+- `voco-panel@sergiopesch.com/companion.js` — The D-Bus client: attaches to VOCO, polls its state and answers its requests.
+- `voco-panel@sergiopesch.com/indicator.js` — Panel pill, meter and menu.
+- `voco-panel@sergiopesch.com/paster.js` — Types Shift+Insert through the Shell's virtual keyboard.
+- `voco-panel@sergiopesch.com/shortcut.js` — Grabs the dictation chord while VOCO keeps reserving it.
+- `voco-panel@sergiopesch.com/version.js` — The running Shell's major version.
 - `voco-panel@sergiopesch.com/model.js` — Presentation model shared with the Node tests.
 - `voco-panel@sergiopesch.com/metadata.json` — Extension metadata for GNOME Shell 46, 48, 50 and 51.
 - `voco-panel@sergiopesch.com/stylesheet.css` — Pill and meter styles.

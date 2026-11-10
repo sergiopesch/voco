@@ -141,9 +141,15 @@ paste through VOCO's own uinput keyboard, and the snap refuses the paste.
 
 ## Files and tests
 
-`voco-panel@sergiopesch.com/` holds `extension.js` (pill, menu, meter, grab and bus
-calls), `model.js` (state checks, shared with Node tests), `metadata.json`,
+`voco-panel@sergiopesch.com/` holds `extension.js`, which only creates and
+destroys a `Companion`; `companion.js` (VOCO's bus protocol); `indicator.js`
+(pill, meter and menu); `paster.js` (Shift+Insert through the Shell's virtual
+keyboard); `shortcut.js` (the grab and its reservation); `version.js` (the Shell
+major); `model.js` (state checks, shared with Node tests); `metadata.json`,
 `stylesheet.css` and `voco-symbol.png`, a copy of `assets/voco-symbol-ui.png`.
+Each class removes what it created, and the modules follow
+[GNOME's extension best practices](https://gjs.guide/extensions/review-guidelines/best-practices.html)
+for review on extensions.gnome.org.
 In `apps/desktop/src-tauri/`, `src/panel.rs` serves the bus, `src/tray.rs` builds
 the state and `src/panel_setup.rs` runs `resources/voco_gnome_panel.py`. A change
 that needs Shell to load new code raises both `version-name` in `metadata.json`
