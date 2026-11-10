@@ -8,6 +8,13 @@ The [release process](docs/release-process.md) describes how a release is made.
 
 ## [Unreleased]
 
+### Changed
+
+- The GNOME panel, now version 20, reads reduced motion from GNOME Shell
+  itself, so it also stays still while the Shell holds animations back. It no
+  longer opens a settings schema, which extensions.gnome.org's checks flagged.
+  After upgrading, sign out and back in to load it.
+
 ### Fixed
 
 - Panel setup names an older or newer copy of the VOCO panel in your home

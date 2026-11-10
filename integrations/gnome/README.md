@@ -22,9 +22,9 @@ tint whenever VOCO isn't idle.
 The meter opens to the left of the icon, so the icon never moves, and only if
 the right side of the bar still fits beside the clock with room for GNOME's
 microphone privacy indicator, which the companion never touches. On a crowded
-panel only the icon shows. With `enable-animations` off in
-`org.gnome.desktop.interface`, the meter opens without motion and the bars
-don't pulse.
+panel only the icon shows. When the Shell's animations are off, through
+`enable-animations` in `org.gnome.desktop.interface` or while the Shell inhibits
+them, the meter opens without motion and the bars don't pulse.
 
 A primary click stops dictation while VOCO is starting or recording, and
 otherwise opens Settings when VOCO allows it. Other mouse buttons, the Menu key
