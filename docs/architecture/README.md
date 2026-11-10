@@ -496,7 +496,7 @@ they open a microphone.
 
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
-otherwise points setup and Help to `COMPANION_PAGE` on extensions.gnome.org;
+otherwise points setup and Help to `COMPANION_PAGE`, its page on extensions.gnome.org;
 setup shows the link wherever the paste check fails for want of the companion.
 snapd installs the snap's desktop entry as `voco_voco.desktop`, which
 `activation.rs` counts as VOCO's launcher in the snap only.
