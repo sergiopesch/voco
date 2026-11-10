@@ -169,7 +169,11 @@ lesson(
         ),
         (
             "integrations/gnome/voco-panel@sergiopesch.com/extension.js",
-            "The GNOME Shell companion, in JavaScript.",
+            "The GNOME Shell companion's entry point, in JavaScript.",
+        ),
+        (
+            "integrations/gnome/voco-panel@sergiopesch.com/companion.js",
+            "The companion's side of its conversation with VOCO.",
         ),
         ("integrations/chromium/content.js", "The Chromium extension's script inside web pages."),
         ("apps/desktop/src-tauri/Cargo.toml", "Rust dependencies, the exact Tauri version and the minimum Rust version."),
@@ -481,12 +485,18 @@ lesson(
             "If the worker dies during a recording, the next push or finish gets \"worker lost\". Transcription ends for that recording, and the next recording starts a new worker.",
         ),
         (
+            "A processor it can't run on",
+            "The native recognizer needs AVX2, FMA and F16C. processor.rs reads the first flags line of /proc/cpuinfo once, and when one of them is missing, no worker ever starts: Rust refuses every request with the installer's words, such as \"VOCO's speech recognition needs a processor with AVX2, FMA and F16C; this one lacks F16C. In a virtual machine, pass the host CPU through.\" At startup VOCO shows \"Processor not supported\" and the tray reads \"VOCO — Processor not supported\". The window asks the same question before a recording, so a start is refused before any microphone opens. A file without a flags line, as on another architecture, lacks nothing.",
+        ),
+        (
             "Private diagnostics",
             "When the worker rejects a request, its answer names only the error type after \"stream request rejected: \". It never contains audio or text.",
         ),
     ],
     [
         (B + "speech_stream.rs", "Starts the worker, enforces time limits and never replays a request."),
+        (B + "processor.rs", "Reads the processor's flags once and names what the recognizer needs but lacks."),
+        (F + "lib/dictationRecording.ts", "Refuses a recording on such a processor before any microphone opens."),
         (B + "worker_sandbox.rs", "Confines the worker: close-on-exec descriptors and the seccomp filter."),
         (R + "stream_worker.py", "The worker's entry point; keeps library output off the protocol."),
         (R + "worker_main.py", "Checks every request and answers one line at a time."),
@@ -542,7 +552,7 @@ lesson(
     [
         (
             "A pinned build",
-            "NATIVE-BUILD.json records the NeMo-Speech.cpp and ggml revisions and the patch digests. The build targets generic x86-64 with AVX, AVX2, FMA and F16C, and leaves AVX-512, AMX and OpenMP off. That sets the processor VOCO needs.",
+            "NATIVE-BUILD.json records the NeMo-Speech.cpp and ggml revisions and the patch digests. The build targets generic x86-64 with AVX, AVX2, FMA and F16C, and leaves AVX-512, AMX and OpenMP off. That sets the processor VOCO needs: on one that lacks AVX2, FMA or F16C, VOCO starts no worker at all.",
         ),
         (
             "Two small patches",
@@ -875,8 +885,8 @@ lesson(
     ],
     [
         (
-            "Nine fields",
-            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; myWordsHeard, the versions VOCO learned when you said a word; and installChannel.",
+            "Ten fields",
+            "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; startAtLogin, which defaults to true; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; myWordsHeard, the versions VOCO learned when you said a word; and installChannel.",
         ),
         (
             "Update checks",
@@ -892,11 +902,15 @@ lesson(
         ),
         (
             "The root helper",
-            "Only pkexec runs /usr/libexec/voco-update-helper, through a polkit action that always asks for an administrator's password. It takes just the folder and the version, copies the three files into /var/cache/voco-update, checks them again, refuses a release that isn't newer than the installed one, and runs apt-get install or dnf install on that copy. VOCO then restarts. You can cancel only the download, and from the password prompt until VOCO exits no recording can start.",
+            "Only pkexec runs /usr/libexec/voco-update-helper, through a polkit action that always asks for an administrator's password. It sets its own umask, 022, because pkexec keeps the caller's, so nothing it creates is writable by your group. It takes just the folder and the version, copies the three files into /var/cache/voco-update, checks them again, refuses a release that isn't newer than the installed one, and runs apt-get install or dnf install on that copy. VOCO then restarts. You can cancel only the download, and from the password prompt until VOCO exits no recording can start.",
         ),
         (
             "Two channels",
             "The default channel ignores pre-releases, and its helper text reads \"Recommended for everyday use.\" Beta includes them: \"Beta releases change more often.\" Drafts are always ignored.",
+        ),
+        (
+            "Start at login",
+            "In the packages and the snap, Settings offers Start VOCO when you sign in, under Startup, and it is on until you turn it off; a source build has no switch. On, it reads \"VOCO starts without opening a window, ready for your shortcut.\" Off: \"After you sign in, open VOCO from your app launcher before you dictate.\" Turning it on or off changes the login entry first, so if that fails, the setting and the entry both stay as they were.",
         ),
         ("Installation method", "installChannel only chooses which update instructions VOCO shows."),
         (
@@ -910,7 +924,8 @@ lesson(
     ],
     [
         (B + "config.rs", "Loads, patches and saves the settings and their copy, and restores what an earlier VOCO dropped."),
-        (F + "components/ControlPanel.tsx", "The settings window, including the update channel."),
+        (F + "components/ControlPanel.tsx", "The settings window, including the update channel and the login switch."),
+        (B + "login_start.rs", "Keeps the login entry in step with the setting."),
         (B + "confinement.rs", "Tells the window when the Snap Store updates VOCO, so it never checks."),
         (F + "components/ConfigRecoveryPanel.tsx", "The three ways out when settings can't load."),
         (F + "lib/updates.ts", "Asks GitHub for releases and filters them by channel."),
@@ -971,6 +986,10 @@ lesson(
             "When VOCO's own launcher starts it, GIO names VOCO.desktop and this process, so VOCO shows its popover as it would for a second launch. A start from a terminal or a login autostart stays in the tray.",
         ),
         (
+            "Starting at login",
+            "Once setup is complete, and while Start VOCO when you sign in is on, VOCO keeps one entry, voco-login.desktop, in $XDG_CONFIG_HOME/autostart, and removes it otherwise. It brings the entry in step at startup and after every settings save, and never writes through a link or into another user's file. TryExec=voco makes the session skip the entry once the package is gone. In the snap, $XDG_CONFIG_HOME is the snap's own folder, and the recipe's autostart key tells snapd to start VOCO from that entry. A login start stays in the tray, and a source build keeps no entry.",
+        ),
+        (
             "A hidden window",
             "With native capture VOCO really hides its window. On X11, where WebKit records, VOCO instead shrinks the window to 1 by 1 pixel and moves it off-screen.",
         ),
@@ -992,11 +1011,11 @@ lesson(
         ),
         (
             "The snap",
-            "When snapd names it voco, VOCO knows it runs as its snap and leaves out the virtual keyboard, the keyboard reader, the IBus listener and the update check. On Wayland only the GNOME companion types for it: \"On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.\" On other Wayland desktops Start is refused, and X11 keeps xdotool.",
+            "When snapd names it voco, VOCO knows it runs as its snap and leaves out the virtual keyboard, the keyboard reader, the IBus listener and the update check. On Wayland only the GNOME companion types for it: \"On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it's already installed, sign out and back in.\" On other Wayland desktops Start is refused, and X11 keeps xdotool.",
         ),
         (
             "Connections the snap needs",
-            "Until the store connects them itself, the snap names the commands. Before each recording it asks snapctl whether audio-record is connected: \"The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.\" PipeWire settles what a snap may record when it connects, so native capture connects only once the plug is, and the same VOCO then records. WebKit, which captures on X11, lists its microphones once, so there VOCO asks to be restarted. logind refuses the snap until login-session-observe is connected, and while it does, the paste check asks snapctl about the plug before it asks logind again.",
+            "Where its plugs aren't connected, the snap says how to connect them. Before each recording it asks snapctl whether audio-record is connected: \"The VOCO snap can't use the microphone yet. Allow it in Settings, under Apps, then VOCO, or run snap connect voco:audio-record. Then try again.\" PipeWire settles what a snap may record when it connects, so native capture connects only once the plug is, and the same VOCO then records. WebKit, which captures on X11, lists its microphones once, so there VOCO asks to be restarted. logind refuses the snap until login-session-observe is connected, and while it does, the paste check asks snapctl about the plug before it asks logind again.",
         ),
     ],
     [
@@ -1011,7 +1030,8 @@ lesson(
         (B + "confinement.rs", "Knows when VOCO runs as its snap, and asks snapctl about its microphone connection."),
         ("apps/desktop/src-tauri/tauri.conf.json", "The Debian package's dependencies and files."),
         ("packaging/rpm/voco.spec.in", "The Fedora package: the same files, with Fedora's names for the dependencies."),
-        ("packaging/snap/snapcraft.yaml.in", "The snap's recipe: core24, the GNOME extension, three plugs and the panel slot."),
+        ("packaging/snap/snapcraft.yaml.in", "The snap's recipe: core24, the GNOME extension, three plugs, the panel slot and the login entry."),
+        (B + "login_start.rs", "The login entry, kept in step with the setting."),
         ("packaging/udev/70-voco-uinput.rules", "Gives the active session's user access to /dev/uinput."),
         ("packaging/udev/voco-uinput.conf", "Loads the uinput module at boot."),
         ("packaging/tauri/VOCO.desktop", "The desktop entry."),
@@ -1209,7 +1229,7 @@ lesson(
             "Unit checks",
             "scripts/test-unit.sh checks the patched libraries, the speech reports and runtime, capture helpers, the IBus engine and the window's Vitest suite.",
         ),
-        ("Rust checks", "cargo fmt, clippy with warnings treated as errors, and cargo test."),
+        ("Rust checks", "cargo fmt, clippy with warnings treated as errors, and cargo test with the update helper included."),
         (
             "Speech checks",
             "CI reuses the native speech runtime from a released package, checked against a fixed checksum, then runs the speech baseline and the worker protocol tests, on Ubuntu 24.04 and in the Debian 13 and Fedora 44 containers. Rust Check & Test runs the protocol tests once more from only the worker files a package ships, staged by stage-speech-worker.py.",
@@ -1540,14 +1560,14 @@ lesson(
     "On GNOME, VOCO can live in the top bar near the clock, with bars that move while you speak.",
     [
         "The optional companion for GNOME 46, 48, 50 and 51 shows VOCO's microphone in the top bar. While you dictate, a seven-bar meter opens on its left when there is room beside the clock.",
-        "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing.",
+        "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing. The snap can't enable extensions, so its setup and Help offer Get the VOCO panel, which opens the companion's page on extensions.gnome.org.",
         "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs Alt+D or Alt+Shift+D inside the Shell, so other apps never see the shortcut, and presses VOCO's paste keys.",
     ],
     [
         ("Enable", "voco --setup-panel or Enable live panel turns on this one extension for your user."),
         (
             "Attach",
-            "The companion calls Attach over D-Bus. VOCO accepts it only from the process that owns org.gnome.Shell, then hides the tray icon.",
+            "The companion calls Attach over D-Bus. VOCO accepts it only from the process that owns org.gnome.Shell, then hides the tray icon. A refused Attach is tried again 2 seconds later.",
         ),
         (
             "Poll",
@@ -1565,11 +1585,11 @@ lesson(
     [
         (
             "The menu",
-            "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review, Stop dictation and Quit VOCO. Quit is greyed out while VOCO dictates, and the companion offers it only to a VOCO that sends canQuit.",
+            "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review, Stop dictation and Quit VOCO. Quit is greyed out while VOCO dictates, and the companion offers it only to a VOCO that sends canQuit. Stop names the recording it ends, so the companion offers it only once VOCO's state carries that recording's session.",
         ),
         (
             "Motion",
-            "Bars grow in 45 ms and shrink in 100 ms. While VOCO processes, the bars hold at 0.35 and pulse over 700 ms, each bar 40 ms after the last. The meter opens in 220 ms. When GNOME's animations are off, every change happens at once and nothing pulses.",
+            "Bars grow in 45 ms and shrink in 100 ms. While VOCO processes, the bars hold at 0.35 and pulse over 700 ms, each bar 40 ms after the last. The meter opens in 220 ms. When the Shell's animations are off, by the desktop's setting or while the Shell holds them back, every change happens at once and nothing pulses.",
         ),
         (
             "The bar formula",
@@ -1578,6 +1598,14 @@ lesson(
         (
             "Fresh levels only",
             "A level older than 250 ms reads as silence, so the bars never freeze on an old value.",
+        ),
+        (
+            "One job per file",
+            "extension.js only creates the companion when GNOME enables it and destroys it when GNOME disables it. companion.js speaks VOCO's protocol: Attach, the GetState poll and the one waiting NextRequest. indicator.js draws the pill, the meter and the menu, paster.js types the paste keys, shortcut.js holds the grab and version.js reads the Shell's major version. Each class removes what it created.",
+        ),
+        (
+            "No late replies",
+            "The companion keeps its poll, request and retry timeouts by name, and scheduling one removes the one it replaces. Every call of an attachment carries one Gio.Cancellable, which is cancelled and replaced when the attachment ends, so no late reply is read. The grab is one object, and a reply about a grab no longer held never acts on a newer one.",
         ),
         (
             "Keys released",
@@ -1593,7 +1621,11 @@ lesson(
         ),
         (
             "Setup messages",
-            "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\" After an update, including a copy the Shell marked out of date at login: \"Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.\"",
+            "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\" After an update, including a copy the Shell marked out of date at login: \"Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.\" GNOME loads a copy in your own extensions folder in place of the package's, so setup reports one that isn't the current version as blocked, and never removes it. Its message names the folder after \"Another copy of the VOCO panel, in\" and ends \"Remove that folder, then save your work and sign out and back in.\"",
+        ),
+        (
+            "The snap's panel step",
+            "The snap's VOCO can't enable extensions. On GNOME Wayland, where only the companion types for it, setup says \"The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it's already installed, sign out and back in.\" Get the VOCO panel opens the companion's page, and Install without the website offers a gdbus command to copy into Terminal, which opens GNOME's own install prompt through InstallRemoteExtension, for a browser without GNOME's browser integration. Setup's own check answers once, so when the once-a-second diagnostics turn ready, as when the companion attaches, setup checks again by itself. On X11, where the snap types with xdotool: \"Optional: the VOCO panel adds live microphone bars and Stop to your top bar. Get it from extensions.gnome.org.\"",
         ),
         (
             "Other desktops",
@@ -1605,7 +1637,7 @@ lesson(
         ),
         (
             "No icon at all",
-            "The tray icon needs a tray host, on GNOME an AppIndicator extension, which Debian and Fedora don't turn on. If 20 seconds after startup the companion isn't attached and no tray host owns org.kde.StatusNotifierWatcher, VOCO says \"VOCO has no icon in the top bar\" once. On GNOME it adds \"Open VOCO from the app menu, choose Enable live panel in Help, then sign out and back in.\"",
+            "The tray icon needs a tray host, on GNOME an AppIndicator extension, which Debian and Fedora don't turn on. If 20 seconds after startup the companion isn't attached and no tray host owns org.kde.StatusNotifierWatcher, VOCO says \"VOCO has no icon in the top bar\" once. On GNOME it adds \"Open VOCO from the app menu, choose Enable live panel in Help, then sign out and back in.\" and in the snap \"Open VOCO from the app menu and choose Get the VOCO panel in Help.\"",
         ),
         (
             "The tray fallback",
@@ -1613,24 +1645,33 @@ lesson(
         ),
         ("The check cache", "VOCO reuses a panel check for 20 seconds, or for 2 seconds after a failed check."),
         (
-            "Until the next login",
-            "The Shell loads a newly installed companion at the next login, so until then the focused app also gets Alt+D. Setup's last step then leads with VOCO's note on what the shortcut does there and the fix, and the dictation instruction follows it. The note comes from the once-a-second diagnostics, so it changes when you enable the panel.",
+            "Before the companion loads",
+            "A running Shell finds a companion the package just installed only at the next login, and keeps running an older copy it already loaded until then. A first install from extensions.gnome.org, as the snap's setup offers, loads at once. While the focused app also gets Alt+D, setup's last step leads with VOCO's note on what the shortcut does there and the fix, and the dictation instruction follows it. The note comes from the once-a-second diagnostics, so it changes when you enable the panel.",
         ),
     ],
     [
         (
             "integrations/gnome/voco-panel@sergiopesch.com/extension.js",
-            "The companion: the pill, the bars, the menu, the Wayland grab and the paste keys.",
+            "The entry point: creates the companion on enable and destroys it on disable.",
         ),
-        ("integrations/gnome/voco-panel@sergiopesch.com/model.js", "The bar weights and height formula."),
-        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 19 as its version-name, which extensions.gnome.org keeps."),
+        (
+            "integrations/gnome/voco-panel@sergiopesch.com/companion.js",
+            "The protocol: Attach, the GetState poll, the waiting NextRequest, retries and timeouts.",
+        ),
+        ("integrations/gnome/voco-panel@sergiopesch.com/indicator.js", "The pill, the bars and the menu."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/paster.js", "Types Shift+Insert from inside the Shell, or refuses."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/shortcut.js", "The Wayland grab and its lease renewals."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/version.js", "The Shell's major version, where the code differs between them."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/model.js", "The bar weights, the height formula and when Stop can be offered."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 22 as its version-name, which extensions.gnome.org keeps."),
         (B + "panel.rs", "VOCO's D-Bus service for the companion: Attach, state, the shortcut lease and the work it hands out through NextRequest."),
         (B + "panel_setup.rs", "Checks and enables the companion, and caches the result."),
         (B + "tray.rs", "The tray icon, hidden while the companion is attached."),
         (B + "lib.rs", "Says once when VOCO has no icon in the top bar."),
         (B + "tray_icons.rs", "Writes the state icons and meter frames once."),
         (P + "voco_gnome_panel.py", "The helper behind --check-panel and --setup-panel."),
-        (F + "components/PanelSetup.tsx", "The Enable live panel button in setup and Help."),
+        (F + "components/PanelSetup.tsx", "Enable live panel, or the snap's Get the VOCO panel and Install without the website, in setup and Help."),
+        (F + "components/ControlPanel.tsx", "Checks setup again once the diagnostics turn ready."),
         (F + "components/Onboarding.tsx", "Setup, whose last step leads with the shortcut note."),
         (
             "scripts/test-gnome-panel.py",
@@ -1711,7 +1752,8 @@ lesson(
         (B + "desktop_session.rs", "Binds the originating desktop session and checks whether it is active and locked."),
         (B + "lib.rs", "Shortcut routes for each session, and the keyboard created at startup."),
         (B + "confinement.rs", "Knows when VOCO runs as its snap."),
-        ("integrations/gnome/voco-panel@sergiopesch.com/extension.js", "The GNOME grab and paste keys on Wayland."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/shortcut.js", "The GNOME grab on Wayland."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/paster.js", "The GNOME paste keys on Wayland."),
         ("packaging/udev/70-voco-uinput.rules", "Gives the active session's user access to /dev/uinput."),
         ("packaging/udev/voco-uinput.conf", "Loads the uinput module at boot."),
         ("packaging/debian/postinst.py.in", "Applies the udev rule after installing."),
@@ -1762,7 +1804,7 @@ chapters[-1]["comparison"] = {
     "scope": "Code paths at the commit this guide records. Session detection reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY as the table describes.",
     "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing.",
 }
-chapters[-1]["sourceNote"] = "The table follows insertion.rs (helpers and keys), selection_owner.rs (the GNOME copies), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes), confinement.rs (the snap) and extension.js (the GNOME grab). It describes code paths, not a compatibility promise."
+chapters[-1]["sourceNote"] = "The table follows insertion.rs (helpers and keys), selection_owner.rs (the GNOME copies), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes), confinement.rs (the snap), and the companion's shortcut.js (the GNOME grab) and paster.js (its keys). It describes code paths, not a compatibility promise."
 
 # Fail closed if a lesson cites a path absent from the pinned source.
 root = Path(__file__).resolve().parents[1]
