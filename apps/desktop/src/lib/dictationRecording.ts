@@ -101,6 +101,7 @@ export interface DictationRecordingEnv {
   beginNativeCapture: typeof beginNativeCapture;
   releaseBrowserRecording: (triggerId: string) => Promise<void>;
   microphoneAccess: () => Promise<MicrophoneAccess>;
+  speechProcessorProblem: () => Promise<string | null>;
 }
 
 export function createDictationRecording(env: DictationRecordingEnv) {
@@ -158,11 +159,14 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     beginNativeCapture,
     releaseBrowserRecording,
     microphoneAccess,
+    speechProcessorProblem,
   } = env;
 
   // One controller lives for the whole launch, so these limit repeat notifications.
   let crashRecoveryUnavailableNotified = false;
   let interruptionNotifiedSession: number | null = null;
+  // The processor doesn't change while VOCO runs: one answer serves every start.
+  let processorProblem: string | null | undefined;
   let journal: CrashJournal | null = null;
   let journalCleanup: Promise<void> = Promise.resolve();
   // Start, Stop and the stream callbacks share these across recordings.
@@ -328,6 +332,14 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // never blocks a new dictation.
       await finishJournal().catch(() => { journal = null; });
       assertOutputAllowed(startingSessionId);
+      // The speech runtime can't run on such a processor, so nothing records
+      // and the reason replaces a recognizer failure. No answer, no refusal.
+      if (processorProblem === undefined) processorProblem = await speechProcessorProblem().catch(() => undefined);
+      assertOutputAllowed(startingSessionId);
+      if (processorProblem) {
+        startFailureTitle = "Processor not supported";
+        throw new Error(processorProblem);
+      }
       if (!localTest && !isBrowserTrigger(triggerId) && useStore.getState().config) {
         const paste = await getDesktopPasteStatus();
         assertOutputAllowed(startingSessionId);

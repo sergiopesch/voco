@@ -43,6 +43,11 @@ export async function microphoneAccess(): Promise<MicrophoneAccess> {
   return invoke<MicrophoneAccess>("microphone_access");
 }
 
+/** Why the speech runtime can't run on this processor, or null when it can. */
+export async function speechProcessorProblem(): Promise<string | null> {
+  return invoke<string | null>("speech_processor_problem");
+}
+
 /** The account's full name, for setup's first My words entry; null without one. */
 export async function getAccountName(): Promise<string | null> {
   return invoke<string | null>("get_account_name");

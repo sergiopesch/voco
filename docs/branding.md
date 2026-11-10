@@ -185,7 +185,7 @@ level bars instead, redrawn every 90 ms from 64 frames the app draws at launch.
 | Ready to listen, Ready · microphone checks on first use | Ready | None |
 | Starting microphone, Transcribing | Processing | None |
 | Listening, Listening · browser field | Level bars | None |
-| Desktop setup needed, Microphone setup required, Microphone needs permission, Speech model needs attention, Settings need attention, Needs attention | Not ready | Check setup |
+| Processor not supported, Desktop setup needed, Microphone setup required, Microphone needs permission, Speech model needs attention, Settings need attention, Needs attention | Not ready | Check setup |
 
 Ready and dictating carry no label, so starting and stopping never shifts the
 panel. The menu holds the status line, Open VOCO, Start dictation, Stop dictation,

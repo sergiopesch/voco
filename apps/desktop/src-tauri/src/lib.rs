@@ -27,6 +27,7 @@ mod native_capture_commands;
 pub mod panel_setup;
 mod performance;
 mod process_runner;
+mod processor;
 mod selection_owner;
 mod shortcut_arbitration;
 mod shortcut_readiness;
@@ -1176,6 +1177,13 @@ fn is_allowed_external_url(url: &str) -> bool {
 }
 
 fn prepare_model_at_startup(app: &tauri::AppHandle) -> Result<(), String> {
+    // The runtime would fail on this processor, so no worker starts and the
+    // reason replaces the generic speech model warning.
+    if let Some(problem) = processor::speech_problem() {
+        tray::update_model_download_status(app, tray::ModelDownloadStatus::UnsupportedProcessor);
+        send_notification("Processor not supported", problem);
+        return Ok(());
+    }
     info!("Preparing bundled Nemotron streaming model at startup");
     speech_stream::warmup()?;
     info!("Bundled Nemotron streaming model ready");
@@ -2292,6 +2300,7 @@ pub fn run() -> Result<(), String> {
             update_install::update_install_status,
             update_install::dismiss_update_install,
             confinement::microphone_access,
+            processor::speech_processor_problem,
             crash_recovery::list_crash_recovery,
             crash_recovery::get_crash_journal_epoch,
             crash_recovery::dismiss_crash_recovery,

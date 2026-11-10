@@ -90,6 +90,7 @@ it, before DNF started. After a manual install, the checks in
 | **Desktop setup needed**, or a **Dictation setup incomplete** notification | VOCO doesn't record when it can't paste. Run `voco --check-desktop-input` and fix what it names. |
 | **VOCO can't find a desktop session.** | VOCO was started somewhere it can't see your desktop, such as a text console, an SSH session or a script with no desktop variables set. Open VOCO from your desktop. If you start a Wayland desktop such as Sway from a text console, check that `WAYLAND_DISPLAY` is set in the environment VOCO starts from. |
 | **VOCO hidden** | A VOCO window was open. Click where you want the text, then press the shortcut again. |
+| **Processor not supported**, with `VOCO's speech recognition needs a processor with AVX2, FMA and F16C; this one lacks …` | VOCO can't recognize speech on this processor, so it doesn't record. The message names the missing features. In a virtual machine, pass the host CPU through, for example with QEMU's `-cpu host`, then open VOCO again. On a computer without them, VOCO can't run. |
 | **Dictation could not start** or **Microphone could not start** | Read the reason in the notification. For microphone reasons, see [Microphone problems](#microphone-problems). |
 | **Microphone access is blocked** | Allow microphone access in your desktop's privacy settings, then choose **Retry microphone access** on the **Settings** page. |
 | **Choose a microphone in Microphone settings.** | Choose a microphone on the **Settings** page. |

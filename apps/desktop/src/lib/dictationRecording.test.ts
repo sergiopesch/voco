@@ -62,6 +62,7 @@ function harness() {
   const setError = vi.fn();
   const notify = vi.fn(async (_summary: string, _body: string) => {});
   const microphone: { allowed: boolean; detail?: string } = { allowed: true };
+  const processor: { problem: string | null } = { problem: null };
   const audioBuffer = createAudioCaptureBuffer();
   const env = {
     sessionRef: current,
@@ -117,6 +118,7 @@ function harness() {
     beginNativeCapture: vi.fn(),
     releaseBrowserRecording: vi.fn(async () => {}),
     microphoneAccess: vi.fn(async () => ({ ...microphone })),
+    speechProcessorProblem: vi.fn(async () => processor.problem),
   } as unknown as DictationRecordingEnv;
   const recording = createDictationRecording(env);
   // Puts the harness in a live desktop recording that Stop can finish.
@@ -131,7 +133,7 @@ function harness() {
     unmount: recording.dispose,
     recordingWith,
     state, current, cancelled, queue, pasteSession, status,
-    pasteStatus, captureSelection, copy, trace, setError, notify, microphone,
+    pasteStatus, captureSelection, copy, trace, setError, notify, microphone, processor,
   };
 }
 
@@ -190,6 +192,45 @@ it.each(["cursor", "onboarding:test"])("names the snap's microphone connection b
   expect(h.current.current.phase).toBe("error");
   expect(h.setError).toHaveBeenLastCalledWith(detail);
   expect(h.notify).toHaveBeenCalledWith("Microphone could not start", detail);
+});
+
+it.each([
+  { trigger: undefined, notified: true },
+  { trigger: "onboarding:test", notified: true },
+  { trigger: "words:check", notified: false },
+])("names a processor the speech runtime can't use before anything records ($trigger)", async ({ trigger, notified }) => {
+  const h = harness();
+  const problem = "VOCO's speech recognition needs a processor with AVX2, FMA and F16C; this one lacks F16C. In a virtual machine, pass the host CPU through.";
+  h.processor.problem = problem;
+  await h.startRecording(trigger);
+  expect(h.pasteStatus).not.toHaveBeenCalled();
+  expect(h.env.microphoneAccess).not.toHaveBeenCalled();
+  expect(h.captureSelection).not.toHaveBeenCalled();
+  expect(ipc.mock.calls.some(([command]) => command === "speech_stream")).toBe(false);
+  expect(h.current.current.phase).toBe("error");
+  expect(h.setError).toHaveBeenLastCalledWith(problem);
+  // Say it says why in its own window.
+  expect(h.notify.mock.calls).toEqual(notified ? [["Processor not supported", problem]] : []);
+  // The answer serves the next start too.
+  await h.startRecording(trigger);
+  expect(h.env.speechProcessorProblem).toHaveBeenCalledOnce();
+});
+
+it("asks about the processor once and records when it can", async () => {
+  const h = harness();
+  await h.startRecording();
+  await h.startRecording();
+  expect(h.env.speechProcessorProblem).toHaveBeenCalledOnce();
+  expect(h.captureSelection).toHaveBeenCalledTimes(2);
+});
+
+it("records when the processor check can't answer, and asks again next time", async () => {
+  const h = harness();
+  vi.mocked(h.env.speechProcessorProblem).mockRejectedValueOnce(new Error("no answer"));
+  await h.startRecording();
+  expect(h.captureSelection).toHaveBeenCalledOnce();
+  await h.startRecording();
+  expect(h.env.speechProcessorProblem).toHaveBeenCalledTimes(2);
 });
 
 it("leaves the microphone to the capture when its access check can't answer", async () => {
