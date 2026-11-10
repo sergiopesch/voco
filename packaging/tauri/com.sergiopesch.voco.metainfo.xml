@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.69" date="2026-11-11">
+      <description>
+        <p>VOCO now starts when you sign in, which you can turn off in Settings. The snap's setup installs its GNOME panel in fewer steps and continues by itself, VOCO says plainly when a processor can't run its speech recognition, and Install update works on Debian 13, Ubuntu 26.04 and Fedora 44.</p>
+      </description>
+    </release>
     <release version="2026.0.68" date="2026-11-09">
       <description>
         <p>VOCO and its GNOME panel now talk over a new name, ready for the Snap Store and extensions.gnome.org. After upgrading, sign out and back in so GNOME loads the new panel. Dictation works as before.</p>

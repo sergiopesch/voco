@@ -6,7 +6,12 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
-## [Unreleased]
+## [2026.0.69] - 2026-11-11
+
+VOCO starts when you sign in, and the snap's first minutes get simpler. The
+[release notes](docs/releases/2026.0.69.md) explain the upgrade: from 2026.0.66 to
+2026.0.68 on Debian 13, Ubuntu 26.04 and Fedora 44, use the guided installer
+once; on GNOME, sign out and back in afterwards.
 
 ### Added
 
@@ -672,6 +677,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.69]: https://github.com/sergiopesch/voco/compare/voco.2026.0.68...voco.2026.0.69
 [2026.0.68]: https://github.com/sergiopesch/voco/compare/voco.2026.0.67...voco.2026.0.68
 [2026.0.67]: https://github.com/sergiopesch/voco/compare/voco.2026.0.66...voco.2026.0.67
 [2026.0.66]: https://github.com/sergiopesch/voco/compare/voco.2026.0.65...voco.2026.0.66
