@@ -13,15 +13,36 @@ The [release process](docs/release-process.md) describes how a release is made.
 - The GNOME panel, now version 22 and on
   [extensions.gnome.org](https://extensions.gnome.org/extension/11710/voco/),
   is split into small modules, each of which cleans up after itself, as its
-  reviewers ask. It
-  reads reduced motion from GNOME Shell itself, so it also stays still while
-  the Shell holds animations back. It tries again when VOCO turns it away
-  because the desktop was too busy to confirm it, where it used to stay hidden
-  until VOCO restarted, and offers Stop only once there's a dictation to stop. After upgrading, sign
-  out and back in to load it.
+  reviewers ask. It reads reduced motion from GNOME Shell itself, so it also
+  stays still while the Shell holds animations back. It tries again when VOCO
+  turns it away because the desktop was too busy to confirm it, where it used
+  to stay hidden until VOCO restarted, and offers Stop only once there's a
+  dictation to stop. After upgrading, sign out and back in to load it.
 
 ### Fixed
 
+- The snap's setup continues by itself once the VOCO panel is installed, without
+  **Check panel again**. It no longer says to sign out and back in after
+  installing the panel, which GNOME loads at once; that's only needed when an
+  older copy of the panel is already running.
+- The snap's panel step can install the panel without GNOME's browser
+  integration, which stock Ubuntu lacks: **Install without the website** copies
+  a command that opens GNOME's own install prompt.
+- On X11 the snap calls the VOCO panel optional, since it types without it. It
+  used to say it types through the panel.
+- Setup's last step says to choose **Done** before pressing the shortcut, and
+  that VOCO doesn't start again by itself after you sign out. It used to say
+  VOCO stays in the tray, which it doesn't while the panel shows it.
+- In the snap, Help's setup instructions open the snap's own guide, Help no
+  longer lists the IBus input source or the Chromium shortcut, which the snap
+  doesn't have, and the notice for a missing top bar icon points to **Get the
+  VOCO panel**.
+- The snap's messages about a turned-off permission also name where to allow it
+  in Settings: **Apps**, then **VOCO**, beside the `snap connect` command.
+- In the snap on GNOME, when the VOCO panel is missing, setup shows only the
+  panel step: what's needed, **Get the VOCO panel** and **Check panel again**.
+  It used to add a general setup guide and a Details note repeating it. The
+  panel step's buttons are spaced like setup's own.
 - Panel setup names an older or newer copy of the VOCO panel in your home
   folder, such as one from extensions.gnome.org, which GNOME loads instead of
   the one the package installed. It used to ask you to sign out and back in

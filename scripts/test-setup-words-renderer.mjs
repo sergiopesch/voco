@@ -242,7 +242,7 @@ try {
     const handoff = page.locator('.voco-setup__handoff');
     await handoff.getByText(leak, { exact: true }).waitFor();
     const handoffText = await handoff.innerText();
-    assert.ok(handoffText.indexOf(leak) < handoffText.indexOf('Then click where you want the text'), handoffText);
+    assert.ok(handoffText.indexOf(leak) < handoffText.indexOf('Then choose Done, click where you want the text'), handoffText);
     assert.equal(handoffText.split('Sign out and back in').length, 2, 'The fix reads once');
     await page.getByRole('button', { name: 'Done', exact: true }).waitFor();
     await shot('setup-ready-shortcut-note');
@@ -276,19 +276,50 @@ try {
 
     // The snap types on GNOME Wayland only through the companion, which it
     // can't install: setup stops there and points to the companion's page.
-    const companionPage = 'https://extensions.gnome.org/#q=VOCO';
+    const companionPage = 'https://extensions.gnome.org/extension/11710/voco/';
+    const needsPanel = 'On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it\'s already installed, sign out and back in.';
     await load({
-        desktopInput: { available: false, setupArea: 'panel',
-            detail: 'On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.' },
+        desktopInput: { available: false, setupArea: 'panel', detail: needsPanel },
         panel: { status: 'extensions-site', canEnable: false, url: companionPage,
-            detail: 'Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.' } });
+            detail: 'The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it\'s already installed, sign out and back in.' } });
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     const setup = page.getByRole('region', { name: 'Voice setup' }).or(page.locator('.voco-setup'));
     await setup.getByRole('button', { name: 'Get the VOCO panel', exact: true }).click();
     await page.waitForFunction(url => window.calls.some(([name, target]) => name === 'openExternalUrl' && target === url), companionPage);
     assert.equal(await setup.getByRole('button', { name: 'Enable live panel', exact: true }).count(), 0, 'The snap enables no extension');
     assert.equal(await handoff.count(), 0, 'Setup stops until the snap can type');
+    assert.equal(await setup.getByText('Open setup instructions').count(), 0, 'The panel step is the only remedy');
+    // Without GNOME's browser integration the website can't install it; GNOME's
+    // own prompt can, from one copied Terminal command.
+    const installCommand = 'gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/Shell/Extensions --method org.gnome.Shell.Extensions.InstallRemoteExtension voco-panel@sergiopesch.com';
+    await setup.getByText('Install without the website', { exact: true }).click();
+    assert.equal(await setup.locator('.voco-panel-setup__terminal code').textContent(), installCommand);
+    await setup.getByRole('button', { name: 'Copy command', exact: true }).click();
+    await setup.getByText('Command copied.', { exact: true }).waitFor();
+    assert.ok(await page.evaluate(command => window.calls.some(([name, text]) => name === 'copyDesktopText' && text === command), installCommand));
+    await shot('setup-snap-panel-step');
     results.push({ case: 'the-snap-points-to-the-companion-page', passed: true });
+
+    // GNOME loads a first install at once, the panel attaches, and the runtime
+    // poll finds desktop input ready: setup moves on with no click.
+    await page.evaluate(() => {
+        const ready = { available: true, detail: '' };
+        const earlier = window.nativeHandlers.getRuntimeDiagnostics;
+        window.nativeHandlers.getDesktopInputStatus = () => ready;
+        window.nativeHandlers.getPanelSetupStatus = () => ({ status: 'active', canEnable: false, detail: 'Live panel bars and Stop are active.' });
+        window.nativeHandlers.getRuntimeDiagnostics = (args) => ({ ...(earlier ? earlier(args) : window.nativeCallDefaults?.getRuntimeDiagnostics),
+            sessionType: 'wayland', typeSimulation: { available: true, missingCommands: [] }, clipboard: { available: true, missingCommands: [] },
+            ibusShortcut: { setupState: 'not-installed', available: false }, desktopInput: ready,
+            desktopPaste: { enabled: true, available: true, detail: '' }, shortcut: { hotkey: 'Alt+D', route: 'gnome_panel', state: 'available', detail: '' } });
+        window.callsBeforeAttach = window.calls.length;
+    });
+    await handoff.waitFor({ timeout: 5000 });
+    await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
+    await handoff.getByText('Live panel bars and Stop are active.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Get the VOCO panel', exact: true }).count(), 0, 'Nothing left to install');
+    assert.equal(await page.getByText('Desktop setup needs one more step.').count(), 0);
+    await shot('setup-snap-panel-attached');
+    results.push({ case: 'the-snap-continues-once-the-panel-attaches', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();

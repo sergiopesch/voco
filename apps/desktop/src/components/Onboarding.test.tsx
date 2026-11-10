@@ -94,6 +94,27 @@ it("reaches the words step before desktop setup is ready, and checks it before D
   expect(last).not.toContain("Test again");
 });
 
+it("offers only the panel when the panel is what desktop setup needs", () => {
+  const props = {
+    microphone: "System default", status: "idle" as const, passed: false, failed: false, attempted: false,
+    setupError: null, checkingDesktopSetup: false, preparing: false, saving: false, blocked: false,
+    hotkey: "Alt+D", desktopReady: false, onStart: vi.fn(), onStop: vi.fn(), onFinish: vi.fn(async () => {}),
+    onOpenDesktopSetupGuide: vi.fn(),
+  };
+  // The snap on GNOME Wayland without its panel: one step, the panel's own.
+  const snap = renderToStaticMarkup(<Onboarding {...props} desktopSetupPanel
+    desktopSetupError="On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in." />);
+  expect(snap).toContain("Desktop setup needs one more step.");
+  expect(snap).toContain("Panel setup");
+  expect(snap).not.toContain("Open setup instructions");
+  expect(snap).not.toContain("<summary>Details</summary>");
+  // Any other desktop setup problem keeps its details and the guide.
+  const other = renderToStaticMarkup(<Onboarding {...props} desktopSetupError="Sign out and back in once after installing VOCO." />);
+  expect(other).toContain("<summary>Details</summary>");
+  expect(other).toContain("Open setup instructions");
+  expect(other).not.toContain("Panel setup");
+});
+
 it("leads the handoff with the fix while the shortcut also reaches the focused app", () => {
   const props = {
     microphone: "System default", status: "idle" as const, passed: true, failed: false, attempted: true,
@@ -106,12 +127,15 @@ it("leads the handoff with the fix while the shortcut also reaches the focused a
   const leaky = renderToStaticMarkup(<Onboarding {...props} shortcutNote={note} />);
   expect(leaky.split(note)).toHaveLength(2);
   expect(leaky.indexOf(note)).toBeLessThan(leaky.indexOf("where you want the text"));
-  expect(leaky).toContain("Then click where you want the text");
+  expect(leaky).toContain("Then choose Done, click where you want the text");
   // The note replaces the panel's own status line, so the step reads once.
   expect(leaky).not.toContain("Checking your panel");
   expect(leaky).toContain(">Done</button>");
   const ready = renderToStaticMarkup(<Onboarding {...props} shortcutNote={null} />);
-  expect(ready).toContain("Click where you want the text");
+  expect(ready).toContain("Choose Done, click where you want the text");
+  // VOCO doesn't start at login, so the last step doesn't promise it stays.
+  expect(ready).toContain("After you sign in again, open it from your app launcher.");
+  expect(ready).not.toContain("stays in your tray");
   expect(ready).not.toContain("Then click");
   expect(ready).toContain("Checking your panel");
 });

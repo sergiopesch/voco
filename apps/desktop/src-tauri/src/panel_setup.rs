@@ -89,6 +89,7 @@ pub fn check(enable: bool) -> Result<PanelSetupStatus, String> {
     if crate::confinement::is_snap() {
         return Ok(snap_status(
             &crate::current_desktop(),
+            crate::session_type_from_environment() == crate::SessionType::Wayland,
             crate::panel::companion_asks_for_voco(),
         ));
     }
@@ -117,11 +118,18 @@ fn other_desktop() -> PanelSetupStatus {
 /// companion's own attachment says it runs: `asking`, from the running VOCO,
 /// None when none answered. Without it, setup points to the page the snap's
 /// companion comes from.
-fn snap_status(desktop: &str, asking: Option<bool>) -> PanelSetupStatus {
+fn snap_status(desktop: &str, wayland: bool, asking: Option<bool>) -> PanelSetupStatus {
     if !crate::is_gnome_desktop(desktop) {
         return other_desktop();
     }
     match asking {
+        // On X11 the snap types with xdotool and grabs its own shortcut.
+        Some(false) if !wayland => PanelSetupStatus {
+            status: "optional".into(),
+            detail: "Optional: the VOCO panel adds live microphone bars and Stop to your top bar. Get it from extensions.gnome.org.".into(),
+            can_enable: false,
+            url: Some(COMPANION_PAGE.into()),
+        },
         Some(true) => PanelSetupStatus {
             status: "active".into(),
             detail: "Live panel bars and Stop are active.".into(),
@@ -130,7 +138,9 @@ fn snap_status(desktop: &str, asking: Option<bool>) -> PanelSetupStatus {
         },
         Some(false) => PanelSetupStatus {
             status: "extensions-site".into(),
-            detail: "Install the VOCO panel from extensions.gnome.org, then sign out and back in. The VOCO snap types through it.".into(),
+            // GNOME loads a first install from extensions.gnome.org at once; only an
+            // older copy already loaded waits for the next login.
+            detail: "The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it's already installed, sign out and back in.".into(),
             can_enable: false,
             url: Some(COMPANION_PAGE.into()),
         },
@@ -228,18 +238,34 @@ mod tests {
 
     #[test]
     fn the_snap_learns_its_companion_from_the_attachment_and_points_to_its_page() {
-        let missing = snap_status("ubuntu:GNOME", Some(false));
+        let missing = snap_status("ubuntu:GNOME", true, Some(false));
         assert_eq!(missing.status, "extensions-site");
         assert_eq!(missing.url.as_deref(), Some(COMPANION_PAGE));
         assert!(!missing.can_enable, "the snap can't enable an extension");
-        let active = snap_status("ubuntu:GNOME", Some(true));
+        // GNOME loads a first install at once; a sign-out is only for an older copy.
+        assert!(missing.detail.contains("setup continues by itself"));
+        assert!(missing
+            .detail
+            .contains("If it's already installed, sign out and back in."));
+        let active = snap_status("ubuntu:GNOME", true, Some(true));
         assert_eq!((active.status.as_str(), active.url), ("active", None));
+        // On X11 the snap types without the panel, which only adds bars and Stop.
+        let optional = snap_status("ubuntu:GNOME", false, Some(false));
+        assert_eq!(optional.status, "optional");
+        assert_eq!(optional.url.as_deref(), Some(COMPANION_PAGE));
+        assert!(optional.detail.starts_with("Optional:"));
+        assert_eq!(
+            snap_status("ubuntu:GNOME", false, Some(true)).status,
+            "active"
+        );
         // A check outside VOCO, with no VOCO to ask, claims neither.
-        let unknown = snap_status("ubuntu:GNOME", None);
+        let unknown = snap_status("ubuntu:GNOME", true, None);
         assert_eq!(unknown.status, "unavailable");
         assert!(unknown.detail.contains("Open VOCO, then check again"));
         for asking in [None, Some(false), Some(true)] {
-            assert_eq!(snap_status("KDE", asking).status, "other-desktop");
+            for wayland in [true, false] {
+                assert_eq!(snap_status("KDE", wayland, asking).status, "other-desktop");
+            }
         }
     }
 

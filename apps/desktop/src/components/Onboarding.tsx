@@ -100,17 +100,20 @@ export function Onboarding({ microphone, status, passed,
     <div className="voco-setup__status" role={problem || desktopSetupError ? "alert" : "status"}>
       <StatusMark state={state} /><span>{statusText}</span>
     </div>
-    {desktopSetupError ? <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details> : null}
-    {desktopSetupError && onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
-    {desktopSetupError && desktopSetupPanel ? <PanelSetup disabled={busy || blocked} /> : null}
+    {/* When the panel is the fix, its own step says so and offers it; the
+        details and the general guide would only repeat it. */}
+    {desktopSetupError && desktopSetupPanel ? <PanelSetup disabled={busy || blocked} /> : desktopSetupError ? <>
+      <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details>
+      {onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
+    </> : null}
     {testing ? <div className="voco-setup__transcript" role="region" aria-label="Test transcript" tabIndex={0}>
       {transcript && transcript !== "(no speech detected)" ? transcript : <span>Try saying “{suggestion}”</span>}
     </div> : null}
     {handoff ? <div className="voco-setup__handoff">
       {/* While the focused app also acts on the shortcut, as before a fresh install's panel loads at the next login, the fix comes first. */}
       {shortcutNote ? <PanelSetup disabled={busy || blocked} note={shortcutNote} /> : null}
-      <p>{shortcutNote ? "Then click" : "Click"} where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
-      <p>VOCO stays in your tray. You can reopen it from your app launcher.</p>
+      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
+      <p>VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher.</p>
       {shortcutNote ? null : <PanelSetup disabled={busy || blocked} />}
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}
     </div> : testing ? <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p> : null}

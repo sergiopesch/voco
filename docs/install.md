@@ -95,9 +95,15 @@ Install update. It is strictly confined, which decides where it can type:
 
 - **GNOME on Wayland:** through the
   [VOCO panel](https://extensions.gnome.org/extension/11710/voco/), which a snap
-  can't install. VOCO's setup opens its page: choose Install there, then sign out
-  and back in.
-- **X11 sessions:** with `xdotool`, without the panel.
+  can't install. VOCO's setup opens its page: choose Install there, and GNOME
+  asks you to confirm. The panel works at once and setup continues by itself.
+  The site's Install button needs GNOME's browser integration. Without it,
+  choose **Install without the website** in setup, copy its command into
+  Terminal and choose Install in GNOME's prompt. Or add the browser extension
+  the page offers, run `sudo apt install gnome-browser-connector`, and reload
+  the page.
+- **X11 sessions:** with `xdotool`. The panel is optional there: it adds live
+  microphone bars and Stop to the top bar.
 - **Other Wayland desktops:** it can't type, and setup says so. Use the Debian
   package or the RPM.
 

@@ -918,7 +918,7 @@ fn input_preflight() -> InputPreflight {
 }
 
 /// What the snap needs on GNOME Wayland before it can type.
-const SNAP_NEEDS_PANEL: &str = "On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in.";
+const SNAP_NEEDS_PANEL: &str = "On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it's already installed, sign out and back in.";
 /// On other Wayland desktops the snap can't type at all.
 const SNAP_DESKTOP_UNSUPPORTED: &str = "The VOCO snap types only on GNOME and in X11 sessions. On this desktop, install VOCO's .deb or RPM from its GitHub releases instead.";
 
