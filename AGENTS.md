@@ -382,6 +382,15 @@ and the update check. [The snap](#the-snap) lists its rules.
   reports `restart`, never a load error. GNOME loads a per-user copy of the
   UUID in place of the package's, so setup reports one whose `version-name`
   isn't the current one as `blocked`, naming its folder; it never removes it.
+- extensions.gnome.org reviews every upload. Upload the release's companion zip
+  there only when `version-name` changed, and follow its
+  [best practices](https://gjs.guide/extensions/review-guidelines/best-practices.html):
+  a small entry point, a class per job that cleans up what it creates, no
+  lifecycle flags, each timeout removed beside its re-creation, and Shell version
+  checks rather than optional calls on Shell APIs. The snap's VOCO and its
+  companion come from different stores and update separately, so a protocol
+  change keeps working with the companion published there and with the VOCO the
+  store serves until both have moved.
 - The diagnostics poll, the setup input check and the once-per-launch shortcut
   notice may reuse a companion check for up to 20 s, or 2 s after a failed or
   unavailable check. Attach, Detach, name loss and explicit enabling clear it;
@@ -552,9 +561,12 @@ and the update check. [The snap](#the-snap) lists its rules.
   (`VOCO_RELEASE_SNAP=1 scripts/assemble-release.sh`) and uploads it from the
   signing machine after the same checks as the packages, to `edge` first; hosted
   CI never builds VOCO's snap. Try it on Ubuntu 24.04 and the latest Ubuntu before promoting it past
-  `edge`. Ask the store to auto-connect `audio-record` and
-  `login-session-observe`; until it does, setup shows their `snap connect`
-  commands. On X11, where WebKit captures, `audio-record` connected after VOCO
+  `edge`. VOCO's snap declaration allows the `dbus` slot for
+  `com.sergiopesch.voco.Panel` and auto-connects `audio-record` and
+  `login-session-observe`, so an upload that asks for the same plugs and slot
+  passes the store's automated review; a new plug, slot or bus name needs a store
+  request first. Where they aren't connected, as after a `--dangerous` install,
+  setup shows their `snap connect` commands. On X11, where WebKit captures, `audio-record` connected after VOCO
   started needs a restart, and VOCO says so rather than open a microphone.
 
 ## Working practices
