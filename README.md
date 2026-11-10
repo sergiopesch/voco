@@ -48,6 +48,18 @@ earlier version, follow the [upgrade steps](docs/releases/2026.0.68.md#upgrade).
 For manual installation, verification and removal, see
 [Install VOCO](docs/install.md).
 
+On Ubuntu, VOCO is also in the App Center and the
+[Snap Store](https://snapcraft.io/voco), which keeps it up to date:
+
+```bash
+sudo snap install voco
+```
+
+The snap types on GNOME on Wayland, through the
+[VOCO panel](https://extensions.gnome.org/extension/11710/voco/) that its setup
+opens for you, and in X11 sessions. On other Wayland desktops, use the installer
+above. See [the snap](docs/install.md#snap-store) for what it leaves out.
+
 ## Your first dictation
 
 VOCO asks which English you write, runs a short voice test, then offers to
