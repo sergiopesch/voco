@@ -298,52 +298,80 @@ try {
     assert.equal((await handoff.innerText()).split('Sign out and back in').length, 2, 'The fix reads once');
     results.push({ case: 'enabling-the-panel-updates-the-shortcut-note', passed: true });
 
-    // The snap types on GNOME Wayland only through the companion, which it
-    // can't install: setup stops there and points to the companion's page.
-    const companionPage = 'https://extensions.gnome.org/extension/11710/voco/';
-    const needsPanel = 'On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it\'s already installed, sign out and back in.';
+    // The snap on GNOME Wayland types through GNOME's RemoteDesktop portal, which
+    // asks once, from the person's click: setup asks for that, then the shortcut,
+    // and never sends anyone outside VOCO and GNOME (AGENTS.md, Onboarding).
+    const needsTyping = 'VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME\'s dialog and choose Share.';
+    const portal = { applies: true, typingAllowed: false, panelAttached: false, shortcutPortal: true, shortcutBound: false, shortcutTrigger: null };
     await load({
-        desktopInput: { available: false, setupArea: 'panel', detail: needsPanel },
-        panel: { status: 'extensions-site', canEnable: false, url: companionPage,
-            detail: 'The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it\'s already installed, sign out and back in.' } });
+        desktopInput: { available: false, setupArea: 'portal', detail: needsTyping },
+        panel: { status: 'optional', canEnable: false, url: 'https://extensions.gnome.org/extension/11710/voco/',
+            detail: 'Optional: the VOCO panel adds live microphone bars and Stop to your top bar, and VOCO then types without GNOME\'s orange icon. Get it from extensions.gnome.org.' } });
+    await page.evaluate(status => {
+        window.portal = { ...status };
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portal });
+        // GNOME's dialog stays open until the test answers it.
+        window.nativeHandlers.allowPortalTyping = () => new Promise(resolve => { window.answerTyping = () => {
+            window.portal.typingAllowed = true; resolve({ ...window.portal }); }; });
+        window.nativeHandlers.allowPortalShortcut = () => new Promise(resolve => { window.answerShortcut = () => {
+            Object.assign(window.portal, { shortcutBound: true, shortcutTrigger: 'Press <Alt>d' }); resolve({ ...window.portal }); }; });
+    }, portal);
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     const setup = page.getByRole('region', { name: 'Voice setup' }).or(page.locator('.voco-setup'));
-    await setup.getByRole('button', { name: 'Get the VOCO panel', exact: true }).click();
-    await page.waitForFunction(url => window.calls.some(([name, target]) => name === 'openExternalUrl' && target === url), companionPage);
-    assert.equal(await setup.getByRole('button', { name: 'Enable live panel', exact: true }).count(), 0, 'The snap enables no extension');
-    assert.equal(await handoff.count(), 0, 'Setup stops until the snap can type');
-    assert.equal(await setup.getByText('Open setup instructions').count(), 0, 'The panel step is the only remedy');
-    // Without GNOME's browser integration the website can't install it; GNOME's
-    // own prompt can, from one copied Terminal command.
-    const installCommand = 'gdbus call --session --dest org.gnome.Shell.Extensions --object-path /org/gnome/Shell/Extensions --method org.gnome.Shell.Extensions.InstallRemoteExtension voco-panel@sergiopesch.com';
-    await setup.getByText('Install without the website', { exact: true }).click();
-    assert.equal(await setup.locator('.voco-panel-setup__terminal code').textContent(), installCommand);
-    await setup.getByRole('button', { name: 'Copy command', exact: true }).click();
-    await setup.getByText('Command copied.', { exact: true }).waitFor();
-    assert.ok(await page.evaluate(command => window.calls.some(([name, text]) => name === 'copyDesktopText' && text === command), installCommand));
-    await shot('setup-snap-panel-step');
-    results.push({ case: 'the-snap-points-to-the-companion-page', passed: true });
-
-    // GNOME loads a first install at once, the panel attaches, and the runtime
-    // poll finds desktop input ready: setup moves on with no click.
+    const permissions = setup.getByRole('group', { name: 'Typing and shortcut' });
+    await permissions.getByText('GNOME asks you once: turn on Allow Remote Interaction, then choose Share.', { exact: false }).waitFor();
+    assert.equal(await setup.getByRole('button', { name: 'Get the VOCO panel', exact: true }).count(), 0, 'Setup never asks for the panel');
+    assert.equal(await setup.getByText('extensions.gnome.org', { exact: false }).count(), 0, 'Nothing outside VOCO and GNOME');
+    assert.equal(await setup.getByText('Open setup instructions').count(), 0, 'GNOME\'s permission is the only remedy');
+    assert.equal(await handoff.count(), 0, 'Setup stops until GNOME lets VOCO type');
+    await shot('setup-snap-allow-typing');
+    await permissions.getByRole('button', { name: 'Allow typing', exact: true }).click();
+    await permissions.getByRole('button', { name: 'Waiting for GNOME…', exact: true }).waitFor();
+    await permissions.getByText('GNOME’s dialog is open. Turn on Allow Remote Interaction, then choose Share.', { exact: true }).waitFor();
+    // A second click while GNOME's dialog is open asks nothing more.
+    await permissions.getByRole('button', { name: 'Waiting for GNOME…', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.calls.filter(([name]) => name === 'allowPortalTyping').length), 1);
+    await shot('setup-snap-waiting-for-gnome');
+    // GNOME allowed it: setup checks desktop input again and moves on with no other click.
     await page.evaluate(() => {
-        const ready = { available: true, detail: '' };
-        const earlier = window.nativeHandlers.getRuntimeDiagnostics;
+        const ready = { available: true, detail: 'GNOME can keep Alt+D for VOCO, so the app you\'re dictating into never receives it. Choose Add Alt+D, then Add in GNOME\'s dialog.', setupArea: 'portal' };
         window.nativeHandlers.getDesktopInputStatus = () => ready;
-        window.nativeHandlers.getPanelSetupStatus = () => ({ status: 'active', canEnable: false, detail: 'Live panel bars and Stop are active.' });
-        window.nativeHandlers.getRuntimeDiagnostics = (args) => ({ ...(earlier ? earlier(args) : window.nativeCallDefaults?.getRuntimeDiagnostics),
+        const earlier = window.nativeHandlers.getRuntimeDiagnostics;
+        window.nativeHandlers.getRuntimeDiagnostics = (args) => ({ ...(earlier ? earlier(args) : {}),
             sessionType: 'wayland', typeSimulation: { available: true, missingCommands: [] }, clipboard: { available: true, missingCommands: [] },
             ibusShortcut: { setupState: 'not-installed', available: false }, desktopInput: ready,
-            desktopPaste: { enabled: true, available: true, detail: '' }, shortcut: { hotkey: 'Alt+D', route: 'gnome_panel', state: 'available', detail: '' } });
-        window.callsBeforeAttach = window.calls.length;
+            desktopPaste: { enabled: true, available: true, detail: '' }, shortcut: { hotkey: 'Alt+D', route: 'gnome_portal', state: 'available', detail: '' } });
+        window.answerTyping();
     });
     await handoff.waitFor({ timeout: 5000 });
     await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
-    await handoff.getByText('Live panel bars and Stop are active.', { exact: true }).waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Get the VOCO panel', exact: true }).count(), 0, 'Nothing left to install');
-    assert.equal(await page.getByText('Desktop setup needs one more step.').count(), 0);
-    await shot('setup-snap-panel-attached');
-    results.push({ case: 'the-snap-continues-once-the-panel-attaches', passed: true });
+    // The shortcut comes next, in the same words: what GNOME shows, what to choose.
+    const handoffPermissions = handoff.getByRole('group', { name: 'Typing and shortcut' });
+    await handoffPermissions.getByText('VOCO can type into your apps.', { exact: false }).waitFor();
+    await handoffPermissions.getByText('GNOME asks you once: choose Add.', { exact: false }).waitFor();
+    assert.equal(await handoff.getByRole('button', { name: 'Get the VOCO panel', exact: true }).count(), 0, 'The handoff never asks for the panel');
+    await shot('setup-snap-add-shortcut');
+    await handoffPermissions.getByRole('button', { name: 'Add Alt+D', exact: true }).click();
+    await handoffPermissions.getByText('GNOME’s dialog is open. Choose Add.', { exact: true }).waitFor();
+    await page.evaluate(() => window.answerShortcut());
+    await handoffPermissions.getByText('starts and stops dictation. To change it, open GNOME Settings, then Apps, then VOCO.', { exact: false }).waitFor();
+    assert.equal(await handoffPermissions.locator('strong').last().textContent(), 'Alt+D', 'GNOME\'s trigger, as VOCO writes shortcuts');
+    await shot('setup-snap-ready');
+    results.push({ case: 'the-snap-asks-gnome-for-typing-then-the-shortcut', passed: true });
+
+    // GNOME refused: setup says so in its words and offers the button again.
+    await load({ desktopInput: { available: false, setupArea: 'portal', detail: needsTyping }, panel: { status: 'optional', canEnable: false, detail: 'Optional.' } });
+    await page.evaluate(status => {
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...status });
+        window.nativeHandlers.allowPortalTyping = () => Promise.reject('GNOME didn\'t allow VOCO to type. Choose Allow typing again, turn on Allow Remote Interaction, then choose Share.');
+    }, portal);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await page.getByRole('button', { name: 'Allow typing', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: 'GNOME didn\'t allow VOCO to type.' }).waitFor();
+    await page.getByRole('button', { name: 'Allow typing', exact: true }).waitFor();
+    assert.equal(await handoff.count(), 0, 'Setup stays until GNOME lets VOCO type');
+    await shot('setup-snap-typing-refused');
+    results.push({ case: 'a-refusal-keeps-the-step-and-offers-it-again', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();

@@ -74,6 +74,8 @@ export interface DictationRecordingEnv {
   getDesktopPasteStatus: () => Promise<DesktopPasteStatus>;
   pasteDesktopText: typeof pasteDesktopText;
   copyDesktopText: (text: string) => Promise<void>;
+  /** The snap opens its typing session with GNOME (portal_keys.rs). */
+  beginDesktopTyping?: () => Promise<void>;
   traceDictationEvent: (event: string, fields?: HotkeyTraceFields | null) => Promise<void>;
   showNotification: (title: string, body: string) => Promise<void>;
   setStatus: (status: DictationStatus) => void;
@@ -133,6 +135,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     getDesktopPasteStatus,
     pasteDesktopText,
     copyDesktopText,
+    beginDesktopTyping,
     traceDictationEvent,
     showNotification,
     setStatus,
@@ -359,6 +362,9 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           throw new Error("Streaming dictation is disabled in the desktop environment.");
         }
         desktopPasteSessionRef.current = true;
+        // The snap opens its typing session with GNOME now, well before the
+        // first words; returning to idle closes it.
+        void beginDesktopTyping?.().catch(() => {});
         traceDictationEvent("dictation_desktop_paste_session_started").catch(() => {});
       }
       if (!localTest && !isBrowserTrigger(triggerId) && !desktopPasteSessionRef.current) {

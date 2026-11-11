@@ -1064,6 +1064,16 @@ fn get_runtime_diagnostics(
     }
 }
 
+#[cfg(target_os = "linux")]
+fn portal_shortcut_holds() -> bool {
+    portal_shortcut::holds()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn portal_shortcut_holds() -> bool {
+    false
+}
+
 fn shortcut_runtime_status(
     bridge_available: bool,
     panel_reserved: bool,
@@ -1107,6 +1117,7 @@ fn shortcut_runtime_status(
         configured_preset: Preset::of(&config.hotkey),
         bridge_available,
         panel_reserved,
+        portal_bound: portal_shortcut_holds(),
     })
 }
 

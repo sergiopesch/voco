@@ -90,6 +90,35 @@ export function getPanelSetupStatus(): Promise<PanelSetupStatus> {
 export function enableGnomePanel(): Promise<PanelSetupStatus> {
   return invoke("enable_gnome_panel");
 }
+/** The snap's GNOME portals (AGENTS.md): typing through RemoteDesktop and the
+ * shortcut through GlobalShortcuts, each allowed once in GNOME's dialog. */
+export interface PortalSetupStatus {
+  /** The snap on GNOME Wayland, where these portals apply. */
+  applies: boolean;
+  typingAllowed: boolean;
+  /** The VOCO panel types and holds the shortcut instead. */
+  panelAttached: boolean;
+  /** This GNOME has the shortcut portal (GNOME 48 and later). */
+  shortcutPortal: boolean;
+  shortcutBound: boolean;
+  /** GNOME's description of the trigger, such as "Press <Alt>d". */
+  shortcutTrigger: string | null;
+}
+export function getPortalSetupStatus(): Promise<PortalSetupStatus> {
+  return invoke("get_portal_setup_status");
+}
+/** Opens GNOME's typing dialog and waits for the answer; rejects with why not. */
+export function allowPortalTyping(): Promise<PortalSetupStatus> {
+  return invoke("allow_portal_typing");
+}
+/** Opens GNOME's shortcut dialog and waits for the answer; rejects with why not. */
+export function allowPortalShortcut(): Promise<PortalSetupStatus> {
+  return invoke("allow_portal_shortcut");
+}
+/** A desktop dictation starts: the snap opens its typing session with GNOME. */
+export function beginDesktopTyping(): Promise<void> {
+  return invoke("begin_desktop_typing");
+}
 export function takeLauncherActivation(): Promise<boolean> {
   return invoke("take_launcher_activation");
 }
@@ -120,8 +149,9 @@ export interface DesktopPasteMetrics {
    * didn't within the wait, "unobserved" where the helpers can't tell. */
   selectionRead: "clipboard" | "primary" | "none" | "unobserved";
   selectionReadMs: number | null;
-  /** Which keyboard sent the keys: the GNOME companion, VOCO's uinput device or xdotool. */
-  pasteKeys: "companion" | "uinput" | "xdotool";
+  /** Which keyboard sent the keys: the GNOME companion, VOCO's uinput device,
+   * GNOME's RemoteDesktop portal (the snap) or xdotool. */
+  pasteKeys: "companion" | "uinput" | "portal" | "xdotool";
 }
 
 /** Pastes into whatever has focus now; rejects with an InsertionError. */

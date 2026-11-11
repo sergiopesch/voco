@@ -123,10 +123,16 @@ fn snap_status(desktop: &str, wayland: bool, asking: Option<bool>) -> PanelSetup
         return other_desktop();
     }
     match asking {
-        // On X11 the snap types with xdotool and grabs its own shortcut.
-        Some(false) if !wayland => PanelSetupStatus {
+        // The snap types without it, through GNOME's portal on Wayland and
+        // xdotool on X11; the panel only adds its meter and Stop.
+        Some(false) => PanelSetupStatus {
             status: "optional".into(),
-            detail: "Optional: the VOCO panel adds live microphone bars and Stop to your top bar. Get it from extensions.gnome.org.".into(),
+            detail: if wayland {
+                "Optional: the VOCO panel adds live microphone bars and Stop to your top bar, and VOCO then types without GNOME's orange icon. Get it from extensions.gnome.org."
+            } else {
+                "Optional: the VOCO panel adds live microphone bars and Stop to your top bar. Get it from extensions.gnome.org."
+            }
+            .into(),
             can_enable: false,
             url: Some(COMPANION_PAGE.into()),
         },
@@ -135,14 +141,6 @@ fn snap_status(desktop: &str, wayland: bool, asking: Option<bool>) -> PanelSetup
             detail: "Live panel bars and Stop are active.".into(),
             can_enable: false,
             url: None,
-        },
-        Some(false) => PanelSetupStatus {
-            status: "extensions-site".into(),
-            // GNOME loads a first install from extensions.gnome.org at once; only an
-            // older copy already loaded waits for the next login.
-            detail: "The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it's already installed, sign out and back in.".into(),
-            can_enable: false,
-            url: Some(COMPANION_PAGE.into()),
         },
         // Only `voco --check-panel` asks while no VOCO runs.
         None => PanelSetupStatus {
@@ -237,23 +235,20 @@ mod tests {
     }
 
     #[test]
-    fn the_snap_learns_its_companion_from_the_attachment_and_points_to_its_page() {
-        let missing = snap_status("ubuntu:GNOME", true, Some(false));
-        assert_eq!(missing.status, "extensions-site");
-        assert_eq!(missing.url.as_deref(), Some(COMPANION_PAGE));
-        assert!(!missing.can_enable, "the snap can't enable an extension");
-        // GNOME loads a first install at once; a sign-out is only for an older copy.
-        assert!(missing.detail.contains("setup continues by itself"));
-        assert!(missing
+    fn the_snap_learns_its_companion_from_the_attachment_and_offers_it_as_optional() {
+        // The snap types through GNOME's portal without it (AGENTS.md).
+        for wayland in [true, false] {
+            let missing = snap_status("ubuntu:GNOME", wayland, Some(false));
+            assert_eq!(missing.status, "optional");
+            assert_eq!(missing.url.as_deref(), Some(COMPANION_PAGE));
+            assert!(!missing.can_enable, "the snap can't enable an extension");
+            assert!(missing.detail.starts_with("Optional:"));
+        }
+        assert!(snap_status("ubuntu:GNOME", true, Some(false))
             .detail
-            .contains("If it's already installed, sign out and back in."));
+            .contains("without GNOME's orange icon"));
         let active = snap_status("ubuntu:GNOME", true, Some(true));
         assert_eq!((active.status.as_str(), active.url), ("active", None));
-        // On X11 the snap types without the panel, which only adds bars and Stop.
-        let optional = snap_status("ubuntu:GNOME", false, Some(false));
-        assert_eq!(optional.status, "optional");
-        assert_eq!(optional.url.as_deref(), Some(COMPANION_PAGE));
-        assert!(optional.detail.starts_with("Optional:"));
         assert_eq!(
             snap_status("ubuntu:GNOME", false, Some(true)).status,
             "active"

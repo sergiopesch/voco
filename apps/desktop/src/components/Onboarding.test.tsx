@@ -94,18 +94,25 @@ it("reaches the words step before desktop setup is ready, and checks it before D
   expect(last).not.toContain("Test again");
 });
 
-it("offers only the panel when the panel is what desktop setup needs", () => {
+it("offers only the panel or GNOME's permissions when that is what desktop setup needs", () => {
   const props = {
     microphone: "System default", status: "idle" as const, passed: false, failed: false, attempted: false,
     setupError: null, checkingDesktopSetup: false, preparing: false, saving: false, blocked: false,
     hotkey: "Alt+D", desktopReady: false, onStart: vi.fn(), onStop: vi.fn(), onFinish: vi.fn(async () => {}),
     onOpenDesktopSetupGuide: vi.fn(),
   };
-  // The snap on GNOME Wayland without its panel: one step, the panel's own.
-  const snap = renderToStaticMarkup(<Onboarding {...props} desktopSetupPanel
-    desktopSetupError="On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, then sign out and back in." />);
-  expect(snap).toContain("Desktop setup needs one more step.");
-  expect(snap).toContain("Panel setup");
+  // A package on GNOME whose fix is the panel: one step, the panel's own.
+  const panel = renderToStaticMarkup(<Onboarding {...props} desktopSetupArea="panel"
+    desktopSetupError="Enable the VOCO panel, then sign out and back in." />);
+  expect(panel).toContain("Desktop setup needs one more step.");
+  expect(panel).toContain("Panel setup");
+  expect(panel).not.toContain("Open setup instructions");
+  expect(panel).not.toContain("<summary>Details</summary>");
+  // The snap on GNOME Wayland: GNOME's own permissions, never the panel.
+  const snap = renderToStaticMarkup(<Onboarding {...props} desktopSetupArea="portal" storeSetup
+    desktopSetupError="VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME's dialog and choose Share." />);
+  expect(snap).toContain("Typing and shortcut");
+  expect(snap).not.toContain("Panel setup");
   expect(snap).not.toContain("Open setup instructions");
   expect(snap).not.toContain("<summary>Details</summary>");
   // Any other desktop setup problem keeps its details and the guide.

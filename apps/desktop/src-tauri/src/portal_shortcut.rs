@@ -313,6 +313,12 @@ fn close() {
     }
 }
 
+/// GNOME's portal holds VOCO's chord now.
+pub fn holds() -> bool {
+    let state = shortcut();
+    state.session.is_some() && !state.suspended
+}
+
 /// The companion's lease holds the chord: release the portal's grab.
 pub fn suspend() {
     let was = std::mem::replace(&mut shortcut().suspended, true);
