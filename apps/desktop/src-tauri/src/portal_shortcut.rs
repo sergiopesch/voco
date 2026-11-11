@@ -20,8 +20,10 @@ const BOUND_FILE: &str = "global-shortcut";
 const DIALOG_TIMEOUT: Duration = Duration::from_secs(300);
 /// A rebind GNOME already allowed answers at once.
 const REBIND_TIMEOUT: Duration = Duration::from_secs(30);
-/// A paste never waits on a press longer than this (AGENTS.md, Delivery).
-const HELD_LIMIT: Duration = Duration::from_millis(1_500);
+/// A press GNOME hasn't reported released after this long reads as unknown, so
+/// a lost `Deactivated` can't hold back every paste. Below it a press is held:
+/// the paste's own 1.5 s wait then sends no keys (AGENTS.md, Delivery).
+const STALE_PRESS: Duration = Duration::from_secs(5);
 /// After the shortcut's release, time for its modifier's own release.
 const MODIFIER_GRACE: Duration = Duration::from_millis(150);
 
@@ -470,10 +472,11 @@ pub fn resume() {
     rebind(accelerator);
 }
 
-/// Through the portal VOCO can't read modifiers, so a paste waits while the
-/// last press hasn't been released, at most 1.5 s after it, then 150 ms after
-/// the release for the modifier's own (AGENTS.md, Delivery). Unknown without a
-/// portal press.
+/// Through the portal VOCO can't read modifiers, so a press is held until
+/// GNOME's `Deactivated`, then 150 ms for the modifier's own release
+/// (AGENTS.md, Delivery). Keys sent while Super or Alt is down make another
+/// chord, which pastes nothing, so a paste that outwaits its bound sends none.
+/// Unknown without a portal press, or once a press is stale.
 pub fn keys_held() -> Option<bool> {
     let command = *COMMAND_PRESS
         .lock()
@@ -484,18 +487,16 @@ pub fn keys_held() -> Option<bool> {
     let state = shortcut();
     state.session.as_ref()?;
     let pressed = state.pressed?;
-    Some(held(pressed, state.released, Instant::now()))
+    held(pressed, state.released, Instant::now())
 }
 
-fn held(pressed: Instant, released: Option<Instant>, now: Instant) -> bool {
-    if now.saturating_duration_since(pressed) >= HELD_LIMIT {
-        return false;
-    }
+fn held(pressed: Instant, released: Option<Instant>, now: Instant) -> Option<bool> {
     match released {
         Some(released) if released >= pressed => {
-            now.saturating_duration_since(released) < MODIFIER_GRACE
+            Some(now.saturating_duration_since(released) < MODIFIER_GRACE)
         }
-        _ => true,
+        _ if now.saturating_duration_since(pressed) >= STALE_PRESS => None,
+        _ => Some(true),
     }
 }
 
@@ -536,19 +537,36 @@ mod tests {
     fn a_paste_waits_for_the_release_then_the_modifier_grace() {
         let pressed = Instant::now();
         let at = |ms| pressed + Duration::from_millis(ms);
-        assert!(held(pressed, None, at(100)), "still pressed");
-        assert!(
+        assert_eq!(held(pressed, None, at(100)), Some(true), "still pressed");
+        assert_eq!(
             held(pressed, Some(at(200)), at(300)),
+            Some(true),
             "within the modifier grace"
         );
-        assert!(!held(pressed, Some(at(200)), at(351)), "after the grace");
-        assert!(
-            !held(pressed, None, at(1_500)),
-            "never past 1.5 s from the press"
+        assert_eq!(
+            held(pressed, Some(at(200)), at(351)),
+            Some(false),
+            "after the grace"
         );
-        assert!(
-            !held(pressed, Some(at(1_400)), at(1_500)),
-            "the limit wins over the grace"
+        assert_eq!(
+            held(pressed, None, at(2_000)),
+            Some(true),
+            "a long hold stays held, so the paste's wait sends no keys"
+        );
+        assert_eq!(
+            held(pressed, Some(at(2_000)), at(2_100)),
+            Some(true),
+            "a long hold's release still gets the grace"
+        );
+        assert_eq!(
+            held(pressed, None, at(5_000)),
+            None,
+            "a press never reported released reads as unknown"
+        );
+        assert_eq!(
+            held(at(500), Some(at(400)), at(600)),
+            Some(true),
+            "an earlier release doesn't end a newer press"
         );
     }
 }

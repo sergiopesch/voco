@@ -1422,6 +1422,8 @@ fn renderer_replaced(app: &tauri::AppHandle) {
         log::warn!("Renderer crash recovery could not be prepared: {error}");
     }
     native_capture_commands::reset_renderer();
+    #[cfg(target_os = "linux")]
+    portal_keys::renderer_replaced();
     let browser = app.try_state::<BrowserIntegration>();
     if let Some(broker) = browser.as_ref().and_then(|browser| browser.0.as_ref()) {
         broker.renderer_replaced();

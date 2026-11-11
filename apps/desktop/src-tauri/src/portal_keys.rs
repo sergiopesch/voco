@@ -259,6 +259,13 @@ pub fn note_dictating(dictating: bool) {
     }
 }
 
+/// The renderer was replaced (AGENTS.md, Delivery): the dictation it ran
+/// ended with no status saying so, so the session closes now.
+pub fn renderer_replaced() {
+    DICTATING.store(false, Ordering::SeqCst);
+    end();
+}
+
 /// Closes a session that has stayed open while VOCO was idle for two checks
 /// in a row, as after a dictation that failed before its status changed, so
 /// GNOME's icon never stays up. Portal thread only.
@@ -463,6 +470,19 @@ pub fn allow() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_replaced_renderer_ends_the_dictation_and_its_session() {
+        note_dictating(true);
+        let before = typing().generation;
+        renderer_replaced();
+        assert!(!DICTATING.load(Ordering::SeqCst));
+        assert!(
+            typing().generation > before,
+            "a session opening now is closed"
+        );
+        assert!(typing().session.is_none());
+    }
 
     #[test]
     fn messages_say_what_to_do() {

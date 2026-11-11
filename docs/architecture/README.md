@@ -510,7 +510,8 @@ each later Start returns a new one, which replaces it. The renderer calls
 `begin_desktop_typing` when a desktop dictation starts, which opens a session
 from the token in the background (8–90 ms on GNOME 50), and
 `update_runtime_status` closes it when the dictation status returns to idle,
-after Stop's last paste and space; the lock watch and exit close it too. GNOME
+after Stop's last paste and space; the lock watch, a replaced renderer and exit
+close it too. GNOME
 shows its orange remote-access icon while a session exists. Its Stop closes the
 session: the `Closed` signal clears it and sends the tray's stop request, so the
 dictation ends as Stop does and copies the rest. A paste sends Shift, Insert
@@ -524,8 +525,10 @@ GNOME answers without a dialog. `Activated` toggles through
 `eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
 trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
 Super+X. Modifiers can't be
-read through the portal, so `keys_held` holds a paste until `Deactivated`, at
-most 1.5 s after the press, then 150 ms more. The companion's `ReserveShortcut`
+read through the portal, so `keys_held` counts a press as held until
+`Deactivated`, then 150 ms more, and the paste's usual 1.5 s wait sends no keys
+while it is held: keys under Super or Alt make another chord and paste nothing.
+A press with no `Deactivated` after 5 s reads as unknown. The companion's `ReserveShortcut`
 suspends the portal session and its release binds again, so one grab holds the
 chord.
 

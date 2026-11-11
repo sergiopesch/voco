@@ -238,9 +238,12 @@ and the update check. [The snap](#the-snap) lists its rules.
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press. Through the RemoteDesktop portal VOCO can't read modifiers, so
-  after a portal shortcut press a paste waits for its `Deactivated`, at most 1.5 s
-  after the press, then 150 ms for the modifier's own release; after a
-  `voco --toggle` in the snap, which reports no release, it waits 400 ms. An X11 paste also waits, at most 1.5 s, while the X server's
+  a portal shortcut press counts as held until its `Deactivated`, then 150 ms
+  for the modifier's own release, and the same 1.5 s wait sends no keys while
+  it is: keys sent under Super or Alt make another chord, which pastes nothing.
+  A press with no `Deactivated` after 5 s reads as unknown, so a lost signal
+  can't hold back every paste. After a `voco --toggle` in the snap, which
+  reports no release, a paste waits 400 ms. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
