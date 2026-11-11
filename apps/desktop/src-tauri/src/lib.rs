@@ -61,12 +61,22 @@ pub fn toggle_running_application() -> Result<(), String> {
     })
 }
 #[cfg(target_os = "linux")]
+mod gnome_custom_shortcut;
+#[cfg(target_os = "linux")]
 mod panel;
+#[cfg(target_os = "linux")]
+mod portal;
+#[cfg(all(test, target_os = "linux"))]
+mod portal_fixture;
+#[cfg(target_os = "linux")]
+mod portal_keys;
+#[cfg(target_os = "linux")]
+mod portal_shortcut;
 mod tray;
 
 use config::{
     load_cached_update_check, save_cached_update_check, AppConfig, AppConfigPatch,
-    CachedUpdateCheck,
+    CachedUpdateCheck, DEFAULT_HOTKEY,
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -84,7 +94,7 @@ static RENDERER_EPOCH: AtomicU64 = AtomicU64::new(1);
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
 
 // The evdev listener's preset, encoded by `Preset::encode`; a custom shortcut disables it.
-static EVDEV_PRESET: AtomicU8 = AtomicU8::new(Preset::AltD as u8);
+static EVDEV_PRESET: AtomicU8 = AtomicU8::new(Preset::SuperX as u8);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
 static SHORTCUT_OBSERVATIONS: LazyLock<shortcut_readiness::Observations> =
     LazyLock::new(shortcut_readiness::Observations::default);
@@ -384,16 +394,24 @@ fn has_pending_hotkey_toggle() -> bool {
         .unwrap_or(false)
 }
 
-/// The two shortcuts passive Wayland evdev observes and the GNOME companion grabs,
-/// in tray menu order. Every other shortcut is custom.
+/// The shortcuts passive Wayland evdev observes and the GNOME companion grabs,
+/// in tray menu order, the default first. Every other shortcut is custom.
+///
+/// Super+X is the default (`config::DEFAULT_HOTKEY`) because a grab that takes
+/// only an Alt chord's letter, as the companion's and GNOME's shortcut portal
+/// do, leaves apps seeing Alt pressed and released alone. Firefox, Thunderbird,
+/// LibreOffice and Electron editors then open their menu bar, which swallows the
+/// Shift+Insert pastes that follow. A lone Super opens nothing in an app, and
+/// mutter doesn't open the overview once it has seen the X.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Preset {
+    SuperX,
     AltD,
     AltShiftD,
 }
 
 impl Preset {
-    const ALL: [Self; 2] = [Self::AltD, Self::AltShiftD];
+    const ALL: [Self; 3] = [Self::SuperX, Self::AltD, Self::AltShiftD];
 
     /// The preset a shortcut names, in any spelling the parser accepts.
     fn of(hotkey: &str) -> Option<Self> {
@@ -410,6 +428,7 @@ impl Preset {
 
     fn label(self) -> &'static str {
         match self {
+            Self::SuperX => "Super+X",
             Self::AltD => "Alt+D",
             Self::AltShiftD => "Alt+Shift+D",
         }
@@ -419,15 +438,10 @@ impl Preset {
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     fn accelerator(self) -> &'static str {
         match self {
+            Self::SuperX => "<Super>x",
             Self::AltD => "<Alt>d",
             Self::AltShiftD => "<Alt><Shift>d",
         }
-    }
-
-    /// Whether the chord holds Shift; evdev matches the Shift state exactly.
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-    fn shift(self) -> bool {
-        self == Self::AltShiftD
     }
 
     /// A preset is stored as its position in ALL; anything else means custom.
@@ -656,6 +670,12 @@ fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, Str
     })?;
     let config = AppConfig::reset_to_defaults()
         .map_err(|error| restore_hotkey(&previous_hotkey, error.to_string(), rebind))?;
+    // GNOME's permissions go with the settings; setup asks for them again.
+    #[cfg(target_os = "linux")]
+    {
+        portal_keys::forget();
+        portal_shortcut::forget();
+    }
     Ok(publish_config(&app, config, "recovered"))
 }
 
@@ -841,10 +861,133 @@ fn with_panel_recommendation(
     if input.available {
         if let Some(detail) = stop_shortcut_setup_issue(app) {
             input.detail = detail;
-            input.setup_area = Some("panel");
+            input.setup_area = Some(shortcut_setup_area(app));
         }
     }
     input
+}
+
+/// Where setup fixes the shortcut: GNOME's portal in the snap, else the panel.
+fn shortcut_setup_area(app: &tauri::AppHandle) -> &'static str {
+    #[cfg(target_os = "linux")]
+    if portal_keys::applies() && !panel::reserves_current_shortcut(app) {
+        return "portal";
+    }
+    let _ = app;
+    "panel"
+}
+
+/// The snap's shortcut on GNOME Wayland: None once GNOME's portal holds it.
+#[cfg(target_os = "linux")]
+fn portal_shortcut_issue(hotkey: &str) -> Option<String> {
+    if portal_shortcut::custom_applies() {
+        return (!portal_shortcut::custom_present(hotkey)).then(|| format!(
+            "{hotkey} doesn't reach VOCO yet. Choose Add {hotkey}, and VOCO adds it to GNOME's keyboard shortcuts."
+        ));
+    }
+    if portal_shortcut::bound() {
+        return None;
+    }
+    Some(if portal_shortcut::available() {
+        format!("GNOME can keep {hotkey} for VOCO, so the app you're dictating into never receives it. Choose Add {hotkey}, then Add in GNOME's dialog.")
+    } else {
+        format!("{hotkey} doesn't reach VOCO yet. In GNOME Settings, under Keyboard, add a custom shortcut for {hotkey} that runs voco --toggle.")
+    })
+}
+
+/// What the snap's portal setup shows: whether GNOME lets VOCO type, and
+/// whether it holds VOCO's shortcut.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PortalSetupStatus {
+    /// The snap on GNOME Wayland, where these portals apply.
+    applies: bool,
+    typing_allowed: bool,
+    /// The companion types instead.
+    panel_attached: bool,
+    /// The companion also holds the saved chord. A companion before version
+    /// 23 holds only Alt chords, so with Super+X GNOME's portal still must.
+    panel_holds_shortcut: bool,
+    /// This GNOME has the GlobalShortcuts portal (48 and later).
+    shortcut_portal: bool,
+    /// Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead.
+    shortcut_custom: bool,
+    shortcut_bound: bool,
+    /// GNOME's description of the trigger, such as "Press <Alt>d".
+    shortcut_trigger: Option<String>,
+}
+
+#[cfg(target_os = "linux")]
+fn portal_setup_status(app: &tauri::AppHandle, hotkey: &str) -> PortalSetupStatus {
+    let applies = portal_keys::applies();
+    let shortcut_portal = applies && portal_shortcut::available();
+    let shortcut_custom = applies && !shortcut_portal && portal_shortcut::custom_applies();
+    PortalSetupStatus {
+        applies,
+        typing_allowed: applies && portal_keys::allowed(),
+        panel_attached: panel::is_attached(),
+        panel_holds_shortcut: panel::reserves_current_shortcut(app),
+        shortcut_portal,
+        shortcut_custom,
+        // GNOME Settings can remove a custom shortcut, so ask GNOME, not the record.
+        shortcut_bound: if shortcut_custom {
+            portal_shortcut::custom_present(hotkey)
+        } else {
+            applies && portal_shortcut::bound()
+        },
+        shortcut_trigger: portal_shortcut::trigger(),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn portal_setup_status(_app: &tauri::AppHandle, _hotkey: &str) -> PortalSetupStatus {
+    PortalSetupStatus {
+        applies: false,
+        typing_allowed: false,
+        panel_attached: false,
+        panel_holds_shortcut: false,
+        shortcut_portal: false,
+        shortcut_custom: false,
+        shortcut_bound: false,
+        shortcut_trigger: None,
+    }
+}
+
+fn configured_or_default_hotkey(app: &tauri::AppHandle) -> String {
+    tray::current_hotkey(app).unwrap_or_else(|_| DEFAULT_HOTKEY.into())
+}
+
+#[tauri::command(async)]
+fn get_portal_setup_status(app: tauri::AppHandle) -> PortalSetupStatus {
+    portal_setup_status(&app, &configured_or_default_hotkey(&app))
+}
+
+/// Setup's and Settings' Allow typing: GNOME shows its dialog once.
+#[tauri::command(async)]
+fn allow_portal_typing(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
+    #[cfg(target_os = "linux")]
+    portal_keys::allow()?;
+    Ok(portal_setup_status(
+        &app,
+        &configured_or_default_hotkey(&app),
+    ))
+}
+
+/// Setup's and Settings' shortcut button: GNOME shows its dialog once.
+#[tauri::command(async)]
+fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
+    let hotkey = configured_or_default_hotkey(&app);
+    #[cfg(target_os = "linux")]
+    portal_shortcut::allow(&hotkey)?;
+    Ok(portal_setup_status(&app, &hotkey))
+}
+
+/// A desktop dictation starts: open the snap's typing session, if it types
+/// through GNOME's portal. Its end closes when VOCO returns to idle.
+#[tauri::command]
+fn begin_desktop_typing() {
+    #[cfg(target_os = "linux")]
+    portal_keys::begin();
 }
 
 #[tauri::command(async)]
@@ -867,8 +1010,15 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 }
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
-    let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| "Alt+D".into());
+    let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| DEFAULT_HOTKEY.into());
     let preset = wayland_preset(is_wayland_session(), &hotkey)?;
+    // The snap holds its chord through GNOME's shortcut portal instead, unless
+    // the companion holds it: one attached before version 23 grabs only Alt
+    // chords, so attachment alone doesn't hold Super+X.
+    #[cfg(target_os = "linux")]
+    if portal_keys::applies() && !panel::reserves_current_shortcut(app) {
+        return portal_shortcut_issue(preset.label());
+    }
     panel_setup::stop_shortcut_setup_detail(
         preset.label(),
         panel_setup::cached_check(),
@@ -951,6 +1101,16 @@ fn get_runtime_diagnostics(
     }
 }
 
+#[cfg(target_os = "linux")]
+fn portal_shortcut_holds() -> bool {
+    portal_shortcut::holds()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn portal_shortcut_holds() -> bool {
+    false
+}
+
 fn shortcut_runtime_status(
     bridge_available: bool,
     panel_reserved: bool,
@@ -994,6 +1154,7 @@ fn shortcut_runtime_status(
         configured_preset: Preset::of(&config.hotkey),
         bridge_available,
         panel_reserved,
+        portal_bound: portal_shortcut_holds(),
     })
 }
 
@@ -1261,6 +1422,8 @@ fn renderer_replaced(app: &tauri::AppHandle) {
         log::warn!("Renderer crash recovery could not be prepared: {error}");
     }
     native_capture_commands::reset_renderer();
+    #[cfg(target_os = "linux")]
+    portal_keys::renderer_replaced();
     let browser = app.try_state::<BrowserIntegration>();
     if let Some(broker) = browser.as_ref().and_then(|browser| browser.0.as_ref()) {
         broker.renderer_replaced();
@@ -1457,6 +1620,38 @@ fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bo
     false
 }
 
+/// GNOME Settings changed the snap's shortcut (portal_shortcut.rs): VOCO's
+/// config follows, off the portal thread. A trigger VOCO can't take is logged
+/// and left alone.
+#[cfg(target_os = "linux")]
+pub(crate) fn follow_gnome_shortcut(app_handle: &tauri::AppHandle, hotkey: String) {
+    let app = app_handle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if tray::current_hotkey(&app).is_ok_and(|current| current == hotkey) {
+            return;
+        }
+        let patch = config::AppConfigPatch {
+            hotkey: config::PatchField::Set(hotkey.clone()),
+            ..Default::default()
+        };
+        if let Err(error) = persist_config_patch(&app, patch, false) {
+            warn!("VOCO's shortcut didn't follow GNOME's {hotkey}: {error}");
+        }
+    });
+}
+
+/// A press of the snap's GNOME shortcut (portal_shortcut.rs), from the portal
+/// thread: toggle on GTK's thread, as every other route does.
+#[cfg(target_os = "linux")]
+pub(crate) fn toggle_from_portal(app_handle: &tauri::AppHandle) {
+    let app = app_handle.clone();
+    if let Err(error) = app_handle.run_on_main_thread(move || {
+        eval_toggle_with_backend(&app, "gnome_portal");
+    }) {
+        error!("Could not toggle from GNOME's shortcut: {error}");
+    }
+}
+
 fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
     if let Err(e) = app_handle.emit_to("main", TOGGLE_DICTATION_EVENT, ()) {
         error!("Failed to emit toggle event: {e}");
@@ -1576,9 +1771,9 @@ struct ConfiguredHotkey {
 
 fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
     let error = validate_dictation_hotkey(&config.hotkey).err()?;
-    let invalid_hotkey = std::mem::replace(&mut config.hotkey, "Alt+D".to_string());
+    let invalid_hotkey = std::mem::replace(&mut config.hotkey, DEFAULT_HOTKEY.to_string());
     Some(format!(
-        "Your shortcut '{invalid_hotkey}' was reset to Alt+D: {error}"
+        "Your shortcut '{invalid_hotkey}' was reset to {DEFAULT_HOTKEY}: {error}"
     ))
 }
 
@@ -1587,7 +1782,7 @@ fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
 fn configured_hotkey() -> ConfiguredHotkey {
     let Ok(mut config) = AppConfig::load() else {
         return ConfiguredHotkey {
-            hotkey: "Alt+D".to_string(),
+            hotkey: DEFAULT_HOTKEY.to_string(),
             notice: Some((
                 "Dictation paused",
                 "VOCO could not load your settings. Open VOCO to fix them.".to_string(),
@@ -1600,7 +1795,7 @@ fn configured_hotkey() -> ConfiguredHotkey {
         Err(error) => (
             "Dictation paused",
             format!(
-                "VOCO could not reset your shortcut '{invalid_hotkey}' to Alt+D ({error}). Open VOCO to fix your settings."
+                "VOCO could not reset your shortcut '{invalid_hotkey}' to {DEFAULT_HOTKEY} ({error}). Open VOCO to fix your settings."
             ),
         ),
     });
@@ -1807,6 +2002,12 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                         }
                         debug!("Toggle received via socket");
                         trace_hotkey_event("socket_toggle_received", Some("socket"));
+                        // In the snap a GNOME custom shortcut sends this, with no
+                        // release to wait for (portal_shortcut.rs).
+                        #[cfg(target_os = "linux")]
+                        if confinement::is_snap() {
+                            portal_shortcut::note_command_press();
+                        }
                         eval_toggle_with_backend(&handle, "socket");
                     }
                     Err(error) => {
@@ -1843,12 +2044,9 @@ fn supports_evdev_hotkey_parts(
     if name.map(is_ignored_evdev_device_name).unwrap_or(false) {
         return false;
     }
-    let Some(keys) = keys else {
-        return false;
-    };
-    let has_alt =
-        keys.contains(evdev::KeyCode::KEY_LEFTALT) || keys.contains(evdev::KeyCode::KEY_RIGHTALT);
-    has_alt && keys.contains(evdev::KeyCode::KEY_D)
+    // A shortcut change never reopens devices, so watch any keyboard that can
+    // type one of the presets; each preset counts only its own.
+    keys.is_some_and(|keys| !hotkey_state::typable_presets(keys.iter()).is_empty())
 }
 
 #[cfg(target_os = "linux")]
@@ -1903,7 +2101,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
         let mut reopen_logged = false;
 
         loop {
-            let (mut dev, shift) = match RawDevice::open(&path) {
+            let (mut dev, typable) = match RawDevice::open(&path) {
                 Ok(device) => {
                     // event paths are reused after unplug. Recheck capabilities
                     // and the virtual-device exclusion on every open.
@@ -1914,10 +2112,10 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         std::thread::sleep(std::time::Duration::from_secs(2));
                         continue;
                     }
-                    let shift = device.supported_keys().is_some_and(|keys| {
-                        keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
-                            || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
-                    });
+                    let typable = device
+                        .supported_keys()
+                        .map(|keys| hotkey_state::typable_presets(keys.iter()))
+                        .unwrap_or_default();
                     let held_keys = match device.get_key_state() {
                         Ok(keys) => keys,
                         Err(error) => {
@@ -1927,7 +2125,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         }
                     };
                     if let Ok(mut state) = EVDEV_KEYS.lock() {
-                        state.attach(&path, held_keys.iter(), shift);
+                        state.attach(&path, held_keys.iter(), typable.clone());
                     } else {
                         error!("Failed to lock evdev keyboard state");
                         return;
@@ -1936,7 +2134,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         info!("Reconnected evdev keyboard at {}", path.display());
                         reopen_logged = false;
                     }
-                    (device, shift)
+                    (device, typable)
                 }
                 Err(e) => {
                     if !reopen_logged {
@@ -1983,7 +2181,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                             match dev.get_key_state() {
                                 Ok(keys) => {
                                     if let Ok(mut state) = EVDEV_KEYS.lock() {
-                                        state.attach(&path, keys.iter(), shift);
+                                        state.attach(&path, keys.iter(), typable.clone());
                                     }
                                 }
                                 Err(error) => {
@@ -2373,6 +2571,10 @@ pub fn run() -> Result<(), String> {
             get_desktop_input_status,
             get_panel_setup_status,
             enable_gnome_panel,
+            begin_desktop_typing,
+            get_portal_setup_status,
+            allow_portal_typing,
+            allow_portal_shortcut,
             activation::take_launcher_activation,
             paste_desktop_text,
             copy_desktop_text,
@@ -2429,6 +2631,8 @@ pub fn run() -> Result<(), String> {
                 // dictation and ignores it otherwise, so a lock never starts one.
                 desktop_session::watch_lock(move || {
                     trace_hotkey_event("session_locked_stop", Some("logind"));
+                    // GNOME doesn't end a remote desktop session at the lock.
+                    portal_keys::end();
                     // A toggle still waiting for the renderer came before the lock.
                     if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
                         *pending_backend = None;
@@ -2448,6 +2652,11 @@ pub fn run() -> Result<(), String> {
             keep_login_start_in_step_at_startup();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
+            #[cfg(target_os = "linux")]
+            {
+                portal_keys::setup(app.handle());
+                portal_shortcut::setup(app.handle(), &hotkey);
+            }
             EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
             let use_evdev_hotkey = uses_evdev_hotkey(wayland_session, &hotkey);
@@ -2534,6 +2743,8 @@ pub fn run() -> Result<(), String> {
         .map_err(|error| error.to_string())?
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                #[cfg(target_os = "linux")]
+                portal_keys::end();
                 crash_recovery::clean_exit();
                 performance::shutdown();
                 native_capture_commands::shutdown();
@@ -2804,33 +3015,39 @@ mod tests {
 
     #[test]
     fn hotkey_presets() {
+        assert_eq!(Preset::of("Super+X"), Some(Preset::SuperX));
+        assert_eq!(Preset::of("super+x"), Some(Preset::SuperX));
+        assert_eq!(Preset::of("SUPER+KEYX"), Some(Preset::SuperX));
+        assert_eq!(Preset::of("Cmd+X"), Some(Preset::SuperX));
         assert_eq!(Preset::of("Alt+D"), Some(Preset::AltD));
         assert_eq!(Preset::of("Alt+Shift+D"), Some(Preset::AltShiftD));
         assert_eq!(Preset::of("alt + d"), Some(Preset::AltD));
         assert_eq!(Preset::of("SHIFT+ALT+KEYD"), Some(Preset::AltShiftD));
-        assert_eq!(Preset::of("Ctrl+Shift+V"), None);
+        for custom in ["Super+D", "Alt+X", "Super+Shift+X", "Ctrl+Shift+V"] {
+            assert_eq!(Preset::of(custom), None, "{custom}");
+        }
         assert_eq!(Preset::of("not a shortcut"), None);
     }
 
     #[test]
-    fn presets_keep_their_labels_accelerators_and_shift_state() {
+    fn presets_keep_their_order_labels_and_accelerators() {
         let pinned = [
-            (Preset::AltD, "Alt+D", "<Alt>d", false),
-            (Preset::AltShiftD, "Alt+Shift+D", "<Alt><Shift>d", true),
+            (Preset::SuperX, "Super+X", "<Super>x"),
+            (Preset::AltD, "Alt+D", "<Alt>d"),
+            (Preset::AltShiftD, "Alt+Shift+D", "<Alt><Shift>d"),
         ];
         assert_eq!(Preset::ALL, pinned.map(|(preset, ..)| preset));
-        for (preset, label, accelerator, shift) in pinned {
-            assert_eq!(
-                (preset.label(), preset.accelerator(), preset.shift()),
-                (label, accelerator, shift)
-            );
+        for (preset, label, accelerator) in pinned {
+            assert_eq!((preset.label(), preset.accelerator()), (label, accelerator));
             assert_eq!(Preset::of(label), Some(preset));
+            assert!(validate_dictation_hotkey(label).is_ok());
         }
-        for preset in [None, Some(Preset::AltD), Some(Preset::AltShiftD)] {
+        assert_eq!(Preset::of(DEFAULT_HOTKEY), Some(Preset::SuperX));
+        for preset in [None].into_iter().chain(Preset::ALL.map(Some)) {
             assert_eq!(Preset::decode(Preset::encode(preset)), preset);
         }
-        assert_eq!(Preset::encode(Some(Preset::AltD)), 0);
-        assert_eq!(Preset::decode(2), None);
+        assert_eq!(Preset::encode(Some(Preset::SuperX)), 0);
+        assert_eq!(Preset::decode(3), None);
         assert_eq!(Preset::decode(u8::MAX), None);
     }
 
@@ -2870,7 +3087,7 @@ mod tests {
             ..AppConfig::default()
         };
         assert!(repair_invalid_configured_hotkey(&mut invalid).is_some());
-        assert_eq!(invalid.hotkey, "Alt+D");
+        assert_eq!(invalid.hotkey, DEFAULT_HOTKEY);
 
         let mut reserved = AppConfig {
             hotkey: "shift + alt + r".to_string(),
@@ -2884,7 +3101,7 @@ mod tests {
             ..AppConfig::default()
         };
         assert!(repair_invalid_configured_hotkey(&mut modifierless).is_some());
-        assert_eq!(modifierless.hotkey, "Alt+D");
+        assert_eq!(modifierless.hotkey, DEFAULT_HOTKEY);
 
         let mut valid = AppConfig {
             hotkey: "Ctrl+Shift+V".to_string(),
@@ -2932,10 +3149,12 @@ mod tests {
 
     #[test]
     fn evdev_hotkey_backend_only_handles_supported_wayland_shortcuts() {
+        assert_eq!(wayland_preset(true, "Super+X"), Some(Preset::SuperX));
         assert_eq!(wayland_preset(true, "Alt+D"), Some(Preset::AltD));
         assert_eq!(wayland_preset(true, "Alt+Shift+D"), Some(Preset::AltShiftD));
         assert_eq!(wayland_preset(true, "Ctrl+Shift+V"), None);
         assert_eq!(wayland_preset(true, "Control+Space"), None);
+        assert_eq!(wayland_preset(false, "Super+X"), None);
         assert_eq!(wayland_preset(false, "Alt+D"), None);
         assert_eq!(wayland_preset(false, "Alt+Shift+D"), None);
     }
@@ -2949,6 +3168,8 @@ mod tests {
             )
         };
         assert_eq!(backends(true, "Alt+D"), (true, false));
+        assert_eq!(backends(true, "Super+X"), (true, false));
+        assert_eq!(backends(false, "Super+X"), (false, true));
         // VOCO registers nothing: it needs a desktop shortcut for voco --toggle.
         assert_eq!(backends(true, "Ctrl+Shift+V"), (false, false));
         assert_eq!(backends(false, "Ctrl+Shift+V"), (false, true));
@@ -2957,18 +3178,22 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn evdev_watches_only_real_keyboards_that_can_type_alt_d() {
+    fn evdev_watches_only_real_keyboards_that_can_type_a_preset() {
         use evdev::{AttributeSet, KeyCode};
         let keys = |codes: &[KeyCode]| codes.iter().copied().collect::<AttributeSet<KeyCode>>();
         let alt_d = keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
         let right_alt_d = keys(&[KeyCode::KEY_RIGHTALT, KeyCode::KEY_D]);
+        let super_x = keys(&[KeyCode::KEY_LEFTMETA, KeyCode::KEY_X]);
         assert!(supports_evdev_hotkey_parts(
             Some("AT Translated Set 2 keyboard"),
             Some(&*alt_d)
         ));
         assert!(supports_evdev_hotkey_parts(None, Some(&*right_alt_d)));
+        assert!(supports_evdev_hotkey_parts(None, Some(&*super_x)));
         for unable in [
             keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_R]),
+            keys(&[KeyCode::KEY_LEFTMETA, KeyCode::KEY_D]),
+            keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_X]),
             keys(&[KeyCode::KEY_D]),
         ] {
             assert!(!supports_evdev_hotkey_parts(None, Some(&*unable)));

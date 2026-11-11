@@ -1,17 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DEFAULT_HOTKEY,
   DIAGNOSTICS_TIMEOUT_MS,
   DiagnosticsRequestGate,
   microphoneLabel,
   sameJsonValue,
   shortcutPresentation,
   startLaunchDiagnostics,
+  superKeyHint,
   unknownShortcut,
   withTimeout,
 } from "./shortcutPresentation";
 import type { ShortcutDiagnostics } from "@/types";
 
 const available: ShortcutDiagnostics = { hotkey: "Alt+D", route: "evdev", state: "available", detail: "Current keyboard is open." };
+
+describe("the default shortcut", () => {
+  it("is Super+X, and setup names the Super key only for a Super chord", () => {
+    expect(DEFAULT_HOTKEY).toBe("Super+X");
+    for (const hotkey of ["Super+X", "super + x", "Cmd+X", "Ctrl+Super+V"]) {
+      expect(superKeyHint(hotkey)).toBe("Super is the key with the Windows or logo symbol.");
+    }
+    for (const hotkey of ["Alt+D", "Alt+Shift+D", "Ctrl+Shift+S"]) expect(superKeyHint(hotkey)).toBeNull();
+  });
+});
 
 describe("sameJsonValue", () => {
   it("compares diagnostics payloads structurally, ignoring key order", () => {
@@ -167,7 +179,7 @@ describe("microphone footer", () => {
   it("uses only the approved native identity, never the browser default", () => {
     const source = { label: "Remapped voco_test_sink_long.monitor", name: "source" };
     expect(microphoneLabel("native", source, null, [])).toBe(source.label);
-    expect(microphoneLabel("native", null, null, [])).toBe("No native microphone selected");
+    expect(microphoneLabel("native", null, null, [])).toBe("System default");
     expect(microphoneLabel("pending", source, null, [])).toBe("Checking microphone setup");
     expect(microphoneLabel("webkit", source, null, [])).toBe("System default");
   });

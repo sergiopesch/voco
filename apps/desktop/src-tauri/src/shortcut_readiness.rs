@@ -41,6 +41,8 @@ pub(crate) struct Snapshot<'a> {
     pub configured_preset: Option<Preset>,
     pub bridge_available: bool,
     pub panel_reserved: bool,
+    /// The snap's GNOME shortcut portal holds the chord (portal_shortcut.rs).
+    pub portal_bound: bool,
 }
 
 impl Observations {
@@ -127,6 +129,14 @@ impl Observations {
                 "VOCO's GNOME panel handles this shortcut.",
             );
         }
+        // GNOME's shortcut portal consumes the chord and toggles, as the panel does.
+        if snapshot.portal_bound {
+            return status(
+                Some("gnome-portal"),
+                "available",
+                "GNOME holds this shortcut for VOCO.",
+            );
+        }
         if !snapshot.use_evdev && snapshot.plugin_hotkey == Some(snapshot.hotkey) {
             return status(
                 Some("global-shortcut"),
@@ -188,6 +198,7 @@ mod tests {
             configured_preset: Some(Preset::AltD),
             bridge_available: false,
             panel_reserved: false,
+            portal_bound: false,
         }
     }
     #[test]
@@ -215,11 +226,13 @@ mod tests {
     #[test]
     fn old_runtime_mode_cannot_advertise_new_config() {
         let o = Observations::default();
-        let mut s = snapshot();
-        s.evdev_keyboards = Some(1);
-        s.hotkey = "Alt+Shift+D";
-        s.configured_preset = Some(Preset::AltShiftD);
-        assert_eq!(o.status(s).state, "unavailable");
+        for preset in [Preset::AltShiftD, Preset::SuperX] {
+            let mut s = snapshot();
+            s.evdev_keyboards = Some(1);
+            s.hotkey = preset.label();
+            s.configured_preset = Some(preset);
+            assert_eq!(o.status(s).state, "unavailable");
+        }
     }
     #[test]
     fn armed_poll_requires_current_config_and_fresh_heartbeat() {

@@ -321,6 +321,7 @@ describe("shortcut recording", () => {
     expect(press({ key: "a", code: "KeyA" })).toBeNull();
     expect(press({ key: "A", code: "KeyA", shiftKey: true })).toBeNull();
     expect(press({ key: "Control", code: "ControlLeft", ctrlKey: true })).toBeNull();
+    for (const key of ["Meta", "OS", "Super"]) expect(press({ key, code: "MetaLeft", metaKey: true })).toBeNull();
   });
 });
 

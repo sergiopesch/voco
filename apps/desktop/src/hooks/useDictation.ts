@@ -23,6 +23,7 @@ import { beginNativeCapture,type NativeCaptureSession } from "@/lib/nativeCaptur
 import { encodeNativeRetainedSource,type NativeCaptureTerminalOutcome } from "@/lib/nativeCaptureAudit";
 import type { HotkeyTraceFields } from "@/lib/tauri";
 import {
+  beginDesktopTyping,
   copyDesktopText,
   debugNativeCaptureEnabled,
   getDesktopPasteStatus,
@@ -450,6 +451,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
       getDesktopPasteStatus,
       pasteDesktopText,
       copyDesktopText,
+      beginDesktopTyping,
       traceDictationEvent,
       showNotification,
       setStatus,

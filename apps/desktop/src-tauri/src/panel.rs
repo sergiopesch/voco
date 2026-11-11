@@ -84,6 +84,8 @@ fn reserve(key: &str, lease: Duration) {
     if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
         *until = Some((key.to_owned(), Instant::now() + lease));
     }
+    // One grab holds the chord: the snap's portal shortcut yields to the lease.
+    crate::portal_shortcut::suspend();
 }
 
 /// The configured chord Shell grabs whenever attached, idle included.
@@ -525,6 +527,7 @@ fn release(host: &impl Host, lease: &mut Lease) {
     clear_shortcut();
     set_owner(None);
     host.show_tray(true);
+    crate::portal_shortcut::resume();
 }
 
 type Reply = Result<Option<glib::Variant>, (&'static str, &'static str)>;
@@ -831,6 +834,20 @@ mod tests {
 
     fn shortcut_call() -> glib::Variant {
         ("shortcut", "").to_variant()
+    }
+
+    #[test]
+    fn shell_may_grab_only_a_preset_accelerator() {
+        let named = |accelerator: &str| {
+            shortcut_accelerator(&serde_json::json!({ "shortcutAccelerator": accelerator }))
+                .map(str::to_owned)
+        };
+        for preset in ["<Super>x", "<Alt>d", "<Alt><Shift>d"] {
+            assert_eq!(named(preset).as_deref(), Some(preset));
+        }
+        for other in ["<Super>d", "<Alt>x", "<Super><Shift>x", "<Control>v", ""] {
+            assert_eq!(named(other), None, "{other}");
+        }
     }
 
     #[test]

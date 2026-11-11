@@ -175,8 +175,13 @@ pub struct ReleaseInfo {
     pub prerelease: bool,
 }
 
+/// The shortcut of a new setup, and of a reset. A saved shortcut is never
+/// migrated: a config written before Super+X became the default keeps its own.
+/// `Preset` says why Super+X rather than an Alt chord.
+pub const DEFAULT_HOTKEY: &str = "Super+X";
+
 fn default_hotkey() -> String {
-    "Alt+D".to_string()
+    DEFAULT_HOTKEY.to_string()
 }
 
 fn default_start_at_login() -> bool {
@@ -1011,6 +1016,18 @@ mod tests {
     }
 
     #[test]
+    fn a_new_setup_gets_super_x_and_a_saved_shortcut_stays() {
+        assert_eq!(AppConfig::default().hotkey, "Super+X");
+        let unnamed: AppConfig = serde_json::from_str("{}").unwrap();
+        assert_eq!(unnamed.hotkey, DEFAULT_HOTKEY);
+        for saved in ["Alt+D", "Alt+Shift+D", "Ctrl+Shift+V"] {
+            let config: AppConfig =
+                serde_json::from_str(&serde_json::json!({ "hotkey": saved }).to_string()).unwrap();
+            assert_eq!(config.hotkey, saved);
+        }
+    }
+
+    #[test]
     fn update_channel_serializes_kebab_case() {
         let json = serde_json::to_string(&UpdateChannel::Stable).unwrap();
         assert_eq!(json, r#""stable""#);
@@ -1112,10 +1129,10 @@ mod tests {
         let recovered = reset_config_file(&path).unwrap();
 
         assert!(!test_dir.join(SAVED_COPY).exists());
-        assert_eq!(recovered.hotkey, "Alt+D");
+        assert_eq!(recovered.hotkey, DEFAULT_HOTKEY);
         let persisted: AppConfig =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(persisted.hotkey, "Alt+D");
+        assert_eq!(persisted.hotkey, DEFAULT_HOTKEY);
         let backups = fs::read_dir(&test_dir)
             .unwrap()
             .filter_map(Result::ok)

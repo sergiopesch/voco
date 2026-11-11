@@ -30,10 +30,14 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `tray_icons.rs` — Writes the state icons and 64 meter frames once, to paths that stay valid for the process lifetime, after removing the ones an earlier VOCO left behind.
 - `panel.rs` — GNOME companion bridge on D-Bus (`com.sergiopesch.voco.Panel1`), its shortcut lease and the work it hands the companion through `NextRequest`.
 - `panel_setup.rs` — Bounded companion check and setup; a check is reused for 20 seconds, or 2 seconds after a failure.
+- `portal.rs` — The thread and main context that hold every GNOME portal request, session and signal for the snap.
+- `portal_keys.rs` — The snap's paste keys through GNOME's RemoteDesktop portal: the saved permission, a session per desktop dictation and Shift+Insert.
+- `portal_shortcut.rs` — The snap's shortcut through GNOME's GlobalShortcuts portal, its release wait and its yielding to the companion's lease.
+- `portal_fixture.rs` — Test-only: the portal suite's VOCO, an ignored test that runs the portal code and production paste one command at a time.
 - `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
 - `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.
 - `shortcut_readiness.rs` — Shortcut status observations and their text; it never registers or admits a shortcut.
-- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, and the count of live keyboards that shortcut status reports.
+- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, each preset's chord matched with exactly its own modifiers, and the count of live keyboards that can type it, which shortcut status reports.
 - `hotkey_trace.rs` — Opt-in shortcut timing trace, enabled with `VOCO_HOTKEY_TRACE=1`.
 - `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
 - `activation.rs` — Owner-only launcher socket `voco-activate.sock`, and the check that a launcher click started VOCO; either presents the window, and neither toggles capture.
@@ -89,6 +93,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ConfigRecoveryPanel.tsx` — Shown when the settings file can't be read: Retry, Open and Reset.
 - `ConfigRecoveryPanel.test.tsx` — Recovery panel actions.
 - `PanelSetup.tsx` — GNOME companion status and setup button.
+- `PortalSetup.tsx` — The snap's GNOME permissions in setup, Help and the shortcut page: Allow typing, then Add and the shortcut, such as Add Super+X.
 - `NativeMicrophoneSettings.tsx` — Microphone list for native capture.
 - `DeviceSelect.tsx` — Accessible device picker.
 - `VoiceSignal.tsx` — Level display for the microphone signal.
@@ -334,6 +339,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-private-ibus-engine.py`, `test-private-ibus-engine.sh` — IBus engine on a headless IBus daemon.
 - `test-gnome-panel.py`, `test-gnome-panel.sh`, `test-panel-model.mjs`, `test-panel-setup.py` — GNOME companion.
 - `test-gnome-panel-container.sh` — The companion suite on a GNOME Shell no hosted runner ships, in a digest-pinned Fedora image under rootless Podman.
+- `test-gnome-portals.py`, `test-gnome-portals.sh` — The snap's typing and shortcut through GNOME 50's portals.
 - `test-application-delivery.py`, `test-application-delivery.sh` — Paste into real applications on a private desktop.
 - `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py`, `browser-app-harness.mjs` — Chromium paste, exact field and toolbar.
 - `test-chromium-exact-field.mjs`, `chromium-background.test.cjs`, `chromium-content-lifecycle.test.cjs` — Extension scripts.

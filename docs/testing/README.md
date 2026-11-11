@@ -84,6 +84,7 @@ Suites that type through VOCO's virtual keyboard also need the
 | --- | --- | --- |
 | None | `test-private-ibus-engine.sh` | VOCO's IBus engine against a private IBus daemon, with no display or session bus |
 | `--gnome-panel` | `test-gnome-panel.sh` | GNOME Shell with the [companion](../../integrations/gnome/README.md#files-and-tests) and synthetic app status; with `VOCO_PANEL_APP_BINARY`, the app's tray bridge too, or only the bridge with `VOCO_PANEL_SUITE=bridge` |
+| `--gnome-portals` | `test-gnome-portals.sh` | GNOME Shell 50 with PipeWire, xdg-desktop-portal and its GNOME backend, and the snap's [portal code](#the-portal-suite) through the lib test binary that `VOCO_PORTAL_TEST_BINARY` names |
 | `--native-desktop` | `test-native-desktop.sh` | Real GTK and WebKit widgets with private X11, D-Bus and IBus |
 | `--native-wayland` | `test-native-wayland.sh` | Real Wayland surfaces in headless Weston; with `VOCO_WAYLAND_APP_BINARY`, the app starting, opening and quitting from its tray |
 | `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio whose fixture source carries the `object.serial` PipeWire would set: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |
@@ -190,6 +191,38 @@ just before the first key and after the last, which `shell-probe-input-state.py`
 relays from inside the namespace. There `wl-copy` is `shell-probe-wl-copy.py`,
 which sets each selection through the private Shell probe.
 
+### The portal suite
+
+`test-gnome-portals.sh` proves the snap's typing and shortcut through GNOME's
+portals (AGENTS.md, Delivery and Shortcut). It needs GNOME Shell 50 and a lib
+test binary: `cargo test --locked --lib --no-run` prints its path. In the
+namespace it starts PipeWire, a headless Shell with XWayland and the
+`gnome-portal-probe` extension, and xdg-desktop-portal with its GNOME backend,
+which starts gnome-control-center's shortcut provider. VOCO is that binary's
+ignored `portal_fixture::serve_the_portal_suite` with `SNAP_NAME=voco`: it runs
+the real `portal_keys.rs`, `portal_shortcut.rs` and production desktop paste,
+one command from the suite at a time. No snapd runs here, so the portal names
+every caller through its own test hook (`XDG_DESKTOP_PORTAL_TEST_APP_INFO_KIND`)
+from the metadata `snap routine portal-info` gives the `voco` snap, under the
+app ID `voco_voco`, with a stand-in for the desktop entry snapd installs.
+
+The suite answers GNOME's dialogs over AT-SPI: Allow Remote Interaction, then
+Share, and the shortcut dialog's Add. The probe's Clutter keyboard inside the
+Shell presses Super+X, VOCO's default, so the tester's keys open no remote
+desktop session of their own. Each paste goes to `fixtures/paste-field.py` on Wayland and under
+XWayland and must land exactly, from one Shift+Insert. It checks, in order:
+dictation without GNOME's permission opens no session and types nothing; Allow
+typing shows GNOME's dialog once; each dictation restores the permission without
+a dialog and closes its session when it ends; the remote-access icon's Stop
+stops the dictation, and the next paste sends no key; a session no dictation
+reports needing closes by itself; the shortcut dialog appears once, Super+X then
+toggles and never reaches the field, and a paste while the chord is down waits
+for `Deactivated` and 150 ms more; while the companion's lease holds the chord
+Super+X doesn't toggle, and after it the shortcut binds again without a dialog.
+Without a tauri app the fixture counts the stops and toggles the portal code
+asks for instead. `VOCO_PORTAL_EVIDENCE_DIR` receives `results.json`, the
+dialogs' and the remote-access icon's screenshots, and each service's log.
+
 ## Speech suites
 
 These run `runtime/speech/stream_worker.py` with the model and runtime in
@@ -281,6 +314,7 @@ requests into it, on Ubuntu 24.04 unless the table says otherwise. Evidence arti
 | Application | The release build of `voco` and `voco-browser-host` with the runtime, then the tray bridge on GNOME, `--full-application`, both delivery suites on `gnome-wayland` through the release build's production paste and the uinput bridge, the applications suite through the GNOME companion, the Wayland lifecycle, `--browser-application` and `--browser-toolbar` | `application-evidence` |
 | GNOME 50 Companion | On `ubuntu-26.04`, the companion regression headless on GNOME Shell 50 | `gnome50-panel-evidence` |
 | GNOME 51 Companion | The same regression on GNOME Shell 51, built from a digest-pinned Fedora 45 image and run in rootless Podman | `gnome51-panel-evidence` |
+| GNOME 50 Portals | On `ubuntu-26.04`, the lib test binary, then the [portal suite](#the-portal-suite) headless on GNOME Shell 50 | `gnome50-portal-evidence` |
 | Debian 13 Runtime, Fedora 44 Runtime | In digest-pinned containers, VOCO's package dependencies by that distribution's names, then the speech runtime, IBus and worker protocol tests and the speech baseline on its Python | None |
 | Snap Confinement Probe | A strict snap built from `scripts/fixtures/snap-dbus-probe`, owning `com.sergiopesch.voco.Panel` through a session `dbus` slot on the runner's own session bus. An unconfined process plays GNOME Shell (`scripts/test-snap-dbus-probe.py`). The snap must answer its pending `NextRequest` and receive its report, and its own call to that process must be refused. | None |
 

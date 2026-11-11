@@ -1697,7 +1697,7 @@ rm -rf "$VOCO_DOWNLOAD_DIR"
 config_base="${HOME}/.config"
 # Match dirs::config_dir(): an XDG override must be absolute.
 if [[ "${XDG_CONFIG_HOME:-}" == /* ]]; then config_base="$XDG_CONFIG_HOME"; fi
-HOTKEY="Alt+D"
+HOTKEY="Super+X"
 for saved_config in "${config_base}/voco/config.json" "${config_base}/voice/config.json"; do
   if [[ -e "$saved_config" || -L "$saved_config" ]]; then HOTKEY="unchanged"; fi
 done

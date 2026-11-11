@@ -294,7 +294,7 @@ fn speech_quality_payload(request: &Value) -> Option<Value> {
     // Which keyboard sent the paste's keys.
     if let Some(keys) = request["paste_keys"]
         .as_str()
-        .filter(|s| matches!(*s, "companion" | "uinput" | "xdotool"))
+        .filter(|s| matches!(*s, "companion" | "uinput" | "portal" | "xdotool"))
     {
         safe["paste_keys"] = json!(keys);
     }
@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn a_paste_keeps_which_keyboard_sent_it_but_nothing_else() {
-        for keys in ["companion", "uinput", "xdotool"] {
+        for keys in ["companion", "uinput", "portal", "xdotool"] {
             let request = json!({"event":"native_dispatch", "session":"12345678-1234-1234-1234-123456789abc",
                 "outcome":"dispatched", "paste_keys":keys});
             assert_eq!(

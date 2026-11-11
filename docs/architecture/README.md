@@ -193,7 +193,7 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
    every key while the chord is held, so the paste waits for the release. It
    also waits while the X server reports Shift, Control, Alt, Super or AltGr
    held: the Shift of Shift+Insert would turn a shortcut someone is pressing,
-   such as Alt+D, into Alt+Shift+D, which nothing takes for the shortcut.
+   such as Super+X, into Super+Shift+X, which nothing takes for the shortcut.
 6. It sends Shift+Insert: through the companion or the virtual keyboard on
    Wayland, and with `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
@@ -306,8 +306,8 @@ it is.
 
 | Route | When | Behaviour |
 | --- | --- | --- |
-| GNOME companion | GNOME 46, 48, 50 or 51 on Wayland with the companion attached | Shell grabs Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
-| Passive evdev | Wayland with Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. The focused app also receives the chord. |
+| GNOME companion | GNOME 46, 48, 50 or 51 on Wayland with the companion attached | Shell grabs Super+X, Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
+| Passive evdev | Wayland with Super+X, Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. A keyboard counts for a preset only when it has that chord's modifier, Shift if it names Shift, and letter; the chord matches with exactly its own modifiers held on any keyboard. The focused app also receives the chord. |
 | X11 grab | X11, any valid shortcut | A root-window key grab consumes the chord and toggles on release, so the paste keys reach the app. |
 | IBus engine | The VOCO Dictation input source is selected | Protocol 6. Consumes the chord in IBus-aware fields and changes no text. |
 | `voco --toggle` | Any desktop binding | Connects once to the owner-only socket. The connection itself is the request. |
@@ -316,7 +316,16 @@ The companion holds a 2.5-second lease on the exact configured accelerator and
 renews it about once a second. While the lease is fresh, evdev ignores the
 chord. While the IBus engine holds its 1-second lease, evdev ignores the chord
 and VOCO releases its X11 grab so the engine receives it. On Wayland, a shortcut
-other than the two presets needs a desktop binding that runs `voco --toggle`.
+other than the three presets needs a desktop binding that runs `voco --toggle`.
+
+The presets are `Preset` in `lib.rs`: Super+X, the default, then Alt+D and
+Alt+Shift+D, in the tray's order. The companion and GNOME's shortcut portal
+consume only the letter of a chord, so the focused app still sees its modifier
+pressed and released alone. For Alt that opens the menu bar in Firefox,
+Thunderbird, LibreOffice and Electron editors, and the menu takes the
+Shift+Insert pastes that follow; a lone Super opens nothing, and mutter doesn't
+open the overview once it has seen the X. A saved shortcut is never migrated,
+and an invalid one resets to `config::DEFAULT_HOTKEY`.
 Shortcut status text comes from `shortcut_readiness.rs`.
 
 ## Tray and GNOME companion
@@ -374,7 +383,7 @@ that itself, and asks you to quit and open VOCO again.
 ## Configuration
 
 Settings live in `$XDG_CONFIG_HOME/voco/config.json` with ten fields:
-`hotkey` (default `Alt+D`), `selectedMic`, `onboardingCompleted`,
+`hotkey` (default `Super+X`), `selectedMic`, `onboardingCompleted`,
 `startAtLogin` (on until the user turns it off), `updateChannel` (`stable` or
 `beta`), `automaticUpdateChecks`, `installChannel`,
 `englishSpelling` (`british`, `american` or `as-recognised`, and `null`
@@ -488,14 +497,46 @@ presenting the old.
 (`SNAP_NAME`). Strict confinement gives it no `/dev/uinput`, `/dev/input`,
 IBus engine, systemd user manager or network, so the snap skips what needs
 them: the virtual keyboard, passive evdev, the IBus listener, the retired
-`voco-ydotoold.service` and the update check. On Wayland only the companion
-types for it: the paste check passes once the companion asks for work, and a
-paste without it typed nothing. `voco --check-desktop-input` and
-`--check-panel` run apart from the VOCO the companion works for, so they ask it
-with `CompanionAsking`, which answers any caller; when no VOCO answers, they
-say to open VOCO and check again. Until then, setup says what's missing: on GNOME,
-the VOCO panel from extensions.gnome.org; on other Wayland desktops, the `.deb`
-or RPM instead. X11 sessions keep `xdotool` and `xclip`.
+`voco-ydotoold.service` and the update check. On GNOME Wayland the companion
+types for it once it asks for work; otherwise GNOME's RemoteDesktop portal does.
+
+`portal.rs` runs one thread with a private main context for every portal
+request, session and signal, so neither GNOME's answer nor the person answering
+GNOME's dialog ever blocks GTK's thread. `portal_keys.rs` opens a keyboard-only
+RemoteDesktop session with `persist_mode` 2. Setup's **Allow typing** opens the
+first one without a restore token, which shows GNOME's dialog, and saves the
+token GNOME returns in `remote-desktop-token` beside the config, owner-only;
+each later Start returns a new one, which replaces it. The renderer calls
+`begin_desktop_typing` when a desktop dictation starts, which opens a session
+from the token in the background (8–90 ms on GNOME 50), and
+`update_runtime_status` closes it when the dictation status returns to idle,
+after Stop's last paste and space; the lock watch, a replaced renderer and exit
+close it too. GNOME
+shows its orange remote-access icon while a session exists. Its Stop closes the
+session: the `Closed` signal clears it and sends the tray's stop request, so the
+dictation ends as Stop does and copies the rest. A paste sends Shift, Insert
+and their releases with `NotifyKeyboardKeycode`; one before the session has
+started waits up to 400 ms, then typed nothing.
+
+`portal_shortcut.rs` binds one `toggle` shortcut through GlobalShortcuts (GNOME
+48 and later), first from setup's button, which shows GNOME's dialog, and records
+that in `global-shortcut` beside the config. At each start it binds again, which
+GNOME answers without a dialog. `Activated` toggles through
+`eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
+trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
+Super+X. Modifiers can't be
+read through the portal, so `keys_held` counts a press as held until
+`Deactivated`, then 150 ms more, and the paste's usual 1.5 s wait sends no keys
+while it is held: keys under Super or Alt make another chord and paste nothing.
+A press with no `Deactivated` after 5 s reads as unknown. The companion's `ReserveShortcut`
+suspends the portal session and its release binds again, so one grab holds the
+chord.
+
+`voco --check-desktop-input` and `--check-panel` run apart from the VOCO the
+companion works for, so they ask it with `CompanionAsking`, which answers any
+caller; the portal path is ready when the token is saved. Until it is, setup
+shows the portal step (`setupArea` `portal`); on other Wayland desktops, it
+names the `.deb` or RPM instead. X11 sessions keep `xdotool` and `xclip`.
 
 logind's session signals don't reach a snap, because `login-session-observe`
 passes only the manager's, and `GetSessionByPID` is out of its reach. So the
@@ -530,8 +571,8 @@ they open a microphone.
 
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
-otherwise points setup and Help to `COMPANION_PAGE`, its page on extensions.gnome.org;
-setup shows the link wherever the paste check fails for want of the companion.
+otherwise `optional`, with `COMPANION_PAGE`, its page on extensions.gnome.org,
+which Help offers; setup never asks for it.
 snapd installs the snap's desktop entry as `voco_voco.desktop`, which
 `activation.rs` counts as VOCO's launcher in the snap only.
 

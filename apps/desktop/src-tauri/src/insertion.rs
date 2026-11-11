@@ -239,9 +239,9 @@ fn input_status_with(preflight: &InputPreflight) -> DesktopInputStatus {
         } else {
             support.detail.clone()
         },
-        // The snap's Wayland keys wait for the companion, which the panel's
-        // setup points to.
-        setup_area: (!support.available && support.detail == SNAP_NEEDS_PANEL).then_some("panel"),
+        // The snap's Wayland keys wait for GNOME's typing permission, which
+        // the portal setup asks for.
+        setup_area: (!support.available && support.detail == SNAP_NEEDS_TYPING).then_some("portal"),
     }
 }
 
@@ -329,6 +329,17 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     // device can never leave the clipboard changed with nothing typed.
     if keys == PasteKeys::Uinput {
         ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
+    }
+    // Likewise GNOME's typing session: one still starting, refused or closed
+    // by GNOME's Stop leaves the clipboard alone and the text pending.
+    #[cfg(target_os = "linux")]
+    if keys == PasteKeys::Portal {
+        crate::portal_keys::ready().map_err(|failure| match failure {
+            crate::portal_keys::PortalPasteError::NoMutation(message)
+            | crate::portal_keys::PortalPasteError::Uncertain(message) => {
+                InsertionError::no_mutation(message)
+            }
+        })?;
     }
     let routed = paste_text(text);
     // A space is pasted, never sent as a Space key: on a focused button,
@@ -450,12 +461,25 @@ pub fn copy_desktop_text(text: &str) -> Result<(), InsertionError> {
 /// Unknown state never blocks delivery: evdev may lack permission, and other
 /// desktops, or a companion that hasn't asked for work yet, give no answer.
 fn shortcut_modifiers_held() -> Option<bool> {
-    crate::evdev_modifiers_held().or_else(|| {
-        crate::panel::companion_asks_for_work()
-            .then(crate::panel::paste_modifiers_clear)
-            .and_then(Result::ok)
-            .map(|clear| !clear)
-    })
+    crate::evdev_modifiers_held()
+        .or_else(|| {
+            crate::panel::companion_asks_for_work()
+                .then(crate::panel::paste_modifiers_clear)
+                .and_then(Result::ok)
+                .map(|clear| !clear)
+        })
+        .or_else(portal_keys_held)
+}
+
+/// After a press of the snap's portal shortcut (portal_shortcut.rs).
+#[cfg(target_os = "linux")]
+fn portal_keys_held() -> Option<bool> {
+    crate::portal_shortcut::keys_held()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn portal_keys_held() -> Option<bool> {
+    None
 }
 
 /// The X11 shortcut callback reports each press and release of the chord.
@@ -472,8 +496,8 @@ fn x11_shortcut_held() -> Option<bool> {
     Some(pressed.is_some_and(|at| at.elapsed() < MODIFIER_RELEASE_TIMEOUT))
 }
 
-/// An X11 paste also waits while a modifier is held: someone pressing Alt+D
-/// as xdotool holds Shift for Shift+Insert presses Alt+Shift+D, which neither
+/// An X11 paste also waits while a modifier is held: someone pressing Super+X
+/// as xdotool holds Shift for Shift+Insert presses Super+Shift+X, which neither
 /// IBus nor VOCO's grab takes for the shortcut, so the press is lost (#193).
 fn x11_keys_held() -> Option<bool> {
     any_held(x11_shortcut_held(), x11_modifiers_held())
@@ -645,6 +669,8 @@ enum PasteKeys {
     Companion,
     /// VOCO's own uinput device (virtual_keyboard.rs).
     Uinput,
+    /// GNOME's RemoteDesktop portal, for the snap (portal_keys.rs).
+    Portal,
     Xdotool,
 }
 
@@ -653,15 +679,15 @@ impl PasteKeys {
         match self {
             Self::Companion => "companion",
             Self::Uinput => "uinput",
+            Self::Portal => "portal",
             Self::Xdotool => "xdotool",
         }
     }
 }
 
 /// On GNOME Wayland, the attached companion types once its loaded copy asks
-/// VOCO for work; otherwise VOCO's uinput device does, except in the snap,
-/// which has no other keyboard, so a missing companion refuses there. X11 keeps
-/// xdotool.
+/// VOCO for work; otherwise VOCO's uinput device does, or in the snap, which
+/// can't open uinput, GNOME's RemoteDesktop portal. X11 keeps xdotool.
 fn paste_keys(
     wayland: bool,
     confined: bool,
@@ -669,8 +695,10 @@ fn paste_keys(
 ) -> PasteKeys {
     if !wayland {
         PasteKeys::Xdotool
-    } else if confined || companion_asks_for_work() {
+    } else if companion_asks_for_work() {
         PasteKeys::Companion
+    } else if confined {
+        PasteKeys::Portal
     } else {
         PasteKeys::Uinput
     }
@@ -716,10 +744,23 @@ fn send_paste_keys(keys: PasteKeys) -> Result<Option<Instant>, InsertionError> {
         PasteKeys::Uinput => crate::virtual_keyboard::paste()
             .map(Some)
             .map_err(InsertionError::uncertain),
+        #[cfg(target_os = "linux")]
+        PasteKeys::Portal => {
+            crate::portal_keys::paste()
+                .map(Some)
+                .map_err(|failure| match failure {
+                    crate::portal_keys::PortalPasteError::NoMutation(message) => {
+                        InsertionError::no_mutation(message)
+                    }
+                    crate::portal_keys::PortalPasteError::Uncertain(message) => {
+                        InsertionError::uncertain(message)
+                    }
+                })
+        }
         #[cfg(not(target_os = "linux"))]
-        PasteKeys::Companion | PasteKeys::Uinput => Err(InsertionError::no_mutation(
-            "Wayland paste keys need Linux.",
-        )),
+        PasteKeys::Companion | PasteKeys::Uinput | PasteKeys::Portal => Err(
+            InsertionError::no_mutation("Wayland paste keys need Linux."),
+        ),
         PasteKeys::Xdotool => {
             let mut paste = process_runner::command("xdotool");
             paste.args(X11_PASTE_ARGUMENTS);
@@ -918,34 +959,37 @@ fn input_preflight() -> InputPreflight {
 }
 
 /// What the snap needs on GNOME Wayland before it can type.
-const SNAP_NEEDS_PANEL: &str = "On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it's already installed, sign out and back in.";
+pub(crate) const SNAP_NEEDS_TYPING: &str = "VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME's dialog and choose Share.";
 /// On other Wayland desktops the snap can't type at all.
 const SNAP_DESKTOP_UNSUPPORTED: &str = "The VOCO snap types only on GNOME and in X11 sessions. On this desktop, install VOCO's .deb or RPM from its GitHub releases instead.";
 
-/// For `voco --check-desktop-input` while no VOCO answers: the companion
-/// attaches to the running VOCO, so only that VOCO knows.
-const SNAP_CHECK_NEEDS_VOCO: &str = "On Wayland, the VOCO snap types through the VOCO panel, and only the running VOCO can tell whether the panel is connected. Open VOCO, then check again.";
-
-/// The snap's Wayland keys: the companion's, once it asks VOCO for work.
+/// The snap's Wayland keys: the companion's, once it asks VOCO for work, or
+/// GNOME's RemoteDesktop portal once GNOME allowed VOCO to type.
 fn companion_keys_ready() -> Result<(), String> {
-    let asking = companion_asks_for_voco();
-    if asking == Some(true) {
-        return Ok(());
-    }
-    Err(snap_keys_missing(
+    snap_keys_ready(
         crate::is_gnome_desktop(&crate::current_desktop()),
-        asking.is_some(),
+        companion_asks_for_voco() == Some(true),
+        portal_typing_allowed(),
     )
-    .into())
+    .map_err(str::to_owned)
 }
 
-/// `voco_answered`: a VOCO answered whether its companion asks for work.
-fn snap_keys_missing(gnome: bool, voco_answered: bool) -> &'static str {
-    match (gnome, voco_answered) {
-        (false, _) => SNAP_DESKTOP_UNSUPPORTED,
-        (true, true) => SNAP_NEEDS_PANEL,
-        (true, false) => SNAP_CHECK_NEEDS_VOCO,
+fn snap_keys_ready(gnome: bool, companion: bool, portal_allowed: bool) -> Result<(), &'static str> {
+    match (gnome, companion, portal_allowed) {
+        (false, _, _) => Err(SNAP_DESKTOP_UNSUPPORTED),
+        (true, true, _) | (true, false, true) => Ok(()),
+        (true, false, false) => Err(SNAP_NEEDS_TYPING),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn portal_typing_allowed() -> bool {
+    crate::portal_keys::allowed()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn portal_typing_allowed() -> bool {
+    false
 }
 
 /// A failed spawn proves the helper did not run. Any later error is uncertain:
@@ -1139,31 +1183,43 @@ mod tests {
 
     #[test]
     fn the_snap_names_what_it_needs_to_type_on_wayland() {
-        assert_eq!(snap_keys_missing(true, true), SNAP_NEEDS_PANEL);
-        // A check outside VOCO can't learn about the companion until VOCO runs.
-        assert_eq!(snap_keys_missing(true, false), SNAP_CHECK_NEEDS_VOCO);
-        for answered in [false, true] {
-            assert_eq!(snap_keys_missing(false, answered), SNAP_DESKTOP_UNSUPPORTED);
+        for companion in [false, true] {
+            for allowed in [false, true] {
+                assert_eq!(
+                    snap_keys_ready(false, companion, allowed),
+                    Err(SNAP_DESKTOP_UNSUPPORTED)
+                );
+            }
         }
+        assert_eq!(snap_keys_ready(true, true, false), Ok(()));
+        assert_eq!(snap_keys_ready(true, false, true), Ok(()));
+        assert_eq!(snap_keys_ready(true, false, false), Err(SNAP_NEEDS_TYPING));
+        assert!(SNAP_NEEDS_TYPING.contains("Allow typing"));
     }
 
     #[test]
     fn wayland_pastes_through_the_companion_only_when_it_asks_for_work() {
         assert_eq!(paste_keys(true, false, || true), PasteKeys::Companion);
         assert_eq!(paste_keys(true, false, || false), PasteKeys::Uinput);
-        // The snap has no other keyboard: an absent companion refuses.
-        assert_eq!(paste_keys(true, true, || false), PasteKeys::Companion);
+        // The snap can't open uinput: without the companion GNOME's portal types.
+        assert_eq!(paste_keys(true, true, || true), PasteKeys::Companion);
+        assert_eq!(paste_keys(true, true, || false), PasteKeys::Portal);
         for confined in [false, true] {
             assert_eq!(
                 paste_keys(false, confined, || panic!("X11 asked the companion")),
                 PasteKeys::Xdotool
             );
         }
-        let labels =
-            [PasteKeys::Companion, PasteKeys::Uinput, PasteKeys::Xdotool].map(PasteKeys::label);
+        let labels = [
+            PasteKeys::Companion,
+            PasteKeys::Uinput,
+            PasteKeys::Portal,
+            PasteKeys::Xdotool,
+        ]
+        .map(PasteKeys::label);
         assert_eq!(
             labels,
-            ["companion", "uinput", "xdotool"],
+            ["companion", "uinput", "portal", "xdotool"],
             "performance.rs keeps exactly these"
         );
     }

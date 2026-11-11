@@ -308,7 +308,7 @@ if [[ "$INSTALL_MODE" == true ]]; then
   echo -e "  ${WHITE}${BOLD}▸${NC} Or run: ${GRAPHITE_SOFT}voco${NC}"
   echo
   echo -e "  ${DIM}Speech uses the pinned runtime bundled in the package.${NC}"
-  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}Alt+D${NC}${DIM}, or your saved shortcut, to dictate!${NC}"
+  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}Super+X${NC}${DIM}, or your saved shortcut, to dictate!${NC}"
   echo
   echo -e "  ${DIM}Change the shortcut on the Shortcut page of VOCO's Settings.${NC}"
   echo
@@ -325,6 +325,6 @@ else
   echo -e "  ${WHITE}${BOLD}▸${NC} Full install:  ${GRAPHITE_SOFT}./scripts/setup.sh --install${NC}"
   echo
   echo -e "  ${DIM}Speech needs the pinned runtime: see docs/linux-packaging.md#runtime-provisioning.${NC}"
-  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}Alt+D${NC}${DIM} to dictate.${NC}"
+  echo -e "  ${DIM}Click where you want the text, then press ${BOLD}Super+X${NC}${DIM}, or your saved shortcut, to dictate.${NC}"
   echo
 fi

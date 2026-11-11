@@ -11,7 +11,7 @@ OLD_UUID = 'voco-panel@voco.local'
 # The companion's version-name, which extensions.gnome.org keeps; it replaces
 # version with its own upload number. Bump both with behavior changes that
 # require reloading the running Shell companion.
-COMPANION_VERSION = 22
+COMPANION_VERSION = 23
 PACKAGE = Path('/usr/share/gnome-shell/extensions') / UUID
 # Every runtime file of the companion, as packaged; scripts/test-panel-setup.py
 # compares it with the source directory and the Debian file map.
@@ -54,7 +54,7 @@ def shown(folder):
 
 def classify(version, installed, info, enabled, globally_disabled, user_copy=None):
     if version.split('.')[0] not in SUPPORTED_SHELLS:
-        return result('unsupported', 'The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
+        return result('unsupported', 'The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives the shortcut. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.')
     if not installed:
         return result('missing', 'The VOCO panel files are missing. Reinstall the complete VOCO package.')
     if globally_disabled:

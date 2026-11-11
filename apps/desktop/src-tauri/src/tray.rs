@@ -476,7 +476,17 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     if !apply_runtime_snapshot(&mut tray_state.runtime, snapshot) {
         return;
     }
+    let dictating = matches!(
+        tray_state.runtime.dictation_status,
+        DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing
+    );
     drop(tray_state);
+    // A return to idle means the dictation's last paste, Stop's space
+    // included, is done: the snap's typing session closes (AGENTS.md).
+    #[cfg(target_os = "linux")]
+    crate::portal_keys::note_dictating(dictating);
+    #[cfg(not(target_os = "linux"))]
+    let _ = dictating;
     refresh_tray(app);
 }
 
@@ -497,9 +507,12 @@ fn refresh_tray(app: &tauri::AppHandle) {
 fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     sync_meter_timer(app, tray_state);
     let current = crate::Preset::of(&tray_state.current_hotkey);
+    // GNOME Settings changes the shortcut GNOME holds for the snap, not VOCO's menu.
+    let gnome_holds = crate::portal_shortcut_holds();
     for (preset, item) in &tray_state.hotkey_items {
         let mark = if current == Some(*preset) { '✓' } else { ' ' };
         let _ = item.set_text(format!("{mark} {}", preset.label()));
+        let _ = item.set_enabled(!gnome_holds);
     }
     let presentation = derive_tray_presentation(&tray_state.runtime);
     // Even equivalent presentation updates carry a new action token to Shell.
@@ -647,7 +660,7 @@ fn meter_animations_enabled() -> bool {
     })
 }
 
-fn request_stop(app: &tauri::AppHandle) {
+pub(crate) fn request_stop(app: &tauri::AppHandle) {
     let _ = app.emit_to(
         "main",
         "voco:toggle-dictation",
@@ -964,6 +977,9 @@ mod tests {
     #[test]
     fn panel_grabs_only_the_passive_wayland_chords() {
         for (hotkey, accelerator) in [
+            ("Super+X", Some("<Super>x")),
+            ("super + x", Some("<Super>x")),
+            ("Super+D", None),
             ("Alt+D", Some("<Alt>d")),
             ("alt + d", Some("<Alt>d")),
             ("Alt+Shift+D", Some("<Alt><Shift>d")),

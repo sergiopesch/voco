@@ -278,8 +278,15 @@ live in `$SNAP_USER_DATA`, as does its login start entry, and it never reads a
 package's settings. On the
 session bus it owns `com.sergiopesch.voco.Panel` through a `dbus` slot: confinement lets it
 answer GNOME Shell's calls but never call the Shell, so the companion asks it
-for work. On Wayland only the companion types for it; on X11 `xdotool` does, as
-for the packages. Until `login-session-observe` is connected, logind refuses
+for work. On GNOME Wayland the companion types for it when you added it;
+otherwise GNOME's RemoteDesktop portal does, in a keyboard-only session that VOCO
+opens only while you dictate and that sends only Shift and Insert. GNOME asks
+you once, in its own dialog, and shows its orange remote-access icon for as long
+as a session exists; its Stop ends the session and the dictation. VOCO keeps
+GNOME's restore token in its own settings folder, owner-only, and never logs it.
+GNOME's shortcut portal holds the snap's shortcut, after you allowed that once,
+so the focused app never receives it. On X11 `xdotool` types, as for the
+packages. Until `login-session-observe` is connected, logind refuses
 the snap, and it sends no paste keys; until `audio-record` is connected, the
 snap opens no microphone and names the `snap connect` command.
 

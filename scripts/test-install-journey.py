@@ -351,9 +351,9 @@ voco_ui_close
             self.assertNotIn('check again', screen)
             if settings:
                 self.assertIn('unchanged', screen)
-                self.assertNotIn('Alt+D', screen)
+                self.assertNotIn('Super+X', screen)
             else:
-                self.assertIn('Alt+D', screen)
+                self.assertIn('Super+X', screen)
             if launch_case == 'started':
                 self.assertIn('Opening VOCO', screen)
                 self.assertNotIn('Open VOCO →', screen)

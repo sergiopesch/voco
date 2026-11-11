@@ -171,7 +171,8 @@ dependencies, conflicts or obsoletes.
 Store rather than the GitHub release. It copies the tree into the snap's payload
 without what strict confinement can't use: the `/dev/uinput` rule and module
 file, the IBus engine and its component, the GNOME companion, which the snap
-gets from extensions.gnome.org, and `voco-browser-host` with its manifests and
+types without through GNOME's portals and can get from extensions.gnome.org, and
+`voco-browser-host` with its manifests and
 the Chromium extension. Each path it leaves out must exist in the staged tree,
 so the list can't silently go stale.
 

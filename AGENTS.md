@@ -94,7 +94,8 @@ differs. `.editorconfig` sets the formatting basics. Keep Vite 8 and the React p
 together, keep explicit output targets, and keep root renderer fixtures on the
 desktop's Vite resolution. Check both dev rendering and packaged WebKit.
 
-The config (`config.rs`) holds the shortcut, the microphone, English spelling
+The config (`config.rs`) holds the shortcut (`DEFAULT_HOTKEY`, Super+X, until
+the user saves another), the microphone, English spelling
 (null until someone chooses; dictation then spells British), My words and its
 taught versions (empty until the user adds one), onboarding state, whether
 VOCO starts at login (on until the user turns it off), the update channel, the
@@ -237,8 +238,12 @@ and the update check. [The snap](#the-snap) lists its rules.
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press. Through the RemoteDesktop portal VOCO can't read modifiers, so
-  after a portal shortcut press a paste waits for its `Deactivated`, at most 1.5 s
-  after the press, then 150 ms for the modifier's own release. An X11 paste also waits, at most 1.5 s, while the X server's
+  a portal shortcut press counts as held until its `Deactivated`, then 150 ms
+  for the modifier's own release, and the same 1.5 s wait sends no keys while
+  it is: keys sent under Super or Alt make another chord, which pastes nothing.
+  A press with no `Deactivated` after 5 s reads as unknown, so a lost signal
+  can't hold back every paste. After a `voco --toggle` in the snap, which
+  reports no release, a paste waits 400 ms. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
@@ -300,7 +305,7 @@ and the update check. [The snap](#the-snap) lists its rules.
   unconfined caller's pending call and receives its calls, and its own calls to
   that caller are refused.
 - CI's portal suite proves the snap's portal path in a headless GNOME 50 with the
-  real xdg-desktop-portal and its GNOME backend, VOCO registered under the snap's
+  real xdg-desktop-portal and its GNOME backend, which names VOCO by the snap's
   app ID: the first typing session shows GNOME's dialog and later ones restore
   without it; every paste lands with its exact text in a GTK field on Wayland and
   under XWayland; dictation opens a session and its end closes it; the
@@ -361,30 +366,46 @@ and the update check. [The snap](#the-snap) lists its rules.
 ### Shortcut
 
 - Toggles are debounced for 120 ms (`TOGGLE_DEBOUNCE_MS`).
+- The presets (`Preset` in `lib.rs`, in the tray's order) are Super+X, the
+  default for a new setup and for a reset or repair, then Alt+D and
+  Alt+Shift+D; any other valid chord is custom. Never migrate a saved shortcut.
+  The companion's grab and the GlobalShortcuts portal take only the chord's
+  letter, so the focused app sees its modifier pressed and released alone. A
+  lone Alt opens the menu bar in Firefox, Thunderbird, LibreOffice and VS Code,
+  and the menu swallows the pastes that follow, so the default never pairs Alt
+  with a letter. Passive evdev and the IBus engine match the shortcut with
+  exactly its own modifiers held, on any keyboard: Super+X never with Alt, Control or
+  Shift, Alt+D never with Super or Shift.
 - In the snap on GNOME 48 and later without the companion, the GlobalShortcuts
   portal holds the shortcut (`portal_shortcut.rs`): one `toggle` shortcut whose
-  preferred trigger is the saved chord. Only setup's and Settings' explicit
+  preferred trigger is the saved chord, in the shortcuts specification's
+  spelling (`LOGO+x` for Super+X). Only setup's and Settings' explicit
   button binds it the first time, which shows GNOME's dialog; VOCO records that,
   and later starts bind it again, which GNOME answers without one. Each
   `Activated` toggles through the debounce. GNOME Settings, under Apps, changes
-  the trigger, and VOCO's Settings shows the trigger GNOME reports. While the
+  the trigger: VOCO saves each trigger GNOME reports, at a bind or a
+  `ShortcutsChanged`, as its shortcut when it can take it, so its labels name the
+  key GNOME listens for, and its tray presets are disabled while GNOME holds it. While the
   companion's lease is fresh VOCO closes the portal session, so one grab holds the
   chord, and binds again when the lease lapses. On GNOME 46, which has no
   GlobalShortcuts portal, setup's button adds a GNOME custom shortcut that runs
-  `voco --toggle` for the saved chord, only when no other GNOME shortcut uses it,
-  and never changes another.
+  `voco --toggle` for the saved chord, only when neither GNOME's window shortcuts
+  nor another custom shortcut uses it, and never changes another. GNOME's schema
+  for those keys isn't in the snap's runtime, so the snap carries one with the
+  same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
-  app also receives Alt+D (browsers focus the address bar, terminals delete a
-  word), and an evdev toggle while the chord leaks sends one notification per
-  launch with the panel remedy, which Settings also shows. When no keyboard is
-  readable and neither the panel nor IBus takes the chord, it does nothing at
-  all: 20 s after the listener starts, VOCO notifies once with the same remedy.
-- The companion grabs the configured Alt+D or Alt+Shift+D at every status, idle
-  included; each press sends `Action('shortcut', '')`. `ReserveShortcut` holds a
-  2.5 s lease for the exact `shortcutAccelerator` that only the authenticated Shell
-  can renew, about once a second. While it is fresh, passive evdev ignores the
-  chord and the action toggles through the `gnome_panel` backend; otherwise the
-  action is refused and evdev toggles. Release the grab on rejection, disconnect or
+  app also receives the chord (on Alt+D browsers focus the address bar and
+  terminals delete a word; few apps act on Super+X), and an evdev toggle while
+  the chord leaks sends one notification per launch with the panel remedy,
+  which Settings also shows. When no keyboard is readable and neither the panel
+  nor IBus takes the chord, it does nothing at all: 20 s after the listener
+  starts, VOCO notifies once with the same remedy.
+- The companion grabs the configured preset, Super+X, Alt+D or Alt+Shift+D, at
+  every status, idle included; each press sends `Action('shortcut', '')`.
+  `ReserveShortcut` holds a 2.5 s lease for the exact `shortcutAccelerator`
+  that only the authenticated Shell can renew, about once a second. While it is
+  fresh, passive evdev ignores the chord and the action toggles through the
+  `gnome_panel` backend; otherwise the action is refused and evdev toggles. Release the grab on rejection, disconnect or
   disable; late replies about an earlier grab never act on a newer one.
 - A completed IBus decision differs from a poll in flight. Consuming X11 callbacks
   go through the debounce; passive evdev keeps its duplicate guard. The listener
@@ -496,8 +517,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   the RemoteDesktop dialog, then the shortcut, through GlobalShortcuts' dialog or,
   on GNOME 46, the custom shortcut. It says before each what GNOME will show and
   what to choose, and that GNOME shows an orange icon while VOCO types. Nothing
-  outside VOCO and GNOME is needed. A refusal keeps the step, says what happened
+  outside VOCO and GNOME is needed. With the companion attached, setup skips
+  the typing step, and skips the shortcut step only while the companion's lease
+  holds the saved chord: a companion before version 23 grabs only Alt chords,
+  so with Super+X GNOME's shortcut is still asked for. A refusal keeps the step, says what happened
   and offers the button again; setup completes only once typing is allowed.
+- Setup's last step names the shortcut to press and, for a Super chord, says
+  Super is the key with the Windows or logo symbol.
 - Finish must flush capture and recognition successfully. Check the desktop input
   prerequisites without sending keys or changing the clipboard; only then save
   completion. Done returns straight to the hidden tray surface without presenting

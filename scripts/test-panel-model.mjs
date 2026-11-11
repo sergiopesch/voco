@@ -29,10 +29,10 @@ test('meter is finite and bounded even for malformed inputs', () => {
     }
 });
 test('the shortcut stays grabbable at every status and unsupported chords fail closed', () => {
-    for (const shortcutAccelerator of ['<Alt>d', '<Alt><Shift>d'])
+    for (const shortcutAccelerator of ['<Super>x', '<Alt>d', '<Alt><Shift>d'])
         for (const status of ['idle', 'initializing', 'starting', 'recording', 'processing', 'recovery', 'attention'])
             assert.equal(presentation({...state, status, shortcutAccelerator}).shortcutAccelerator, shortcutAccelerator);
-    for (const shortcutAccelerator of [undefined, null, '', '<Control>v', '<alt>d', ['<Alt>d'], 1])
+    for (const shortcutAccelerator of [undefined, null, '', '<Control>v', '<alt>d', '<Super>d', '<Alt>x', '<super>x', ['<Alt>d'], 1])
         assert.equal(presentation({...state, shortcutAccelerator}).shortcutAccelerator, null);
 });
 test('unknown protocol fails closed and recovery never adds panel text', () => {

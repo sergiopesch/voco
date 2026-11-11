@@ -2,6 +2,16 @@ import type { AudioDeviceOption, DesktopInputStatus, ShortcutDiagnostics } from 
 
 const ANY_APP = "To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.";
 
+/** config.rs's DEFAULT_HOTKEY, for a config that hasn't loaded yet. */
+export const DEFAULT_HOTKEY = "Super+X";
+
+/** Many people don't know Super by name, so setup names the key it means. */
+export function superKeyHint(hotkey: string): string | null {
+  return hotkey.split("+").some((part) => /^\s*(super|cmd|command)\s*$/i.test(part))
+    ? "Super is the key with the Windows or logo symbol."
+    : null;
+}
+
 export function unknownShortcut(hotkey: string): ShortcutDiagnostics {
   return { hotkey, route: null, state: "unknown", detail: "Shortcut availability has not been verified." };
 }
@@ -34,7 +44,8 @@ export function microphoneLabel(
   devices: AudioDeviceOption[],
 ): string {
   if (mode === "pending") return "Checking microphone setup";
-  if (mode === "native") return selected ? selected.label || selected.name : "No native microphone selected";
+  // No saved choice records from the system default microphone.
+  if (mode === "native") return selected ? selected.label || selected.name : "System default";
   return devices.find((device) => device.deviceId === deviceId)?.label ?? "System default";
 }
 

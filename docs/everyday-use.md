@@ -6,10 +6,11 @@ your computer. To set VOCO up, see [Install VOCO](install.md).
 ## Dictate
 
 1. Click where you want the text.
-2. Press `Alt+D` and wait until VOCO shows **Listening**.
+2. Press `Super+X` and wait until VOCO shows **Listening**. Super is the key
+   with the Windows or logo symbol.
 3. Speak. Your words appear a phrase at a time, with punctuation and capital
    letters.
-4. Press `Alt+D` again to finish.
+4. Press `Super+X` again to finish.
 
 You can also start and stop from the tray menu. The GNOME panel replaces the
 tray icon and can stop a dictation, but you start with the shortcut. If a VOCO
@@ -61,7 +62,7 @@ VOCO saves the text in [Review](#review) and shows **Dictation saved in Review**
 
 | Control | What it does |
 | --- | --- |
-| Shortcut | Starts and stops dictation. It is `Alt+D` unless you change it. |
+| Shortcut | Starts and stops dictation. It is `Super+X` unless you changed it; a setup from before `Super+X` became the default keeps its shortcut. |
 | Tray menu | Open the tray icon's menu for **Open VOCO**, **Start dictation** or **Stop dictation**, **Settings**, **Review**, **Change shortcut** and **Quit VOCO**. |
 | GNOME panel | Seven bars move with your voice. Click to stop while you dictate, or to open Settings. |
 | GNOME panel menu | Right-click or middle-click the panel, or press Menu or Shift+F10 on it, for **Settings**, **Review**, **Stop dictation** and **Quit VOCO**. |
@@ -184,22 +185,30 @@ is typed or copied, and your spelling choice doesn't apply.
 ## Shortcut
 
 To change the shortcut, choose **Change shortcut** in the tray menu, then
-**Alt+D**, **Alt+Shift+D** or **Custom shortcut…**. On the **Shortcut** page,
-choose **Change shortcut**, type a shortcut or choose **Record keys**, then
-choose **Apply shortcut**. A shortcut needs Alt, Ctrl or Super plus another key.
+**Super+X**, **Alt+D**, **Alt+Shift+D** or **Custom shortcut…**. On the
+**Shortcut** page, choose **Change shortcut**, type a shortcut or choose
+**Record keys**, then choose **Apply shortcut**. A shortcut needs Alt, Ctrl or
+Super plus another key.
 **Record keys** names the key you press rather than the symbol it types, so
 Ctrl+Shift+1 records as `Ctrl+Shift+1`, and a letter on a non-Latin layout as
 its Latin key.
-If your saved shortcut isn't valid, VOCO sets it back to `Alt+D` and shows
-**Shortcut reset**.
+If your saved shortcut isn't valid, VOCO sets it back to `Super+X` and shows
+**Shortcut reset**. VOCO never changes a valid shortcut you saved.
+
+`Super+X` is the default because a shortcut made of Alt and a letter can lose
+words: when GNOME keeps the letter from your app, the app sees Alt pressed and
+released on its own, and Firefox, Thunderbird, LibreOffice and VS Code then open
+their menu bar, which takes the pastes that follow. If you chose `Alt+D` or
+`Alt+Shift+D` and words go missing in those apps, switch to `Super+X`; see
+[Words go missing in Firefox, Thunderbird, LibreOffice or VS Code](troubleshooting.md#words-go-missing-in-firefox-thunderbird-libreoffice-or-vs-code).
 
 | Desktop | How the shortcut reaches VOCO |
 | --- | --- |
 | X11 | VOCO registers the shortcut with the desktop. |
-| GNOME 46, 48, 50 or 51 on Wayland | The [VOCO panel](install.md#gnome-panel) handles an `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
+| GNOME 46, 48, 50 or 51 on Wayland | The [VOCO panel](install.md#gnome-panel) handles a `Super+X`, `Alt+D` or `Alt+Shift+D` shortcut and keeps it from the app you are typing in. |
 | Other Wayland desktops | Bind a key to `voco --toggle`, as described in [Wayland compositor shortcuts](install.md#wayland-compositor-shortcuts). |
 
-On Wayland without the panel, VOCO can still watch for `Alt+D` and
+On Wayland without the panel, VOCO can still watch for `Super+X`, `Alt+D` and
 `Alt+Shift+D` if your account can read keyboard devices, but the key press also
 reaches your app. See
 [The shortcut also reaches your app, or does nothing](troubleshooting.md#the-shortcut-also-reaches-your-app-or-does-nothing)
@@ -246,8 +255,10 @@ until you discard them.
 
 The snap keeps the same files in its own folder, `~/snap/voco`: for example,
 its settings are in `~/snap/voco/current/.config/voco/config.json` and its logs
-in `~/snap/voco/current/.local/state/voco/`. It never reads the packages'
-folders, and they never read its.
+in `~/snap/voco/current/.local/state/voco/`. Beside its settings it keeps
+GNOME's answers: `remote-desktop-token`, which lets it type without asking
+GNOME again, and `global-shortcut`, which records that GNOME holds its
+shortcut. It never reads the packages' folders, and they never read its.
 
 Only your account can read VOCO's settings and recovery files. VOCO doesn't
 save audio in normal use. It also uses private sockets in your session's runtime
@@ -295,6 +306,8 @@ rm -f ~/.config/autostart/voco-login.desktop
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
   the user of the active local session. Outside GNOME 46, 48, 50 and 51, the
   shortcut also needs a desktop binding. The snap types on Wayland only on
-  GNOME, through the VOCO panel.
+  GNOME, through GNOME's Remote Desktop permission or the optional VOCO panel.
+  While it types through GNOME's permission, GNOME shows an orange icon in the
+  top bar, and its Stop ends the dictation.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.

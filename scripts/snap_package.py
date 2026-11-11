@@ -21,6 +21,10 @@ import rpm_package
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "packaging/snap/snapcraft.yaml.in"
 WRAPPERS = ROOT / "packaging/snap/wrappers"
+# GNOME's custom-shortcut keys, which the snap writes on GNOME 46; GLib finds
+# them through XDG_DATA_DIRS, which names the snap's usr/share.
+SCHEMA_SOURCES = ROOT / "packaging/snap/schemas"
+SCHEMAS = "usr/share/glib-2.0/schemas"
 METAINFO = "usr/share/metainfo/com.sergiopesch.voco.metainfo.xml"
 DESKTOP = "usr/share/applications/VOCO.desktop"
 ICON = "usr/share/icons/hicolor/256x256@2/apps/voco.png"
@@ -59,7 +63,7 @@ HELPER_NAMES = ("xclip", "xdotool", "notify-send")
 WRAPPER_FILES = {f"{PRIVATE}/python3": "python3", f"{PRIVATE}/run-helper": "run-helper"}
 # Paths only the snap has: snapcraft's metadata, the GNOME extension's launcher,
 # its content mount points, the private programs and the helpers' names.
-SNAP_ONLY = ("meta", "snap", PRIVATE, "gnome-platform", "gpu-2404", "data-dir",
+SNAP_ONLY = ("meta", "snap", PRIVATE, SCHEMAS, "gnome-platform", "gpu-2404", "data-dir",
              *(f"usr/bin/{name}" for name in HELPER_NAMES))
 
 # The plugs and slots the snap may have: VOCO's own and the GNOME extension's.
@@ -75,9 +79,9 @@ UPDATE_ITEM = "Update checks against GitHub Releases, and Install update, which 
 STORE_UPDATES = "The Snap Store keeps VOCO up to date"
 # What App Center's listing says about where the snap types, and the license
 # the license field can't name.
-SNAP_TYPING = ("The snap types in GNOME on Wayland, through the VOCO panel from "
-               "extensions.gnome.org, and in X11 sessions. On other Wayland desktops, "
-               "use VOCO's .deb or RPM from its GitHub releases.")
+SNAP_TYPING = ("The snap types in GNOME on Wayland, after you allow it once in GNOME's "
+               "own dialog, and in X11 sessions; nothing else to install. On other "
+               "Wayland desktops, use VOCO's .deb or RPM from its GitHub releases.")
 MODEL_LICENSE = ("VOCO is MIT-licensed, and its speech runtime Apache-2.0. The speech model, "
                  "NVIDIA's Nemotron, comes under the NVIDIA Open Model License, and the snap "
                  "carries every license and notice.")
@@ -219,7 +223,30 @@ def write_project(stage, project, version):
     for name in sorted(set(WRAPPER_FILES.values())):
         shutil.copy2(WRAPPERS / name, wrappers / name)
         (wrappers / name).chmod(0o755)
-    return copy_payload(stage, project / "payload")
+    count = copy_payload(stage, project / "payload")
+    write_schemas(project / "payload" / SCHEMAS)
+    return count
+
+
+def write_schemas(target):
+    """The schema sources and their compiled form, as GNOME's snap launcher
+    and GLib's own lookup each read one of them."""
+    target.mkdir(parents=True)
+    for source in sorted(SCHEMA_SOURCES.glob("*.gschema.xml")):
+        shutil.copy2(source, target / source.name)
+    subprocess.check_call(["glib-compile-schemas", "--strict", str(target)])
+
+
+def verify_schemas(snap_root):
+    """The snap carries exactly the reviewed schema sources, compiled."""
+    target = snap_root / SCHEMAS
+    sources = sorted(path.name for path in SCHEMA_SOURCES.glob("*.gschema.xml"))
+    found = sorted(path.name for path in target.iterdir()) if target.is_dir() else []
+    if found != sorted(sources + ["gschemas.compiled"]):
+        raise ValueError(f"/{SCHEMAS} must hold {sources} and gschemas.compiled: {found}")
+    for name in sources:
+        if (target / name).read_bytes() != (SCHEMA_SOURCES / name).read_bytes():
+            raise ValueError(f"/{SCHEMAS}/{name} differs from packaging/snap/schemas/{name}")
 
 
 def build_snap(stage, work, version):
@@ -381,6 +408,7 @@ if __name__ == "__main__":
         metadata = yaml.safe_load(Path(snap_yaml).read_text())
         plugs = verify_metadata(metadata, version)
         verify_private(Path(snap_root))
+        verify_schemas(Path(snap_root))
         files = verify_payload(Path(deb_root), Path(snap_root))
         print(f"{plugs} reviewed plugs, one slot and {files} files and links identical to the "
               "Debian package's.")

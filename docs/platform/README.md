@@ -22,10 +22,12 @@ installer turns it on; after you sign out and back in, it replaces the tray icon
 while VOCO runs. Without the panel or a tray icon, open VOCO from your app menu.
 
 On Ubuntu, VOCO also comes as a strictly confined [snap](../install.md#snap-store).
-It types on GNOME on Wayland through the panel from extensions.gnome.org, and in
-X11 sessions with `xdotool`; on other Wayland desktops it can't type. It has no
-`/dev/uinput` access, passive evdev or IBus input source, so on Wayland its
-shortcut is the panel's or a `voco --toggle` binding.
+It types on GNOME on Wayland through GNOME's Remote Desktop permission, which
+setup asks for once, or through the optional panel, and in X11 sessions with
+`xdotool`; on other Wayland desktops it can't type. It has no `/dev/uinput`
+access, passive evdev or IBus input source, so on Wayland its shortcut is the one
+GNOME holds for it through its shortcut portal (GNOME 48 and later), the panel's,
+or a `voco --toggle` binding.
 
 The two packages hold the same files and need glibc 2.39 or later: they are
 built on Ubuntu 24.04, whose glibc 2.39 and GCC 13 runtime set their floors.
@@ -206,22 +208,27 @@ group, which lets every program you run read all keyboards, or make
 
 ## Shortcuts by desktop
 
-VOCO's shortcut combines Alt, Control or Super with a key, Alt+D by default.
+VOCO's shortcut combines Alt, Control or Super with a key. Super+X is the
+default, and Alt+D and Alt+Shift+D are the other presets; a saved shortcut is
+never changed. A grab that takes only an Alt chord's letter, as the companion's
+and GNOME's shortcut portal do, leaves the focused app seeing Alt pressed and
+released alone, so Firefox, Thunderbird, LibreOffice and VS Code open their menu
+bar and it takes the pastes that follow. A lone Super opens nothing in an app.
 
 | Desktop | How the shortcut reaches VOCO |
 | --- | --- |
-| GNOME 46, 48, 50 or 51 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Alt+D or Alt+Shift+D, so the focused app never sees it. |
-| Wayland with Alt+D or Alt+Shift+D, no companion | Passive evdev. The focused app also acts on the chord. |
+| GNOME 46, 48, 50 or 51 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Super+X, Alt+D or Alt+Shift+D, so the focused app never sees it. |
+| Wayland with Super+X, Alt+D or Alt+Shift+D, no companion | Passive evdev. The focused app also acts on the chord. |
 | Wayland with any other shortcut | A desktop keybinding that runs `voco --toggle`. |
 | X11 | VOCO's root-window grab, for any shortcut it accepts. It toggles on release, so the paste keys reach the app. |
 | Any session, VOCO Dictation selected | The IBus engine consumes the chord in eligible fields. |
 
-With passive evdev, browsers move the cursor to the address bar on Alt+D and
-terminals delete a word. VOCO notifies "Your shortcut also reached the app" once
-per launch, with the fix for your desktop. When VOCO can read no keyboard and no
-companion or input source takes the chord, the shortcut does nothing: shortly
-after VOCO starts it notifies "Your shortcut can't reach VOCO yet" once, with
-the same fix.
+With passive evdev, few apps act on Super+X, but browsers move the cursor to
+the address bar on Alt+D and terminals delete a word. VOCO notifies "Your
+shortcut also reached the app" once per launch, with the fix for your desktop.
+When VOCO can read no keyboard and no companion or input source takes the
+chord, the shortcut does nothing: shortly after VOCO starts it notifies "Your
+shortcut can't reach VOCO yet" once, with the same fix.
 
 `voco --toggle` connects once to VOCO's owner-only socket,
 `$XDG_RUNTIME_DIR/voco.sock`; the connection is the request. It never launches

@@ -2,11 +2,13 @@ import { StatusMark } from "./StatusMark";
 import { RecordingVoiceSignal } from "./VoiceSignal";
 import { SettingsIcon } from "./SettingsIcon";
 import { PanelSetup } from "./PanelSetup";
+import { PortalSetup } from "./PortalSetup";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { DictationStatus, EnglishSpelling } from "@/types";
 import { useStore } from "@/store/useStore";
 import { ENGLISH_VARIETIES } from "@/lib/englishSpelling";
+import { superKeyHint } from "@/lib/shortcutPresentation";
 
 interface OnboardingProps {
   microphone: string;
@@ -16,8 +18,13 @@ interface OnboardingProps {
   attempted: boolean;
   setupError?: string | null;
   desktopSetupError?: string | null;
-  /** The failure needs the companion, which the panel's setup provides. */
-  desktopSetupPanel?: boolean;
+  /** Where the desktop failure is fixed: the panel's setup, or, in the snap,
+   * GNOME's portal permissions. */
+  desktopSetupArea?: "panel" | "portal" | null;
+  /** Where the shortcut note is fixed, as above. */
+  shortcutArea?: "panel" | "portal" | null;
+  /** The Snap Store's VOCO, whose setup never asks for the panel. */
+  storeSetup?: boolean;
   checkingDesktopSetup?: boolean;
   onCheckDesktopSetup?: () => void;
   onOpenDesktopSetupGuide?: () => void;
@@ -51,7 +58,8 @@ interface OnboardingProps {
 
 export function Onboarding({ microphone, status, passed,
   failed, preparing, saving, blocked, hotkey, microphoneControls, desktopReady = false,
-  onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError, desktopSetupPanel = false,
+  onStart, onStop, onFinish, attempted, setupError, onRetrySetup, desktopSetupError, desktopSetupArea = null,
+  shortcutArea = null, storeSetup = false,
   checkingDesktopSetup, onCheckDesktopSetup, onOpenDesktopSetupGuide, spelling = "british", focusPrimary = false,
   wordsDone = true, wordsChecked = true, onContinue, shortcutNote = null, startsAtLogin = false }: OnboardingProps) {
   // Only this view shows recognition text, so only it re-renders per hypothesis.
@@ -103,9 +111,10 @@ export function Onboarding({ microphone, status, passed,
     <div className="voco-setup__status" role={problem || desktopSetupError ? "alert" : "status"}>
       <StatusMark state={state} /><span>{statusText}</span>
     </div>
-    {/* When the panel is the fix, its own step says so and offers it; the
-        details and the general guide would only repeat it. */}
-    {desktopSetupError && desktopSetupPanel ? <PanelSetup disabled={busy || blocked} /> : desktopSetupError ? <>
+    {/* When the panel or GNOME's permissions are the fix, their own step says
+        so and offers it; the details and the general guide would only repeat it. */}
+    {desktopSetupError && desktopSetupArea === "portal" ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} onChanged={() => onCheckDesktopSetup?.()} />
+      : desktopSetupError && desktopSetupArea === "panel" ? <PanelSetup disabled={busy || blocked} /> : desktopSetupError ? <>
       <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details>
       {onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
     </> : null}
@@ -114,15 +123,22 @@ export function Onboarding({ microphone, status, passed,
     </div> : null}
     {handoff ? <div className="voco-setup__handoff">
       {/* While the focused app also acts on the shortcut, as before a fresh install's panel loads at the next login, the fix comes first. */}
-      {shortcutNote ? <PanelSetup disabled={busy || blocked} note={shortcutNote} /> : null}
-      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
+      {/* The snap's GNOME permissions come first, with what the orange icon
+          means; its setup never offers the panel. */}
+      {shortcutNote ? shortcutArea === "portal" ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} />
+        : <PanelSetup disabled={busy || blocked} note={shortcutNote} />
+        : storeSetup ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} /> : null}
+      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.{superKeyHint(hotkey) ? ` ${superKeyHint(hotkey)}` : null}</p>
       <p>{startsAtLogin ? "VOCO starts when you sign in. You can turn this off in Settings."
         : "VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher."}</p>
-      {shortcutNote ? null : <PanelSetup disabled={busy || blocked} />}
+      {shortcutNote || storeSetup ? null : <PanelSetup disabled={busy || blocked} />}
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}
     </div> : testing ? <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p> : null}
     <div className="voco-setup__actions">
-      {passed && !recording ? <>
+      {/* GNOME's permission step carries its own button; checking again
+          without it would only repeat the step. */}
+      {passed && !recording && desktopSetupError && desktopSetupArea === "portal" && !handoff && !toWords ? null
+      : passed && !recording ? <>
         <button ref={primaryRef} className="voco-button voco-button--primary" disabled={busy || blocked || failed || Boolean(setupError)}
           onClick={handoff ? () => void onFinish() : toWords ? onContinue : onCheckDesktopSetup}>
           {saving ? "Saving…" : checkingDesktopSetup ? "Checking setup…" : handoff ? "Done" : toWords ? "Continue" : "Check desktop setup"}</button>
