@@ -55,10 +55,10 @@ On Ubuntu, VOCO is also in the App Center and the
 sudo snap install voco
 ```
 
-The snap types on GNOME on Wayland, through the
-[VOCO panel](https://extensions.gnome.org/extension/11710/voco/) that its setup
-opens for you, and in X11 sessions. On other Wayland desktops, use the installer
-above. See [the snap](docs/install.md#snap-store) for what it leaves out.
+The snap types on GNOME on Wayland, after you allow it once in GNOME's own
+dialog during setup, and in X11 sessions. On other Wayland desktops, use the
+installer above. See [the snap](docs/install.md#snap-store) for how it types and
+what it leaves out.
 
 ## Your first dictation
 

@@ -246,8 +246,10 @@ until you discard them.
 
 The snap keeps the same files in its own folder, `~/snap/voco`: for example,
 its settings are in `~/snap/voco/current/.config/voco/config.json` and its logs
-in `~/snap/voco/current/.local/state/voco/`. It never reads the packages'
-folders, and they never read its.
+in `~/snap/voco/current/.local/state/voco/`. Beside its settings it keeps
+GNOME's answers: `remote-desktop-token`, which lets it type without asking
+GNOME again, and `global-shortcut`, which records that GNOME holds its
+shortcut. It never reads the packages' folders, and they never read its.
 
 Only your account can read VOCO's settings and recovery files. VOCO doesn't
 save audio in normal use. It also uses private sockets in your session's runtime
@@ -295,6 +297,8 @@ rm -f ~/.config/autostart/voco-login.desktop
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
   the user of the active local session. Outside GNOME 46, 48, 50 and 51, the
   shortcut also needs a desktop binding. The snap types on Wayland only on
-  GNOME, through the VOCO panel.
+  GNOME, through GNOME's Remote Desktop permission or the optional VOCO panel.
+  While it types through GNOME's permission, GNOME shows an orange icon in the
+  top bar, and its Stop ends the dictation.
 - Apps that remap Shift+Insert, remote desktops and virtual machines may not
   accept the paste.

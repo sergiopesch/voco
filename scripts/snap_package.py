@@ -75,9 +75,9 @@ UPDATE_ITEM = "Update checks against GitHub Releases, and Install update, which 
 STORE_UPDATES = "The Snap Store keeps VOCO up to date"
 # What App Center's listing says about where the snap types, and the license
 # the license field can't name.
-SNAP_TYPING = ("The snap types in GNOME on Wayland, through the VOCO panel from "
-               "extensions.gnome.org, and in X11 sessions. On other Wayland desktops, "
-               "use VOCO's .deb or RPM from its GitHub releases.")
+SNAP_TYPING = ("The snap types in GNOME on Wayland, after you allow it once in GNOME's "
+               "own dialog, and in X11 sessions; nothing else to install. On other "
+               "Wayland desktops, use VOCO's .deb or RPM from its GitHub releases.")
 MODEL_LICENSE = ("VOCO is MIT-licensed, and its speech runtime Apache-2.0. The speech model, "
                  "NVIDIA's Nemotron, comes under the NVIDIA Open Model License, and the snap "
                  "carries every license and notice.")

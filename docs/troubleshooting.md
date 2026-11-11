@@ -20,9 +20,10 @@ two checks send no keys, leave the clipboard alone and change no settings.
 With the `.deb` or RPM on Wayland, `getfacl /dev/uinput` shows whether your
 login may use `/dev/uinput`, which VOCO needs to press the paste keys; see
 [Access to /dev/uinput](platform/README.md#access-to-devuinput). The snap
-doesn't use `/dev/uinput`: on GNOME on Wayland it types through the VOCO panel,
-and only the running VOCO can tell whether the panel is connected, so open VOCO
-before you run the checks.
+doesn't use `/dev/uinput`: on GNOME on Wayland it types through GNOME's Remote
+Desktop permission, or through the VOCO panel if you added it. Only the running
+VOCO can tell whether the panel is connected, so open VOCO before you run the
+checks.
 
 In VOCO, open **Settings** and choose **Help**. The sections
 **My microphone is not working**, **My shortcut is not working** and
@@ -121,14 +122,15 @@ address bar, so your words land there, and terminals delete a word. VOCO warns
 once per launch with **Your shortcut also reached the app**. If VOCO can't read
 any keyboard either, the shortcut does nothing, and shortly after VOCO starts
 it says **Your shortcut can't reach VOCO yet**. The snap can't read keyboards,
-so on Wayland without the panel its shortcut does nothing. Fix either one of
+so on Wayland its shortcut works only once GNOME holds it. Fix either one of
 these ways:
 
 - On GNOME 46, 48, 50 or 51 with the `.deb` or RPM, choose **Enable live panel**
   on the **Help** page, or run `voco --setup-panel`. Then sign out and back in.
-- With the snap on GNOME, choose **Get the VOCO panel** on the **Help** page and
-  install the panel from extensions.gnome.org. GNOME loads a first install at
-  once.
+- With the snap on GNOME 48 or later, choose **Add Alt+D** on the **Help** page,
+  then **Add** in GNOME's dialog. On Ubuntu 24.04, add a custom shortcut for
+  `voco --toggle` in **Settings** → **Keyboard** → **View and Customize
+  Shortcuts** → **Custom Shortcuts**.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
 - With the `.deb` or RPM, add the
@@ -220,9 +222,10 @@ when the panel needs a step.
 
 - If the panel isn't enabled, choose **Enable live panel** on the **Help** page,
   or run `voco --setup-panel`. Then save your work and sign out and back in.
-  GNOME loads the panel, and any update to it, when you sign in. The snap can't
-  enable the panel: choose **Get the VOCO panel** on the **Help** page and
-  install it from extensions.gnome.org, which loads a first install at once.
+  GNOME loads the panel, and any update to it, when you sign in. The snap
+  doesn't need the panel. To add it anyway, choose **Get the VOCO panel** on the
+  **Help** page and install it from extensions.gnome.org, which loads a first
+  install at once.
 - If GNOME extensions are turned off, turn them on in the Extensions app. If a
   policy blocks them, ask your administrator.
 - With the `.deb` or RPM, if it names another copy of the panel in your home
@@ -335,7 +338,9 @@ off, turn it back on in Ubuntu's **Settings** → **Apps** → **VOCO**, or with
 | `The VOCO snap can't use the microphone yet. …, then try again.` | In Settings, open **Apps**, then **VOCO**, and allow the microphone. Or run `snap connect voco:audio-record`, which asks for your password. Then start dictation again. |
 | `The VOCO snap can't use the microphone yet. … Then quit VOCO and open it again.` | In an X11 session VOCO lists microphones once, at startup. Allow the microphone in Settings, under **Apps**, then **VOCO**, or run `snap connect voco:audio-record`. Then quit VOCO and open it again. |
 | `The VOCO snap can't see whether this session is active or locked, so it sent no paste keys. …` | Allow it in Settings, under **Apps**, then **VOCO**, or run `snap connect voco:login-session-observe`. Then dictate again. VOCO checks the session before each paste. |
-| `On Wayland, the VOCO snap types through the VOCO panel. …` | Install the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/) from extensions.gnome.org; it works at once. If the site's Install button asks for GNOME's browser integration, add its browser extension and run `sudo apt install gnome-browser-connector`. If the panel is already installed, sign out and back in. |
+| `VOCO types into your apps through GNOME, which asks you once. …` | Choose **Allow typing** in setup or on the **Help** page. In GNOME's **Remote Desktop** dialog, turn on **Allow Remote Interaction**, then choose **Share**. |
+| `VOCO isn't allowed to type yet. …` | The same: choose **Allow typing** on the **Help** page and allow it in GNOME's dialog. |
+| `GNOME's Stop ended VOCO's typing, so it sent no paste keys.` | You chose **Stop** on GNOME's orange icon. VOCO stopped and copied the rest of your words; paste them with Shift+Insert or Ctrl+V. The next dictation connects again by itself. |
 | `The VOCO snap types only on GNOME and in X11 sessions. …` | The snap can't type on other Wayland desktops. Install the `.deb` or RPM from VOCO's [GitHub releases](https://github.com/sergiopesch/voco/releases) instead. |
 
 The Snap Store updates the snap. While VOCO runs, snapd holds an update back and

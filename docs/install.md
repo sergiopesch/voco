@@ -97,17 +97,23 @@ The store connects the microphone (`audio-record`) and the session checks
 (`login-session-observe`) itself, and keeps VOCO up to date, so the snap has no
 Install update. It is strictly confined, which decides where it can type:
 
-- **GNOME on Wayland:** through the
-  [VOCO panel](https://extensions.gnome.org/extension/11710/voco/), which a snap
-  can't install. VOCO's setup opens its page: choose Install there, and GNOME
-  asks you to confirm. The panel works at once and setup continues by itself.
-  The site's Install button needs GNOME's browser integration. Without it,
-  choose **Install without the website** in setup, copy its command into
-  Terminal and choose Install in GNOME's prompt. Or add the browser extension
-  the page offers, run `sudo apt install gnome-browser-connector`, and reload
-  the page.
-- **X11 sessions:** with `xdotool`. The panel is optional there: it adds live
-  microphone bars and Stop to the top bar.
+- **GNOME on Wayland:** through GNOME's own Remote Desktop permission, with
+  nothing else to install. Setup asks for it once: choose **Allow typing**, turn
+  on **Allow Remote Interaction** in GNOME's dialog, then choose **Share**. GNOME
+  remembers the answer. While you dictate, GNOME shows an orange icon in the top
+  bar, for at least five seconds; choosing **Stop** there ends the dictation and
+  copies the rest of your words. Then setup offers **Add Alt+D**: choose **Add**
+  in GNOME's dialog, and GNOME keeps the shortcut for VOCO, so the app you're
+  typing in never receives it. Change it in **Settings** → **Apps** → **VOCO**.
+  On Ubuntu 24.04, whose GNOME has no shortcut dialog, add a custom shortcut for
+  `voco --toggle` in **Settings** → **Keyboard**.
+- **X11 sessions:** with `xdotool`.
+
+On GNOME, the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/)
+is optional: it adds live microphone bars and Stop to the top bar, and VOCO then
+types through it, without GNOME's orange icon. Help in VOCO's Settings links to
+it.
+
 - **Other Wayland desktops:** it can't type, and setup says so. Use the Debian
   package or the RPM.
 
@@ -123,6 +129,9 @@ tray or panel menu so the update can apply, then open VOCO again.
 If you turn off the microphone or session permission, VOCO says which one it
 needs. Turn it back on in Ubuntu's **Settings** → **Apps** → **VOCO**, or run
 `snap connect voco:audio-record` or `snap connect voco:login-session-observe`.
+GNOME's Settings has no switch for the Remote Desktop permission. VOCO keeps
+GNOME's answer in its own settings folder, so `sudo snap remove --purge voco`
+removes it, and a new install asks again.
 
 ## Manual install
 
@@ -379,7 +388,7 @@ This also removes the package's `/dev/uinput` rule, but the access the rule
 gave lasts until you restart the computer.
 
 For the snap, run `sudo snap remove voco`, and remove the VOCO panel in the
-Extensions app if you installed it from extensions.gnome.org. snapd keeps a
+Extensions app if you added it from extensions.gnome.org. snapd keeps a
 snapshot of the snap's data, including My words and any text saved for Review,
 for about 31 days. To remove the data at once, run
 `sudo snap remove --purge voco` instead.

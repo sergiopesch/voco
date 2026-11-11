@@ -488,14 +488,41 @@ presenting the old.
 (`SNAP_NAME`). Strict confinement gives it no `/dev/uinput`, `/dev/input`,
 IBus engine, systemd user manager or network, so the snap skips what needs
 them: the virtual keyboard, passive evdev, the IBus listener, the retired
-`voco-ydotoold.service` and the update check. On Wayland only the companion
-types for it: the paste check passes once the companion asks for work, and a
-paste without it typed nothing. `voco --check-desktop-input` and
-`--check-panel` run apart from the VOCO the companion works for, so they ask it
-with `CompanionAsking`, which answers any caller; when no VOCO answers, they
-say to open VOCO and check again. Until then, setup says what's missing: on GNOME,
-the VOCO panel from extensions.gnome.org; on other Wayland desktops, the `.deb`
-or RPM instead. X11 sessions keep `xdotool` and `xclip`.
+`voco-ydotoold.service` and the update check. On GNOME Wayland the companion
+types for it once it asks for work; otherwise GNOME's RemoteDesktop portal does.
+
+`portal.rs` runs one thread with a private main context for every portal
+request, session and signal, so neither GNOME's answer nor the person answering
+GNOME's dialog ever blocks GTK's thread. `portal_keys.rs` opens a keyboard-only
+RemoteDesktop session with `persist_mode` 2. Setup's **Allow typing** opens the
+first one without a restore token, which shows GNOME's dialog, and saves the
+token GNOME returns in `remote-desktop-token` beside the config, owner-only;
+each later Start returns a new one, which replaces it. The renderer calls
+`begin_desktop_typing` when a desktop dictation starts, which opens a session
+from the token in the background (8–90 ms on GNOME 50), and
+`update_runtime_status` closes it when the dictation status returns to idle,
+after Stop's last paste and space; the lock watch and exit close it too. GNOME
+shows its orange remote-access icon while a session exists. Its Stop closes the
+session: the `Closed` signal clears it and sends the tray's stop request, so the
+dictation ends as Stop does and copies the rest. A paste sends Shift, Insert
+and their releases with `NotifyKeyboardKeycode`; one before the session has
+started waits up to 400 ms, then typed nothing.
+
+`portal_shortcut.rs` binds one `toggle` shortcut through GlobalShortcuts (GNOME
+48 and later), first from setup's button, which shows GNOME's dialog, and records
+that in `global-shortcut` beside the config. At each start it binds again, which
+GNOME answers without a dialog. `Activated` toggles through
+`eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. Modifiers can't be
+read through the portal, so `keys_held` holds a paste until `Deactivated`, at
+most 1.5 s after the press, then 150 ms more. The companion's `ReserveShortcut`
+suspends the portal session and its release binds again, so one grab holds the
+chord.
+
+`voco --check-desktop-input` and `--check-panel` run apart from the VOCO the
+companion works for, so they ask it with `CompanionAsking`, which answers any
+caller; the portal path is ready when the token is saved. Until it is, setup
+shows the portal step (`setupArea` `portal`); on other Wayland desktops, it
+names the `.deb` or RPM instead. X11 sessions keep `xdotool` and `xclip`.
 
 logind's session signals don't reach a snap, because `login-session-observe`
 passes only the manager's, and `GetSessionByPID` is out of its reach. So the
@@ -530,8 +557,8 @@ they open a microphone.
 
 The snap can't ask GNOME Shell about extensions, nor enable one, so
 `panel_setup.rs` reports its companion active once it asks for work, and
-otherwise points setup and Help to `COMPANION_PAGE`, its page on extensions.gnome.org;
-setup shows the link wherever the paste check fails for want of the companion.
+otherwise `optional`, with `COMPANION_PAGE`, its page on extensions.gnome.org,
+which Help offers; setup never asks for it.
 snapd installs the snap's desktop entry as `voco_voco.desktop`, which
 `activation.rs` counts as VOCO's launcher in the snap only.
 
