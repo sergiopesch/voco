@@ -110,7 +110,9 @@ Restored taught versions that clash with the list are dropped, and only their
 count is logged. VOCO never overwrites a config it cannot read, nor repairs one
 from the copy: Settings shows a recovery panel, and only Reset renames the file
 to a `config.recovery-backup-*` copy before writing defaults. Reset also deletes
-`config.json.last` and the backups of earlier resets.
+`config.json.last` and the backups of earlier resets. The snap keeps its portal
+restore token and its record of a bound shortcut beside the config, owner-only;
+Reset deletes both, and setup then asks GNOME again.
 
 VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
 with the exact upstream RUSTSEC-2024-0429 fix ([backport](vendor/glib/VOCO-PATCH.md)),
@@ -120,8 +122,8 @@ provenance and the optimized iterator regression before accepting a dependency
 change.
 
 VOCO ships a `.deb`, an RPM and a strict snap, `voco` in the Snap Store, from one
-staged tree. The snap serves GNOME on Wayland, typing through the companion, and
-X11 sessions. It leaves out what strict confinement forbids: the uinput keyboard
+staged tree. The snap serves GNOME on Wayland, typing through GNOME's
+RemoteDesktop portal or the companion, and X11 sessions. It leaves out what strict confinement forbids: the uinput keyboard
 and its udev rule, evdev, the IBus engine, the companion itself, the Chromium host
 and the update check. [The snap](#the-snap) lists its rules.
 
@@ -234,7 +236,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   modifiers to be released (evdev, else the companion's modifier check). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
-  after the press. An X11 paste also waits, at most 1.5 s, while the X server's
+  after the press. Through the RemoteDesktop portal VOCO can't read modifiers, so
+  after a portal shortcut press a paste waits for its `Deactivated`, at most 1.5 s
+  after the press, then 150 ms for the modifier's own release. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
@@ -258,7 +262,23 @@ and the update check. [The snap](#the-snap) lists its rules.
   at the lock screen, since its metadata names no session modes and
   `ScreenShield.activate()` pushes `unlock-dialog`. VOCO's origin and lock checks
   still run before the copy and before the request.
-- Otherwise Wayland keys go through VOCO's own uinput device, "VOCO virtual
+- In the snap on GNOME Wayland without that companion, the keys go through
+  GNOME's RemoteDesktop portal (`portal_keys.rs`), in a keyboard-only session
+  with `persist_mode` 2 so GNOME asks once. VOCO opens the session when desktop
+  dictation starts and closes it when that dictation ends, after Stop's last
+  paste and space, at a lock, when the renderer is replaced and at quit; it never
+  holds one while idle. GNOME shows its orange remote-access icon while a session
+  exists, at least 5 s, and its Stop closes the session: VOCO then stops the
+  dictation as Stop does, copying the rest. Each paste sends Shift, Insert and
+  their releases with `NotifyKeyboardKeycode`, 12 ms apart, never another key. A
+  paste before the session has started, a session that failed to start, or one
+  GNOME closed, typed nothing: `no-mutation`. A call that fails after Shift went
+  out is uncertain, and VOCO then releases Shift. Only setup's and Settings'
+  explicit button starts a session without a restore token, which shows GNOME's
+  dialog; dictation without a token is refused with that remedy. Each Start's new
+  token replaces the saved one. A session that waits for GNOME's dialog, because
+  the user revoked the permission, types nothing until the user answers.
+- Otherwise, outside the snap, Wayland keys go through VOCO's own uinput device, "VOCO virtual
   keyboard" (`virtual_keyboard.rs`); X11 keeps `xdotool`. Keep one device per
   process, created at startup and reused for the process lifetime, never one per
   paste: the compositor adds a new device late and could lose its first keys, so
@@ -279,6 +299,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   the protocol relies on: a strict snap with a session `dbus` slot answers an
   unconfined caller's pending call and receives its calls, and its own calls to
   that caller are refused.
+- CI's portal suite proves the snap's portal path in a headless GNOME 50 with the
+  real xdg-desktop-portal and its GNOME backend, VOCO registered under the snap's
+  app ID: the first typing session shows GNOME's dialog and later ones restore
+  without it; every paste lands with its exact text in a GTK field on Wayland and
+  under XWayland; dictation opens a session and its end closes it; the
+  indicator's Stop stops the dictation with no key after it; the shortcut toggles
+  through `Activated` and the next paste waits for `Deactivated`.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that
@@ -334,6 +361,18 @@ and the update check. [The snap](#the-snap) lists its rules.
 ### Shortcut
 
 - Toggles are debounced for 120 ms (`TOGGLE_DEBOUNCE_MS`).
+- In the snap on GNOME 48 and later without the companion, the GlobalShortcuts
+  portal holds the shortcut (`portal_shortcut.rs`): one `toggle` shortcut whose
+  preferred trigger is the saved chord. Only setup's and Settings' explicit
+  button binds it the first time, which shows GNOME's dialog; VOCO records that,
+  and later starts bind it again, which GNOME answers without one. Each
+  `Activated` toggles through the debounce. GNOME Settings, under Apps, changes
+  the trigger, and VOCO's Settings shows the trigger GNOME reports. While the
+  companion's lease is fresh VOCO closes the portal session, so one grab holds the
+  chord, and binds again when the lease lapses. On GNOME 46, which has no
+  GlobalShortcuts portal, setup's button adds a GNOME custom shortcut that runs
+  `voco --toggle` for the saved chord, only when no other GNOME shortcut uses it,
+  and never changes another.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives Alt+D (browsers focus the address bar, terminals delete a
   word), and an evdev toggle while the chord leaks sends one notification per
@@ -369,10 +408,11 @@ and the update check. [The snap](#the-snap) lists its rules.
   is Wayland-only. Enable the companion only through the user-run setup
   (`voco --setup-panel`), which also moves an enabled `voco-panel@voco.local` to
   the new UUID; package hooks never change enabled extensions. The snap can't
-  enable extensions, since GNOME's Extensions interface is out of its reach: its
-  setup opens the companion's page on extensions.gnome.org through the portal and
-  reports the companion active once it attaches. Keep "sign out and back in"
-  feedback distinct from active status.
+  enable extensions, since GNOME's Extensions interface is out of its reach. For
+  the snap the companion is optional: setup never asks for it, and Settings offers
+  its page on extensions.gnome.org, opened through the portal, as a top-bar meter
+  without GNOME's remote-access icon, reporting it active once it attaches. Keep
+  "sign out and back in" feedback distinct from active status.
 - VOCO owns `com.sergiopesch.voco.Panel` on the session bus, under the
   maintainer's own domain as the Snap Store requires of a slot's bus name, and
   every interface, object path and error the two sides use sits under it. A
@@ -451,6 +491,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   leave nothing listed, setup says they can personalise VOCO in Settings later.
 - Say it, in setup and Settings, uses the same queue with local-only output and
   the saved list, as recognized, without spelling. Never paste or copy it.
+- In the snap on GNOME Wayland without the companion, setup's desktop step asks
+  for GNOME's permissions from the user's clicks, one at a time: typing, through
+  the RemoteDesktop dialog, then the shortcut, through GlobalShortcuts' dialog or,
+  on GNOME 46, the custom shortcut. It says before each what GNOME will show and
+  what to choose, and that GNOME shows an orange icon while VOCO types. Nothing
+  outside VOCO and GNOME is needed. A refusal keeps the step, says what happened
+  and offers the button again; setup completes only once typing is allowed.
 - Finish must flush capture and recognition successfully. Check the desktop input
   prerequisites without sending keys or changing the clipboard; only then save
   completion. Done returns straight to the hidden tray surface without presenting
@@ -549,18 +596,22 @@ and the update check. [The snap](#the-snap) lists its rules.
   libraries in the app. `VOCO_STREAM_PYTHON` names the worker's wrapper, which
   adds only `LD_LIBRARY_PATH` for those folders, found from its own path, and
   runs that Python with VOCO's flags.
-- It types only through the companion on GNOME Wayland and through `xdotool` on
-  X11. Elsewhere Start is refused, and setup names the build that supports that
-  desktop. Only the running VOCO knows whether the companion asks it for work, so
+- It types through the companion when it asks for work, otherwise through the
+  RemoteDesktop portal on GNOME Wayland, and through `xdotool` on X11. Elsewhere
+  Start is refused, and setup names the build that supports that desktop. Only
+  the running VOCO knows whether the companion asks it for work, so
   `voco --check-desktop-input` and `--check-panel` ask it with
   `com.sergiopesch.voco.Panel1.CompanionAsking`, the one method any caller
-  may use, and with no VOCO to ask they claim neither. Its shortcut is the companion's grab on GNOME Wayland, VOCO's grab on
-  X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus route.
+  may use, and with no VOCO to ask they claim neither; the portal path is ready
+  when a restore token is saved. Its shortcut is the companion's grab or the
+  GlobalShortcuts portal on GNOME Wayland (a custom shortcut on GNOME 46), VOCO's
+  grab on X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus
+  route.
 - logind's session signals don't reach a snap, because `login-session-observe`
   receives only the manager's, and `GetSessionByPID` is out of its reach. So the
   snap binds its origin through a validated session ID or the user's sessions,
   reads `LockedHint` and `Active` at each check and `LockedHint` once a second,
-  and stops dictation when it reads locked. Until `login-session-observe` is
+  and stops dictation and closes any portal session when it reads locked. Until `login-session-observe` is
   connected, both checks reject (`no-mutation`), on X11 as on Wayland, and
   Start is refused with the `snap connect` remedy.
 - Its config, journal and logs live in `$SNAP_USER_DATA`. It never reads a
@@ -573,7 +624,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   `com.sergiopesch.voco.Panel` and auto-connects `audio-record` and
   `login-session-observe`, so an upload that asks for the same plugs and slot
   passes the store's automated review; a new plug, slot or bus name needs a store
-  request first. Where they aren't connected, as after a `--dangerous` install,
+  request first. The portals need no plug beyond `desktop`. Before promoting,
+  install it from the store's channel in fresh Ubuntu 24.04 and latest Ubuntu
+  desktop VMs, as a new user, through setup, dictation, a lock and a restart. Where they aren't connected, as after a `--dangerous` install,
   setup shows their `snap connect` commands. On X11, where WebKit captures, `audio-record` connected after VOCO
   started needs a restart, and VOCO says so rather than open a microphone.
 
