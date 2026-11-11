@@ -330,6 +330,17 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     if keys == PasteKeys::Uinput {
         ensure_virtual_keyboard().map_err(InsertionError::no_mutation)?;
     }
+    // Likewise GNOME's typing session: one still starting, refused or closed
+    // by GNOME's Stop leaves the clipboard alone and the text pending.
+    #[cfg(target_os = "linux")]
+    if keys == PasteKeys::Portal {
+        crate::portal_keys::ready().map_err(|failure| match failure {
+            crate::portal_keys::PortalPasteError::NoMutation(message)
+            | crate::portal_keys::PortalPasteError::Uncertain(message) => {
+                InsertionError::no_mutation(message)
+            }
+        })?;
+    }
     let routed = paste_text(text);
     // A space is pasted, never sent as a Space key: on a focused button,
     // checkbox or terminal prompt a Space key would act. The stream ends each

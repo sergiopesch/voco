@@ -400,6 +400,12 @@ fn key(
         .map_err(|error| error.to_string())
 }
 
+/// A session is open, or opens within the starting wait: checked before the
+/// clipboard copy, so a missing session typed nothing and changed nothing.
+pub fn ready() -> Result<(), PortalPasteError> {
+    current_session().map(|_| ())
+}
+
 /// Shift, Insert and their releases, 12 ms apart, never another key. Returns
 /// when the Insert press went out.
 pub fn paste() -> Result<Instant, PortalPasteError> {
