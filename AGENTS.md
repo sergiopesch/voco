@@ -514,7 +514,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   the RemoteDesktop dialog, then the shortcut, through GlobalShortcuts' dialog or,
   on GNOME 46, the custom shortcut. It says before each what GNOME will show and
   what to choose, and that GNOME shows an orange icon while VOCO types. Nothing
-  outside VOCO and GNOME is needed. A refusal keeps the step, says what happened
+  outside VOCO and GNOME is needed. With the companion attached, setup skips
+  the typing step, and skips the shortcut step only while the companion's lease
+  holds the saved chord: a companion before version 23 grabs only Alt chords,
+  so with Super+X GNOME's shortcut is still asked for. A refusal keeps the step, says what happened
   and offers the button again; setup completes only once typing is allowed.
 - Setup's last step names the shortcut to press and, for a Super chord, says
   Super is the key with the Windows or logo symbol.

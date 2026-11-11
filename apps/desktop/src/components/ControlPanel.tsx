@@ -974,7 +974,7 @@ export function ControlPanel({
                   <div className="voco-preferences__group">
                     <div className="voco-preferences__card voco-preferences__form">
                       {updatesByStore && waylandDesktop ? <PortalSetup hotkey={config.hotkey} disabled={saving || dictationBusy}
-                        onStatus={status => setGnomeHoldsShortcut(status.applies && !status.panelAttached && status.shortcutBound)} /> : null}
+                        onStatus={status => setGnomeHoldsShortcut(status.applies && !status.panelHoldsShortcut && status.shortcutBound)} /> : null}
                       {gnomeHoldsShortcut ? null : !editingShortcut ? <div className="voco-preferences__shortcut-summary"><span>Start and stop dictation</span><kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd><button className="voco-button voco-button--secondary" ref={shortcutEditButtonRef} onClick={() => setEditingShortcut(true)}>Change shortcut</button></div> : <div className="voco-preferences__shortcut-editor">
                         <label className="voco-field"><span>Start and stop dictation</span><input disabled={saving} value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft} aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
                           onBlur={() => { if (recordingShortcut) endShortcutCapture(); }} onChange={(event) => setHotkeyDraft(event.target.value)}

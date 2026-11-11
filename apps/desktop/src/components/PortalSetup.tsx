@@ -63,21 +63,25 @@ export function PortalSetup({ hotkey, disabled = false, onChanged, onStatus }: {
   }
   if (!status) return <div className="voco-portal-setup" role="group" aria-label="Typing and shortcut"><p role="status">Checking GNOME’s permissions…</p></div>;
   if (!status.applies) return null;
-  if (status.panelAttached) {
+  if (status.panelAttached && status.panelHoldsShortcut) {
     return <div className="voco-portal-setup" role="group" aria-label="Typing and shortcut">
       <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span>The VOCO panel types for VOCO and holds <strong>{hotkey}</strong>.</span></p>
     </div>;
   }
   const shortcut = triggerLabel(status.shortcutTrigger, hotkey);
+  // An attached panel types; one before version 23 can't hold Super+X, so
+  // GNOME's shortcut step still shows.
+  const typing = status.panelAttached || status.typingAllowed;
   return <div className="voco-portal-setup" role="group" aria-label="Typing and shortcut">
-    {status.typingAllowed ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span>VOCO can type into your apps. While you dictate, GNOME shows an orange icon in the top bar; choosing Stop there ends the dictation.</span></p>
+    {status.panelAttached ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span>The VOCO panel types for VOCO.</span></p>
+      : status.typingAllowed ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span>VOCO can type into your apps. While you dictate, GNOME shows an orange icon in the top bar; choosing Stop there ends the dictation.</span></p>
       : <div className="voco-portal-setup__step">
         <p>VOCO types your words into the app you’re using, through GNOME. GNOME asks you once: turn on <strong>Allow Remote Interaction</strong>, then choose <strong>Share</strong>.</p>
         <button className="voco-button voco-button--secondary" disabled={disabled} onClick={() => void ask("typing")}>
           {asking === "typing" ? "Waiting for GNOME…" : "Allow typing"}</button>
         {asking === "typing" ? <p role="status">GNOME’s dialog is open. Turn on Allow Remote Interaction, then choose Share.</p> : null}
       </div>}
-    {status.typingAllowed ? status.shortcutBound ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span><strong>{shortcut}</strong> starts and stops dictation. {status.shortcutCustom
+    {typing ? status.shortcutBound ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span><strong>{shortcut}</strong> starts and stops dictation. {status.shortcutCustom
         ? "To change it, open GNOME Settings, then Keyboard, then View and Customize Shortcuts, then Custom Shortcuts."
         : "To change it, open GNOME Settings, then Apps, then VOCO."}</span></p>
       : status.shortcutPortal ? <div className="voco-portal-setup__step">

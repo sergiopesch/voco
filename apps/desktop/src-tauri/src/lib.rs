@@ -861,18 +861,19 @@ fn with_panel_recommendation(
     if input.available {
         if let Some(detail) = stop_shortcut_setup_issue(app) {
             input.detail = detail;
-            input.setup_area = Some(shortcut_setup_area());
+            input.setup_area = Some(shortcut_setup_area(app));
         }
     }
     input
 }
 
 /// Where setup fixes the shortcut: GNOME's portal in the snap, else the panel.
-fn shortcut_setup_area() -> &'static str {
+fn shortcut_setup_area(app: &tauri::AppHandle) -> &'static str {
     #[cfg(target_os = "linux")]
-    if portal_keys::applies() && !panel::is_attached() {
+    if portal_keys::applies() && !panel::reserves_current_shortcut(app) {
         return "portal";
     }
+    let _ = app;
     "panel"
 }
 
@@ -902,8 +903,11 @@ struct PortalSetupStatus {
     /// The snap on GNOME Wayland, where these portals apply.
     applies: bool,
     typing_allowed: bool,
-    /// The companion types and holds the chord instead.
+    /// The companion types instead.
     panel_attached: bool,
+    /// The companion also holds the saved chord. A companion before version
+    /// 23 holds only Alt chords, so with Super+X GNOME's portal still must.
+    panel_holds_shortcut: bool,
     /// This GNOME has the GlobalShortcuts portal (48 and later).
     shortcut_portal: bool,
     /// Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead.
@@ -914,7 +918,7 @@ struct PortalSetupStatus {
 }
 
 #[cfg(target_os = "linux")]
-fn portal_setup_status(hotkey: &str) -> PortalSetupStatus {
+fn portal_setup_status(app: &tauri::AppHandle, hotkey: &str) -> PortalSetupStatus {
     let applies = portal_keys::applies();
     let shortcut_portal = applies && portal_shortcut::available();
     let shortcut_custom = applies && !shortcut_portal && portal_shortcut::custom_applies();
@@ -922,6 +926,7 @@ fn portal_setup_status(hotkey: &str) -> PortalSetupStatus {
         applies,
         typing_allowed: applies && portal_keys::allowed(),
         panel_attached: panel::is_attached(),
+        panel_holds_shortcut: panel::reserves_current_shortcut(app),
         shortcut_portal,
         shortcut_custom,
         // GNOME Settings can remove a custom shortcut, so ask GNOME, not the record.
@@ -935,11 +940,12 @@ fn portal_setup_status(hotkey: &str) -> PortalSetupStatus {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn portal_setup_status(_hotkey: &str) -> PortalSetupStatus {
+fn portal_setup_status(_app: &tauri::AppHandle, _hotkey: &str) -> PortalSetupStatus {
     PortalSetupStatus {
         applies: false,
         typing_allowed: false,
         panel_attached: false,
+        panel_holds_shortcut: false,
         shortcut_portal: false,
         shortcut_custom: false,
         shortcut_bound: false,
@@ -953,7 +959,7 @@ fn configured_or_default_hotkey(app: &tauri::AppHandle) -> String {
 
 #[tauri::command(async)]
 fn get_portal_setup_status(app: tauri::AppHandle) -> PortalSetupStatus {
-    portal_setup_status(&configured_or_default_hotkey(&app))
+    portal_setup_status(&app, &configured_or_default_hotkey(&app))
 }
 
 /// Setup's and Settings' Allow typing: GNOME shows its dialog once.
@@ -961,7 +967,10 @@ fn get_portal_setup_status(app: tauri::AppHandle) -> PortalSetupStatus {
 fn allow_portal_typing(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
     #[cfg(target_os = "linux")]
     portal_keys::allow()?;
-    Ok(portal_setup_status(&configured_or_default_hotkey(&app)))
+    Ok(portal_setup_status(
+        &app,
+        &configured_or_default_hotkey(&app),
+    ))
 }
 
 /// Setup's and Settings' shortcut button: GNOME shows its dialog once.
@@ -970,7 +979,7 @@ fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, Str
     let hotkey = configured_or_default_hotkey(&app);
     #[cfg(target_os = "linux")]
     portal_shortcut::allow(&hotkey)?;
-    Ok(portal_setup_status(&hotkey))
+    Ok(portal_setup_status(&app, &hotkey))
 }
 
 /// A desktop dictation starts: open the snap's typing session, if it types
@@ -1003,9 +1012,11 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
     let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| DEFAULT_HOTKEY.into());
     let preset = wayland_preset(is_wayland_session(), &hotkey)?;
-    // The snap holds its chord through GNOME's shortcut portal instead.
+    // The snap holds its chord through GNOME's shortcut portal instead, unless
+    // the companion holds it: one attached before version 23 grabs only Alt
+    // chords, so attachment alone doesn't hold Super+X.
     #[cfg(target_os = "linux")]
-    if portal_keys::applies() && !panel::is_attached() {
+    if portal_keys::applies() && !panel::reserves_current_shortcut(app) {
         return portal_shortcut_issue(preset.label());
     }
     panel_setup::stop_shortcut_setup_detail(

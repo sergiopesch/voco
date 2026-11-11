@@ -302,7 +302,7 @@ try {
     // asks once, from the person's click: setup asks for that, then the shortcut,
     // and never sends anyone outside VOCO and GNOME (AGENTS.md, Onboarding).
     const needsTyping = 'VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME\'s dialog and choose Share.';
-    const portal = { applies: true, typingAllowed: false, panelAttached: false, shortcutPortal: true, shortcutCustom: false, shortcutBound: false, shortcutTrigger: null };
+    const portal = { applies: true, typingAllowed: false, panelAttached: false, panelHoldsShortcut: false, shortcutPortal: true, shortcutCustom: false, shortcutBound: false, shortcutTrigger: null };
     await load({
         desktopInput: { available: false, setupArea: 'portal', detail: needsTyping },
         panel: { status: 'optional', canEnable: false, url: 'https://extensions.gnome.org/extension/11710/voco/',
@@ -392,6 +392,27 @@ try {
     assert.equal(await custom.locator('strong').last().textContent(), 'Super+X');
     await shot('setup-snap-gnome46-ready');
     results.push({ case: 'gnome-46-adds-a-custom-shortcut', passed: true });
+
+    // A panel from extensions.gnome.org before version 23 types but grabs only
+    // Alt chords: with Super+X, setup still offers GNOME's shortcut, never
+    // claiming the panel holds it.
+    await load({ desktopInput: { available: true, setupArea: 'portal', detail: 'GNOME can keep Super+X for VOCO, so the app you\'re dictating into never receives it. Choose Add Super+X, then Add in GNOME\'s dialog.' },
+        config: { hotkey: 'Super+X' }, panel: { status: 'active', canEnable: false, detail: 'The VOCO panel is active.' } });
+    await page.evaluate(status => {
+        window.portalPanel = { ...status, panelAttached: true, panelHoldsShortcut: false };
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portalPanel });
+        window.nativeHandlers.allowPortalShortcut = () => { Object.assign(window.portalPanel, { shortcutBound: true, shortcutTrigger: 'Press <Super>x' }); return { ...window.portalPanel }; };
+    }, portal);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    const olderPanel = handoff.getByRole('group', { name: 'Typing and shortcut' });
+    await olderPanel.getByText('The VOCO panel types for VOCO.', { exact: true }).waitFor();
+    assert.equal(await olderPanel.getByText('holds Super+X', { exact: false }).count(), 0, 'An older panel never holds Super+X');
+    assert.equal(await olderPanel.getByRole('button', { name: 'Allow typing', exact: true }).count(), 0, 'The panel types, so GNOME needn\'t');
+    await olderPanel.getByText('GNOME asks you once: choose Add.', { exact: false }).waitFor();
+    await shot('setup-snap-older-panel-add-shortcut');
+    await olderPanel.getByRole('button', { name: 'Add Super+X', exact: true }).click();
+    await olderPanel.getByText('starts and stops dictation. To change it, open GNOME Settings, then Apps, then VOCO.', { exact: false }).waitFor();
+    results.push({ case: 'an-older-panel-still-gets-gnomes-shortcut', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();

@@ -96,8 +96,11 @@ export interface PortalSetupStatus {
   /** The snap on GNOME Wayland, where these portals apply. */
   applies: boolean;
   typingAllowed: boolean;
-  /** The VOCO panel types and holds the shortcut instead. */
+  /** The VOCO panel types instead. */
   panelAttached: boolean;
+  /** The panel also holds the saved shortcut; one before version 23 holds
+   * only Alt chords, so GNOME's shortcut portal still holds Super+X. */
+  panelHoldsShortcut: boolean;
   /** This GNOME has the shortcut portal (GNOME 48 and later). */
   shortcutPortal: boolean;
   /** Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead. */
