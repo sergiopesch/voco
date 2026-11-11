@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The two keys of GNOME's custom keyboard shortcuts that VOCO's snap writes on
+     GNOME 46, which has no GlobalShortcuts portal (AGENTS.md, Shortcut). GNOME's
+     own descriptions aren't in the snap's runtime; these give the same IDs, paths
+     and types, so the values VOCO writes are the ones GNOME Settings reads. -->
+<schemalist>
+  <schema id="org.gnome.settings-daemon.plugins.media-keys" path="/org/gnome/settings-daemon/plugins/media-keys/">
+    <key name="custom-keybindings" type="as">
+      <default>[]</default>
+      <summary>Custom keybindings</summary>
+    </key>
+  </schema>
+  <schema id="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding">
+    <key name="name" type="s">
+      <default>''</default>
+      <summary>Name</summary>
+    </key>
+    <key name="command" type="s">
+      <default>''</default>
+      <summary>Command</summary>
+    </key>
+    <key name="binding" type="s">
+      <default>''</default>
+      <summary>Binding</summary>
+    </key>
+  </schema>
+</schemalist>

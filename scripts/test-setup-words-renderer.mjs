@@ -302,7 +302,7 @@ try {
     // asks once, from the person's click: setup asks for that, then the shortcut,
     // and never sends anyone outside VOCO and GNOME (AGENTS.md, Onboarding).
     const needsTyping = 'VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME\'s dialog and choose Share.';
-    const portal = { applies: true, typingAllowed: false, panelAttached: false, shortcutPortal: true, shortcutBound: false, shortcutTrigger: null };
+    const portal = { applies: true, typingAllowed: false, panelAttached: false, shortcutPortal: true, shortcutCustom: false, shortcutBound: false, shortcutTrigger: null };
     await load({
         desktopInput: { available: false, setupArea: 'portal', detail: needsTyping },
         panel: { status: 'optional', canEnable: false, url: 'https://extensions.gnome.org/extension/11710/voco/',
@@ -372,6 +372,26 @@ try {
     assert.equal(await handoff.count(), 0, 'Setup stays until GNOME lets VOCO type');
     await shot('setup-snap-typing-refused');
     results.push({ case: 'a-refusal-keeps-the-step-and-offers-it-again', passed: true });
+
+    // GNOME 46 has no shortcut portal: VOCO adds a GNOME custom shortcut itself,
+    // with no dialog, and says where GNOME keeps it.
+    await load({ desktopInput: { available: true, setupArea: 'portal', detail: 'Super+X doesn\'t reach VOCO yet. Choose Add Super+X, and VOCO adds it to GNOME\'s keyboard shortcuts.' },
+        config: { hotkey: 'Super+X' }, panel: { status: 'optional', canEnable: false, detail: 'Optional.' } });
+    await page.evaluate(status => {
+        window.portal46 = { ...status, typingAllowed: true, shortcutPortal: false, shortcutCustom: true };
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portal46 });
+        window.nativeHandlers.allowPortalShortcut = () => { Object.assign(window.portal46, { shortcutBound: true, shortcutTrigger: 'Press <Super>x' }); return { ...window.portal46 }; };
+    }, portal);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    const custom = handoff.getByRole('group', { name: 'Typing and shortcut' });
+    await custom.getByText('VOCO can add Super+X to GNOME’s keyboard shortcuts', { exact: false }).waitFor();
+    assert.equal(await custom.getByText('choose Add', { exact: false }).count(), 0, 'GNOME 46 shows no dialog to answer');
+    await shot('setup-snap-gnome46-add-shortcut');
+    await custom.getByRole('button', { name: 'Add Super+X', exact: true }).click();
+    await custom.getByText('then Custom Shortcuts.', { exact: false }).waitFor();
+    assert.equal(await custom.locator('strong').last().textContent(), 'Super+X');
+    await shot('setup-snap-gnome46-ready');
+    results.push({ case: 'gnome-46-adds-a-custom-shortcut', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();

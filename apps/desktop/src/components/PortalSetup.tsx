@@ -77,12 +77,19 @@ export function PortalSetup({ hotkey, disabled = false, onChanged, onStatus }: {
           {asking === "typing" ? "Waiting for GNOME…" : "Allow typing"}</button>
         {asking === "typing" ? <p role="status">GNOME’s dialog is open. Turn on Allow Remote Interaction, then choose Share.</p> : null}
       </div>}
-    {status.typingAllowed ? status.shortcutBound ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span><strong>{shortcut}</strong> starts and stops dictation. To change it, open GNOME Settings, then Apps, then VOCO.</span></p>
+    {status.typingAllowed ? status.shortcutBound ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span><strong>{shortcut}</strong> starts and stops dictation. {status.shortcutCustom
+        ? "To change it, open GNOME Settings, then Keyboard, then View and Customize Shortcuts, then Custom Shortcuts."
+        : "To change it, open GNOME Settings, then Apps, then VOCO."}</span></p>
       : status.shortcutPortal ? <div className="voco-portal-setup__step">
         <p>GNOME can keep <strong>{hotkey}</strong> for VOCO, so the app you’re typing in never receives it. GNOME asks you once: choose <strong>Add</strong>.</p>
         <button className="voco-button voco-button--secondary" disabled={disabled} onClick={() => void ask("shortcut")}>
           {asking === "shortcut" ? "Waiting for GNOME…" : `Add ${hotkey}`}</button>
         {asking === "shortcut" ? <p role="status">GNOME’s dialog is open. Choose Add.</p> : null}
+      </div>
+      : status.shortcutCustom ? <div className="voco-portal-setup__step">
+        <p>VOCO can add <strong>{hotkey}</strong> to GNOME’s keyboard shortcuts, so the app you’re typing in never receives it.</p>
+        <button className="voco-button voco-button--secondary" disabled={disabled} onClick={() => void ask("shortcut")}>
+          {asking === "shortcut" ? "Adding…" : `Add ${hotkey}`}</button>
       </div>
       : <div className="voco-portal-setup__step">
         <p>To start and stop dictation with <strong>{hotkey}</strong>, open GNOME Settings, then Keyboard, then View and Customize Shortcuts, then Custom Shortcuts. Add a shortcut named VOCO with the command <code>voco --toggle</code> and the shortcut {hotkey}.</p>

@@ -61,6 +61,8 @@ pub fn toggle_running_application() -> Result<(), String> {
     })
 }
 #[cfg(target_os = "linux")]
+mod gnome_custom_shortcut;
+#[cfg(target_os = "linux")]
 mod panel;
 #[cfg(target_os = "linux")]
 mod portal;
@@ -877,6 +879,11 @@ fn shortcut_setup_area() -> &'static str {
 /// The snap's shortcut on GNOME Wayland: None once GNOME's portal holds it.
 #[cfg(target_os = "linux")]
 fn portal_shortcut_issue(hotkey: &str) -> Option<String> {
+    if portal_shortcut::custom_applies() {
+        return (!portal_shortcut::custom_present(hotkey)).then(|| format!(
+            "{hotkey} doesn't reach VOCO yet. Choose Add {hotkey}, and VOCO adds it to GNOME's keyboard shortcuts."
+        ));
+    }
     if portal_shortcut::bound() {
         return None;
     }
@@ -899,58 +906,71 @@ struct PortalSetupStatus {
     panel_attached: bool,
     /// This GNOME has the GlobalShortcuts portal (48 and later).
     shortcut_portal: bool,
+    /// Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead.
+    shortcut_custom: bool,
     shortcut_bound: bool,
     /// GNOME's description of the trigger, such as "Press <Alt>d".
     shortcut_trigger: Option<String>,
 }
 
 #[cfg(target_os = "linux")]
-fn portal_setup_status() -> PortalSetupStatus {
+fn portal_setup_status(hotkey: &str) -> PortalSetupStatus {
     let applies = portal_keys::applies();
+    let shortcut_portal = applies && portal_shortcut::available();
+    let shortcut_custom = applies && !shortcut_portal && portal_shortcut::custom_applies();
     PortalSetupStatus {
         applies,
         typing_allowed: applies && portal_keys::allowed(),
         panel_attached: panel::is_attached(),
-        shortcut_portal: applies && portal_shortcut::available(),
-        shortcut_bound: applies && portal_shortcut::bound(),
+        shortcut_portal,
+        shortcut_custom,
+        // GNOME Settings can remove a custom shortcut, so ask GNOME, not the record.
+        shortcut_bound: if shortcut_custom {
+            portal_shortcut::custom_present(hotkey)
+        } else {
+            applies && portal_shortcut::bound()
+        },
         shortcut_trigger: portal_shortcut::trigger(),
     }
 }
 
 #[cfg(not(target_os = "linux"))]
-fn portal_setup_status() -> PortalSetupStatus {
+fn portal_setup_status(_hotkey: &str) -> PortalSetupStatus {
     PortalSetupStatus {
         applies: false,
         typing_allowed: false,
         panel_attached: false,
         shortcut_portal: false,
+        shortcut_custom: false,
         shortcut_bound: false,
         shortcut_trigger: None,
     }
 }
 
+fn configured_or_default_hotkey(app: &tauri::AppHandle) -> String {
+    tray::current_hotkey(app).unwrap_or_else(|_| DEFAULT_HOTKEY.into())
+}
+
 #[tauri::command(async)]
-fn get_portal_setup_status() -> PortalSetupStatus {
-    portal_setup_status()
+fn get_portal_setup_status(app: tauri::AppHandle) -> PortalSetupStatus {
+    portal_setup_status(&configured_or_default_hotkey(&app))
 }
 
 /// Setup's and Settings' Allow typing: GNOME shows its dialog once.
 #[tauri::command(async)]
-fn allow_portal_typing() -> Result<PortalSetupStatus, String> {
+fn allow_portal_typing(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
     #[cfg(target_os = "linux")]
     portal_keys::allow()?;
-    Ok(portal_setup_status())
+    Ok(portal_setup_status(&configured_or_default_hotkey(&app)))
 }
 
 /// Setup's and Settings' shortcut button: GNOME shows its dialog once.
 #[tauri::command(async)]
 fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
-    let hotkey = tray::current_hotkey(&app).unwrap_or_else(|_| DEFAULT_HOTKEY.into());
+    let hotkey = configured_or_default_hotkey(&app);
     #[cfg(target_os = "linux")]
     portal_shortcut::allow(&hotkey)?;
-    #[cfg(not(target_os = "linux"))]
-    let _ = hotkey;
-    Ok(portal_setup_status())
+    Ok(portal_setup_status(&hotkey))
 }
 
 /// A desktop dictation starts: open the snap's typing session, if it types
@@ -1949,6 +1969,12 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                         }
                         debug!("Toggle received via socket");
                         trace_hotkey_event("socket_toggle_received", Some("socket"));
+                        // In the snap a GNOME custom shortcut sends this, with no
+                        // release to wait for (portal_shortcut.rs).
+                        #[cfg(target_os = "linux")]
+                        if confinement::is_snap() {
+                            portal_shortcut::note_command_press();
+                        }
                         eval_toggle_with_backend(&handle, "socket");
                     }
                     Err(error) => {

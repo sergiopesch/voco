@@ -100,6 +100,8 @@ export interface PortalSetupStatus {
   panelAttached: boolean;
   /** This GNOME has the shortcut portal (GNOME 48 and later). */
   shortcutPortal: boolean;
+  /** Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead. */
+  shortcutCustom: boolean;
   shortcutBound: boolean;
   /** GNOME's description of the trigger, such as "Press <Super>x". */
   shortcutTrigger: string | null;

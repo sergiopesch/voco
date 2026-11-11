@@ -201,6 +201,10 @@ class SnapPackageTest(unittest.TestCase):
             self.assertEqual(wrapper.stat().st_mode & 0o777, 0o755)
         self.assertTrue((project / "payload/usr/bin/voco").is_file())
         self.assertFalse((project / "payload/DEBIAN").exists())
+        # GNOME's custom-shortcut keys, for GNOME 46, as sources and compiled.
+        schemas = project / "payload" / snap.SCHEMAS
+        self.assertTrue((schemas / "gschemas.compiled").is_file())
+        snap.verify_schemas(project / "payload")
 
     def test_the_build_asks_snapcraft_for_one_snap_with_its_manifest(self):
         work = self.root / "work"

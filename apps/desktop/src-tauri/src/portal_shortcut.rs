@@ -86,6 +86,37 @@ pub fn forget() {
     if let Some(path) = bound_path() {
         let _ = std::fs::remove_file(path);
     }
+    if applies() {
+        crate::gnome_custom_shortcut::remove();
+    }
+}
+
+/// On GNOME 46, without the portal, the snap adds a GNOME custom shortcut
+/// that runs `voco --toggle` (gnome_custom_shortcut.rs).
+pub fn custom_applies() -> bool {
+    applies() && !available() && crate::gnome_custom_shortcut::available()
+}
+
+fn gtk_accelerator(hotkey: &str) -> Option<&'static str> {
+    crate::Preset::of(hotkey).map(crate::Preset::accelerator)
+}
+
+/// VOCO's GNOME custom shortcut exists for `hotkey`.
+pub fn custom_present(hotkey: &str) -> bool {
+    gtk_accelerator(hotkey).is_some_and(crate::gnome_custom_shortcut::present)
+}
+
+/// The press of a GNOME custom shortcut reaches VOCO as `voco --toggle`, with
+/// no release to wait for: a paste waits this long after it instead, for the
+/// chord's keys to come up (AGENTS.md, Delivery).
+const COMMAND_GRACE: Duration = Duration::from_millis(400);
+static COMMAND_PRESS: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// A `voco --toggle` reached the snap.
+pub fn note_command_press() {
+    *COMMAND_PRESS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(Instant::now());
 }
 
 /// GNOME's description of the trigger, once bound.
@@ -275,15 +306,29 @@ fn rebind(accelerator: String) {
 
 /// Whether this GNOME offers the GlobalShortcuts portal (GNOME 48 and later).
 pub fn available() -> bool {
+    // The session's portal can't gain or lose the interface while VOCO runs,
+    // and the diagnostics poll asks once a second.
+    static AVAILABLE: OnceLock<bool> = OnceLock::new();
     applies()
-        && portal::run(|connection| portal::has_interface(connection, INTERFACE, 1))
-            .unwrap_or(false)
+        && *AVAILABLE.get_or_init(|| {
+            portal::run(|connection| portal::has_interface(connection, INTERFACE, 1))
+                .unwrap_or(false)
+        })
 }
 
 /// Setup's and Settings' button: GNOME shows its dialog once.
 pub fn allow(accelerator: &str) -> Result<Option<String>, String> {
     if !applies() {
         return Err("VOCO uses GNOME's shortcut portal only in the snap on GNOME Wayland.".into());
+    }
+    if custom_applies() {
+        let chord = gtk_accelerator(accelerator).ok_or_else(|| {
+            "Choose Super+X, Alt+D or Alt+Shift+D in VOCO's Settings first.".to_string()
+        })?;
+        crate::gnome_custom_shortcut::add(chord, accelerator)?;
+        let trigger = format!("Press {chord}");
+        record_bound(Some(&trigger));
+        return Ok(Some(trigger));
     }
     let accelerator = accelerator.to_owned();
     let result = portal::run(move |connection| {
@@ -353,6 +398,12 @@ pub fn resume() {
 /// the release for the modifier's own (AGENTS.md, Delivery). Unknown without a
 /// portal press.
 pub fn keys_held() -> Option<bool> {
+    let command = *COMMAND_PRESS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if command.is_some_and(|at| at.elapsed() < COMMAND_GRACE) {
+        return Some(true);
+    }
     let state = shortcut();
     state.session.as_ref()?;
     let pressed = state.pressed?;

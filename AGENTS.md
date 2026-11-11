@@ -239,7 +239,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press. Through the RemoteDesktop portal VOCO can't read modifiers, so
   after a portal shortcut press a paste waits for its `Deactivated`, at most 1.5 s
-  after the press, then 150 ms for the modifier's own release. An X11 paste also waits, at most 1.5 s, while the X server's
+  after the press, then 150 ms for the modifier's own release; after a
+  `voco --toggle` in the snap, which reports no release, it waits 400 ms. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
@@ -383,8 +384,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   companion's lease is fresh VOCO closes the portal session, so one grab holds the
   chord, and binds again when the lease lapses. On GNOME 46, which has no
   GlobalShortcuts portal, setup's button adds a GNOME custom shortcut that runs
-  `voco --toggle` for the saved chord, only when no other GNOME shortcut uses it,
-  and never changes another.
+  `voco --toggle` for the saved chord, only when neither GNOME's window shortcuts
+  nor another custom shortcut uses it, and never changes another. GNOME's schema
+  for those keys isn't in the snap's runtime, so the snap carries one with the
+  same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives the chord (on Alt+D browsers focus the address bar and
   terminals delete a word; few apps act on Super+X), and an evdev toggle while
