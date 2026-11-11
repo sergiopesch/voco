@@ -380,7 +380,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   button binds it the first time, which shows GNOME's dialog; VOCO records that,
   and later starts bind it again, which GNOME answers without one. Each
   `Activated` toggles through the debounce. GNOME Settings, under Apps, changes
-  the trigger, and VOCO's Settings shows the trigger GNOME reports. While the
+  the trigger: VOCO saves each trigger GNOME reports, at a bind or a
+  `ShortcutsChanged`, as its shortcut when it can take it, so its labels name the
+  key GNOME listens for, and its tray presets are disabled while GNOME holds it. While the
   companion's lease is fresh VOCO closes the portal session, so one grab holds the
   chord, and binds again when the lease lapses. On GNOME 46, which has no
   GlobalShortcuts portal, setup's button adds a GNOME custom shortcut that runs

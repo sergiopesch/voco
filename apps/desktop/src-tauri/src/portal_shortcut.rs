@@ -188,6 +188,37 @@ fn watch(connection: &gio::DBusConnection) {
         )
     });
     SIGNALS.with(|signals| signals.borrow_mut().extend(ids));
+    // A change in GNOME Settings, under Apps.
+    let changed = connection.signal_subscribe(
+        Some(portal::DESTINATION),
+        Some(INTERFACE),
+        Some("ShortcutsChanged"),
+        Some(portal::OBJECT),
+        None,
+        gio::DBusSignalFlags::NONE,
+        |_, _, _, _, _, parameters| {
+            let session = parameters.child_value(0).str().map(str::to_owned);
+            let mut state = shortcut();
+            if session.is_none() || session != state.session {
+                return;
+            }
+            let shortcuts = parameters.child_value(1);
+            let trigger = (0..shortcuts.n_children())
+                .map(|index| shortcuts.child_value(index))
+                .find(|entry| entry.child_value(0).str() == Some(SHORTCUT_ID))
+                .and_then(|entry| {
+                    glib::VariantDict::new(Some(&entry.child_value(1)))
+                        .lookup_value("trigger_description", None)
+                        .and_then(|value| value.str().map(str::to_owned))
+                });
+            let Some(trigger) = trigger else { return };
+            state.trigger = Some(trigger.clone());
+            drop(state);
+            record_bound(Some(&trigger));
+            follow(Some(&trigger));
+        },
+    );
+    SIGNALS.with(|signals| signals.borrow_mut().push(changed));
 }
 
 fn unwatch(connection: &gio::DBusConnection) {
@@ -267,6 +298,51 @@ fn bind(
     Ok((session, trigger))
 }
 
+/// "Super+X" from GNOME's trigger description, such as "Press <Super>x":
+/// VOCO's own spelling, for its config and labels. None for anything else.
+fn trigger_hotkey(description: &str) -> Option<String> {
+    let description = description.trim();
+    let accelerator = description
+        .strip_prefix("Press")
+        .unwrap_or(description)
+        .trim();
+    let mut parts = Vec::new();
+    let mut rest = accelerator;
+    while let Some(start) = rest.strip_prefix('<') {
+        let end = start.find('>')?;
+        parts.push(match start[..end].to_ascii_lowercase().as_str() {
+            "super" => "Super".to_owned(),
+            "alt" => "Alt".to_owned(),
+            "shift" => "Shift".to_owned(),
+            "control" | "primary" | "ctrl" => "Ctrl".to_owned(),
+            _ => return None,
+        });
+        rest = &start[end + 1..];
+    }
+    let key = rest.trim();
+    // A global shortcut always holds a modifier; a bare key isn't one VOCO takes.
+    if parts.is_empty() || key.is_empty() || key.contains(['<', '>', ' ']) {
+        return None;
+    }
+    parts.push(if key.chars().count() == 1 {
+        key.to_ascii_uppercase()
+    } else {
+        key.to_owned()
+    });
+    Some(parts.join("+"))
+}
+
+/// GNOME holds the chord, and GNOME Settings changes it: VOCO's config
+/// follows, so its labels name the key GNOME listens for.
+fn follow(trigger: Option<&str>) {
+    let Some(hotkey) = trigger.and_then(trigger_hotkey) else {
+        return;
+    };
+    if let Some(app) = APP.get() {
+        crate::follow_gnome_shortcut(app, hotkey);
+    }
+}
+
 fn adopt(connection: &gio::DBusConnection, session: String, trigger: Option<String>) {
     let mut state = shortcut();
     if state.suspended {
@@ -278,10 +354,11 @@ fn adopt(connection: &gio::DBusConnection, session: String, trigger: Option<Stri
         portal::close_session(connection, &old);
     }
     if trigger.is_some() {
-        state.trigger = trigger;
+        state.trigger = trigger.clone();
     }
     drop(state);
     watch(connection);
+    follow(trigger.as_deref());
 }
 
 /// At startup: bind again what the person already added, without a dialog.
@@ -425,6 +502,25 @@ fn held(pressed: Instant, released: Option<Instant>, now: Instant) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gnome_triggers_read_as_voco_shortcuts() {
+        assert_eq!(trigger_hotkey("Press <Super>x").as_deref(), Some("Super+X"));
+        assert_eq!(
+            trigger_hotkey("Press <Alt><Shift>d").as_deref(),
+            Some("Alt+Shift+D")
+        );
+        assert_eq!(
+            trigger_hotkey("<Control><Alt>k").as_deref(),
+            Some("Ctrl+Alt+K")
+        );
+        assert_eq!(
+            trigger_hotkey("Press <Super>F8").as_deref(),
+            Some("Super+F8")
+        );
+        assert_eq!(trigger_hotkey("Press <Hyper>x"), None);
+        assert_eq!(trigger_hotkey("Press "), None);
+    }
 
     #[test]
     fn preferred_trigger_uses_the_portal_spelling() {

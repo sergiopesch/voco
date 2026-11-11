@@ -1607,6 +1607,26 @@ fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bo
     false
 }
 
+/// GNOME Settings changed the snap's shortcut (portal_shortcut.rs): VOCO's
+/// config follows, off the portal thread. A trigger VOCO can't take is logged
+/// and left alone.
+#[cfg(target_os = "linux")]
+pub(crate) fn follow_gnome_shortcut(app_handle: &tauri::AppHandle, hotkey: String) {
+    let app = app_handle.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if tray::current_hotkey(&app).is_ok_and(|current| current == hotkey) {
+            return;
+        }
+        let patch = config::AppConfigPatch {
+            hotkey: config::PatchField::Set(hotkey.clone()),
+            ..Default::default()
+        };
+        if let Err(error) = persist_config_patch(&app, patch, false) {
+            warn!("VOCO's shortcut didn't follow GNOME's {hotkey}: {error}");
+        }
+    });
+}
+
 /// A press of the snap's GNOME shortcut (portal_shortcut.rs), from the portal
 /// thread: toggle on GTK's thread, as every other route does.
 #[cfg(target_os = "linux")]
