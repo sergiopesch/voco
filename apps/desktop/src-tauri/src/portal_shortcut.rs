@@ -25,7 +25,9 @@ const REBIND_TIMEOUT: Duration = Duration::from_secs(30);
 /// the paste's own 1.5 s wait then sends no keys (AGENTS.md, Delivery).
 const STALE_PRESS: Duration = Duration::from_secs(5);
 /// After the shortcut's release, time for its modifier's own release.
-const MODIFIER_GRACE: Duration = Duration::from_millis(150);
+/// People often let go of Super or Alt a moment after the letter, and keys
+/// sent while it is down make another chord, which pastes nothing.
+const MODIFIER_GRACE: Duration = Duration::from_millis(400);
 
 #[derive(Default)]
 struct Shortcut {
@@ -551,7 +553,7 @@ pub fn resume() {
 }
 
 /// Through the portal VOCO can't read modifiers, so a press is held until
-/// GNOME's `Deactivated`, then 150 ms for the modifier's own release
+/// GNOME's `Deactivated`, then 400 ms for the modifier's own release
 /// (AGENTS.md, Delivery). Keys sent while Super or Alt is down make another
 /// chord, which pastes nothing, so a paste that outwaits its bound sends none.
 /// Unknown without a portal press, or once a press is stale.
@@ -634,7 +636,7 @@ mod tests {
             "within the modifier grace"
         );
         assert_eq!(
-            held(pressed, Some(at(200)), None, at(351)),
+            held(pressed, Some(at(200)), None, at(601)),
             Some(false),
             "after the grace"
         );

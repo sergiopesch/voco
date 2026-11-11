@@ -531,7 +531,7 @@ plus 100 ms of the last as one. A first `Activated` toggles through
 trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
 Super+X. Modifiers can't be
 read through the portal, so `keys_held` counts a press as held until
-`Deactivated`, then 150 ms more, and the paste's usual 1.5 s wait sends no keys
+`Deactivated`, then 400 ms more for the modifier's own release, and the paste's usual 1.5 s wait sends no keys
 while it is held: keys under Super or Alt make another chord and paste nothing.
 A press with no `Deactivated` after 5 s reads as unknown. The companion's `ReserveShortcut`
 suspends the portal session and its release binds again, so one grab holds the

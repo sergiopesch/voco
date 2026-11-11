@@ -473,7 +473,7 @@ try:
     check('shortcut', shortcut)
 
     def held_shortcut():
-        # A paste while the chord is down waits for Deactivated, then 150 ms.
+        # A paste while the chord is down waits for Deactivated, then 400 ms.
         session = begin('held')
         field.clear()
         toggles = voco.counts()['toggles']
@@ -484,14 +484,17 @@ try:
         mark = time.monotonic()
         voco.send('paste', text='heldx')
         time.sleep(.4)
-        released = time.monotonic(); key(X, False); time.sleep(.03); key(SUPER, False)
+        # People often let go of Super a moment after the letter.
+        released = time.monotonic(); key(X, False); time.sleep(.3)
+        super_released = time.monotonic(); key(SUPER, False)
         answered = voco.reply(5)
         assert 'ok' in answered, answered
         assert wait_for(lambda: field.text() == 'heldx', 3), field.text()
         inserts = field.seen('insert', mark)
         assert len(inserts) == 1 and inserts[0]['shift'], inserts
         after_release = inserts[0]['t'] - released
-        assert .15 <= after_release < 1, f'the Insert came {after_release:.3f} s after the release'
+        assert .4 <= after_release < 1.2, f'the Insert came {after_release:.3f} s after the release'
+        assert inserts[0]['t'] > super_released, 'the paste went out while Super was down'
         assert inserts[0]['t'] - pressed < 2, 'the paste waited past 1.5 s from the press'
         end(session)
         return {'insertAfterReleaseMs': round(after_release * 1000, 1),
