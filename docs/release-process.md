@@ -237,7 +237,8 @@ executables in isolated desktops, as [Testing](testing/README.md) describes. The
 signing computer rebuilds them from the same commit, so the released files
 aren't byte-identical to the ones CI ran; the validation record says so. Its
 GNOME 50 Companion job runs the companion on Ubuntu 26.04, its GNOME 51 Companion
-job runs it on Fedora 45's Shell in a container, and its Debian 13 and
+job runs it on Fedora 45's Shell in a container, its GNOME 50 Portals job runs
+the snap's portal code against GNOME's portals on Ubuntu 26.04, and its Debian 13 and
 Fedora 44 Runtime jobs install the packages' dependencies by those systems'
 names and run the speech runtime there. No job builds a package or VOCO's
 snap; the Snap Confinement Probe job builds only a test snap from

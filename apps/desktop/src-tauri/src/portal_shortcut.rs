@@ -44,6 +44,11 @@ static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
     released: None,
 });
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+/// The toggles `Activated` asked for. The portal suite (portal_fixture.rs)
+/// runs without a tauri app, so it counts them here.
+#[cfg(test)]
+pub(crate) static TOGGLES_REQUESTED: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
 
 fn shortcut() -> MutexGuard<'static, Shortcut> {
     SHORTCUT
@@ -139,6 +144,8 @@ fn watch(connection: &gio::DBusConnection) {
                     state.pressed = Some(Instant::now());
                     state.released = None;
                     drop(state);
+                    #[cfg(test)]
+                    TOGGLES_REQUESTED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     if let Some(app) = APP.get() {
                         crate::toggle_from_portal(app);
                     }

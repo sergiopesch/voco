@@ -300,7 +300,7 @@ and the update check. [The snap](#the-snap) lists its rules.
   unconfined caller's pending call and receives its calls, and its own calls to
   that caller are refused.
 - CI's portal suite proves the snap's portal path in a headless GNOME 50 with the
-  real xdg-desktop-portal and its GNOME backend, VOCO registered under the snap's
+  real xdg-desktop-portal and its GNOME backend, which names VOCO by the snap's
   app ID: the first typing session shows GNOME's dialog and later ones restore
   without it; every paste lands with its exact text in a GTK field on Wayland and
   under XWayland; dictation opens a session and its end closes it; the

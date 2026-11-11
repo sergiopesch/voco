@@ -65,6 +65,11 @@ static TYPING: Mutex<Typing> = Mutex::new(Typing {
     closed_by_gnome: false,
 });
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+/// The stops GNOME's Stop asked for. The portal suite (portal_fixture.rs)
+/// runs without a tauri app, so it counts them here.
+#[cfg(test)]
+pub(crate) static STOPS_REQUESTED: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
 /// The renderer's dictation status: starting, recording or processing.
 static DICTATING: AtomicBool = AtomicBool::new(false);
 /// How often an open session checks that a dictation still needs it.
@@ -111,6 +116,12 @@ fn save_token(token: &str) {
 /// GNOME allowed VOCO to type, and its restore token is saved.
 pub fn allowed() -> bool {
     load_token().is_some()
+}
+
+/// The session a dictation opened, for the portal suite (portal_fixture.rs).
+#[cfg(test)]
+pub(crate) fn session() -> Option<String> {
+    typing().session.clone()
 }
 
 /// For Reset: GNOME asks again at the next setup.
@@ -220,6 +231,8 @@ fn watch_closed(connection: &gio::DBusConnection, session: &str) {
             state.closed_by_gnome = true;
             drop(state);
             log::info!("GNOME closed VOCO's typing session");
+            #[cfg(test)]
+            STOPS_REQUESTED.fetch_add(1, Ordering::SeqCst);
             if let Some(app) = APP.get() {
                 crate::tray::request_stop(app);
             }

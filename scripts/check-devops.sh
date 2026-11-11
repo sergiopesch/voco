@@ -265,6 +265,8 @@ if release_build not in application or application.index(release_build) > applic
     raise SystemExit("The application job must test the release build of both executables")
 if commands.count(hosted + " --gnome-panel-container") != 1:
     raise SystemExit(f"{workflow_path} must run the GNOME companion suite on a newer Shell exactly once")
+if commands.count(hosted + " --gnome-portals") != 1:
+    raise SystemExit(f"{workflow_path} must prove the snap's portal path on GNOME 50 exactly once")
 images = [image for image in re.findall(r"(?:VOCO_PANEL_IMAGE|image): (\S+)", workflow) if not image.startswith("${{")]
 if not images or any(not re.search(r"@sha256:[0-9a-f]{64}$", image) for image in images):
     raise SystemExit(f"{workflow_path} container images must be pinned by digest: {images}")

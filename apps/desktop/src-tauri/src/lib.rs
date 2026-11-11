@@ -64,6 +64,8 @@ pub fn toggle_running_application() -> Result<(), String> {
 mod panel;
 #[cfg(target_os = "linux")]
 mod portal;
+#[cfg(all(test, target_os = "linux"))]
+mod portal_fixture;
 #[cfg(target_os = "linux")]
 mod portal_keys;
 #[cfg(target_os = "linux")]
