@@ -53,7 +53,8 @@ The installer asks for your password when APT or DNF needs it, and:
    open VOCO from your desktop.
 
 The installer doesn't touch your settings. VOCO keeps a saved shortcut, and
-uses `Alt+D` when it starts without one.
+uses `Super+X` when it starts without one. Super is the key with the Windows or
+logo symbol.
 
 | Exit status | Meaning |
 | --- | --- |
@@ -102,7 +103,7 @@ Install update. It is strictly confined, which decides where it can type:
   on **Allow Remote Interaction** in GNOME's dialog, then choose **Share**. GNOME
   remembers the answer. While you dictate, GNOME shows an orange icon in the top
   bar, for at least five seconds; choosing **Stop** there ends the dictation and
-  copies the rest of your words. Then setup offers **Add Alt+D**: choose **Add**
+  copies the rest of your words. Then setup offers **Add Super+X**: choose **Add**
   in GNOME's dialog, and GNOME keeps the shortcut for VOCO, so the app you're
   typing in never receives it. Change it in **Settings** → **Apps** → **VOCO**.
   On Ubuntu 24.04, whose GNOME has no shortcut dialog, add a custom shortcut for
@@ -237,12 +238,12 @@ only show your words in the VOCO window.
    Add any other word VOCO should know, then choose **Continue**, or
    **Skip for now**. See [Say it](everyday-use.md#say-it).
 5. Choose **Done**. If the button says **Check desktop setup**, fix what VOCO
-   shows, then choose it again. If the step says `Alt+D` also reaches the app
+   shows, then choose it again. If the step says `Super+X` also reaches the app
    you are dictating into, do what it says before you dictate. After a fresh
    install on GNOME, that's signing out and back in to load the panel.
 
-To dictate, click where you want the text, press `Alt+D` and speak. Press
-`Alt+D` again to finish. See [Everyday use](everyday-use.md).
+To dictate, click where you want the text, press `Super+X` and speak. Press
+`Super+X` again to finish. See [Everyday use](everyday-use.md).
 
 From then on, the packages and the snap start VOCO when you sign in, without
 opening a window. To turn that off, see
@@ -282,8 +283,8 @@ explains the rule, how to check it and how to use a different policy.
 
 On GNOME 46, 48, 50 and 51, VOCO includes an optional top-bar panel with live
 microphone bars, a menu and a Stop control. On Wayland it also keeps your
-`Alt+D` or `Alt+Shift+D` shortcut from reaching the app you are typing in, and
-presses VOCO's paste keys. The
+`Super+X`, `Alt+D` or `Alt+Shift+D` shortcut from reaching the app you are
+typing in, and presses VOCO's paste keys. The
 guided installer turns it on. Otherwise, run `voco --setup-panel` or choose
 **Enable live panel** on VOCO's Help page. Save your work, then sign out and
 back in to load the panel. To check it without changing anything, run
@@ -303,8 +304,8 @@ The compositor is the part of a Wayland desktop that draws windows and handles
 shortcuts. Without the [GNOME panel](#gnome-panel), VOCO can't reserve a
 global shortcut on Wayland. Instead, bind a key to `voco --toggle` in your
 desktop settings. The command asks the running VOCO to start or stop dictation.
-It never opens VOCO, so keep VOCO running. The panel handles only `Alt+D` and
-`Alt+Shift+D`, so with the panel bind any other key the same way.
+It never opens VOCO, so keep VOCO running. The panel handles only `Super+X`,
+`Alt+D` and `Alt+Shift+D`, so with the panel bind any other key the same way.
 
 Pick an unused key such as F8. VOCO briefly holds Shift while it pastes, so the
 binding must also work with Shift held. Either let it ignore modifiers or add a

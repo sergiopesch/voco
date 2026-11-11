@@ -24,7 +24,8 @@ appear where you are typing, while you speak.
   In a terminal, don't dictate while a program waits for an answer, such as a
   coding agent's permission prompt: it may
   [read your words as keys](docs/everyday-use.md#where-your-words-go).
-- **One shortcut.** Press `Alt+D` to start and again to finish.
+- **One shortcut.** Press `Super+X` to start and again to finish. Super is the
+  key with the Windows or logo symbol.
 - **Writes your words your way.** List names and terms on the **My words** page,
   and VOCO writes them as you typed them, with their capitals and accents. Say a
   word to check it, and if VOCO hears it wrong, teach VOCO how you say it.
@@ -74,8 +75,9 @@ check that it writes your name right.
    wrong, choose **Teach VOCO**. Then choose **Continue** and **Done**. If the
    button says **Check desktop setup**, choose it first and follow any
    instructions VOCO shows.
-5. Click where you want the text in another app, press `Alt+D` and speak. Press
-   `Alt+D` again to finish.
+5. Click where you want the text in another app, press `Super+X` and speak.
+   Press `Super+X` again to finish. If you set VOCO up before it chose `Super+X`,
+   your shortcut stays the one you had.
 
 VOCO pastes through the clipboard, so dictation replaces what you copied last.
 Text goes to whichever window has keyboard focus. See

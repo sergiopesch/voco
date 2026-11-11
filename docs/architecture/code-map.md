@@ -37,7 +37,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
 - `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.
 - `shortcut_readiness.rs` — Shortcut status observations and their text; it never registers or admits a shortcut.
-- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, and the count of live keyboards that shortcut status reports.
+- `hotkey_state.rs` — Physical key state per evdev device for the passive shortcut listener, each preset's chord matched with exactly its own modifiers, and the count of live keyboards that can type it, which shortcut status reports.
 - `hotkey_trace.rs` — Opt-in shortcut timing trace, enabled with `VOCO_HOTKEY_TRACE=1`.
 - `trigger_socket.rs` — Owner-only trigger socket `voco.sock`, with its `voice.sock` alias, that `voco --toggle` connects to.
 - `activation.rs` — Owner-only launcher socket `voco-activate.sock`, and the check that a launcher click started VOCO; either presents the window, and neither toggles capture.
@@ -93,7 +93,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `ConfigRecoveryPanel.tsx` — Shown when the settings file can't be read: Retry, Open and Reset.
 - `ConfigRecoveryPanel.test.tsx` — Recovery panel actions.
 - `PanelSetup.tsx` — GNOME companion status and setup button.
-- `PortalSetup.tsx` — The snap's GNOME permissions in setup, Help and the shortcut page: Allow typing, then Add Alt+D.
+- `PortalSetup.tsx` — The snap's GNOME permissions in setup, Help and the shortcut page: Allow typing, then Add and the shortcut, such as Add Super+X.
 - `NativeMicrophoneSettings.tsx` — Microphone list for native capture.
 - `DeviceSelect.tsx` — Accessible device picker.
 - `VoiceSignal.tsx` — Level display for the microphone signal.

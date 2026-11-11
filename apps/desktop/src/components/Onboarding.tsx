@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import type { DictationStatus, EnglishSpelling } from "@/types";
 import { useStore } from "@/store/useStore";
 import { ENGLISH_VARIETIES } from "@/lib/englishSpelling";
+import { superKeyHint } from "@/lib/shortcutPresentation";
 
 interface OnboardingProps {
   microphone: string;
@@ -124,7 +125,7 @@ export function Onboarding({ microphone, status, passed,
       {/* While the focused app also acts on the shortcut, as before a fresh install's panel loads at the next login, the fix comes first. */}
       {shortcutNote ? shortcutArea === "portal" ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} />
         : <PanelSetup disabled={busy || blocked} note={shortcutNote} /> : null}
-      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
+      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.{superKeyHint(hotkey) ? ` ${superKeyHint(hotkey)}` : null}</p>
       <p>{startsAtLogin ? "VOCO starts when you sign in. You can turn this off in Settings."
         : "VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher."}</p>
       {/* The snap's GNOME permissions stay in view, with what the orange icon

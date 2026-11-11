@@ -72,6 +72,10 @@ it("moves a passed test on to the words step, then hands off with Done", () => {
   // Someone who said no word in the step hears where My words is for later.
   const skipped = renderToStaticMarkup(<Onboarding {...props} wordsDone wordsChecked={false} />);
   expect(skipped).toContain("You can always come back and personalise VOCO in Settings, under My words.");
+  // The default names the Super key, which many people know only by its symbol.
+  expect(ready).not.toContain("Super is the key");
+  const superX = renderToStaticMarkup(<Onboarding {...props} hotkey="Super+X" wordsDone wordsChecked />);
+  expect(superX).toContain("Super+X</kbd>. Press again to finish. Super is the key with the Windows or logo symbol.");
 });
 
 it("reaches the words step before desktop setup is ready, and checks it before Done", () => {

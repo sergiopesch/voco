@@ -43,6 +43,7 @@ pub struct PanelSetupStatus {
 /// or elsewhere a desktop keybinding for `voco --toggle`. Passive evdev
 /// observation alone lets the focused application also act on them (Alt+D
 /// focuses a browser address or deletes a terminal word), moving the cursor.
+/// Apps rarely bind Super+X, so its notice claims no effect.
 pub fn stop_shortcut_setup_detail(
     hotkey: &str,
     status: Result<PanelSetupStatus, String>,
@@ -54,8 +55,12 @@ pub fn stop_shortcut_setup_detail(
         ));
     };
     let remedy = shortcut_remedy(panel, attached)?;
+    let effect = match crate::Preset::of(hotkey) {
+        Some(crate::Preset::SuperX) => "an app that has its own use for it acts on it too",
+        _ => "browsers move the cursor to the address bar, so your words land there, and terminals delete a word",
+    };
     Some(format!(
-        "{hotkey} also reaches the app you are dictating into: browsers move the cursor to the address bar, so your words land there, and terminals delete a word. {remedy}"
+        "{hotkey} also reaches the app you are dictating into: {effect}. {remedy}"
     ))
 }
 
@@ -265,11 +270,16 @@ mod tests {
     }
 
     #[test]
-    fn default_wayland_shortcut_recommends_live_companion() {
+    fn a_passive_wayland_shortcut_recommends_live_companion() {
         let detail = stop_shortcut_setup_detail("Alt+D", panel("restart"), false)
             .expect("unloaded companion is recommended");
         assert!(detail.starts_with("Alt+D also reaches the app you are dictating into"));
         assert!(detail.ends_with("Sign out and back in to load the shortcut."));
+        let super_x = stop_shortcut_setup_detail("Super+X", panel("disabled"), false).unwrap();
+        assert!(super_x.starts_with(
+            "Super+X also reaches the app you are dictating into: an app that has its own use for it acts on it too."
+        ));
+        assert!(super_x.contains("Enable the VOCO panel"));
         assert!(
             stop_shortcut_setup_detail("Alt+Shift+D", panel("disabled"), false)
                 .is_some_and(|detail| detail.contains("Enable the VOCO panel"))

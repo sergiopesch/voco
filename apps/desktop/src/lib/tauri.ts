@@ -101,7 +101,7 @@ export interface PortalSetupStatus {
   /** This GNOME has the shortcut portal (GNOME 48 and later). */
   shortcutPortal: boolean;
   shortcutBound: boolean;
-  /** GNOME's description of the trigger, such as "Press <Alt>d". */
+  /** GNOME's description of the trigger, such as "Press <Super>x". */
   shortcutTrigger: string | null;
 }
 export function getPortalSetupStatus(): Promise<PortalSetupStatus> {

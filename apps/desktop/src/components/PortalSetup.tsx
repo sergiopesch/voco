@@ -3,7 +3,7 @@ import { allowPortalShortcut, allowPortalTyping, getPortalSetupStatus } from "@/
 import type { PortalSetupStatus } from "@/lib/tauri";
 import { StatusMark } from "./StatusMark";
 
-/** "Alt+D" from GNOME's trigger description, such as "Press <Alt>d". */
+/** "Super+X" from GNOME's trigger description, such as "Press <Super>x". */
 export function triggerLabel(trigger: string | null | undefined, fallback: string): string {
   const description = trigger?.replace(/^Press\s+/i, "").trim();
   if (!description) return fallback;

@@ -442,6 +442,30 @@ class SessionControlHotkeyTests(unittest.TestCase):
             self.assertFalse(coordinator.consume_shortcut(engine, key, alt | int(extra)))
         self.assertTrue(coordinator.consume_shortcut(engine, key, alt))
 
+    def test_super_x_matches_only_super_alone(self) -> None:
+        coordinator = VocoCoordinator()
+        engine = FakeEngine()
+        coordinator.activate_engine(engine)
+        coordinator.poll_trigger("Super+X")
+        key = IBus.keyval_from_name("x")
+        mod4 = int(IBus.ModifierType.MOD4_MASK)
+        for extra in (
+            IBus.ModifierType.MOD1_MASK,
+            IBus.ModifierType.CONTROL_MASK,
+            IBus.ModifierType.SHIFT_MASK,
+            IBus.ModifierType.MOD5_MASK,
+        ):
+            self.assertFalse(coordinator.consume_shortcut(engine, key, mod4 | int(extra)))
+        self.assertFalse(coordinator.consume_shortcut(engine, IBus.keyval_from_name("d"), mod4))
+        self.assertTrue(coordinator.consume_shortcut(engine, key, mod4))
+        super_mask = int(IBus.ModifierType.SUPER_MASK)
+        self.assertTrue(coordinator.consume_shortcut(engine, key, mod4 | super_mask))
+        coordinator.poll_trigger("Alt+D")
+        alt = int(IBus.ModifierType.MOD1_MASK)
+        d = IBus.keyval_from_name("d")
+        self.assertFalse(coordinator.consume_shortcut(engine, d, alt | mod4))
+        self.assertTrue(coordinator.consume_shortcut(engine, d, alt))
+
     def test_supported_non_shift_modifier_aliases_are_preserved(self) -> None:
         controls = {
             name: session_control_hotkey_specs(f"{name}+D")[0][0]

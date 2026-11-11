@@ -34,7 +34,7 @@ import {
   readCachedUpdateState,
   writeCachedUpdateState,
 } from "@/lib/updates";
-import { DIAGNOSTICS_TIMEOUT_MS, DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut, withTimeout } from "@/lib/shortcutPresentation";
+import { DEFAULT_HOTKEY, DIAGNOSTICS_TIMEOUT_MS, DiagnosticsRequestGate, sameJsonValue, shortcutPresentation, startLaunchDiagnostics, unknownShortcut, withTimeout } from "@/lib/shortcutPresentation";
 import { UpdateCheckCoordinator } from "@/lib/updateCheckCoordinator";
 import { createPanelLevelSender } from "@/lib/audioLevel";
 import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
@@ -486,7 +486,7 @@ export function App() {
     // Once per launch, naming the shortcut only when it is verified to work.
     if (prepareNotifiedRef.current) return;
     prepareNotifiedRef.current = true;
-    const hotkey = useStore.getState().config?.hotkey ?? "Alt+D";
+    const hotkey = useStore.getState().config?.hotkey ?? DEFAULT_HOTKEY;
     await showNotification(
       "Ready to try dictation",
       shortcutPresentation(hotkey, runtimeDiagnostics?.shortcut).available

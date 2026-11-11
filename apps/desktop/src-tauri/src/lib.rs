@@ -74,7 +74,7 @@ mod tray;
 
 use config::{
     load_cached_update_check, save_cached_update_check, AppConfig, AppConfigPatch,
-    CachedUpdateCheck,
+    CachedUpdateCheck, DEFAULT_HOTKEY,
 };
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -92,7 +92,7 @@ static RENDERER_EPOCH: AtomicU64 = AtomicU64::new(1);
 static LAST_TOGGLE_MS: AtomicI64 = AtomicI64::new(-1);
 
 // The evdev listener's preset, encoded by `Preset::encode`; a custom shortcut disables it.
-static EVDEV_PRESET: AtomicU8 = AtomicU8::new(Preset::AltD as u8);
+static EVDEV_PRESET: AtomicU8 = AtomicU8::new(Preset::SuperX as u8);
 static USE_EVDEV_HOTKEY: AtomicBool = AtomicBool::new(false);
 static SHORTCUT_OBSERVATIONS: LazyLock<shortcut_readiness::Observations> =
     LazyLock::new(shortcut_readiness::Observations::default);
@@ -392,16 +392,24 @@ fn has_pending_hotkey_toggle() -> bool {
         .unwrap_or(false)
 }
 
-/// The two shortcuts passive Wayland evdev observes and the GNOME companion grabs,
-/// in tray menu order. Every other shortcut is custom.
+/// The shortcuts passive Wayland evdev observes and the GNOME companion grabs,
+/// in tray menu order, the default first. Every other shortcut is custom.
+///
+/// Super+X is the default (`config::DEFAULT_HOTKEY`) because a grab that takes
+/// only an Alt chord's letter, as the companion's and GNOME's shortcut portal
+/// do, leaves apps seeing Alt pressed and released alone. Firefox, Thunderbird,
+/// LibreOffice and Electron editors then open their menu bar, which swallows the
+/// Shift+Insert pastes that follow. A lone Super opens nothing in an app, and
+/// mutter doesn't open the overview once it has seen the X.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Preset {
+    SuperX,
     AltD,
     AltShiftD,
 }
 
 impl Preset {
-    const ALL: [Self; 2] = [Self::AltD, Self::AltShiftD];
+    const ALL: [Self; 3] = [Self::SuperX, Self::AltD, Self::AltShiftD];
 
     /// The preset a shortcut names, in any spelling the parser accepts.
     fn of(hotkey: &str) -> Option<Self> {
@@ -418,6 +426,7 @@ impl Preset {
 
     fn label(self) -> &'static str {
         match self {
+            Self::SuperX => "Super+X",
             Self::AltD => "Alt+D",
             Self::AltShiftD => "Alt+Shift+D",
         }
@@ -427,15 +436,10 @@ impl Preset {
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     fn accelerator(self) -> &'static str {
         match self {
+            Self::SuperX => "<Super>x",
             Self::AltD => "<Alt>d",
             Self::AltShiftD => "<Alt><Shift>d",
         }
-    }
-
-    /// Whether the chord holds Shift; evdev matches the Shift state exactly.
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-    fn shift(self) -> bool {
-        self == Self::AltShiftD
     }
 
     /// A preset is stored as its position in ALL; anything else means custom.
@@ -941,7 +945,7 @@ fn allow_portal_typing() -> Result<PortalSetupStatus, String> {
 /// Setup's and Settings' shortcut button: GNOME shows its dialog once.
 #[tauri::command(async)]
 fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
-    let hotkey = tray::current_hotkey(&app).unwrap_or_else(|_| "Alt+D".into());
+    let hotkey = tray::current_hotkey(&app).unwrap_or_else(|_| DEFAULT_HOTKEY.into());
     #[cfg(target_os = "linux")]
     portal_shortcut::allow(&hotkey)?;
     #[cfg(not(target_os = "linux"))]
@@ -977,7 +981,7 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 }
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
-    let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| "Alt+D".into());
+    let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| DEFAULT_HOTKEY.into());
     let preset = wayland_preset(is_wayland_session(), &hotkey)?;
     // The snap holds its chord through GNOME's shortcut portal instead.
     #[cfg(target_os = "linux")]
@@ -1714,9 +1718,9 @@ struct ConfiguredHotkey {
 
 fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
     let error = validate_dictation_hotkey(&config.hotkey).err()?;
-    let invalid_hotkey = std::mem::replace(&mut config.hotkey, "Alt+D".to_string());
+    let invalid_hotkey = std::mem::replace(&mut config.hotkey, DEFAULT_HOTKEY.to_string());
     Some(format!(
-        "Your shortcut '{invalid_hotkey}' was reset to Alt+D: {error}"
+        "Your shortcut '{invalid_hotkey}' was reset to {DEFAULT_HOTKEY}: {error}"
     ))
 }
 
@@ -1725,7 +1729,7 @@ fn repair_invalid_configured_hotkey(config: &mut AppConfig) -> Option<String> {
 fn configured_hotkey() -> ConfiguredHotkey {
     let Ok(mut config) = AppConfig::load() else {
         return ConfiguredHotkey {
-            hotkey: "Alt+D".to_string(),
+            hotkey: DEFAULT_HOTKEY.to_string(),
             notice: Some((
                 "Dictation paused",
                 "VOCO could not load your settings. Open VOCO to fix them.".to_string(),
@@ -1738,7 +1742,7 @@ fn configured_hotkey() -> ConfiguredHotkey {
         Err(error) => (
             "Dictation paused",
             format!(
-                "VOCO could not reset your shortcut '{invalid_hotkey}' to Alt+D ({error}). Open VOCO to fix your settings."
+                "VOCO could not reset your shortcut '{invalid_hotkey}' to {DEFAULT_HOTKEY} ({error}). Open VOCO to fix your settings."
             ),
         ),
     });
@@ -1981,12 +1985,9 @@ fn supports_evdev_hotkey_parts(
     if name.map(is_ignored_evdev_device_name).unwrap_or(false) {
         return false;
     }
-    let Some(keys) = keys else {
-        return false;
-    };
-    let has_alt =
-        keys.contains(evdev::KeyCode::KEY_LEFTALT) || keys.contains(evdev::KeyCode::KEY_RIGHTALT);
-    has_alt && keys.contains(evdev::KeyCode::KEY_D)
+    // A shortcut change never reopens devices, so watch any keyboard that can
+    // type one of the presets; each preset counts only its own.
+    keys.is_some_and(|keys| !hotkey_state::typable_presets(keys.iter()).is_empty())
 }
 
 #[cfg(target_os = "linux")]
@@ -2041,7 +2042,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
         let mut reopen_logged = false;
 
         loop {
-            let (mut dev, shift) = match RawDevice::open(&path) {
+            let (mut dev, typable) = match RawDevice::open(&path) {
                 Ok(device) => {
                     // event paths are reused after unplug. Recheck capabilities
                     // and the virtual-device exclusion on every open.
@@ -2052,10 +2053,10 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         std::thread::sleep(std::time::Duration::from_secs(2));
                         continue;
                     }
-                    let shift = device.supported_keys().is_some_and(|keys| {
-                        keys.contains(evdev::KeyCode::KEY_LEFTSHIFT)
-                            || keys.contains(evdev::KeyCode::KEY_RIGHTSHIFT)
-                    });
+                    let typable = device
+                        .supported_keys()
+                        .map(|keys| hotkey_state::typable_presets(keys.iter()))
+                        .unwrap_or_default();
                     let held_keys = match device.get_key_state() {
                         Ok(keys) => keys,
                         Err(error) => {
@@ -2065,7 +2066,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         }
                     };
                     if let Ok(mut state) = EVDEV_KEYS.lock() {
-                        state.attach(&path, held_keys.iter(), shift);
+                        state.attach(&path, held_keys.iter(), typable.clone());
                     } else {
                         error!("Failed to lock evdev keyboard state");
                         return;
@@ -2074,7 +2075,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                         info!("Reconnected evdev keyboard at {}", path.display());
                         reopen_logged = false;
                     }
-                    (device, shift)
+                    (device, typable)
                 }
                 Err(e) => {
                     if !reopen_logged {
@@ -2121,7 +2122,7 @@ fn spawn_evdev_device_worker(app_handle: tauri::AppHandle, path: std::path::Path
                             match dev.get_key_state() {
                                 Ok(keys) => {
                                     if let Ok(mut state) = EVDEV_KEYS.lock() {
-                                        state.attach(&path, keys.iter(), shift);
+                                        state.attach(&path, keys.iter(), typable.clone());
                                     }
                                 }
                                 Err(error) => {
@@ -2955,33 +2956,39 @@ mod tests {
 
     #[test]
     fn hotkey_presets() {
+        assert_eq!(Preset::of("Super+X"), Some(Preset::SuperX));
+        assert_eq!(Preset::of("super+x"), Some(Preset::SuperX));
+        assert_eq!(Preset::of("SUPER+KEYX"), Some(Preset::SuperX));
+        assert_eq!(Preset::of("Cmd+X"), Some(Preset::SuperX));
         assert_eq!(Preset::of("Alt+D"), Some(Preset::AltD));
         assert_eq!(Preset::of("Alt+Shift+D"), Some(Preset::AltShiftD));
         assert_eq!(Preset::of("alt + d"), Some(Preset::AltD));
         assert_eq!(Preset::of("SHIFT+ALT+KEYD"), Some(Preset::AltShiftD));
-        assert_eq!(Preset::of("Ctrl+Shift+V"), None);
+        for custom in ["Super+D", "Alt+X", "Super+Shift+X", "Ctrl+Shift+V"] {
+            assert_eq!(Preset::of(custom), None, "{custom}");
+        }
         assert_eq!(Preset::of("not a shortcut"), None);
     }
 
     #[test]
-    fn presets_keep_their_labels_accelerators_and_shift_state() {
+    fn presets_keep_their_order_labels_and_accelerators() {
         let pinned = [
-            (Preset::AltD, "Alt+D", "<Alt>d", false),
-            (Preset::AltShiftD, "Alt+Shift+D", "<Alt><Shift>d", true),
+            (Preset::SuperX, "Super+X", "<Super>x"),
+            (Preset::AltD, "Alt+D", "<Alt>d"),
+            (Preset::AltShiftD, "Alt+Shift+D", "<Alt><Shift>d"),
         ];
         assert_eq!(Preset::ALL, pinned.map(|(preset, ..)| preset));
-        for (preset, label, accelerator, shift) in pinned {
-            assert_eq!(
-                (preset.label(), preset.accelerator(), preset.shift()),
-                (label, accelerator, shift)
-            );
+        for (preset, label, accelerator) in pinned {
+            assert_eq!((preset.label(), preset.accelerator()), (label, accelerator));
             assert_eq!(Preset::of(label), Some(preset));
+            assert!(validate_dictation_hotkey(label).is_ok());
         }
-        for preset in [None, Some(Preset::AltD), Some(Preset::AltShiftD)] {
+        assert_eq!(Preset::of(DEFAULT_HOTKEY), Some(Preset::SuperX));
+        for preset in [None].into_iter().chain(Preset::ALL.map(Some)) {
             assert_eq!(Preset::decode(Preset::encode(preset)), preset);
         }
-        assert_eq!(Preset::encode(Some(Preset::AltD)), 0);
-        assert_eq!(Preset::decode(2), None);
+        assert_eq!(Preset::encode(Some(Preset::SuperX)), 0);
+        assert_eq!(Preset::decode(3), None);
         assert_eq!(Preset::decode(u8::MAX), None);
     }
 
@@ -3021,7 +3028,7 @@ mod tests {
             ..AppConfig::default()
         };
         assert!(repair_invalid_configured_hotkey(&mut invalid).is_some());
-        assert_eq!(invalid.hotkey, "Alt+D");
+        assert_eq!(invalid.hotkey, DEFAULT_HOTKEY);
 
         let mut reserved = AppConfig {
             hotkey: "shift + alt + r".to_string(),
@@ -3035,7 +3042,7 @@ mod tests {
             ..AppConfig::default()
         };
         assert!(repair_invalid_configured_hotkey(&mut modifierless).is_some());
-        assert_eq!(modifierless.hotkey, "Alt+D");
+        assert_eq!(modifierless.hotkey, DEFAULT_HOTKEY);
 
         let mut valid = AppConfig {
             hotkey: "Ctrl+Shift+V".to_string(),
@@ -3083,10 +3090,12 @@ mod tests {
 
     #[test]
     fn evdev_hotkey_backend_only_handles_supported_wayland_shortcuts() {
+        assert_eq!(wayland_preset(true, "Super+X"), Some(Preset::SuperX));
         assert_eq!(wayland_preset(true, "Alt+D"), Some(Preset::AltD));
         assert_eq!(wayland_preset(true, "Alt+Shift+D"), Some(Preset::AltShiftD));
         assert_eq!(wayland_preset(true, "Ctrl+Shift+V"), None);
         assert_eq!(wayland_preset(true, "Control+Space"), None);
+        assert_eq!(wayland_preset(false, "Super+X"), None);
         assert_eq!(wayland_preset(false, "Alt+D"), None);
         assert_eq!(wayland_preset(false, "Alt+Shift+D"), None);
     }
@@ -3100,6 +3109,8 @@ mod tests {
             )
         };
         assert_eq!(backends(true, "Alt+D"), (true, false));
+        assert_eq!(backends(true, "Super+X"), (true, false));
+        assert_eq!(backends(false, "Super+X"), (false, true));
         // VOCO registers nothing: it needs a desktop shortcut for voco --toggle.
         assert_eq!(backends(true, "Ctrl+Shift+V"), (false, false));
         assert_eq!(backends(false, "Ctrl+Shift+V"), (false, true));
@@ -3108,18 +3119,22 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn evdev_watches_only_real_keyboards_that_can_type_alt_d() {
+    fn evdev_watches_only_real_keyboards_that_can_type_a_preset() {
         use evdev::{AttributeSet, KeyCode};
         let keys = |codes: &[KeyCode]| codes.iter().copied().collect::<AttributeSet<KeyCode>>();
         let alt_d = keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_D]);
         let right_alt_d = keys(&[KeyCode::KEY_RIGHTALT, KeyCode::KEY_D]);
+        let super_x = keys(&[KeyCode::KEY_LEFTMETA, KeyCode::KEY_X]);
         assert!(supports_evdev_hotkey_parts(
             Some("AT Translated Set 2 keyboard"),
             Some(&*alt_d)
         ));
         assert!(supports_evdev_hotkey_parts(None, Some(&*right_alt_d)));
+        assert!(supports_evdev_hotkey_parts(None, Some(&*super_x)));
         for unable in [
             keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_R]),
+            keys(&[KeyCode::KEY_LEFTMETA, KeyCode::KEY_D]),
+            keys(&[KeyCode::KEY_LEFTALT, KeyCode::KEY_X]),
             keys(&[KeyCode::KEY_D]),
         ] {
             assert!(!supports_evdev_hotkey_parts(None, Some(&*unable)));

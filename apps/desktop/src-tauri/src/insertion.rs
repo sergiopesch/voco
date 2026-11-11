@@ -496,8 +496,8 @@ fn x11_shortcut_held() -> Option<bool> {
     Some(pressed.is_some_and(|at| at.elapsed() < MODIFIER_RELEASE_TIMEOUT))
 }
 
-/// An X11 paste also waits while a modifier is held: someone pressing Alt+D
-/// as xdotool holds Shift for Shift+Insert presses Alt+Shift+D, which neither
+/// An X11 paste also waits while a modifier is held: someone pressing Super+X
+/// as xdotool holds Shift for Shift+Insert presses Super+Shift+X, which neither
 /// IBus nor VOCO's grab takes for the shortcut, so the press is lost (#193).
 fn x11_keys_held() -> Option<bool> {
     any_held(x11_shortcut_held(), x11_modifiers_held())

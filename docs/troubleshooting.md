@@ -116,21 +116,21 @@ events for a bug report, see [Shortcut traces](#shortcut-traces).
 
 ## The shortcut also reaches your app, or does nothing
 
-On Wayland without the GNOME panel, the `.deb` and RPM watch for `Alt+D` and
-`Alt+Shift+D` but can't stop your app from receiving them. Browsers jump to the
-address bar, so your words land there, and terminals delete a word. VOCO warns
-once per launch with **Your shortcut also reached the app**. If VOCO can't read
-any keyboard either, the shortcut does nothing, and shortly after VOCO starts
+On Wayland without the GNOME panel, the `.deb` and RPM watch for `Super+X`,
+`Alt+D` and `Alt+Shift+D` but can't stop your app from receiving them. Few apps
+act on `Super+X`. On `Alt+D`, browsers jump to the address bar, so your words
+land there, and terminals delete a word. VOCO warns once per launch with
+**Your shortcut also reached the app**. If VOCO can't read any keyboard either, the shortcut does nothing, and shortly after VOCO starts
 it says **Your shortcut can't reach VOCO yet**. The snap can't read keyboards,
 so on Wayland its shortcut works only once GNOME holds it. Fix either one of
 these ways:
 
 - On GNOME 46, 48, 50 or 51 with the `.deb` or RPM, choose **Enable live panel**
   on the **Help** page, or run `voco --setup-panel`. Then sign out and back in.
-- With the snap on GNOME 48 or later, choose **Add Alt+D** on the **Help** page,
-  then **Add** in GNOME's dialog. On Ubuntu 24.04, add a custom shortcut for
-  `voco --toggle` in **Settings** → **Keyboard** → **View and Customize
-  Shortcuts** → **Custom Shortcuts**.
+- With the snap on GNOME 48 or later, choose **Add** and your shortcut, such as
+  **Add Super+X**, on the **Help** page, then **Add** in GNOME's dialog. On
+  Ubuntu 24.04, add a custom shortcut for `voco --toggle` in **Settings** →
+  **Keyboard** → **View and Customize Shortcuts** → **Custom Shortcuts**.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
 - With the `.deb` or RPM, add the
@@ -154,6 +154,17 @@ these ways:
 When a paste fails, VOCO shows **VOCO stopped typing** and keeps listening. At
 Stop, it copies the words it didn't type to the clipboard. See
 [If a paste fails](everyday-use.md#if-a-paste-fails).
+
+## Words go missing in Firefox, Thunderbird, LibreOffice or VS Code
+
+If your shortcut is `Alt+D` or `Alt+Shift+D`, these apps may open their menu
+bar when you press it, and the menu takes the words VOCO pastes, so nothing
+appears. GNOME keeps the shortcut's letter from your app, so the app sees Alt
+pressed and released on its own, which is how you open their menus from the
+keyboard. Press Esc to close the menu, then set `Super+X` on the **Shortcut**
+page of VOCO's Settings, or choose **Change shortcut** → **Super+X** in the
+tray menu. `Super+X` is the default for new setups, but VOCO keeps a shortcut
+you saved. See [Shortcut](everyday-use.md#shortcut).
 
 ## A word on My words comes out wrong
 
@@ -264,7 +275,7 @@ may ask you to open VOCO.
 - **Open config directory** opens the folder that holds the file.
 - **Reset to defaults**, then **Confirm reset**, renames the file to
   `config.recovery-backup-<numbers>.json` in the same folder and writes default
-  settings. Your shortcut returns to `Alt+D`, and VOCO runs the voice test
+  settings. Your shortcut returns to `Super+X`, and VOCO runs the voice test
   again. VOCO keeps that backup until you delete it or reset again. A reset
   also deletes `config.json.last`, VOCO's copy of your settings, and the
   backups of earlier resets.

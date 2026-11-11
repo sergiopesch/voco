@@ -63,8 +63,8 @@ It exits 1 when its helper can't run. To turn the companion off, run
 ## The shortcut on Wayland
 
 In a Wayland session the attached companion grabs VOCO's shortcut at every
-status, idle included, when it is Alt+D or Alt+Shift+D. Each press, autorepeat
-ignored, calls `Action('shortcut', '')`, which toggles like any other route. It
+status, idle included, when it is Super+X, the default, Alt+D or Alt+Shift+D.
+Each press, autorepeat ignored, calls `Action('shortcut', '')`, which toggles like any other route. It
 works in windows, full screen included, and the overview, but not in Shell menus
 or dialogs.
 
@@ -104,8 +104,9 @@ bus name.
 `recording`, `processing`, `attention` or `idle`), `description` (the tray
 menu's status line), `token`, `stopSession`, `canStop`, `canOpen`, `canQuit`, `level` (0
 to 1, only while recording, 0 after 250 ms without a new level),
-and `shortcutAccelerator`. The accelerator is `<Alt>d`, `<Alt><Shift>d` or
-null, and null on X11. The companion polls every 50 ms while recording, every
+and `shortcutAccelerator`. The accelerator is `<Super>x`, `<Alt>d`,
+`<Alt><Shift>d` or null, and null on X11; a companion from before version 23
+grabs no `<Super>x`, and VOCO then takes the shortcut as it does without one. The companion polls every 50 ms while recording, every
 1.5 seconds otherwise, and at each `changed` request below.
 
 The companion asks VOCO for work, because a confined VOCO can answer GNOME
@@ -193,7 +194,10 @@ writes a reproducible archive of the five files, attached to each release.
 
 - Only GNOME 46, 48, 50 and 51 load the companion. Elsewhere VOCO uses its tray,
   which on GNOME needs an AppIndicator extension.
-- The grab covers Alt+D and Alt+Shift+D only. Apps that inhibit system
+- The grab covers Super+X, Alt+D and Alt+Shift+D only. It takes the letter, so
+  with an Alt chord the focused app sees Alt pressed and released alone, and
+  Firefox, Thunderbird, LibreOffice and VS Code open their menu bar, which takes
+  VOCO's pastes. That is why Super+X is the default. Apps that inhibit system
   shortcuts, such as virtual machines and remote desktops, receive the chord.
 - The tests use a synthetic VOCO service in a nested or headless session, not
   other themes, other panel extensions or physical displays.

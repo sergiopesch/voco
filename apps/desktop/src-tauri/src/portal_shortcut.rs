@@ -30,7 +30,7 @@ struct Shortcut {
     session: Option<String>,
     /// Closed while the companion's lease holds the chord.
     suspended: bool,
-    /// GNOME's description of the trigger, such as "Press <Alt>d".
+    /// GNOME's description of the trigger, such as "Press <Super>x".
     trigger: Option<String>,
     pressed: Option<Instant>,
     released: Option<Instant>,
@@ -98,15 +98,16 @@ pub fn trigger() -> Option<String> {
     })
 }
 
-/// "ALT+d" for the portal's preferred trigger, from VOCO's accelerator.
+/// "LOGO+x" for the portal's preferred trigger, from VOCO's shortcut: the
+/// shortcuts specification's modifier names, and the key's keysym in lower case.
 fn preferred_trigger(accelerator: &str) -> String {
     accelerator
         .split('+')
-        .map(|part| match part.to_ascii_lowercase().as_str() {
-            "alt" => "ALT".to_owned(),
+        .map(|part| match part.trim().to_ascii_lowercase().as_str() {
+            "alt" | "option" => "ALT".to_owned(),
             "shift" => "SHIFT".to_owned(),
             "ctrl" | "control" => "CTRL".to_owned(),
-            "super" | "logo" => "LOGO".to_owned(),
+            "super" | "logo" | "cmd" | "command" => "LOGO".to_owned(),
             key => key.to_owned(),
         })
         .collect::<Vec<_>>()
@@ -343,7 +344,7 @@ pub fn resume() {
     let accelerator = APP
         .get()
         .and_then(|app| crate::tray::current_hotkey(app).ok())
-        .unwrap_or_else(|| "Alt+D".into());
+        .unwrap_or_else(|| crate::config::DEFAULT_HOTKEY.into());
     rebind(accelerator);
 }
 
@@ -376,8 +377,12 @@ mod tests {
 
     #[test]
     fn preferred_trigger_uses_the_portal_spelling() {
+        assert_eq!(preferred_trigger("Super+X"), "LOGO+x");
+        assert_eq!(preferred_trigger("super + x"), "LOGO+x");
+        assert_eq!(preferred_trigger("Cmd+X"), "LOGO+x");
         assert_eq!(preferred_trigger("Alt+D"), "ALT+d");
         assert_eq!(preferred_trigger("Alt+Shift+D"), "ALT+SHIFT+d");
+        assert_eq!(preferred_trigger(crate::config::DEFAULT_HOTKEY), "LOGO+x");
     }
 
     #[test]

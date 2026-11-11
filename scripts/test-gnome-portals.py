@@ -26,8 +26,8 @@ fixtures = Path(__file__).resolve().parent / 'fixtures'
 PORTAL, PORTAL_PATH = 'org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop'
 WAYLAND = 'voco-portal-test'
 FIELD = 'VOCO paste fixture'
-# Evdev codes for the probe's keyboard.
-SHIFT, ALT, D = 42, 56, 32
+# Evdev codes for the probe's keyboard: Shift, and Super+X, VOCO's default.
+SHIFT, SUPER, X = 42, 125, 45
 # The refusals: the paste preflight's or portal_keys.rs's remedy without
 # GNOME's permission, and portal_keys.rs's after GNOME's Stop.
 NOT_ALLOWED, CLOSED_BY_GNOME = 'Choose Allow typing', "GNOME's Stop ended VOCO's typing"
@@ -85,9 +85,9 @@ def screenshot(name):
 
 
 def chord(hold=.08):
-    """Alt+D, as a hand presses it."""
-    key(ALT, True); time.sleep(.03); key(D, True); time.sleep(hold)
-    key(D, False); time.sleep(.03); key(ALT, False)
+    """Super+X, as a hand presses it."""
+    key(SUPER, True); time.sleep(.03); key(X, True); time.sleep(hold)
+    key(X, False); time.sleep(.03); key(SUPER, False)
 
 
 def owner_pid(name):
@@ -454,9 +454,9 @@ try:
     check('idleGuard', idle_guard)
 
     def shortcut():
-        # Setup's shortcut button: GNOME asks once; Alt+D then toggles and
+        # Setup's shortcut button: GNOME asks once; Super+X then toggles and
         # never reaches the focused app.
-        voco.send('allow-shortcut', text='Alt+D')
+        voco.send('allow-shortcut', text='Super+X')
         dialog = answer('dialog-global-shortcuts', 'Add')
         answered = voco.reply(30)
         assert 'ok' in answered, answered
@@ -468,7 +468,7 @@ try:
         for _ in range(3):
             chord(); time.sleep(.4)
         assert voco.counts()['toggles'] == toggles + 3, voco.counts()
-        assert field.text() == '', f'Alt+D reached the focused app: {field.text()!r}'
+        assert field.text() == '', f'Super+X reached the focused app: {field.text()!r}'
         return {'dialog': dialog, 'trigger': answered['ok'], 'toggles': 3}
     check('shortcut', shortcut)
 
@@ -477,14 +477,14 @@ try:
         session = begin('held')
         field.clear()
         toggles = voco.counts()['toggles']
-        key(ALT, True); time.sleep(.03)
-        pressed = time.monotonic(); key(D, True)
+        key(SUPER, True); time.sleep(.03)
+        pressed = time.monotonic(); key(X, True)
         assert wait_for(lambda: voco.counts()['toggles'] == toggles + 1, 2), 'Activated did not toggle'
         assert voco.counts()['keysHeld'] is True
         mark = time.monotonic()
         voco.send('paste', text='heldx')
         time.sleep(.4)
-        released = time.monotonic(); key(D, False); time.sleep(.03); key(ALT, False)
+        released = time.monotonic(); key(X, False); time.sleep(.03); key(SUPER, False)
         answered = voco.reply(5)
         assert 'ok' in answered, answered
         assert wait_for(lambda: field.text() == 'heldx', 3), field.text()

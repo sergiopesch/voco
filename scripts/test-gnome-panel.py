@@ -32,7 +32,7 @@ bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 # The synthetic service serves the app's own interface, so it can't drift from panel.rs.
 panel_rs = (Path(__file__).resolve().parents[1] / 'apps/desktop/src-tauri/src/panel.rs').read_text()
 xml = re.search(r'const XML: &str = r#"(.*?)"#;', panel_rs, re.S).group(1)
-SUPPORTED = ('<Alt>d', '<Alt><Shift>d')
+SUPPORTED = ('<Super>x', '<Alt>d', '<Alt><Shift>d')
 def snapshot():
     return json.dumps(state)
 def give(kind, request_id=0):
@@ -123,7 +123,7 @@ class RemoteInput:
     """Real compositor input through Mutter's RemoteDesktop API, the path GNOME Remote Desktop uses."""
     # Evdev key and button codes.
     KEYS = {'alt': 56, 'Alt_L': 56, 'Alt_R': 100, 'shift': 42, 'Shift_L': 42, 'Shift_R': 54,
-            'Control_L': 29, 'Control_R': 97, 'Super_L': 125, 'Super_R': 126, 'd': 32, 'space': 57,
+            'Control_L': 29, 'Control_R': 97, 'Super_L': 125, 'Super_R': 126, 'super': 125, 'd': 32, 'x': 45, 'space': 57,
             'Menu': 127, 'F10': 68}
     BUTTONS = {1: 0x110, 2: 0x112, 3: 0x111}
     def __init__(self):
@@ -253,8 +253,9 @@ try:
         report['staleTrayIconsRemoved'] = True
         native = json.loads(call('NativeState').unpack()[0])
         assert native['version'] == 1 and not native['canStop'], native
-        # Only a companion from before v17 read the Stop-only fields.
-        assert native.get('shortcutAccelerator') == '<Alt>d', native
+        # Only a companion from before v17 read the Stop-only fields. A new
+        # setup's shortcut is Super+X.
+        assert native.get('shortcutAccelerator') == '<Super>x', native
         assert 'stopAccelerator' not in native and 'stopShortcutToken' not in native, native
         report['nativeBridgeState'] = native
         try:
@@ -521,7 +522,9 @@ try:
     window=Gtk.Window(title='VOCO shortcut fixture'); entry=Gtk.Entry(); window.add(entry)
     leaked=[]
     def on_key(_widget, event):
-        if event.keyval in (Gdk.KEY_d, Gdk.KEY_D) and event.state & Gdk.ModifierType.MOD1_MASK:
+        super_held = event.state & (Gdk.ModifierType.SUPER_MASK | Gdk.ModifierType.MOD4_MASK)
+        if (event.keyval in (Gdk.KEY_d, Gdk.KEY_D) and event.state & Gdk.ModifierType.MOD1_MASK) or \
+                (event.keyval in (Gdk.KEY_x, Gdk.KEY_X) and super_held):
             leaked.append(True); entry.select_region(0, -1)
         return False
     entry.connect('key-press-event', on_key)
@@ -619,6 +622,10 @@ try:
     shortcut_state('idle','<Alt><Shift>d')
     assert press('alt+shift+d') == consumed, 'a changed chord must be regrabbed'
     assert press('alt+d') == released, 'the previous chord must return to the application'
+    shortcut_state('idle','<Super>x')
+    assert press('super+x') == consumed, 'the default Super+X must be grabbed like the Alt chords'
+    # The focused field still takes the Alt chord, so Super+X opened no overview.
+    assert press('alt+shift+d') == released, 'Super+X must return the Alt chord to the application'
     # Late replies about a replaced grab, false or failed, must not release or
     # detach the newer one.
     for accelerator, combo, settle in [

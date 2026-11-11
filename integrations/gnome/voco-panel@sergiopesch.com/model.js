@@ -19,7 +19,7 @@ export function presentation(state) {
         level: state.status === 'recording' && Number.isFinite(state.level)
             ? Math.max(0, Math.min(1, state.level)) : 0,
         // Grabbed at every status; only chords passive evdev also observes.
-        shortcutAccelerator: ['<Alt>d', '<Alt><Shift>d'].includes(state.shortcutAccelerator)
+        shortcutAccelerator: ['<Super>x', '<Alt>d', '<Alt><Shift>d'].includes(state.shortcutAccelerator)
             ? state.shortcutAccelerator : null,
     };
 }

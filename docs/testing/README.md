@@ -208,17 +208,17 @@ app ID `voco_voco`, with a stand-in for the desktop entry snapd installs.
 
 The suite answers GNOME's dialogs over AT-SPI: Allow Remote Interaction, then
 Share, and the shortcut dialog's Add. The probe's Clutter keyboard inside the
-Shell presses Alt+D, so the tester's keys open no remote desktop session of
-their own. Each paste goes to `fixtures/paste-field.py` on Wayland and under
+Shell presses Super+X, VOCO's default, so the tester's keys open no remote
+desktop session of their own. Each paste goes to `fixtures/paste-field.py` on Wayland and under
 XWayland and must land exactly, from one Shift+Insert. It checks, in order:
 dictation without GNOME's permission opens no session and types nothing; Allow
 typing shows GNOME's dialog once; each dictation restores the permission without
 a dialog and closes its session when it ends; the remote-access icon's Stop
 stops the dictation, and the next paste sends no key; a session no dictation
-reports needing closes by itself; the shortcut dialog appears once, Alt+D then
+reports needing closes by itself; the shortcut dialog appears once, Super+X then
 toggles and never reaches the field, and a paste while the chord is down waits
 for `Deactivated` and 150 ms more; while the companion's lease holds the chord
-Alt+D doesn't toggle, and after it the shortcut binds again without a dialog.
+Super+X doesn't toggle, and after it the shortcut binds again without a dialog.
 Without a tauri app the fixture counts the stops and toggles the portal code
 asks for instead. `VOCO_PORTAL_EVIDENCE_DIR` receives `results.json`, the
 dialogs' and the remote-access icon's screenshots, and each service's log.

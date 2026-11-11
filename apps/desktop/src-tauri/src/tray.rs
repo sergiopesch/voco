@@ -974,6 +974,9 @@ mod tests {
     #[test]
     fn panel_grabs_only_the_passive_wayland_chords() {
         for (hotkey, accelerator) in [
+            ("Super+X", Some("<Super>x")),
+            ("super + x", Some("<Super>x")),
+            ("Super+D", None),
             ("Alt+D", Some("<Alt>d")),
             ("alt + d", Some("<Alt>d")),
             ("Alt+Shift+D", Some("<Alt><Shift>d")),

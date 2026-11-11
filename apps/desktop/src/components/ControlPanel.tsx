@@ -20,7 +20,7 @@ import { isDictationActive } from "@/lib/activityMode";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
-import { DIAGNOSTICS_TIMEOUT_MS, microphoneLabel, shortcutPresentation, withTimeout } from "@/lib/shortcutPresentation";
+import { DEFAULT_HOTKEY, DIAGNOSTICS_TIMEOUT_MS, microphoneLabel, shortcutPresentation, withTimeout } from "@/lib/shortcutPresentation";
 import { getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
 import { PanelSetup } from "@/components/PanelSetup";
@@ -140,7 +140,8 @@ function shortcutKey(event: ShortcutKeyEvent): string {
 }
 
 export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent): string | null {
-  if (["Alt", "Control", "Shift", "Meta"].includes(event.key)) return null;
+  // Engines name the Super key itself Meta, OS or Super.
+  if (["Alt", "Control", "Shift", "Meta", "OS", "Super", "Hyper"].includes(event.key)) return null;
   const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"].filter(Boolean);
   return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, shortcutKey(event)].join("+") : null;
 }
@@ -717,7 +718,7 @@ export function ControlPanel({
   }
 
   async function saveHotkey(): Promise<boolean> {
-    const normalizedHotkey = hotkeyDraft.trim() || "Alt+D";
+    const normalizedHotkey = hotkeyDraft.trim() || DEFAULT_HOTKEY;
     setHotkeyDraft(normalizedHotkey);
     setHotkeyError(null);
     // The native shortcut parser validates supported aliases and reserved shortcuts.

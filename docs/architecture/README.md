@@ -193,7 +193,7 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
    every key while the chord is held, so the paste waits for the release. It
    also waits while the X server reports Shift, Control, Alt, Super or AltGr
    held: the Shift of Shift+Insert would turn a shortcut someone is pressing,
-   such as Alt+D, into Alt+Shift+D, which nothing takes for the shortcut.
+   such as Super+X, into Super+Shift+X, which nothing takes for the shortcut.
 6. It sends Shift+Insert: through the companion or the virtual keyboard on
    Wayland, and with `xdotool key --clearmodifiers` on X11. Toolkits paste CLIPBOARD and terminals
    paste PRIMARY.
@@ -306,8 +306,8 @@ it is.
 
 | Route | When | Behaviour |
 | --- | --- | --- |
-| GNOME companion | GNOME 46, 48, 50 or 51 on Wayland with the companion attached | Shell grabs Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
-| Passive evdev | Wayland with Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. The focused app also receives the chord. |
+| GNOME companion | GNOME 46, 48, 50 or 51 on Wayland with the companion attached | Shell grabs Super+X, Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
+| Passive evdev | Wayland with Super+X, Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. A keyboard counts for a preset only when it has that chord's modifier, Shift if it names Shift, and letter; the chord matches with exactly its own modifiers held on any keyboard. The focused app also receives the chord. |
 | X11 grab | X11, any valid shortcut | A root-window key grab consumes the chord and toggles on release, so the paste keys reach the app. |
 | IBus engine | The VOCO Dictation input source is selected | Protocol 6. Consumes the chord in IBus-aware fields and changes no text. |
 | `voco --toggle` | Any desktop binding | Connects once to the owner-only socket. The connection itself is the request. |
@@ -316,7 +316,16 @@ The companion holds a 2.5-second lease on the exact configured accelerator and
 renews it about once a second. While the lease is fresh, evdev ignores the
 chord. While the IBus engine holds its 1-second lease, evdev ignores the chord
 and VOCO releases its X11 grab so the engine receives it. On Wayland, a shortcut
-other than the two presets needs a desktop binding that runs `voco --toggle`.
+other than the three presets needs a desktop binding that runs `voco --toggle`.
+
+The presets are `Preset` in `lib.rs`: Super+X, the default, then Alt+D and
+Alt+Shift+D, in the tray's order. The companion and GNOME's shortcut portal
+consume only the letter of a chord, so the focused app still sees its modifier
+pressed and released alone. For Alt that opens the menu bar in Firefox,
+Thunderbird, LibreOffice and Electron editors, and the menu takes the
+Shift+Insert pastes that follow; a lone Super opens nothing, and mutter doesn't
+open the overview once it has seen the X. A saved shortcut is never migrated,
+and an invalid one resets to `config::DEFAULT_HOTKEY`.
 Shortcut status text comes from `shortcut_readiness.rs`.
 
 ## Tray and GNOME companion
@@ -374,7 +383,7 @@ that itself, and asks you to quit and open VOCO again.
 ## Configuration
 
 Settings live in `$XDG_CONFIG_HOME/voco/config.json` with ten fields:
-`hotkey` (default `Alt+D`), `selectedMic`, `onboardingCompleted`,
+`hotkey` (default `Super+X`), `selectedMic`, `onboardingCompleted`,
 `startAtLogin` (on until the user turns it off), `updateChannel` (`stable` or
 `beta`), `automaticUpdateChecks`, `installChannel`,
 `englishSpelling` (`british`, `american` or `as-recognised`, and `null`
@@ -512,7 +521,9 @@ started waits up to 400 ms, then typed nothing.
 48 and later), first from setup's button, which shows GNOME's dialog, and records
 that in `global-shortcut` beside the config. At each start it binds again, which
 GNOME answers without a dialog. `Activated` toggles through
-`eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. Modifiers can't be
+`eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
+trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
+Super+X. Modifiers can't be
 read through the portal, so `keys_held` holds a paste until `Deactivated`, at
 most 1.5 s after the press, then 150 ms more. The companion's `ReserveShortcut`
 suspends the portal session and its release binds again, so one grab holds the

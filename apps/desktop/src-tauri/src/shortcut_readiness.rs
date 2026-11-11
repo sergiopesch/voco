@@ -226,11 +226,13 @@ mod tests {
     #[test]
     fn old_runtime_mode_cannot_advertise_new_config() {
         let o = Observations::default();
-        let mut s = snapshot();
-        s.evdev_keyboards = Some(1);
-        s.hotkey = "Alt+Shift+D";
-        s.configured_preset = Some(Preset::AltShiftD);
-        assert_eq!(o.status(s).state, "unavailable");
+        for preset in [Preset::AltShiftD, Preset::SuperX] {
+            let mut s = snapshot();
+            s.evdev_keyboards = Some(1);
+            s.hotkey = preset.label();
+            s.configured_preset = Some(preset);
+            assert_eq!(o.status(s).state, "unavailable");
+        }
     }
     #[test]
     fn armed_poll_requires_current_config_and_fresh_heartbeat() {

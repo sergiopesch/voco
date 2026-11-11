@@ -837,6 +837,20 @@ mod tests {
     }
 
     #[test]
+    fn shell_may_grab_only_a_preset_accelerator() {
+        let named = |accelerator: &str| {
+            shortcut_accelerator(&serde_json::json!({ "shortcutAccelerator": accelerator }))
+                .map(str::to_owned)
+        };
+        for preset in ["<Super>x", "<Alt>d", "<Alt><Shift>d"] {
+            assert_eq!(named(preset).as_deref(), Some(preset));
+        }
+        for other in ["<Super>d", "<Alt>x", "<Super><Shift>x", "<Control>v", ""] {
+            assert_eq!(named(other), None, "{other}");
+        }
+    }
+
+    #[test]
     fn fresh_idle_reservation_suppresses_only_its_attached_current_chord() {
         let _serial = serial();
         let host = fake(idle(Some("<Alt>d")));
