@@ -20,6 +20,7 @@ fn counts() -> Value {
     json!({
         "stops": crate::portal_keys::STOPS_REQUESTED.load(Ordering::SeqCst),
         "toggles": crate::portal_shortcut::TOGGLES_REQUESTED.load(Ordering::SeqCst),
+        "activations": crate::portal_shortcut::ACTIVATIONS.load(Ordering::SeqCst),
         "keysHeld": crate::portal_shortcut::keys_held(),
     })
 }

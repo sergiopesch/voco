@@ -521,7 +521,12 @@ started waits up to 400 ms, then typed nothing.
 `portal_shortcut.rs` binds one `toggle` shortcut through GlobalShortcuts (GNOME
 48 and later), first from setup's button, which shows GNOME's dialog, and records
 that in `global-shortcut` beside the config. At each start it binds again, which
-GNOME answers without a dialog. `Activated` toggles through
+GNOME answers without a dialog. GNOME's grab repeats `Activated` while the
+chord is held, about every 30 ms after the keyboard's repeat delay; one before
+`Deactivated` and within that delay (at least 900 ms) plus 100 ms of the last is a
+repeat and toggles nothing. GNOME 46's custom shortcut runs `voco --toggle` for
+each repeat too, so `note_command_press` treats a toggle within the repeat delay
+plus 100 ms of the last as one. A first `Activated` toggles through
 `eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
 trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
 Super+X. Modifiers can't be

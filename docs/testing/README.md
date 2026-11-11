@@ -217,7 +217,8 @@ a dialog and closes its session when it ends; the remote-access icon's Stop
 stops the dictation, and the next paste sends no key; a session no dictation
 reports needing closes by itself; the shortcut dialog appears once, Super+X then
 toggles and never reaches the field, and a paste while the chord is down waits
-for `Deactivated` and 150 ms more; while the companion's lease holds the chord
+for `Deactivated` and 150 ms more; a chord held for 1.5 s, which GNOME repeats,
+toggles once, and the next press toggles; while the companion's lease holds the chord
 Super+X doesn't toggle, and after it the shortcut binds again without a dialog.
 Without a tauri app the fixture counts the stops and toggles the portal code
 asks for instead. `VOCO_PORTAL_EVIDENCE_DIR` receives `results.json`, the

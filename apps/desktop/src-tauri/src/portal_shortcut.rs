@@ -10,7 +10,7 @@ use crate::portal::{self, Refusal};
 use glib::variant::ToVariant;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
-use webkit2gtk::gio;
+use webkit2gtk::gio::{self, prelude::SettingsExt};
 
 const INTERFACE: &str = "org.freedesktop.portal.GlobalShortcuts";
 const SHORTCUT_ID: &str = "toggle";
@@ -36,6 +36,8 @@ struct Shortcut {
     trigger: Option<String>,
     pressed: Option<Instant>,
     released: Option<Instant>,
+    /// The last `Activated`, a held chord's repeats included.
+    activated: Option<Instant>,
 }
 
 static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
@@ -44,6 +46,7 @@ static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
     trigger: None,
     pressed: None,
     released: None,
+    activated: None,
 });
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 /// The toggles `Activated` asked for. The portal suite (portal_fixture.rs)
@@ -51,6 +54,61 @@ static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 #[cfg(test)]
 pub(crate) static TOGGLES_REQUESTED: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
+/// Every `Activated`, a held chord's repeats included.
+#[cfg(test)]
+pub(crate) static ACTIVATIONS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+/// GNOME's grabs, the portal's and a custom shortcut's, repeat a held chord's
+/// press about every 30 ms once the keyboard's repeat delay has passed, so
+/// only a press after a release toggles (AGENTS.md, Shortcut). None when the
+/// keyboard doesn't repeat. Read once: GNOME's default is 500 ms.
+fn repeat_delay() -> Option<Duration> {
+    static DELAY: OnceLock<Option<Duration>> = OnceLock::new();
+    *DELAY.get_or_init(|| {
+        const DEFAULT: Duration = Duration::from_millis(500);
+        let Some(schema) = gio::SettingsSchemaSource::default()
+            .and_then(|source| source.lookup("org.gnome.desktop.peripherals.keyboard", true))
+            .filter(|schema| schema.has_key("repeat") && schema.has_key("delay"))
+        else {
+            return Some(DEFAULT);
+        };
+        let keyboard = gio::Settings::new_full(&schema, None::<&gio::SettingsBackend>, None);
+        keyboard
+            .boolean("repeat")
+            .then(|| Duration::from_millis(keyboard.uint("delay").into()))
+    })
+}
+
+/// A repeat follows the last press or repeat within the repeat delay and a
+/// margin; the first comes after the delay, the rest about every 30 ms.
+const REPEAT_MARGIN: Duration = Duration::from_millis(100);
+
+fn within_repeat(last: Option<Instant>, now: Instant, delay: Option<Duration>) -> bool {
+    match (last, delay) {
+        (Some(last), Some(delay)) => now.saturating_duration_since(last) < delay + REPEAT_MARGIN,
+        _ => false,
+    }
+}
+
+/// A held chord's repeated `Activated`: GNOME hasn't reported the press
+/// released, and the last activation came within the repeat window. A lost
+/// `Deactivated` can't swallow a later press, which comes after a silence
+/// repeats never leave.
+fn is_repeat(state: &Shortcut, now: Instant, delay: Option<Duration>) -> bool {
+    let down = state
+        .pressed
+        .is_some_and(|pressed| !state.released.is_some_and(|released| released >= pressed));
+    down && within_repeat(
+        state.activated,
+        now,
+        Some(delay.unwrap_or_default().max(STALE_REPEAT)),
+    )
+}
+
+/// Without keyboard repeat, a press GNOME never reported released stops
+/// counting as one this long after its last activation.
+const STALE_REPEAT: Duration = Duration::from_millis(900);
 
 fn shortcut() -> MutexGuard<'static, Shortcut> {
     SHORTCUT
@@ -109,16 +167,28 @@ pub fn custom_present(hotkey: &str) -> bool {
 }
 
 /// The press of a GNOME custom shortcut reaches VOCO as `voco --toggle`, with
-/// no release to wait for: a paste waits this long after it instead, for the
-/// chord's keys to come up (AGENTS.md, Delivery).
+/// no release to wait for: a paste waits this long after it, or after its last
+/// repeat, for the chord's keys to come up (AGENTS.md, Delivery).
 const COMMAND_GRACE: Duration = Duration::from_millis(400);
+/// The last `voco --toggle`, a held chord's repeats included.
 static COMMAND_PRESS: Mutex<Option<Instant>> = Mutex::new(None);
 
-/// A `voco --toggle` reached the snap.
-pub fn note_command_press() {
-    *COMMAND_PRESS
+fn command_grace(delay: Option<Duration>) -> Duration {
+    delay.map_or(COMMAND_GRACE, |delay| {
+        COMMAND_GRACE.max(delay + REPEAT_MARGIN)
+    })
+}
+
+/// A `voco --toggle` reached the snap. False for a held chord's repeat, which
+/// GNOME's custom shortcut runs too: it doesn't toggle.
+pub fn note_command_press() -> bool {
+    let now = Instant::now();
+    let mut last = COMMAND_PRESS
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(Instant::now());
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let repeat = within_repeat(*last, now, repeat_delay());
+    *last = Some(now);
+    !repeat
 }
 
 /// GNOME's description of the trigger, once bound.
@@ -175,7 +245,15 @@ fn watch(connection: &gio::DBusConnection) {
                     return;
                 }
                 if signal == "Activated" {
-                    state.pressed = Some(Instant::now());
+                    let now = Instant::now();
+                    #[cfg(test)]
+                    ACTIVATIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let repeat = is_repeat(&state, now, repeat_delay());
+                    state.activated = Some(now);
+                    if repeat {
+                        return;
+                    }
+                    state.pressed = Some(now);
                     state.released = None;
                     drop(state);
                     #[cfg(test)]
@@ -481,21 +559,29 @@ pub fn keys_held() -> Option<bool> {
     let command = *COMMAND_PRESS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if command.is_some_and(|at| at.elapsed() < COMMAND_GRACE) {
+    if command.is_some_and(|at| at.elapsed() < command_grace(repeat_delay())) {
         return Some(true);
     }
     let state = shortcut();
     state.session.as_ref()?;
     let pressed = state.pressed?;
-    held(pressed, state.released, Instant::now())
+    held(pressed, state.released, state.activated, Instant::now())
 }
 
-fn held(pressed: Instant, released: Option<Instant>, now: Instant) -> Option<bool> {
+/// Held until the release and its grace. A press with no release reads as
+/// unknown once nothing, a repeat included, has activated it for a while.
+fn held(
+    pressed: Instant,
+    released: Option<Instant>,
+    activated: Option<Instant>,
+    now: Instant,
+) -> Option<bool> {
+    let last = activated.map_or(pressed, |activated| activated.max(pressed));
     match released {
         Some(released) if released >= pressed => {
             Some(now.saturating_duration_since(released) < MODIFIER_GRACE)
         }
-        _ if now.saturating_duration_since(pressed) >= STALE_PRESS => None,
+        _ if now.saturating_duration_since(last) >= STALE_PRESS => None,
         _ => Some(true),
     }
 }
@@ -537,36 +623,120 @@ mod tests {
     fn a_paste_waits_for_the_release_then_the_modifier_grace() {
         let pressed = Instant::now();
         let at = |ms| pressed + Duration::from_millis(ms);
-        assert_eq!(held(pressed, None, at(100)), Some(true), "still pressed");
         assert_eq!(
-            held(pressed, Some(at(200)), at(300)),
+            held(pressed, None, None, at(100)),
+            Some(true),
+            "still pressed"
+        );
+        assert_eq!(
+            held(pressed, Some(at(200)), None, at(300)),
             Some(true),
             "within the modifier grace"
         );
         assert_eq!(
-            held(pressed, Some(at(200)), at(351)),
+            held(pressed, Some(at(200)), None, at(351)),
             Some(false),
             "after the grace"
         );
         assert_eq!(
-            held(pressed, None, at(2_000)),
+            held(pressed, None, None, at(2_000)),
             Some(true),
             "a long hold stays held, so the paste's wait sends no keys"
         );
         assert_eq!(
-            held(pressed, Some(at(2_000)), at(2_100)),
+            held(pressed, Some(at(2_000)), None, at(2_100)),
             Some(true),
             "a long hold's release still gets the grace"
         );
         assert_eq!(
-            held(pressed, None, at(5_000)),
+            held(pressed, None, None, at(5_000)),
             None,
             "a press never reported released reads as unknown"
         );
         assert_eq!(
-            held(at(500), Some(at(400)), at(600)),
+            held(pressed, None, Some(at(4_990)), at(6_000)),
+            Some(true),
+            "repeats keep a long hold held"
+        );
+        assert_eq!(
+            held(at(500), Some(at(400)), None, at(600)),
             Some(true),
             "an earlier release doesn't end a newer press"
         );
+    }
+
+    #[test]
+    fn a_held_chords_repeats_never_toggle() {
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        let delay = Some(Duration::from_millis(500));
+        let down = Shortcut {
+            pressed: Some(at(0)),
+            activated: Some(at(0)),
+            ..Shortcut::default()
+        };
+        assert!(
+            is_repeat(&down, at(500), delay),
+            "the first repeat, after the delay"
+        );
+        let repeating = Shortcut {
+            pressed: Some(at(0)),
+            activated: Some(at(530)),
+            ..Shortcut::default()
+        };
+        assert!(
+            is_repeat(&repeating, at(560), delay),
+            "repeats about every 30 ms"
+        );
+        let up = Shortcut {
+            pressed: Some(at(0)),
+            released: Some(at(600)),
+            activated: Some(at(560)),
+            ..Shortcut::default()
+        };
+        assert!(
+            !is_repeat(&up, at(700), delay),
+            "a press after the release toggles"
+        );
+        let lost_release = Shortcut {
+            pressed: Some(at(0)),
+            activated: Some(at(0)),
+            ..Shortcut::default()
+        };
+        assert!(
+            !is_repeat(&lost_release, at(2_000), delay),
+            "after a silence no hold leaves, a press toggles even with Deactivated lost"
+        );
+        assert!(
+            is_repeat(&down, at(800), None),
+            "without keyboard repeat a lost release still can't swallow presses for long"
+        );
+        assert!(!is_repeat(&down, at(1_000), None));
+    }
+
+    #[test]
+    fn a_custom_shortcuts_repeats_never_toggle() {
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        let delay = Some(Duration::from_millis(500));
+        assert!(
+            !within_repeat(None, at(0), delay),
+            "the first press toggles"
+        );
+        assert!(
+            within_repeat(Some(at(0)), at(500), delay),
+            "the first repeat doesn't"
+        );
+        assert!(within_repeat(Some(at(500)), at(530), delay));
+        assert!(
+            !within_repeat(Some(at(530)), at(1_400), delay),
+            "a press after the release does"
+        );
+        assert!(
+            !within_repeat(Some(at(0)), at(50), None),
+            "no repeat, no filter"
+        );
+        assert_eq!(command_grace(delay), Duration::from_millis(600));
+        assert_eq!(command_grace(None), COMMAND_GRACE);
     }
 }
