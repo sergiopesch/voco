@@ -37,6 +37,12 @@ if [[ ${1:-} != --inside ]]; then
   exit
 fi
 run=${2:?}
-export PATH=/usr/bin:/bin LIBGL_ALWAYS_SOFTWARE=1 GSK_RENDERER=cairo
+# VOCO runs as the snap here (SNAP_NAME=voco) without snapd, so it asks this
+# stand-in whether its plugs are connected: the store auto-connects both, and a
+# host's real snapctl, as on GitHub's runners, would answer for no snap at all.
+mkdir -p "$run/bin"
+printf '%s\n' '#!/bin/sh' 'case "$1 $2" in "is-connected login-session-observe"|"is-connected audio-record") exit 0 ;; esac' 'exit 1' > "$run/bin/snapctl"
+chmod 755 "$run/bin/snapctl"
+export PATH="$run/bin:/usr/bin:/bin" LIBGL_ALWAYS_SOFTWARE=1 GSK_RENDERER=cairo
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=ubuntu:GNOME GNOME_SHELL_SESSION_MODE=user
 exec dbus-run-session -- /usr/bin/python3 "$ROOT/scripts/test-gnome-portals.py" "$run"
