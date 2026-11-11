@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.70" date="2026-11-12">
+      <description>
+        <p>The snap from the Snap Store and App Center now types on GNOME with nothing else to install: GNOME asks once for permission, and holds VOCO's shortcut for it. New setups use Super+X, which no longer opens Firefox's or LibreOffice's menu bar and loses words, as Alt+D could. On Ubuntu 24.04, setup adds the shortcut to GNOME's keyboard shortcuts for you.</p>
+      </description>
+    </release>
     <release version="2026.0.69" date="2026-11-11">
       <description>
         <p>VOCO now starts when you sign in, which you can turn off in Settings. The snap's setup installs its GNOME panel in fewer steps and continues by itself, VOCO says plainly when a processor can't run its speech recognition, and Install update works on Debian 13, Ubuntu 26.04 and Fedora 44.</p>
