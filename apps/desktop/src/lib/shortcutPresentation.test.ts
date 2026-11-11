@@ -167,7 +167,7 @@ describe("microphone footer", () => {
   it("uses only the approved native identity, never the browser default", () => {
     const source = { label: "Remapped voco_test_sink_long.monitor", name: "source" };
     expect(microphoneLabel("native", source, null, [])).toBe(source.label);
-    expect(microphoneLabel("native", null, null, [])).toBe("No native microphone selected");
+    expect(microphoneLabel("native", null, null, [])).toBe("System default");
     expect(microphoneLabel("pending", source, null, [])).toBe("Checking microphone setup");
     expect(microphoneLabel("webkit", source, null, [])).toBe("System default");
   });

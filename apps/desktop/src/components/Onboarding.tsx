@@ -127,7 +127,9 @@ export function Onboarding({ microphone, status, passed,
       <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.</p>
       <p>{startsAtLogin ? "VOCO starts when you sign in. You can turn this off in Settings."
         : "VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher."}</p>
-      {shortcutNote || storeSetup ? null : <PanelSetup disabled={busy || blocked} />}
+      {/* The snap's GNOME permissions stay in view, with what the orange icon
+          means; its setup never offers the panel. */}
+      {shortcutNote ? null : storeSetup ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} /> : <PanelSetup disabled={busy || blocked} />}
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}
     </div> : testing ? <p className="voco-setup__privacy">{!passed && !recording && !busy ? "Start test turns on your microphone. " : ""}Speech stays on this computer; this test only displays words here.</p> : null}
     <div className="voco-setup__actions">

@@ -901,6 +901,7 @@ input[type="checkbox"]:disabled { opacity: 0.5; }
 .voco-panel-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .voco-panel-setup > p { flex-basis: 100%; margin: 0; }
 .voco-portal-setup { display: grid; gap: 14px; }
+.voco-setup__handoff .voco-portal-setup { margin-bottom: 14px; }
 .voco-portal-setup p { font-size: 15px; }
 .voco-portal-setup__step { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
 .voco-portal-setup__step > p { flex-basis: 100%; margin: 0; line-height: 1.5; }

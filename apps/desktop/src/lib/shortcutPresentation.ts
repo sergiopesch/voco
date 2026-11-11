@@ -34,7 +34,8 @@ export function microphoneLabel(
   devices: AudioDeviceOption[],
 ): string {
   if (mode === "pending") return "Checking microphone setup";
-  if (mode === "native") return selected ? selected.label || selected.name : "No native microphone selected";
+  // No saved choice records from the system default microphone.
+  if (mode === "native") return selected ? selected.label || selected.name : "System default";
   return devices.find((device) => device.deviceId === deviceId)?.label ?? "System default";
 }
 
