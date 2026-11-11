@@ -8,6 +8,7 @@
 
 use crate::portal::{self, Refusal};
 use glib::variant::ToVariant;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 use webkit2gtk::gio;
@@ -64,6 +65,10 @@ static TYPING: Mutex<Typing> = Mutex::new(Typing {
     closed_by_gnome: false,
 });
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
+/// The renderer's dictation status: starting, recording or processing.
+static DICTATING: AtomicBool = AtomicBool::new(false);
+/// How often an open session checks that a dictation still needs it.
+const IDLE_CHECK: Duration = Duration::from_secs(3);
 
 fn typing() -> MutexGuard<'static, Typing> {
     TYPING
@@ -232,6 +237,40 @@ fn unwatch(connection: &gio::DBusConnection) {
     });
 }
 
+/// Each runtime status snapshot. Only a change from dictating to idle closes
+/// the session: a snapshot sent for another reason still says idle just after
+/// `begin`, before the renderer reports the dictation starting.
+pub fn note_dictating(dictating: bool) {
+    if DICTATING.swap(dictating, Ordering::SeqCst) && !dictating {
+        end();
+    }
+}
+
+/// Closes a session that has stayed open while VOCO was idle for two checks
+/// in a row, as after a dictation that failed before its status changed, so
+/// GNOME's icon never stays up. Portal thread only.
+fn watch_idle(generation: u64) {
+    let idle_checks = std::cell::Cell::new(0);
+    // On the portal thread's own context: g_timeout_add would use GTK's.
+    let source = glib::timeout_source_new(IDLE_CHECK, None, glib::Priority::DEFAULT, move || {
+        if typing().generation != generation {
+            return glib::ControlFlow::Break;
+        }
+        if DICTATING.load(Ordering::SeqCst) {
+            idle_checks.set(0);
+            return glib::ControlFlow::Continue;
+        }
+        idle_checks.set(idle_checks.get() + 1);
+        if idle_checks.get() < 2 {
+            return glib::ControlFlow::Continue;
+        }
+        log::info!("Closing VOCO's typing session: no dictation needs it");
+        end();
+        glib::ControlFlow::Break
+    });
+    source.attach(Some(&glib::MainContext::ref_thread_default()));
+}
+
 /// A desktop dictation starts: open a session from the saved permission, in
 /// the background. Without one, nothing opens and pastes are refused.
 pub fn begin() {
@@ -266,6 +305,7 @@ pub fn begin() {
                     state.session = Some(session.clone());
                     drop(state);
                     watch_closed(connection, &session);
+                    watch_idle(generation);
                 } else {
                     drop(state);
                     portal::close_session(connection, &session);

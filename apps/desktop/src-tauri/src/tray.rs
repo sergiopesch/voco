@@ -476,19 +476,17 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     if !apply_runtime_snapshot(&mut tray_state.runtime, snapshot) {
         return;
     }
-    let idle = matches!(
+    let dictating = matches!(
         tray_state.runtime.dictation_status,
-        DictationStatus::Idle | DictationStatus::Error
+        DictationStatus::Starting | DictationStatus::Recording | DictationStatus::Processing
     );
     drop(tray_state);
-    // The dictation's last paste, Stop's space included, is done: close the
-    // snap's typing session so GNOME's remote-access icon goes (AGENTS.md).
+    // A return to idle means the dictation's last paste, Stop's space
+    // included, is done: the snap's typing session closes (AGENTS.md).
     #[cfg(target_os = "linux")]
-    if idle {
-        crate::portal_keys::end();
-    }
+    crate::portal_keys::note_dictating(dictating);
     #[cfg(not(target_os = "linux"))]
-    let _ = idle;
+    let _ = dictating;
     refresh_tray(app);
 }
 
