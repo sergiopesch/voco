@@ -84,6 +84,8 @@ fn reserve(key: &str, lease: Duration) {
     if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
         *until = Some((key.to_owned(), Instant::now() + lease));
     }
+    // One grab holds the chord: the snap's portal shortcut yields to the lease.
+    crate::portal_shortcut::suspend();
 }
 
 /// The configured chord Shell grabs whenever attached, idle included.
@@ -525,6 +527,7 @@ fn release(host: &impl Host, lease: &mut Lease) {
     clear_shortcut();
     set_owner(None);
     host.show_tray(true);
+    crate::portal_shortcut::resume();
 }
 
 type Reply = Result<Option<glib::Variant>, (&'static str, &'static str)>;

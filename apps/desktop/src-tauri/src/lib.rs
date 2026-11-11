@@ -62,6 +62,12 @@ pub fn toggle_running_application() -> Result<(), String> {
 }
 #[cfg(target_os = "linux")]
 mod panel;
+#[cfg(target_os = "linux")]
+mod portal;
+#[cfg(target_os = "linux")]
+mod portal_keys;
+#[cfg(target_os = "linux")]
+mod portal_shortcut;
 mod tray;
 
 use config::{
@@ -656,6 +662,12 @@ fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, Str
     })?;
     let config = AppConfig::reset_to_defaults()
         .map_err(|error| restore_hotkey(&previous_hotkey, error.to_string(), rebind))?;
+    // GNOME's permissions go with the settings; setup asks for them again.
+    #[cfg(target_os = "linux")]
+    {
+        portal_keys::forget();
+        portal_shortcut::forget();
+    }
     Ok(publish_config(&app, config, "recovered"))
 }
 
@@ -841,10 +853,106 @@ fn with_panel_recommendation(
     if input.available {
         if let Some(detail) = stop_shortcut_setup_issue(app) {
             input.detail = detail;
-            input.setup_area = Some("panel");
+            input.setup_area = Some(shortcut_setup_area());
         }
     }
     input
+}
+
+/// Where setup fixes the shortcut: GNOME's portal in the snap, else the panel.
+fn shortcut_setup_area() -> &'static str {
+    #[cfg(target_os = "linux")]
+    if portal_keys::applies() && !panel::is_attached() {
+        return "portal";
+    }
+    "panel"
+}
+
+/// The snap's shortcut on GNOME Wayland: None once GNOME's portal holds it.
+#[cfg(target_os = "linux")]
+fn portal_shortcut_issue(hotkey: &str) -> Option<String> {
+    if portal_shortcut::bound() {
+        return None;
+    }
+    Some(if portal_shortcut::available() {
+        format!("GNOME can keep {hotkey} for VOCO, so the app you're dictating into never receives it. Choose Add {hotkey}, then Add in GNOME's dialog.")
+    } else {
+        format!("{hotkey} doesn't reach VOCO yet. In GNOME Settings, under Keyboard, add a custom shortcut for {hotkey} that runs voco --toggle.")
+    })
+}
+
+/// What the snap's portal setup shows: whether GNOME lets VOCO type, and
+/// whether it holds VOCO's shortcut.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PortalSetupStatus {
+    /// The snap on GNOME Wayland, where these portals apply.
+    applies: bool,
+    typing_allowed: bool,
+    /// The companion types and holds the chord instead.
+    panel_attached: bool,
+    /// This GNOME has the GlobalShortcuts portal (48 and later).
+    shortcut_portal: bool,
+    shortcut_bound: bool,
+    /// GNOME's description of the trigger, such as "Press <Alt>d".
+    shortcut_trigger: Option<String>,
+}
+
+#[cfg(target_os = "linux")]
+fn portal_setup_status() -> PortalSetupStatus {
+    let applies = portal_keys::applies();
+    PortalSetupStatus {
+        applies,
+        typing_allowed: applies && portal_keys::allowed(),
+        panel_attached: panel::is_attached(),
+        shortcut_portal: applies && portal_shortcut::available(),
+        shortcut_bound: applies && portal_shortcut::bound(),
+        shortcut_trigger: portal_shortcut::trigger(),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn portal_setup_status() -> PortalSetupStatus {
+    PortalSetupStatus {
+        applies: false,
+        typing_allowed: false,
+        panel_attached: false,
+        shortcut_portal: false,
+        shortcut_bound: false,
+        shortcut_trigger: None,
+    }
+}
+
+#[tauri::command(async)]
+fn get_portal_setup_status() -> PortalSetupStatus {
+    portal_setup_status()
+}
+
+/// Setup's and Settings' Allow typing: GNOME shows its dialog once.
+#[tauri::command(async)]
+fn allow_portal_typing() -> Result<PortalSetupStatus, String> {
+    #[cfg(target_os = "linux")]
+    portal_keys::allow()?;
+    Ok(portal_setup_status())
+}
+
+/// Setup's and Settings' shortcut button: GNOME shows its dialog once.
+#[tauri::command(async)]
+fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
+    let hotkey = tray::current_hotkey(&app).unwrap_or_else(|_| "Alt+D".into());
+    #[cfg(target_os = "linux")]
+    portal_shortcut::allow(&hotkey)?;
+    #[cfg(not(target_os = "linux"))]
+    let _ = hotkey;
+    Ok(portal_setup_status())
+}
+
+/// A desktop dictation starts: open the snap's typing session, if it types
+/// through GNOME's portal. Its end closes when VOCO returns to idle.
+#[tauri::command]
+fn begin_desktop_typing() {
+    #[cfg(target_os = "linux")]
+    portal_keys::begin();
 }
 
 #[tauri::command(async)]
@@ -869,6 +977,11 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
     let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| "Alt+D".into());
     let preset = wayland_preset(is_wayland_session(), &hotkey)?;
+    // The snap holds its chord through GNOME's shortcut portal instead.
+    #[cfg(target_os = "linux")]
+    if portal_keys::applies() && !panel::is_attached() {
+        return portal_shortcut_issue(preset.label());
+    }
     panel_setup::stop_shortcut_setup_detail(
         preset.label(),
         panel_setup::cached_check(),
@@ -1455,6 +1568,18 @@ fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bo
         trace_hotkey_event(event, Some(backend));
     }
     false
+}
+
+/// A press of the snap's GNOME shortcut (portal_shortcut.rs), from the portal
+/// thread: toggle on GTK's thread, as every other route does.
+#[cfg(target_os = "linux")]
+pub(crate) fn toggle_from_portal(app_handle: &tauri::AppHandle) {
+    let app = app_handle.clone();
+    if let Err(error) = app_handle.run_on_main_thread(move || {
+        eval_toggle_with_backend(&app, "gnome_portal");
+    }) {
+        error!("Could not toggle from GNOME's shortcut: {error}");
+    }
 }
 
 fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
@@ -2373,6 +2498,10 @@ pub fn run() -> Result<(), String> {
             get_desktop_input_status,
             get_panel_setup_status,
             enable_gnome_panel,
+            begin_desktop_typing,
+            get_portal_setup_status,
+            allow_portal_typing,
+            allow_portal_shortcut,
             activation::take_launcher_activation,
             paste_desktop_text,
             copy_desktop_text,
@@ -2429,6 +2558,8 @@ pub fn run() -> Result<(), String> {
                 // dictation and ignores it otherwise, so a lock never starts one.
                 desktop_session::watch_lock(move || {
                     trace_hotkey_event("session_locked_stop", Some("logind"));
+                    // GNOME doesn't end a remote desktop session at the lock.
+                    portal_keys::end();
                     // A toggle still waiting for the renderer came before the lock.
                     if let Ok(mut pending_backend) = PENDING_TOGGLE_BACKEND.lock() {
                         *pending_backend = None;
@@ -2448,6 +2579,11 @@ pub fn run() -> Result<(), String> {
             keep_login_start_in_step_at_startup();
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
+            #[cfg(target_os = "linux")]
+            {
+                portal_keys::setup(app.handle());
+                portal_shortcut::setup(app.handle(), &hotkey);
+            }
             EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
             let use_evdev_hotkey = uses_evdev_hotkey(wayland_session, &hotkey);
@@ -2534,6 +2670,8 @@ pub fn run() -> Result<(), String> {
         .map_err(|error| error.to_string())?
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                #[cfg(target_os = "linux")]
+                portal_keys::end();
                 crash_recovery::clean_exit();
                 performance::shutdown();
                 native_capture_commands::shutdown();

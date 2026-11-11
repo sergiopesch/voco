@@ -476,7 +476,19 @@ pub fn update_runtime_status(app: &tauri::AppHandle, snapshot: RuntimeStatusSnap
     if !apply_runtime_snapshot(&mut tray_state.runtime, snapshot) {
         return;
     }
+    let idle = matches!(
+        tray_state.runtime.dictation_status,
+        DictationStatus::Idle | DictationStatus::Error
+    );
     drop(tray_state);
+    // The dictation's last paste, Stop's space included, is done: close the
+    // snap's typing session so GNOME's remote-access icon goes (AGENTS.md).
+    #[cfg(target_os = "linux")]
+    if idle {
+        crate::portal_keys::end();
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = idle;
     refresh_tray(app);
 }
 
@@ -647,7 +659,7 @@ fn meter_animations_enabled() -> bool {
     })
 }
 
-fn request_stop(app: &tauri::AppHandle) {
+pub(crate) fn request_stop(app: &tauri::AppHandle) {
     let _ = app.emit_to(
         "main",
         "voco:toggle-dictation",
