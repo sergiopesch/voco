@@ -33,10 +33,49 @@ pub fn available() -> bool {
     schema(MEDIA_KEYS).is_some() && schema(CUSTOM).is_some()
 }
 
-/// The command GNOME runs: this snap's `voco --toggle`.
-fn command() -> String {
+/// What VOCO's shortcut ran before it called VOCO over D-Bus: this snap's
+/// `voco --toggle`, a snap launch of about 150 ms for each press and repeat.
+fn launch_command() -> String {
     let instance = std::env::var("SNAP_INSTANCE_NAME").unwrap_or_else(|_| "voco".into());
     format!("/snap/bin/{instance} --toggle")
+}
+
+/// The command GNOME runs for each press, and each repeat while the chord is
+/// held: a call of the running VOCO's Toggle (panel.rs), which arrives in a
+/// few milliseconds, and where that fails, `voco --toggle` as before: no
+/// `dbus-send` on this system, or a VOCO from before Toggle after a revert.
+/// GNOME splits the command as a shell would but runs no shell, hence `sh`.
+fn command() -> String {
+    format!(
+        "sh -c 'dbus-send --session --print-reply --reply-timeout=2000 --dest={name} {path} {interface}.Toggle >/dev/null 2>&1 || {launch}'",
+        name = crate::panel::NAME,
+        path = crate::panel::PATH,
+        interface = crate::panel::INTERFACE,
+        launch = launch_command(),
+    )
+}
+
+/// VOCO's own shortcut, added by a VOCO that launched `voco --toggle`, takes
+/// the current command. Its keys, and every other shortcut, stay as they are.
+pub fn update_command() {
+    let Some(media_keys) = settings(MEDIA_KEYS, None) else {
+        return;
+    };
+    if !custom_paths(&media_keys)
+        .iter()
+        .any(|path| path == VOCO_PATH)
+    {
+        return;
+    }
+    let Some(voco) = settings(CUSTOM, Some(VOCO_PATH)) else {
+        return;
+    };
+    if voco.string("command") == launch_command() {
+        if let Err(error) = voco.set_string("command", &command()) {
+            log::warn!("Could not update the command of VOCO's GNOME shortcut: {error}");
+        }
+        gio::Settings::sync();
+    }
 }
 
 /// GTK accelerators compare without case or modifier order: "<Super>x" and
@@ -174,6 +213,29 @@ pub fn remove() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_shortcut_calls_voco_and_falls_back_to_launching_it() {
+        let command = command();
+        // GNOME parses the command as a desktop entry's Exec: a percent sign
+        // would be a field code, and the shell part must stay one argument.
+        assert!(!command.contains('%'), "{command}");
+        assert!(
+            command.starts_with("sh -c '") && command.ends_with('\''),
+            "{command}"
+        );
+        assert_eq!(command.matches('\'').count(), 2, "{command}");
+        assert!(command.contains(
+            "--dest=com.sergiopesch.voco.Panel /com/sergiopesch/voco/Panel com.sergiopesch.voco.Panel1.Toggle"
+        ), "{command}");
+        // Waits for VOCO's answer, so a failed call runs the launch instead.
+        assert!(
+            command.contains("--print-reply")
+                && command.contains(&format!("|| {}", launch_command())),
+            "{command}"
+        );
+        assert!(launch_command().ends_with(" --toggle"));
+    }
 
     #[test]
     fn chords_compare_without_case_or_modifier_order() {

@@ -74,6 +74,8 @@ mod portal_fixture;
 mod portal_keys;
 #[cfg(target_os = "linux")]
 mod portal_shortcut;
+#[cfg(target_os = "linux")]
+mod shortcut_chord;
 mod tray;
 
 use config::{
@@ -982,6 +984,63 @@ fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, Str
     #[cfg(target_os = "linux")]
     portal_shortcut::allow(&hotkey)?;
     Ok(portal_setup_status(&app, &hotkey))
+}
+
+/// Settings' Apply shortcut in the snap once GNOME holds the shortcut: GNOME
+/// takes the new keys, after its own dialog where it has one, and VOCO saves
+/// the keys GNOME reports. Refused or cancelled, nothing changes.
+#[tauri::command(async)]
+fn change_portal_shortcut(
+    app: tauri::AppHandle,
+    hotkey: String,
+) -> Result<PortalSetupStatus, String> {
+    let hotkey = change_gnome_shortcut(&app, &hotkey)?;
+    Ok(portal_setup_status(&app, &hotkey))
+}
+
+/// Changes the keys of the shortcut GNOME holds for the snap, and saves the
+/// keys GNOME reports. Waits for GNOME's dialog, so never on GTK's thread.
+fn change_gnome_shortcut(app: &tauri::AppHandle, hotkey: &str) -> Result<String, String> {
+    let hotkey = hotkey.trim().to_owned();
+    validate_dictation_hotkey(&hotkey)?;
+    #[cfg(target_os = "linux")]
+    let hotkey = {
+        let trigger = portal_shortcut::change(&hotkey)?;
+        // `change` returns only keys VOCO can take, in GNOME's spelling.
+        shortcut_chord::hotkey_from_trigger(&trigger)
+            .ok_or_else(|| format!("GNOME reported keys VOCO can't read: {trigger}"))?
+    };
+    persist_config_patch(app, AppConfigPatch::with_hotkey(hotkey.clone()), true)?;
+    Ok(hotkey)
+}
+
+/// A preset chosen in the tray's menu. Where GNOME holds the snap's
+/// shortcut, GNOME takes the change, after its own dialog where it has one;
+/// cancelled there, the earlier shortcut stays.
+pub(crate) fn change_hotkey_from_tray(app: &tauri::AppHandle, hotkey: &str) {
+    #[cfg(target_os = "linux")]
+    if gnome_keeps_shortcut(app) {
+        let (app, hotkey) = (app.clone(), hotkey.to_owned());
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(error) = change_gnome_shortcut(&app, &hotkey) {
+                warn!("The tray's change of shortcut to {hotkey} didn't happen: {error}");
+            }
+        });
+        return;
+    }
+    if let Err(error) = change_hotkey_runtime(app, hotkey) {
+        error!("Failed to change hotkey: {error}");
+    }
+}
+
+/// GNOME holds the snap's shortcut now: through its portal, or as VOCO's own
+/// GNOME custom shortcut for the saved keys.
+#[cfg(target_os = "linux")]
+fn gnome_keeps_shortcut(app: &tauri::AppHandle) -> bool {
+    portal_shortcut::holds()
+        || (portal_shortcut::custom_applies()
+            && tray::current_hotkey(app)
+                .is_ok_and(|hotkey| portal_shortcut::custom_present(&hotkey)))
 }
 
 /// A desktop dictation starts: open the snap's typing session, if it types
@@ -1969,6 +2028,8 @@ fn install_socket_cleanup_signal_handler() {
             native_capture_commands::shutdown();
             crash_recovery::clean_exit();
             cleanup_socket_files();
+            #[cfg(target_os = "linux")]
+            confinement::end_clipboard_helpers();
             std::process::exit(128 + received_signal);
         });
     }
@@ -2581,6 +2642,7 @@ pub fn run() -> Result<(), String> {
             get_portal_setup_status,
             allow_portal_typing,
             allow_portal_shortcut,
+            change_portal_shortcut,
             activation::take_launcher_activation,
             paste_desktop_text,
             copy_desktop_text,
@@ -2756,6 +2818,8 @@ pub fn run() -> Result<(), String> {
                 native_capture_commands::shutdown();
                 app.state::<ibus_shortcut::IbusShortcutService>().shutdown();
                 cleanup_socket_files();
+                #[cfg(target_os = "linux")]
+                confinement::end_clipboard_helpers();
             }
         });
 

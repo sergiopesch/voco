@@ -46,6 +46,7 @@ export const enableGnomePanel = getPanelSetupStatus;
 export const getPortalSetupStatus = async () => ({applies:false,typingAllowed:false,panelAttached:false,panelHoldsShortcut:false,shortcutPortal:false,shortcutCustom:false,shortcutBound:false,shortcutTrigger:null});
 export const allowPortalTyping = getPortalSetupStatus;
 export const allowPortalShortcut = getPortalSetupStatus;
+export const changePortalShortcut = getPortalSetupStatus;
 export const beginDesktopTyping = async () => { calls.push(['beginDesktopTyping']); };
 export const openExternalUrl = async (url) => { calls.push(['openExternalUrl', url]); };
 export const microphoneAccess = async () => ({allowed: true});
