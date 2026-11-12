@@ -825,17 +825,62 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Name this week's snaps
+        id: snap-week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      # Hosted runners have lost the Snap Store for hours at a time. The snaps
+      # this job installs are kept from the last run that reached it, so an
+      # outage costs a week-old Snapcraft, not the job.
+      - name: Restore the downloaded snaps
+        id: snap-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/voco-snaps
+          key: snaps-${{ github.job }}-${{ steps.snap-week.outputs.week }}
+          restore-keys: snaps-${{ github.job }}-
+
       - name: Install Snapcraft and the probe's client libraries
-        timeout-minutes: 8
+        id: snaps
+        timeout-minutes: 10
+        env:
+          CACHED: ${{ steps.snap-cache.outputs.cache-hit }}
         run: |
-          # The store times out a request now and then; ride out a short outage.
-          for attempt in 1 2 3 4 5; do
-            sudo snap install snapcraft --classic --channel=9.x/stable && break
-            if [ "$attempt" = 5 ]; then exit 1; fi
-            sleep 20
+          mkdir -p ~/voco-snaps && cd ~/voco-snaps
+          if [ "$CACHED" != true ]; then
+            # This week's copies when the store answers; otherwise whatever an
+            # earlier week left in the cache.
+            for attempt in 1 2 3; do
+              rm -rf fresh && mkdir fresh
+              if (cd fresh && timeout 120 snap download snapd \
+                  && timeout 120 snap download core24 \
+                  && timeout 120 snap download snapcraft --channel=9.x/stable); then
+                rm -f ./*.snap ./*.assert && mv fresh/* . && echo "fresh=true" >> "$GITHUB_OUTPUT"
+                break
+              fi
+              sleep 20
+            done
+            rm -rf fresh
+          fi
+          for name in snapd core24 snapcraft; do
+            if snap list "$name" > /dev/null 2>&1; then continue; fi
+            sudo snap ack "$(ls "${name}"_*.assert)"
+            if [ "$name" = snapcraft ]; then
+              sudo snap install --classic "$(ls "${name}"_*.snap)"
+            else
+              sudo snap install "$(ls "${name}"_*.snap)"
+            fi
           done
+          snap list snapd core24 snapcraft
           sudo apt-get update -qq
           sudo apt-get install -y -qq python3-gi gir1.2-glib-2.0 dbus
+
+      - name: Save the downloaded snaps
+        if: github.ref == 'refs/heads/master' && steps.snaps.outputs.fresh == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/voco-snaps
+          key: ${{ steps.snap-cache.outputs.cache-primary-key }}
 
       - name: Build the probe snap
         timeout-minutes: 12
