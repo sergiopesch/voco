@@ -523,8 +523,9 @@ started waits up to 400 ms, then typed nothing.
 that in `global-shortcut` beside the config. At each start it binds again, which
 GNOME answers without a dialog. GNOME's grab repeats `Activated` while the
 chord is held, about every 30 ms after the keyboard's repeat delay; one before
-`Deactivated` and within that delay (at least 900 ms) plus 100 ms of the last is a
-repeat and toggles nothing. GNOME 46's custom shortcut runs `voco --toggle` for
+`Deactivated` at a repeat's time, the first within 100 ms of that delay after the
+press and the rest within the delay plus 100 ms of the last, is a repeat and
+toggles nothing. Any other is a press. GNOME 46's custom shortcut runs `voco --toggle` for
 each repeat too, so `note_command_press` treats a toggle within the repeat delay
 plus 400 ms of the last as one, since each is a snap launch that can arrive late;
 a paste waits as long after the last. A first `Activated` toggles through
@@ -534,7 +535,10 @@ Super+X. Modifiers can't be
 read through the portal, so `keys_held` counts a press as held until
 `Deactivated`, then 400 ms more for the modifier's own release, and the paste's usual 1.5 s wait sends no keys
 while it is held: keys under Super or Alt make another chord and paste nothing.
-A press with no `Deactivated` after 5 s reads as unknown. The companion's `ReserveShortcut`
+GNOME sends `Deactivated` only when the letter comes up under its modifier, so
+a press with none counts as held only while the chord could still repeat: until
+the repeat delay plus 100 ms after its last `Activated`, or 1 s when the keyboard
+doesn't repeat. Then it reads as unknown. The companion's `ReserveShortcut`
 suspends the portal session and its release binds again, so one grab holds the
 chord.
 
