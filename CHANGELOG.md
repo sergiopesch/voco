@@ -6,6 +6,53 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.70] - 2026-11-12
+
+The snap from the Snap Store and App Center types on GNOME with nothing else to
+install, and new setups use Super+X. The
+[release notes](docs/releases/2026.0.70.md) explain the upgrade; on GNOME, sign
+out and back in afterwards so GNOME loads panel version 23.
+
+### Added
+
+- The snap types on GNOME on Wayland through GNOME's RemoteDesktop portal, with
+  nothing else to install. Setup's **Allow typing** shows GNOME's dialog once,
+  and GNOME remembers the answer. VOCO opens the connection only while you
+  dictate, so GNOME's orange remote-access icon shows only then; its **Stop**
+  ends the dictation and copies the rest. The connection closes at a lock.
+- The snap's shortcut is held by GNOME's GlobalShortcuts portal on GNOME 48 and
+  later, added once in GNOME's dialog, so the focused app never receives it.
+  VOCO follows a change made in GNOME **Settings** → **Apps** → **VOCO**. On
+  GNOME 46 (Ubuntu 24.04), setup adds a GNOME custom shortcut that runs
+  `voco --toggle`, when nothing else uses the chord.
+- CI's **GNOME 50 Portals** job proves the portal path in a headless GNOME 50
+  with the real portal: the dialogs, exact pastes on Wayland and XWayland, the
+  session's lifetime, GNOME's Stop, the shortcut and the paste's wait for its
+  release.
+
+### Changed
+
+- **Super+X is the default shortcut for new setups.** With Alt+D, apps with a
+  menu bar, among them Firefox, Thunderbird, LibreOffice and VS Code, saw a lone
+  Alt and opened the menu bar, which swallowed VOCO's pastes. Alt+D and
+  Alt+Shift+D remain presets, and a saved shortcut never changes.
+- The VOCO panel is optional for the snap: setup no longer asks for it, and Help
+  offers it as live bars and Stop without GNOME's orange icon. The panel is
+  version 23 and accepts Super+X.
+- With the panel attached, the snap's setup still asks GNOME for the shortcut
+  when the panel doesn't hold it: a panel before version 23 holds only Alt+D and
+  Alt+Shift+D.
+- The Snap Store description says the snap types on GNOME after you allow it
+  once in GNOME's dialog, with nothing else to install.
+- A paste through GNOME's portal checks the connection before it changes the
+  clipboard, so a connection that isn't ready types nothing and changes nothing.
+- The microphone label reads "System default" when VOCO uses the system's
+  default microphone.
+
+### Removed
+
+- The snap setup's panel step and its **Install without the website** command.
+
 ## [2026.0.69] - 2026-11-11
 
 VOCO starts when you sign in, and the snap's first minutes get simpler. The
@@ -677,6 +724,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.70]: https://github.com/sergiopesch/voco/compare/voco.2026.0.69...voco.2026.0.70
 [2026.0.69]: https://github.com/sergiopesch/voco/compare/voco.2026.0.68...voco.2026.0.69
 [2026.0.68]: https://github.com/sergiopesch/voco/compare/voco.2026.0.67...voco.2026.0.68
 [2026.0.67]: https://github.com/sergiopesch/voco/compare/voco.2026.0.66...voco.2026.0.67
