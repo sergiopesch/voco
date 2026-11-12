@@ -97,10 +97,22 @@ impl Eis {
 
     /// Waits up to `timeout` for GNOME's keyboard.
     pub(crate) fn ready(&self, timeout: Duration) -> bool {
+        self.wait(timeout, |state| state.link.is_some())
+    }
+
+    /// Waits up to `timeout` for GNOME's keyboard and its first report of the
+    /// modifiers, which GNOME 50 sends as it resumes the keyboard.
+    pub(crate) fn informed(&self, timeout: Duration) -> bool {
+        self.wait(timeout, |state| {
+            state.link.is_some() && state.depressed.is_some()
+        })
+    }
+
+    fn wait(&self, timeout: Duration, reached: impl Fn(&State) -> bool) -> bool {
         let deadline = Instant::now() + timeout;
         let mut state = self.shared.state();
         loop {
-            if state.link.is_some() {
+            if reached(&state) {
                 return true;
             }
             let left = deadline.saturating_duration_since(Instant::now());

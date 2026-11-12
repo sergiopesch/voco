@@ -100,9 +100,12 @@ fn run(command: &Value) -> Value {
             json!({ "ok": true })
         }
         // The next sessions type as on a GNOME without the keyboard
-        // connection, or with it again.
+        // connection, or with one that reports no modifiers, or with it again.
         "keyboard" => {
-            crate::portal_keys::use_keyboard(command["wanted"].as_bool().expect("wanted"));
+            crate::portal_keys::use_keyboard(
+                command["wanted"].as_bool().expect("wanted"),
+                command["silent"].as_bool().unwrap_or(false),
+            );
             json!({ "ok": true })
         }
         "counts" => json!({}),

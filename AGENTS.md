@@ -287,11 +287,12 @@ and the update check. [The snap](#the-snap) lists its rules.
   the shortcut (GNOME 48 and later), the session asks for GNOME's keyboard
   connection with `ConnectToEIS` (`portal_eis.rs`, libei's protocol through
   the `reis` crate), as a sender that binds only the keyboard. The paste keys
-  go through it, and it carries back which modifiers are down, never a key. A
-  connection GNOME refuses, or whose keyboard isn't ready within 2 s, isn't
-  asked for again by that process: the session, opened again if it had
-  connected, sends its keys with the portal's `NotifyKeyboardKeycode`, as on
-  GNOME 46. Either way each paste sends Shift, Insert and their releases,
+  go through it, and it carries back which modifiers are down, never a key.
+  VOCO types through it only where GNOME reports them, as GNOME 50 does when
+  the keyboard resumes. A connection GNOME refuses, whose keyboard isn't ready
+  within 2 s, or that has reported no modifiers 300 ms after that, isn't asked
+  for again by that process: the session, opened again if it had connected,
+  sends its keys with the portal's `NotifyKeyboardKeycode`, as on GNOME 46. Either way each paste sends Shift, Insert and their releases,
   12 ms apart, never another key. A
   paste before the session has started, a session that failed to start, or one
   GNOME closed, typed nothing: `no-mutation`. A key that fails after Shift went
@@ -334,7 +335,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   repeat delay keeps its paste waiting and toggles once, and the next press
   toggles again. With the connection turned off, as on a GNOME that gives
   none, the same pastes go through the portal's key calls and wait for
-  `Deactivated`, or until no repeat follows.
+  `Deactivated`, or until no repeat follows; and a connection taken as
+  reporting no modifiers closes its session, and a plain one types.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that

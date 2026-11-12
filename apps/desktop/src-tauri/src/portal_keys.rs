@@ -8,9 +8,9 @@
 //!
 //! Where GNOME also holds the shortcut through its portal (GNOME 48 and
 //! later), the session asks for GNOME's own keyboard connection
-//! (portal_eis.rs): the keys go through it, and from GNOME 50 it says which
-//! modifiers are down. Elsewhere, or when that connection fails, the keys go
-//! through the portal's own calls.
+//! (portal_eis.rs). GNOME 50 says over it which modifiers are down, and the
+//! keys then go through it. Elsewhere, or when that connection fails or
+//! reports no modifiers, the keys go through the portal's own calls.
 
 use crate::portal::{self, Refusal};
 use crate::portal_eis::Eis;
@@ -40,6 +40,10 @@ const STARTING_WAIT: Duration = Duration::from_millis(400);
 /// GNOME's keyboard is ready within about 10 ms of the connection; without it
 /// by now the session opens again without one.
 const KEYBOARD_WAIT: Duration = Duration::from_secs(2);
+/// GNOME 50 reports the modifiers as it resumes the keyboard. A GNOME that
+/// has reported none this long after never will, and its connection would
+/// only be another way to send the same keys.
+const MODIFIERS_WAIT: Duration = Duration::from_millis(300);
 const TOKEN_FILE: &str = "remote-desktop-token";
 
 pub const NOT_ALLOWED: &str = "VOCO isn't allowed to type yet. Open VOCO's Settings and choose Allow typing, then turn on Allow Remote Interaction in GNOME's dialog.";
@@ -85,8 +89,13 @@ pub(crate) static STOPS_REQUESTED: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 /// The renderer's dictation status: starting, recording or processing.
 static DICTATING: AtomicBool = AtomicBool::new(false);
-/// GNOME's keyboard connection failed once, so this process stops asking.
+/// GNOME's keyboard connection failed or reported no modifiers once, so this
+/// process stops asking.
 static NO_KEYBOARD: AtomicBool = AtomicBool::new(false);
+/// The portal suite has GNOME 50's connection count as one that reports no
+/// modifiers, as an earlier GNOME's would.
+#[cfg(test)]
+static SILENT_KEYBOARD: AtomicBool = AtomicBool::new(false);
 /// How often an open session checks that a dictation still needs it.
 const IDLE_CHECK: Duration = Duration::from_secs(3);
 
@@ -252,17 +261,48 @@ fn connect_keyboard(connection: &gio::DBusConnection, session: &str) -> Result<E
     Eis::connect(descriptor).map_err(|error| error.to_string())
 }
 
-/// Waits for GNOME's keyboard while the portal thread's signals keep flowing,
-/// the shortcut's among them.
-fn keyboard_ready(keyboard: &Eis) -> bool {
+/// What a new keyboard connection turned out to be.
+#[derive(Debug, PartialEq, Eq)]
+enum Keyboard {
+    /// Ready, and GNOME reports the modifiers over it.
+    Informed,
+    /// Ready, but GNOME reports no modifiers.
+    Silent,
+    /// GNOME closed it, or its keyboard never became ready.
+    Unready,
+}
+
+/// Waits for GNOME's keyboard and its first modifier report while the portal
+/// thread's signals keep flowing, the shortcut's among them.
+fn keyboard_state(keyboard: &Eis) -> Keyboard {
+    #[cfg(test)]
+    if SILENT_KEYBOARD.load(Ordering::SeqCst) {
+        return if keyboard.ready(KEYBOARD_WAIT) {
+            Keyboard::Silent
+        } else {
+            Keyboard::Unready
+        };
+    }
     let context = glib::MainContext::ref_thread_default();
-    let deadline = Instant::now() + KEYBOARD_WAIT;
+    let mut deadline = Instant::now() + KEYBOARD_WAIT;
+    let mut ready = false;
     loop {
-        if keyboard.ready(Duration::from_millis(5)) {
-            return true;
+        if keyboard.informed(Duration::from_millis(5)) {
+            return Keyboard::Informed;
         }
-        if keyboard.closed() || Instant::now() >= deadline {
-            return false;
+        if !ready && keyboard.ready(Duration::ZERO) {
+            ready = true;
+            deadline = Instant::now() + MODIFIERS_WAIT;
+        }
+        if keyboard.closed() {
+            return Keyboard::Unready;
+        }
+        if Instant::now() >= deadline {
+            return if ready {
+                Keyboard::Silent
+            } else {
+                Keyboard::Unready
+            };
         }
         while context.iteration(false) {}
     }
@@ -275,9 +315,10 @@ fn wants_keyboard() -> bool {
     !NO_KEYBOARD.load(Ordering::SeqCst) && crate::portal_shortcut::available()
 }
 
-/// A dictation's session with, where GNOME gives one that works, its keyboard
-/// connection. A session whose connection never became ready can't type
-/// either way, so it closes and a plain one opens. Portal thread only.
+/// A dictation's session with its keyboard connection, where GNOME gives one
+/// that reports the modifiers. A session that connected for nothing no longer
+/// takes the portal's own key calls, so it closes and a plain one opens.
+/// Portal thread only.
 fn open_typing(
     connection: &gio::DBusConnection,
     token: &str,
@@ -289,14 +330,14 @@ fn open_typing(
     if !wants_keyboard() {
         return Ok((session, None));
     }
-    match connect_keyboard(connection, &session) {
-        Ok(keyboard) if keyboard_ready(&keyboard) => {
-            return Ok((session, Some(Arc::new(keyboard))))
-        }
-        Ok(_) => {
-            log::warn!(
-                "GNOME's keyboard for VOCO never became ready; using the portal's key calls"
-            );
+    match connect_keyboard(connection, &session).map(|keyboard| {
+        let state = keyboard_state(&keyboard);
+        (keyboard, state)
+    }) {
+        Ok((keyboard, Keyboard::Informed)) => return Ok((session, Some(Arc::new(keyboard)))),
+        Ok((_, state)) => {
+            // Expected on a GNOME before 50, which reports no modifiers.
+            log::info!("GNOME's keyboard connection is {state:?}; using the portal's key calls");
             NO_KEYBOARD.store(true, Ordering::SeqCst);
         }
         Err(error) => {
@@ -549,11 +590,13 @@ pub(crate) fn has_keyboard() -> bool {
     typing().keyboard.is_some()
 }
 
-/// The portal suite runs GNOME 50 both ways: with the keyboard connection,
-/// and as a GNOME that offers none.
+/// The portal suite runs GNOME 50 three ways: with the keyboard connection,
+/// as a GNOME that offers none, and as one whose connection reports no
+/// modifiers.
 #[cfg(test)]
-pub(crate) fn use_keyboard(wanted: bool) {
+pub(crate) fn use_keyboard(wanted: bool, silent: bool) {
     NO_KEYBOARD.store(!wanted, Ordering::SeqCst);
+    SILENT_KEYBOARD.store(silent, Ordering::SeqCst);
 }
 
 /// Shift, Insert and their releases, 12 ms apart, never another key. Returns

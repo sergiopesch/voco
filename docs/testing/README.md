@@ -222,7 +222,8 @@ Super let go before X, which GNOME reports no release for, the paste waits for
 nothing; a paste under Control alone waits for its release, and types nothing
 when it is held past 1.5 s; with the connection turned off, as on a GNOME that
 gives none, a paste waits for `Deactivated` and 400 ms more, or about 600 ms
-after a press GNOME reported no release for; a
+after a press GNOME reported no release for; a connection taken as reporting
+no modifiers closes its session, and a plain one opens and types; a
 chord held past the repeat delay keeps its paste waiting for the release; a
 chord held for 1.5 s, which GNOME repeats, toggles once, and the next press
 toggles; while the companion's lease holds the chord

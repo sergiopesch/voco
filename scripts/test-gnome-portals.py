@@ -275,7 +275,10 @@ def begin(label, keyboard=True):
     assert answered['session'], f'no typing session started: {dialogs()}'
     assert not dialogs(), f'a restored session showed a dialog: {dialogs()}'
     assert wait_for(lambda: answered['session'].rsplit('/', 1)[1] in typing_sessions(), 2), typing_sessions()
-    assert answered['counts']['keyboard'] is keyboard, answered['counts']
+    # GNOME 50 reports the modifiers as its keyboard resumes; without the
+    # connection nothing is known.
+    counts = answered['counts']
+    assert counts['keyboard'] is keyboard and counts['modifiersHeld'] is (False if keyboard else None), counts
     return answered['session']
 
 
@@ -621,6 +624,25 @@ try:
         finally:
             voco.ask('keyboard', wanted=True)
     check('withoutKeyboard', without_keyboard)
+
+    def silent_keyboard():
+        # A GNOME whose keyboard connection reports no modifiers: the session
+        # that connected closes, a plain one opens in its place and types
+        # through the portal's key calls, and the process stops asking.
+        voco.ask('keyboard', wanted=True, silent=True)
+        try:
+            session = begin('silent', keyboard=False)
+            assert typing_sessions() == [session.rsplit('/', 1)[1]], typing_sessions()
+            first = paste(field, 'plainafterall')
+            end(session)
+            # The process stopped asking: the next session is plain at once.
+            again = begin('silent-again', keyboard=False)
+            paste(field, 'stillplain')
+            end(again)
+            return {'reopened': True, 'paste': first}
+        finally:
+            voco.ask('keyboard', wanted=True)
+    check('silentKeyboard', silent_keyboard)
 
     def repeated_shortcut():
         # GNOME's grab repeats Activated while the chord is held, every 30 ms

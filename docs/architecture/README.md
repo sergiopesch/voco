@@ -527,12 +527,14 @@ socket, each with its frame, between `start_emulating` and `stop_emulating`.
 From GNOME 50 the same socket carries `ei_keyboard.modifiers` whenever the
 seat's modifier state changes, from any keyboard, so `modifiers_held` knows
 whether Shift, Control, Alt, Super or AltGr is down, and the paste's modifier
-wait uses that in place of the shortcut's signals. GNOME 46 sends no such
-event, so there, and wherever the connection is refused or its keyboard isn't
-ready within 2 s, the session types with `NotifyKeyboardKeycode` and the
+wait uses that in place of the shortcut's signals. GNOME 50 sends the first
+such event as it resumes the keyboard, and VOCO types through the connection
+only once it has one. GNOME 46 sends none, so there, and wherever the
+connection is refused, its keyboard isn't ready within 2 s or no report has
+come 300 ms after that, the session types with `NotifyKeyboardKeycode` and the
 shortcut's signals say when the keys are up. A session that has connected no
-longer accepts those calls, so a connection that failed after it closes the
-session and opens a plain one, and the process doesn't ask again.
+longer accepts those calls, so `open_typing` closes it and opens a plain one,
+and the process doesn't ask again.
 
 `portal_shortcut.rs` binds one `toggle` shortcut through GlobalShortcuts (GNOME
 48 and later), first from setup's button, which shows GNOME's dialog, and records
