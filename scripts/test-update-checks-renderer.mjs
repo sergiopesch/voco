@@ -82,6 +82,60 @@ try {
     assert.equal(await page.getByText('Update settings').count(), 0, 'No update settings in the snap');
     results.push({ case: 'the-snap-asks-nothing-and-shows-no-update-controls', passed: true, requests: requests.length });
 
+    // The snap's shortcut, once GNOME holds it, changes in Settings: VOCO
+    // proposes the keys, GNOME's dialog confirms them, and Settings shows the
+    // keys GNOME reports. Cancelled in GNOME, the earlier shortcut stays.
+    await load({ onboardingCompleted: true, automaticUpdateChecks: true, hotkey: 'Super+X' }, true);
+    await page.evaluate(() => {
+        window.portal = { applies: true, typingAllowed: true, panelAttached: false, panelHoldsShortcut: false,
+            shortcutPortal: true, shortcutCustom: false, shortcutBound: true, shortcutTrigger: 'Press <Super>x' };
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portal });
+        window.changesAsked = [];
+        window.nativeHandlers.changePortalShortcut = ([hotkey]) => new Promise((resolve, reject) => {
+            window.changesAsked.push(hotkey);
+            window.answerChange = (added) => {
+                if (!added) { reject('GNOME kept your earlier shortcut. To change it to ' + hotkey + ', choose Apply shortcut again, then Add.'); return; }
+                // GNOME reports the keys; Rust saves them and tells the window.
+                window.portal.shortcutTrigger = 'Press <Control><Alt>k';
+                const { config, setConfig } = window.store.getState();
+                setConfig({ ...config, hotkey: 'Ctrl+Alt+K' });
+                resolve({ ...window.portal });
+            };
+        });
+        window.store.getState().setSurface('settings');
+    });
+    await page.getByRole('button', { name: 'Shortcut', exact: true }).click();
+    const shortcutPage = page.locator('.voco-preferences__page');
+    await shortcutPage.getByText('starts and stops dictation.', { exact: false }).waitFor();
+    assert.equal(await shortcutPage.getByText('open GNOME Settings', { exact: false }).count(), 0, 'Settings sends nobody to GNOME Settings');
+    assert.equal(await shortcutPage.locator('.voco-preferences__shortcut-summary kbd').innerText(), 'Super+X');
+    await shortcutPage.getByText('GNOME keeps this shortcut for VOCO', { exact: false }).waitFor();
+    await shortcutPage.getByRole('button', { name: 'Change shortcut', exact: true }).click();
+    const shortcutField = shortcutPage.getByLabel('Start and stop dictation', { exact: true });
+    await shortcutPage.getByText('When you apply it, GNOME asks you once: choose Add.', { exact: true }).waitFor();
+    await shortcutPage.getByRole('button', { name: 'Record keys', exact: true }).click();
+    await shortcutField.press('Control+Alt+k');
+    assert.equal(await shortcutField.inputValue(), 'Ctrl+Alt+K');
+    await shortcutPage.getByRole('button', { name: 'Apply shortcut', exact: true }).click();
+    await shortcutPage.getByText('GNOME’s dialog is open. Choose Add.', { exact: true }).waitFor();
+    assert.equal(await shortcutPage.getByRole('button', { name: 'Waiting for GNOME…', exact: true }).isDisabled(), true);
+    assert.equal(await shortcutPage.getByRole('button', { name: 'Cancel', exact: true }).isDisabled(), true, 'GNOME\'s dialog decides, not a second Cancel');
+    await page.screenshot({ path: out + '/snap-shortcut-waiting-for-gnome.png' });
+    // Cancelled in GNOME's dialog: Settings says so and keeps the editor.
+    await page.evaluate(() => window.answerChange(false));
+    await shortcutPage.getByText('GNOME kept your earlier shortcut.', { exact: false }).waitFor();
+    assert.equal(await page.evaluate(() => window.store.getState().config.hotkey), 'Super+X');
+    await shortcutPage.getByRole('button', { name: 'Apply shortcut', exact: true }).click();
+    await shortcutPage.getByText('GNOME’s dialog is open. Choose Add.', { exact: true }).waitFor();
+    await page.evaluate(() => window.answerChange(true));
+    await shortcutPage.getByRole('button', { name: 'Change shortcut', exact: true }).waitFor();
+    assert.equal(await shortcutPage.locator('.voco-preferences__shortcut-summary kbd').innerText(), 'Ctrl+Alt+K');
+    assert.equal(await shortcutPage.locator('.voco-portal-setup strong').last().textContent(), 'Ctrl+Alt+K', 'GNOME\'s keys, as VOCO writes shortcuts');
+    assert.deepEqual(await page.evaluate(() => window.changesAsked), ['Ctrl+Alt+K', 'Ctrl+Alt+K']);
+    assert.deepEqual(await page.evaluate(() => window.calls.filter(([name]) => name === 'saveConfigPatch')), [], 'GNOME takes the change; no plain save races it');
+    await page.screenshot({ path: out + '/snap-shortcut-changed.png' });
+    results.push({ case: 'the-snap-changes-its-shortcut-in-settings', passed: true });
+
     // Start at login: a switch in Settings where Rust says VOCO can, saved by
     // its own patch. A refused save puts the saved setting back and says why.
     const patches = () => page.evaluate(() => window.calls.filter(([name]) => name === 'saveConfigPatch').map(([, patch]) => patch));

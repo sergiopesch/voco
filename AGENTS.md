@@ -112,7 +112,8 @@ count is logged. VOCO never overwrites a config it cannot read, nor repairs one
 from the copy: Settings shows a recovery panel, and only Reset renames the file
 to a `config.recovery-backup-*` copy before writing defaults. Reset also deletes
 `config.json.last` and the backups of earlier resets. The snap keeps its portal
-restore token and its record of a bound shortcut beside the config, owner-only;
+restore token and its record of a bound shortcut, with the shortcut's ID once
+Settings changed its keys, beside the config, owner-only;
 Reset deletes both, and setup then asks GNOME again.
 
 VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
@@ -425,12 +426,27 @@ and the update check. [The snap](#the-snap) lists its rules.
   GNOME Settings, under Apps, changes
   the trigger: VOCO saves each trigger GNOME reports, at a bind or a
   `ShortcutsChanged`, as its shortcut when it can take it, so its labels name the
-  key GNOME listens for, and its tray presets are disabled while GNOME holds it. While the
+  key GNOME listens for.
+  VOCO's Settings changes the keys too, from its own shortcut editor, as do
+  the tray's presets, and sends nobody to GNOME Settings. GNOME keeps the keys it stored for a shortcut ID
+  whatever an app proposes later, and asks only about an ID it holds no keys
+  for, so Apply shortcut binds the shortcut under its next ID (`toggle-2`,
+  `toggle-3`, recorded beside the config) with the new keys as the preferred
+  trigger. GNOME shows its dialog: when the person adds it, the earlier session
+  closes, GNOME keeps only the new ID and VOCO saves the keys GNOME reports,
+  which that dialog lets the person alter; cancelled, the earlier keys stay
+  and still toggle. Altered there to keys VOCO can't take, such as a key
+  with no Alt, Ctrl or Super, VOCO refuses them and says so: it closes both
+  sessions and drops its records, so it holds no shortcut and the Add button
+  offers its own again, and no start ever shows GNOME's dialog. Any chord whose key has an X keysym VOCO knows
+  (`shortcut_chord.rs`) can be proposed. While the
   companion's lease is fresh VOCO closes the portal session, so one grab holds the
   chord, and binds again when the lease lapses. On GNOME 46, which has no
   GlobalShortcuts portal, setup's button adds a GNOME custom shortcut that runs
   `voco --toggle` for the saved chord, only when neither GNOME's window shortcuts
-  nor another custom shortcut uses it, and never changes another. GNOME's schema
+  nor another custom shortcut uses it, and never changes another. Settings'
+  Apply shortcut moves that one shortcut to the new keys under the same
+  checks, with no dialog, since GNOME's keyboard shortcuts ask nobody. GNOME's schema
   for those keys isn't in the snap's runtime, so the snap carries one with the
   same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
   That shortcut runs `voco --toggle` for each repeat too, so in the snap a
