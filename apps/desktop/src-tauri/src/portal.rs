@@ -132,7 +132,10 @@ pub(crate) fn options(entries: &[(&str, glib::Variant)]) -> glib::Variant {
 pub(crate) enum Refusal {
     /// The person cancelled or denied GNOME's dialog (Response 1).
     Denied,
-    /// GNOME ended the request otherwise (Response 2), or the call failed.
+    /// GNOME ended the request otherwise (Response 2). Its shortcut dialog
+    /// answers Cancel so.
+    Ended,
+    /// The call failed.
     Failed(String),
     /// No Response before the deadline; the request was closed.
     TimedOut,
@@ -213,6 +216,7 @@ pub(crate) fn request(
     finish(match code {
         0 => Ok(glib::VariantDict::new(Some(&results))),
         1 => Err(Refusal::Denied),
+        2 => Err(Refusal::Ended),
         _ => Err(Refusal::Failed(format!("{method} ended with {code}"))),
     })
 }

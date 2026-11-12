@@ -7,13 +7,21 @@
 //! the chord.
 
 use crate::portal::{self, Refusal};
+use crate::shortcut_chord::{hotkey_from_trigger, Chord};
 use glib::variant::ToVariant;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 use webkit2gtk::gio::{self, prelude::SettingsExt};
 
 const INTERFACE: &str = "org.freedesktop.portal.GlobalShortcuts";
-const SHORTCUT_ID: &str = "toggle";
+/// The shortcut's ID until VOCO's Settings changes its keys. GNOME keeps the
+/// keys it stored for an ID whatever an app proposes later, and asks about
+/// new keys only for an ID it hasn't seen, so each change takes the next one:
+/// "toggle-2", "toggle-3".
+const FIRST_ID: &str = "toggle";
+/// The ID GNOME holds VOCO's shortcut under, beside the config; absent
+/// while it is the first.
+const ID_FILE: &str = "global-shortcut-id";
 const DESCRIPTION: &str = "Start or stop dictation";
 const BOUND_FILE: &str = "global-shortcut";
 /// How long setup's button waits for the person to answer GNOME's dialog.
@@ -28,6 +36,8 @@ const MODIFIER_GRACE: Duration = Duration::from_millis(400);
 #[derive(Default)]
 struct Shortcut {
     session: Option<String>,
+    /// The shortcut's ID in that session.
+    id: String,
     /// Closed while the companion's lease holds the chord.
     suspended: bool,
     /// GNOME's description of the trigger, such as "Press <Super>x".
@@ -42,6 +52,7 @@ struct Shortcut {
 
 static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
     session: None,
+    id: String::new(),
     suspended: false,
     trigger: None,
     pressed: None,
@@ -185,10 +196,60 @@ fn record_bound(trigger: Option<&str>) {
     }
 }
 
+fn id_path() -> Option<std::path::PathBuf> {
+    crate::config::AppConfig::config_dir_without_migration()
+        .ok()
+        .map(|dir| dir.join(ID_FILE))
+}
+
+/// The ID GNOME holds VOCO's shortcut under.
+fn saved_id() -> String {
+    id_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| text.trim().to_owned())
+        .filter(|id| valid_id(id))
+        .unwrap_or_else(|| FIRST_ID.to_owned())
+}
+
+/// Only an ID VOCO wrote: "toggle" or "toggle-N".
+fn valid_id(id: &str) -> bool {
+    id == FIRST_ID
+        || id
+            .strip_prefix("toggle-")
+            .is_some_and(|number| number.parse::<u32>().is_ok_and(|number| number >= 2))
+}
+
+/// The ID a change of keys binds: one GNOME hasn't stored keys for.
+fn next_id(id: &str) -> String {
+    let number = id
+        .strip_prefix("toggle-")
+        .and_then(|number| number.parse::<u32>().ok())
+        .unwrap_or(1);
+    format!("toggle-{}", number.saturating_add(1))
+}
+
+fn record_id(id: &str) {
+    let Some(path) = id_path() else { return };
+    let written = if id == FIRST_ID {
+        match std::fs::remove_file(&path) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.to_string()),
+            _ => Ok(()),
+        }
+    } else {
+        crate::config::atomic_write(&path, id).map_err(|error| error.to_string())
+    };
+    if let Err(error) = written {
+        log::warn!("Could not record the ID of VOCO's GNOME shortcut: {error}");
+    }
+}
+
 /// For Reset: GNOME asks again at the next setup.
 pub fn forget() {
     close();
     if let Some(path) = bound_path() {
+        let _ = std::fs::remove_file(path);
+    }
+    if let Some(path) = id_path() {
         let _ = std::fs::remove_file(path);
     }
     if applies() {
@@ -202,13 +263,10 @@ pub fn custom_applies() -> bool {
     applies() && !available() && crate::gnome_custom_shortcut::available()
 }
 
-fn gtk_accelerator(hotkey: &str) -> Option<&'static str> {
-    crate::Preset::of(hotkey).map(crate::Preset::accelerator)
-}
-
 /// VOCO's GNOME custom shortcut exists for `hotkey`.
 pub fn custom_present(hotkey: &str) -> bool {
-    gtk_accelerator(hotkey).is_some_and(crate::gnome_custom_shortcut::present)
+    Chord::of(hotkey)
+        .is_some_and(|chord| crate::gnome_custom_shortcut::present(&chord.gtk_accelerator()))
 }
 
 /// The press of a GNOME custom shortcut reaches VOCO as `voco --toggle`, with
@@ -255,22 +313,6 @@ pub fn trigger() -> Option<String> {
     })
 }
 
-/// "LOGO+x" for the portal's preferred trigger, from VOCO's shortcut: the
-/// shortcuts specification's modifier names, and the key's keysym in lower case.
-fn preferred_trigger(accelerator: &str) -> String {
-    accelerator
-        .split('+')
-        .map(|part| match part.trim().to_ascii_lowercase().as_str() {
-            "alt" | "option" => "ALT".to_owned(),
-            "shift" => "SHIFT".to_owned(),
-            "ctrl" | "control" => "CTRL".to_owned(),
-            "super" | "logo" | "cmd" | "command" => "LOGO".to_owned(),
-            key => key.to_owned(),
-        })
-        .collect::<Vec<_>>()
-        .join("+")
-}
-
 thread_local! {
     static SIGNALS: std::cell::RefCell<Vec<gio::SignalSubscriptionId>> =
         const { std::cell::RefCell::new(Vec::new()) };
@@ -294,7 +336,7 @@ fn watch(connection: &gio::DBusConnection) {
                 let mut state = shortcut();
                 if session.is_none()
                     || session != state.session
-                    || id.as_deref() != Some(SHORTCUT_ID)
+                    || id.as_deref() != Some(state.id.as_str())
                 {
                     return;
                 }
@@ -337,16 +379,9 @@ fn watch(connection: &gio::DBusConnection) {
             if session.is_none() || session != state.session {
                 return;
             }
-            let shortcuts = parameters.child_value(1);
-            let trigger = (0..shortcuts.n_children())
-                .map(|index| shortcuts.child_value(index))
-                .find(|entry| entry.child_value(0).str() == Some(SHORTCUT_ID))
-                .and_then(|entry| {
-                    glib::VariantDict::new(Some(&entry.child_value(1)))
-                        .lookup_value("trigger_description", None)
-                        .and_then(|value| value.str().map(str::to_owned))
-                });
-            let Some(trigger) = trigger else { return };
+            let Some(trigger) = trigger_of(&parameters.child_value(1), &state.id) else {
+                return;
+            };
             state.trigger = Some(trigger.clone());
             drop(state);
             record_bound(Some(&trigger));
@@ -364,9 +399,27 @@ fn unwatch(connection: &gio::DBusConnection) {
     });
 }
 
-/// Creates a session and binds VOCO's shortcut. Portal thread only.
+/// GNOME's description of the keys it holds for the shortcut `id`, from a
+/// portal shortcut list. None when it lists none, or no keys for it.
+fn trigger_of(shortcuts: &glib::Variant, id: &str) -> Option<String> {
+    (0..shortcuts.n_children())
+        .map(|index| shortcuts.child_value(index))
+        .find(|entry| entry.child_value(0).str() == Some(id))
+        .and_then(|entry| {
+            glib::VariantDict::new(Some(&entry.child_value(1)))
+                .lookup_value("trigger_description", None)
+                .and_then(|value| value.str().map(str::to_owned))
+        })
+        .filter(|trigger| !trigger.trim().is_empty())
+}
+
+/// Creates a session and binds VOCO's shortcut under `id`, proposing
+/// `accelerator`'s keys. GNOME asks the person about an ID it holds no keys
+/// for, and answers at once, with the keys it holds, for one it knows.
+/// Portal thread only.
 fn bind(
     connection: &gio::DBusConnection,
+    id: &str,
     accelerator: &str,
     timeout: Duration,
 ) -> Result<(String, Option<String>), Refusal> {
@@ -387,17 +440,18 @@ fn bind(
     )?;
     let session = portal::result_string(&created, "session_handle")
         .ok_or_else(|| Refusal::Failed("GNOME returned no session.".into()))?;
-    let preferred = preferred_trigger(accelerator);
+    let preferred = Chord::of(accelerator).map(|chord| chord.portal_trigger());
     let results = portal::request(
         connection,
         INTERFACE,
         "BindShortcuts",
         |handle| {
-            let properties = portal::options(&[
-                ("description", DESCRIPTION.to_variant()),
-                ("preferred_trigger", preferred.to_variant()),
-            ]);
-            let shortcut = glib::Variant::tuple_from_iter([SHORTCUT_ID.to_variant(), properties]);
+            let mut entries = vec![("description", DESCRIPTION.to_variant())];
+            if let Some(preferred) = &preferred {
+                entries.push(("preferred_trigger", preferred.to_variant()));
+            }
+            let properties = portal::options(&entries);
+            let shortcut = glib::Variant::tuple_from_iter([id.to_variant(), properties]);
             let shortcuts = glib::Variant::array_from_iter_with_type(
                 glib::VariantTy::new("(sa{sv})").expect("static type"),
                 [shortcut],
@@ -420,57 +474,14 @@ fn bind(
     };
     let trigger = results
         .lookup_value("shortcuts", None)
-        .and_then(|list| {
-            (0..list.n_children())
-                .map(|index| list.child_value(index))
-                .find(|entry| entry.child_value(0).str() == Some(SHORTCUT_ID))
-        })
-        .and_then(|entry| {
-            glib::VariantDict::new(Some(&entry.child_value(1)))
-                .lookup_value("trigger_description", None)
-                .and_then(|value| value.str().map(str::to_owned))
-        });
+        .and_then(|list| trigger_of(&list, id));
     Ok((session, trigger))
-}
-
-/// "Super+X" from GNOME's trigger description, such as "Press <Super>x":
-/// VOCO's own spelling, for its config and labels. None for anything else.
-fn trigger_hotkey(description: &str) -> Option<String> {
-    let description = description.trim();
-    let accelerator = description
-        .strip_prefix("Press")
-        .unwrap_or(description)
-        .trim();
-    let mut parts = Vec::new();
-    let mut rest = accelerator;
-    while let Some(start) = rest.strip_prefix('<') {
-        let end = start.find('>')?;
-        parts.push(match start[..end].to_ascii_lowercase().as_str() {
-            "super" => "Super".to_owned(),
-            "alt" => "Alt".to_owned(),
-            "shift" => "Shift".to_owned(),
-            "control" | "primary" | "ctrl" => "Ctrl".to_owned(),
-            _ => return None,
-        });
-        rest = &start[end + 1..];
-    }
-    let key = rest.trim();
-    // A global shortcut always holds a modifier; a bare key isn't one VOCO takes.
-    if parts.is_empty() || key.is_empty() || key.contains(['<', '>', ' ']) {
-        return None;
-    }
-    parts.push(if key.chars().count() == 1 {
-        key.to_ascii_uppercase()
-    } else {
-        key.to_owned()
-    });
-    Some(parts.join("+"))
 }
 
 /// GNOME holds the chord, and GNOME Settings changes it: VOCO's config
 /// follows, so its labels name the key GNOME listens for.
 fn follow(trigger: Option<&str>) {
-    let Some(hotkey) = trigger.and_then(trigger_hotkey) else {
+    let Some(hotkey) = trigger.and_then(hotkey_from_trigger) else {
         return;
     };
     if let Some(app) = APP.get() {
@@ -478,7 +489,7 @@ fn follow(trigger: Option<&str>) {
     }
 }
 
-fn adopt(connection: &gio::DBusConnection, session: String, trigger: Option<String>) {
+fn adopt(connection: &gio::DBusConnection, session: String, id: &str, trigger: Option<String>) {
     let mut state = shortcut();
     if state.suspended {
         drop(state);
@@ -488,6 +499,7 @@ fn adopt(connection: &gio::DBusConnection, session: String, trigger: Option<Stri
     if let Some(old) = state.session.replace(session) {
         portal::close_session(connection, &old);
     }
+    state.id = id.to_owned();
     if trigger.is_some() {
         state.trigger = trigger.clone();
     }
@@ -509,8 +521,9 @@ fn rebind(accelerator: String) {
         if !portal::has_interface(connection, INTERFACE, 1) {
             return;
         }
-        match bind(connection, &accelerator, REBIND_TIMEOUT) {
-            Ok((session, trigger)) => adopt(connection, session, trigger),
+        let id = saved_id();
+        match bind(connection, &id, &accelerator, REBIND_TIMEOUT) {
+            Ok((session, trigger)) => adopt(connection, session, &id, trigger),
             Err(refusal) => log::warn!("VOCO's GNOME shortcut didn't bind: {refusal:?}"),
         }
     });
@@ -534,25 +547,20 @@ pub fn allow(accelerator: &str) -> Result<Option<String>, String> {
         return Err("VOCO uses GNOME's shortcut portal only in the snap on GNOME Wayland.".into());
     }
     if custom_applies() {
-        let chord = gtk_accelerator(accelerator).ok_or_else(|| {
-            "Choose Super+X, Alt+D or Alt+Shift+D in VOCO's Settings first.".to_string()
-        })?;
-        crate::gnome_custom_shortcut::add(chord, accelerator)?;
-        let trigger = format!("Press {chord}");
-        record_bound(Some(&trigger));
-        return Ok(Some(trigger));
+        return add_custom(accelerator).map(Some);
     }
     let accelerator = accelerator.to_owned();
     let result = portal::run(move |connection| {
         if !portal::has_interface(connection, INTERFACE, 1) {
             return Err("This GNOME has no shortcut portal.".to_string());
         }
-        match bind(connection, &accelerator, DIALOG_TIMEOUT) {
+        let id = saved_id();
+        match bind(connection, &id, &accelerator, DIALOG_TIMEOUT) {
             Ok((session, trigger)) => {
-                adopt(connection, session, trigger.clone());
+                adopt(connection, session, &id, trigger.clone());
                 Ok(trigger)
             }
-            Err(Refusal::Denied) => Err(
+            Err(Refusal::Denied | Refusal::Ended) => Err(
                 "GNOME didn't add VOCO's shortcut. Choose the button again, then Add.".to_string(),
             ),
             Err(Refusal::TimedOut) => {
@@ -566,6 +574,88 @@ pub fn allow(accelerator: &str) -> Result<Option<String>, String> {
     .unwrap_or_else(|| Err("VOCO can't reach GNOME's portal.".to_string()))?;
     record_bound(result.as_deref());
     Ok(result)
+}
+
+/// GNOME 46: VOCO's own custom shortcut, added or moved to `accelerator`'s
+/// keys. GNOME's keyboard settings ask nobody, so neither does this.
+fn add_custom(accelerator: &str) -> Result<String, String> {
+    let chord = Chord::of(accelerator)
+        .ok_or_else(|| {
+            format!("GNOME's keyboard shortcuts can't hold {accelerator}. Choose another shortcut.")
+        })?
+        .gtk_accelerator();
+    crate::gnome_custom_shortcut::add(&chord, accelerator)?;
+    let trigger = format!("Press {chord}");
+    record_bound(Some(&trigger));
+    Ok(trigger)
+}
+
+/// Settings' Apply shortcut, once GNOME holds VOCO's shortcut: GNOME's keys
+/// become `accelerator`'s. Through the portal, VOCO binds the shortcut under
+/// its next ID with those keys proposed, GNOME shows its dialog, and when the
+/// person adds it the earlier session closes; GNOME then keeps only the new
+/// ID. Cancelled or refused, the earlier keys stay. Returns GNOME's
+/// description of the keys it now holds, which its dialog lets the person
+/// alter.
+pub fn change(accelerator: &str) -> Result<String, String> {
+    if !applies() {
+        return Err("VOCO uses GNOME's shortcut portal only in the snap on GNOME Wayland.".into());
+    }
+    // One change at a time: a second request while GNOME's dialog is open
+    // would open another under it.
+    static CHANGING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if CHANGING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return Err("GNOME's dialog is already open. Choose Add or Cancel there.".into());
+    }
+    let result = change_keys(accelerator);
+    CHANGING.store(false, std::sync::atomic::Ordering::SeqCst);
+    result
+}
+
+fn change_keys(accelerator: &str) -> Result<String, String> {
+    if custom_applies() {
+        return add_custom(accelerator);
+    }
+    if Chord::of(accelerator).is_none() {
+        return Err(format!(
+            "GNOME can't hold {accelerator} for VOCO. Choose another shortcut."
+        ));
+    }
+    if shortcut().suspended {
+        return Err("The VOCO panel holds the shortcut now. Change it in the panel's menu.".into());
+    }
+    let label = accelerator.to_owned();
+    let accelerator = accelerator.to_owned();
+    let (id, trigger) = portal::run(move |connection| {
+        if !portal::has_interface(connection, INTERFACE, 1) {
+            return Err("This GNOME has no shortcut portal.".to_string());
+        }
+        let id = next_id(&saved_id());
+        match bind(connection, &id, &accelerator, DIALOG_TIMEOUT) {
+            Ok((session, Some(trigger))) => {
+                adopt(connection, session, &id, Some(trigger.clone()));
+                Ok((id, trigger))
+            }
+            // Added with its keys cleared in GNOME's dialog: nothing to press.
+            Ok((session, None)) => {
+                portal::close_session(connection, &session);
+                Err(format!("GNOME added no keys for {label}. Choose Apply shortcut again, then Add."))
+            }
+            Err(Refusal::Denied | Refusal::Ended) => Err(format!(
+                "GNOME kept your earlier shortcut. To change it to {label}, choose Apply shortcut again, then Add."
+            )),
+            Err(Refusal::TimedOut) => {
+                Err("GNOME's dialog wasn't answered. Choose Apply shortcut again.".to_string())
+            }
+            Err(Refusal::Failed(error)) => {
+                Err(format!("GNOME couldn't change VOCO's shortcut: {error}"))
+            }
+        }
+    })
+    .unwrap_or_else(|| Err("VOCO can't reach GNOME's portal.".to_string()))?;
+    record_id(&id);
+    record_bound(Some(&trigger));
+    Ok(trigger)
 }
 
 fn close() {
@@ -663,32 +753,54 @@ mod tests {
     }
 
     #[test]
-    fn gnome_triggers_read_as_voco_shortcuts() {
-        assert_eq!(trigger_hotkey("Press <Super>x").as_deref(), Some("Super+X"));
-        assert_eq!(
-            trigger_hotkey("Press <Alt><Shift>d").as_deref(),
-            Some("Alt+Shift+D")
-        );
-        assert_eq!(
-            trigger_hotkey("<Control><Alt>k").as_deref(),
-            Some("Ctrl+Alt+K")
-        );
-        assert_eq!(
-            trigger_hotkey("Press <Super>F8").as_deref(),
-            Some("Super+F8")
-        );
-        assert_eq!(trigger_hotkey("Press <Hyper>x"), None);
-        assert_eq!(trigger_hotkey("Press "), None);
+    fn a_change_of_keys_takes_the_next_id() {
+        assert_eq!(next_id(FIRST_ID), "toggle-2");
+        assert_eq!(next_id("toggle-2"), "toggle-3");
+        assert_eq!(next_id("toggle-41"), "toggle-42");
+        for id in [FIRST_ID, "toggle-2", "toggle-17"] {
+            assert!(valid_id(id), "{id}");
+            assert!(valid_id(&next_id(id)), "after {id}");
+        }
+        // Anything else in the file is not an ID VOCO wrote.
+        for id in [
+            "",
+            "toggle-",
+            "toggle-1",
+            "toggle-x",
+            "other",
+            "toggle-2\nmore",
+        ] {
+            assert!(!valid_id(id), "{id:?}");
+        }
     }
 
     #[test]
-    fn preferred_trigger_uses_the_portal_spelling() {
-        assert_eq!(preferred_trigger("Super+X"), "LOGO+x");
-        assert_eq!(preferred_trigger("super + x"), "LOGO+x");
-        assert_eq!(preferred_trigger("Cmd+X"), "LOGO+x");
-        assert_eq!(preferred_trigger("Alt+D"), "ALT+d");
-        assert_eq!(preferred_trigger("Alt+Shift+D"), "ALT+SHIFT+d");
-        assert_eq!(preferred_trigger(crate::config::DEFAULT_HOTKEY), "LOGO+x");
+    fn a_shortcut_list_gives_the_keys_of_its_own_id_only() {
+        let entry = |id: &str, trigger: &str| {
+            glib::Variant::tuple_from_iter([
+                id.to_variant(),
+                portal::options(&[("trigger_description", trigger.to_variant())]),
+            ])
+        };
+        let list = glib::Variant::array_from_iter_with_type(
+            glib::VariantTy::new("(sa{sv})").expect("static type"),
+            [
+                entry("toggle", "Press <Super>x"),
+                entry("toggle-2", "Press <Control><Alt>d"),
+                entry("toggle-3", " "),
+            ],
+        );
+        assert_eq!(
+            trigger_of(&list, "toggle-2").as_deref(),
+            Some("Press <Control><Alt>d")
+        );
+        assert_eq!(
+            trigger_of(&list, "toggle").as_deref(),
+            Some("Press <Super>x")
+        );
+        // Listed without keys, or not listed.
+        assert_eq!(trigger_of(&list, "toggle-3"), None);
+        assert_eq!(trigger_of(&list, "toggle-4"), None);
     }
 
     #[test]

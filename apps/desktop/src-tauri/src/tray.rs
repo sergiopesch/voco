@@ -404,9 +404,7 @@ pub fn setup_tray(
                 }
                 id if id.starts_with("hotkey:") && presentation.hotkey_menu_enabled => {
                     let new_hotkey = id.strip_prefix("hotkey:").unwrap();
-                    if let Err(e) = crate::change_hotkey_runtime(app, new_hotkey) {
-                        error!("Failed to change hotkey: {e}");
-                    }
+                    crate::change_hotkey_from_tray(app, new_hotkey);
                 }
                 _ => {}
             }
@@ -507,12 +505,9 @@ fn refresh_tray(app: &tauri::AppHandle) {
 fn apply_tray_state(app: &tauri::AppHandle, tray_state: &mut TrayState) {
     sync_meter_timer(app, tray_state);
     let current = crate::Preset::of(&tray_state.current_hotkey);
-    // GNOME Settings changes the shortcut GNOME holds for the snap, not VOCO's menu.
-    let gnome_holds = crate::portal_shortcut_holds();
     for (preset, item) in &tray_state.hotkey_items {
         let mark = if current == Some(*preset) { '✓' } else { ' ' };
         let _ = item.set_text(format!("{mark} {}", preset.label()));
-        let _ = item.set_enabled(!gnome_holds);
     }
     let presentation = derive_tray_presentation(&tray_state.runtime);
     // Even equivalent presentation updates carry a new action token to Shell.

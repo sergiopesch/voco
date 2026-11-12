@@ -21,7 +21,7 @@ import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import { DEFAULT_HOTKEY, DIAGNOSTICS_TIMEOUT_MS, microphoneLabel, shortcutPresentation, withTimeout } from "@/lib/shortcutPresentation";
-import { getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
+import { changePortalShortcut, getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
 import { PanelSetup } from "@/components/PanelSetup";
 import { PortalSetup } from "@/components/PortalSetup";
@@ -232,6 +232,10 @@ export function ControlPanel({
   // The snap's shortcut belongs to GNOME once its portal holds it; GNOME
   // Settings changes it, not VOCO's editor.
   const [gnomeHoldsShortcut, setGnomeHoldsShortcut] = useState(false);
+  // GNOME 48 and later confirm a change in their own dialog; GNOME 46's
+  // keyboard shortcuts take it without one.
+  const [gnomeConfirmsShortcut, setGnomeConfirmsShortcut] = useState(false);
+  const [askingGnome, setAskingGnome] = useState(false);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
   const waylandDesktop = isWaylandSession(runtimeDiagnostics?.sessionType ?? null);
@@ -721,6 +725,22 @@ export function ControlPanel({
     const normalizedHotkey = hotkeyDraft.trim() || DEFAULT_HOTKEY;
     setHotkeyDraft(normalizedHotkey);
     setHotkeyError(null);
+    // GNOME holds the snap's shortcut: it takes the new keys, after its own
+    // dialog, and VOCO saves the keys GNOME reports. Refused, nothing changes.
+    if (gnomeHoldsShortcut) {
+      if (askingGnome) return false;
+      setAskingGnome(true);
+      try {
+        await changePortalShortcut(normalizedHotkey);
+        setEditingShortcut(false);
+        return true;
+      } catch (error) {
+        setHotkeyError(saveErrorMessage(error));
+        return false;
+      } finally {
+        setAskingGnome(false);
+      }
+    }
     // The native shortcut parser validates supported aliases and reserved shortcuts.
     const result = await savePatch({ hotkey: normalizedHotkey });
     if (result.ok) {
@@ -973,17 +993,25 @@ export function ControlPanel({
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Shortcut</h2></div>
                   <div className="voco-preferences__group">
                     <div className="voco-preferences__card voco-preferences__form">
-                      {updatesByStore && waylandDesktop ? <PortalSetup hotkey={config.hotkey} disabled={saving || dictationBusy}
-                        onStatus={status => setGnomeHoldsShortcut(status.applies && !status.panelHoldsShortcut && status.shortcutBound)} /> : null}
-                      {gnomeHoldsShortcut ? null : !editingShortcut ? <div className="voco-preferences__shortcut-summary"><span>Start and stop dictation</span><kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd><button className="voco-button voco-button--secondary" ref={shortcutEditButtonRef} onClick={() => setEditingShortcut(true)}>Change shortcut</button></div> : <div className="voco-preferences__shortcut-editor">
-                        <label className="voco-field"><span>Start and stop dictation</span><input disabled={saving} value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft} aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
+                      {updatesByStore && waylandDesktop ? <PortalSetup key={config.hotkey} hotkey={config.hotkey} disabled={saving || dictationBusy} changeHint=""
+                        onStatus={status => {
+                          setGnomeHoldsShortcut(status.applies && !status.panelHoldsShortcut && status.shortcutBound);
+                          setGnomeConfirmsShortcut(status.shortcutPortal);
+                        }} /> : null}
+                      {!editingShortcut ? <div className="voco-preferences__shortcut-summary"><span>Start and stop dictation</span><kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd><button className="voco-button voco-button--secondary" ref={shortcutEditButtonRef} onClick={() => setEditingShortcut(true)}>Change shortcut</button></div> : <div className="voco-preferences__shortcut-editor">
+                        <label className="voco-field"><span>Start and stop dictation</span><input disabled={saving || askingGnome} value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft} aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
                           onBlur={() => { if (recordingShortcut) endShortcutCapture(); }} onChange={(event) => setHotkeyDraft(event.target.value)}
                           onKeyDown={(event) => { if (recordingShortcut) { captureShortcut(event); return; } if (event.key === "Enter") { event.preventDefault(); void saveHotkey(); } }} /></label>
-                        <Tooltip text="Press a modifier and key; Escape cancels."><button className="voco-button voco-button--secondary" disabled={saving} onClick={beginShortcutCapture}>Record keys</button></Tooltip>
-                        {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving}>Apply shortcut</button> : null}
-                        <button className="voco-button voco-button--ghost" disabled={saving} onClick={() => { endShortcutCapture(); setHotkeyDraft(config.hotkey); setHotkeyError(null); setEditingShortcut(false); }}>Cancel</button>
+                        <Tooltip text="Press a modifier and key; Escape cancels."><button className="voco-button voco-button--secondary" disabled={saving || askingGnome} onClick={beginShortcutCapture}>Record keys</button></Tooltip>
+                        {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving || askingGnome}>{askingGnome && gnomeConfirmsShortcut ? "Waiting for GNOME…" : "Apply shortcut"}</button> : null}
+                        <button className="voco-button voco-button--ghost" disabled={saving || askingGnome} onClick={() => { endShortcutCapture(); setHotkeyDraft(config.hotkey); setHotkeyError(null); setEditingShortcut(false); }}>Cancel</button>
                       </div>}
-                      {gnomeHoldsShortcut ? null : <p className="voco-preferences__helper" id="voco-hotkey-feedback" role="status">{hotkeyError ?? (recordingShortcut ? "Press a modifier and key. Escape cancels." : shortcut.instruction)}</p>}
+                      <p className="voco-preferences__helper" id="voco-hotkey-feedback" role="status">{hotkeyError ?? (askingGnome && gnomeConfirmsShortcut ? "GNOME’s dialog is open. Choose Add."
+                        : recordingShortcut ? "Press a modifier and key. Escape cancels."
+                        : !gnomeHoldsShortcut ? shortcut.instruction
+                        : !editingShortcut ? "GNOME keeps this shortcut for VOCO, so the app you’re typing in never receives it."
+                        : gnomeConfirmsShortcut ? "When you apply it, GNOME asks you once: choose Add."
+                        : "VOCO changes it in GNOME’s keyboard shortcuts.")}</p>
                       <details className="voco-preferences__disclosure"><summary>Shortcut help</summary><p className="voco-preferences__helper">{shortcut.detail}</p>
                       {shortcut.setup ? <p className="voco-preferences__helper">{shortcut.setup}</p> : null}
                       {waylandDesktop ? <div className="voco-inline-note">
