@@ -21,7 +21,7 @@ import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
 import { openMicrophoneStream } from "@/lib/audioInput";
 import { createAnimationFrameLease } from "@/lib/animationFrameLease";
 import { DEFAULT_HOTKEY, DIAGNOSTICS_TIMEOUT_MS, microphoneLabel, shortcutPresentation, withTimeout } from "@/lib/shortcutPresentation";
-import { changePortalShortcut, getDesktopInputStatus, traceHotkeyEvent } from "@/lib/tauri";
+import { changePortalShortcut, getDesktopInputStatus, openProblemReport, traceHotkeyEvent } from "@/lib/tauri";
 import { Onboarding } from "@/components/Onboarding";
 import { PanelSetup } from "@/components/PanelSetup";
 import { PortalSetup } from "@/components/PortalSetup";
@@ -1098,6 +1098,12 @@ export function ControlPanel({
                   </details>
                   <div className="voco-preferences__actions">
                     <button className="voco-button voco-button--secondary" onClick={() => void onRefreshRuntimeDiagnostics()}>Refresh runtime checks</button>
+                    <Tooltip text="Opens VOCO’s bug form in your browser with your version and desktop filled in. Nothing is sent until you submit it.">
+                      <button className="voco-button voco-button--secondary" onClick={() => void openProblemReport().catch((error: unknown) => {
+                        setSaveFeedback(saveErrorMessage(error));
+                        setSaveOutcome("attention");
+                      })}>Report a problem</button>
+                    </Tooltip>
                     {desktopSetupError ? <button className="voco-button voco-button--secondary" onClick={() => void onOpenReleasePage(setupGuide)}>Open setup instructions</button> : null}
                     <button className="voco-button voco-button--ghost" disabled={saving || hotkeyDirty} title={hotkeyDirty ? "Apply or cancel your shortcut before restarting setup." : undefined}
                       onClick={async () => { const result = await savePatch({ onboardingCompleted: false }); if (result.ok) onSurfaceChange("onboarding"); }}>Run setup again</button>

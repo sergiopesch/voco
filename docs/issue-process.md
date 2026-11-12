@@ -9,7 +9,7 @@ the [release process](release-process.md) covers shipping.
 
 | What | Where | Why there |
 | --- | --- | --- |
-| Something doesn't work | The [bug report](https://github.com/sergiopesch/voco/issues/new?template=bug.yml) form | It asks for the version, the system and the steps, which a fix needs. |
+| Something doesn't work | The [bug report](https://github.com/sergiopesch/voco/issues/new?template=bug.yml) form, which **Report a problem** in VOCO's Help opens with the version, the package and the desktop filled in | It asks for the version, the system and the steps, which a fix needs. |
 | An idea | The [improvement idea](https://github.com/sergiopesch/voco/issues/new?template=feature.yml) form | It asks what the person wants to do, which decides whether it fits VOCO. |
 | A question, or help with setup | [Discussions](https://github.com/sergiopesch/voco/discussions) | An answer isn't work to track. |
 | A vulnerability | A [private advisory](https://github.com/sergiopesch/voco/security/advisories/new) | Never a public issue. |

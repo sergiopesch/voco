@@ -46,6 +46,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `single_instance.rs` — Process lock that allows one VOCO per user.
 - `desktop_notifications.rs` — Notifications that keep their D-Bus sender for the app's lifetime, because GNOME removes notifications whose sender disappears.
 - `performance.rs` — Opt-in performance metadata log, enabled with `VOCO_PERFORMANCE_LOG=1`.
+- `problem_report.rs` — The address of VOCO's bug form with this installation's version, package and desktop filled in, for Help's Report a problem.
 - `process_runner.rs` — Bounded helper processes: timeouts, output limits and reaping.
 - `digest_hex.rs` — Lowercase hex for SHA-256 digests.
 - `native_capture_commands.rs` — Tauri commands for native capture, callable only from VOCO's main page.

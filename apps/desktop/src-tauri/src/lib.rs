@@ -27,6 +27,7 @@ mod native_capture;
 mod native_capture_commands;
 pub mod panel_setup;
 mod performance;
+mod problem_report;
 mod process_runner;
 mod processor;
 mod selection_owner;
@@ -849,6 +850,17 @@ fn open_external_url(url: String) -> Result<(), String> {
 
     process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&url))
         .map_err(|error| format!("Failed to open external URL: {error}"))?;
+    Ok(())
+}
+
+/// Help's Report a problem: VOCO's bug form in the person's browser, with the
+/// version, the package and the desktop filled in (problem_report.rs). The
+/// address is built here, never taken from the window.
+#[tauri::command]
+fn open_problem_report() -> Result<(), String> {
+    let url = problem_report::url_for_this_installation(&current_desktop(), trace_session_label());
+    process_runner::spawn_desktop_launcher(process_runner::command("xdg-open").arg(&url))
+        .map_err(|error| format!("VOCO couldn't open the form in your browser: {error}"))?;
     Ok(())
 }
 
@@ -2644,6 +2656,7 @@ pub fn run() -> Result<(), String> {
             allow_portal_typing,
             allow_portal_shortcut,
             change_portal_shortcut,
+            open_problem_report,
             activation::take_launcher_activation,
             paste_desktop_text,
             copy_desktop_text,

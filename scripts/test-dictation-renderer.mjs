@@ -47,6 +47,7 @@ export const getPortalSetupStatus = async () => ({applies:false,typingAllowed:fa
 export const allowPortalTyping = getPortalSetupStatus;
 export const allowPortalShortcut = getPortalSetupStatus;
 export const changePortalShortcut = getPortalSetupStatus;
+export const openProblemReport = async () => { calls.push(['openProblemReport']); };
 export const beginDesktopTyping = async () => { calls.push(['beginDesktopTyping']); };
 export const openExternalUrl = async (url) => { calls.push(['openExternalUrl', url]); };
 export const microphoneAccess = async () => ({allowed: true});
