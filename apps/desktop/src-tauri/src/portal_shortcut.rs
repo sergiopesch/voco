@@ -20,10 +20,6 @@ const BOUND_FILE: &str = "global-shortcut";
 const DIALOG_TIMEOUT: Duration = Duration::from_secs(300);
 /// A rebind GNOME already allowed answers at once.
 const REBIND_TIMEOUT: Duration = Duration::from_secs(30);
-/// A press GNOME hasn't reported released after this long reads as unknown, so
-/// a lost `Deactivated` can't hold back every paste. Below it a press is held:
-/// the paste's own 1.5 s wait then sends no keys (AGENTS.md, Delivery).
-const STALE_PRESS: Duration = Duration::from_secs(5);
 /// After the shortcut's release, time for its modifier's own release.
 /// People often let go of Super or Alt a moment after the letter, and keys
 /// sent while it is down make another chord, which pastes nothing.
@@ -40,6 +36,8 @@ struct Shortcut {
     released: Option<Instant>,
     /// The last `Activated`, a held chord's repeats included.
     activated: Option<Instant>,
+    /// That `Activated` was a repeat: the chord was still held then.
+    repeating: bool,
 }
 
 static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
@@ -49,6 +47,7 @@ static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
     pressed: None,
     released: None,
     activated: None,
+    repeating: false,
 });
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 /// The toggles `Activated` asked for. The portal suite (portal_fixture.rs)
@@ -61,30 +60,64 @@ pub(crate) static TOGGLES_REQUESTED: std::sync::atomic::AtomicUsize =
 pub(crate) static ACTIVATIONS: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 
+/// GNOME's keyboard repeat: a held key repeats after `delay`, then every
+/// `interval`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Repeat {
+    delay: Duration,
+    interval: Duration,
+}
+
 /// GNOME's grabs, the portal's and a custom shortcut's, repeat a held chord's
 /// press about every 30 ms once the keyboard's repeat delay has passed, so
-/// only a press after a release toggles (AGENTS.md, Shortcut). None when the
-/// keyboard doesn't repeat. Read once: GNOME's default is 500 ms.
-fn repeat_delay() -> Option<Duration> {
-    static DELAY: OnceLock<Option<Duration>> = OnceLock::new();
-    *DELAY.get_or_init(|| {
-        const DEFAULT: Duration = Duration::from_millis(500);
+/// only a press toggles (AGENTS.md, Shortcut). None when the keyboard doesn't
+/// repeat. Read once: GNOME's defaults are 500 ms and 30 ms.
+fn repeat() -> Option<Repeat> {
+    static REPEAT: OnceLock<Option<Repeat>> = OnceLock::new();
+    *REPEAT.get_or_init(|| {
+        const DEFAULT: Repeat = Repeat {
+            delay: Duration::from_millis(500),
+            interval: Duration::from_millis(30),
+        };
         let Some(schema) = gio::SettingsSchemaSource::default()
             .and_then(|source| source.lookup("org.gnome.desktop.peripherals.keyboard", true))
-            .filter(|schema| schema.has_key("repeat") && schema.has_key("delay"))
+            .filter(|schema| {
+                ["repeat", "delay", "repeat-interval"]
+                    .iter()
+                    .all(|key| schema.has_key(key))
+            })
         else {
             return Some(DEFAULT);
         };
         let keyboard = gio::Settings::new_full(&schema, None::<&gio::SettingsBackend>, None);
-        keyboard
-            .boolean("repeat")
-            .then(|| Duration::from_millis(keyboard.uint("delay").into()))
+        keyboard.boolean("repeat").then(|| Repeat {
+            delay: Duration::from_millis(keyboard.uint("delay").into()),
+            interval: Duration::from_millis(keyboard.uint("repeat-interval").into()),
+        })
     })
 }
 
-/// A repeat follows the last press or repeat within the repeat delay and a
-/// margin; the first comes after the delay, the rest about every 30 ms.
+fn repeat_delay() -> Option<Duration> {
+    repeat().map(|repeat| repeat.delay)
+}
+
+/// How far a repeat may trail the time GNOME's keyboard repeat gives it.
 const REPEAT_MARGIN: Duration = Duration::from_millis(100);
+
+/// Without keyboard repeat, a press GNOME never reported released stops
+/// counting as one this long after its last activation.
+const STALE_REPEAT: Duration = Duration::from_millis(900);
+
+/// How long a chord GNOME hasn't reported released can stay silent and still
+/// be held. GNOME sends `Deactivated` only when the letter comes up under its
+/// modifier: let go of Super first, as people often do, and nothing more
+/// arrives. A chord still held repeats, first one repeat delay after the
+/// press, so silence past that and a margin means the modifier is up. Without
+/// keyboard repeat nothing tells a hold from that silence, so it gets the
+/// time a held press counts for.
+fn silence_window(repeat: Option<Repeat>) -> Duration {
+    repeat.map_or(STALE_REPEAT, |repeat| repeat.delay.max(repeat.interval)) + REPEAT_MARGIN
+}
 
 /// Within `window` of the last press or repeat; never without a window.
 fn within_repeat(last: Option<Instant>, now: Instant, window: Option<Duration>) -> bool {
@@ -94,24 +127,33 @@ fn within_repeat(last: Option<Instant>, now: Instant, window: Option<Duration>) 
     }
 }
 
-/// A held chord's repeated `Activated`: GNOME hasn't reported the press
-/// released, and the last activation came within the repeat window. A lost
-/// `Deactivated` can't swallow a later press, which comes after a silence
-/// repeats never leave.
-fn is_repeat(state: &Shortcut, now: Instant, delay: Option<Duration>) -> bool {
+/// A held chord's repeated `Activated`. GNOME hasn't reported the press
+/// released, the chord hasn't gone silent, and the time since the last one is
+/// a repeat's: the first comes one repeat delay after the press, the rest at
+/// the repeat interval, a rhythm no hand presses. Anything else is a new
+/// press, so one soon after the modifier came up first, which GNOME reports
+/// no release for, still toggles.
+fn is_repeat(state: &Shortcut, now: Instant, repeat: Option<Repeat>) -> bool {
     let down = state
         .pressed
         .is_some_and(|pressed| !state.released.is_some_and(|released| released >= pressed));
-    down && within_repeat(
-        state.activated,
-        now,
-        Some(delay.unwrap_or_default().max(STALE_REPEAT) + REPEAT_MARGIN),
-    )
+    let Some(last) = state.activated.filter(|_| down) else {
+        return false;
+    };
+    let gap = now.saturating_duration_since(last);
+    if gap >= silence_window(repeat) {
+        return false;
+    }
+    match repeat {
+        // Read as off: should GNOME repeat all the same, nothing times it.
+        None => true,
+        Some(repeat) => {
+            state.repeating
+                || gap < repeat.interval + REPEAT_MARGIN
+                || gap + REPEAT_MARGIN >= repeat.delay
+        }
+    }
 }
-
-/// Without keyboard repeat, a press GNOME never reported released stops
-/// counting as one this long after its last activation.
-const STALE_REPEAT: Duration = Duration::from_millis(900);
 
 fn shortcut() -> MutexGuard<'static, Shortcut> {
     SHORTCUT
@@ -260,9 +302,10 @@ fn watch(connection: &gio::DBusConnection) {
                     let now = Instant::now();
                     #[cfg(test)]
                     ACTIVATIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let repeat = is_repeat(&state, now, repeat_delay());
+                    let repeated = is_repeat(&state, now, repeat());
                     state.activated = Some(now);
-                    if repeat {
+                    state.repeating = repeated;
+                    if repeated {
                         return;
                     }
                     state.pressed = Some(now);
@@ -563,10 +606,11 @@ pub fn resume() {
 }
 
 /// Through the portal VOCO can't read modifiers, so a press is held until
-/// GNOME's `Deactivated`, then 400 ms for the modifier's own release
-/// (AGENTS.md, Delivery). Keys sent while Super or Alt is down make another
-/// chord, which pastes nothing, so a paste that outwaits its bound sends none.
-/// Unknown without a portal press, or once a press is stale.
+/// GNOME's `Deactivated`, then 400 ms for the modifier's own release, or,
+/// with no `Deactivated`, until the chord has stopped repeating (AGENTS.md,
+/// Delivery). Keys sent while Super or Alt is down make another chord, which
+/// pastes nothing, so a paste that outwaits its bound sends none. Unknown
+/// without a portal press, or once a press has gone silent.
 pub fn keys_held() -> Option<bool> {
     let command = *COMMAND_PRESS
         .lock()
@@ -577,23 +621,31 @@ pub fn keys_held() -> Option<bool> {
     let state = shortcut();
     state.session.as_ref()?;
     let pressed = state.pressed?;
-    held(pressed, state.released, state.activated, Instant::now())
+    held(
+        pressed,
+        state.released,
+        state.activated,
+        Instant::now(),
+        silence_window(repeat()),
+    )
 }
 
 /// Held until the release and its grace. A press with no release reads as
-/// unknown once nothing, a repeat included, has activated it for a while.
+/// unknown once nothing, a repeat included, has activated it for `silence`:
+/// the modifier came up first, which GNOME reports no release for.
 fn held(
     pressed: Instant,
     released: Option<Instant>,
     activated: Option<Instant>,
     now: Instant,
+    silence: Duration,
 ) -> Option<bool> {
     let last = activated.map_or(pressed, |activated| activated.max(pressed));
     match released {
         Some(released) if released >= pressed => {
             Some(now.saturating_duration_since(released) < MODIFIER_GRACE)
         }
-        _ if now.saturating_duration_since(last) >= STALE_PRESS => None,
+        _ if now.saturating_duration_since(last) >= silence => None,
         _ => Some(true),
     }
 }
@@ -601,6 +653,14 @@ fn held(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// GNOME's default keyboard repeat, or with another delay.
+    fn repeat_after(delay_ms: u64) -> Option<Repeat> {
+        Some(Repeat {
+            delay: Duration::from_millis(delay_ms),
+            interval: Duration::from_millis(30),
+        })
+    }
 
     #[test]
     fn gnome_triggers_read_as_voco_shortcuts() {
@@ -635,95 +695,172 @@ mod tests {
     fn a_paste_waits_for_the_release_then_the_modifier_grace() {
         let pressed = Instant::now();
         let at = |ms| pressed + Duration::from_millis(ms);
+        let silence = silence_window(repeat_after(500));
+        assert_eq!(silence, Duration::from_millis(600));
+        let held = |released, activated, now| held(pressed, released, activated, now, silence);
+        assert_eq!(held(None, None, at(100)), Some(true), "still pressed");
         assert_eq!(
-            held(pressed, None, None, at(100)),
-            Some(true),
-            "still pressed"
-        );
-        assert_eq!(
-            held(pressed, Some(at(200)), None, at(300)),
+            held(Some(at(200)), None, at(300)),
             Some(true),
             "within the modifier grace"
         );
         assert_eq!(
-            held(pressed, Some(at(200)), None, at(601)),
+            held(Some(at(200)), None, at(601)),
             Some(false),
             "after the grace"
         );
         assert_eq!(
-            held(pressed, None, None, at(2_000)),
+            held(None, Some(at(1_970)), at(2_000)),
             Some(true),
-            "a long hold stays held, so the paste's wait sends no keys"
+            "a long hold repeats, so it stays held and the paste's wait sends no keys"
         );
         assert_eq!(
-            held(pressed, Some(at(2_000)), None, at(2_100)),
+            held(Some(at(2_000)), Some(at(1_970)), at(2_100)),
             Some(true),
             "a long hold's release still gets the grace"
         );
         assert_eq!(
-            held(pressed, None, None, at(5_000)),
-            None,
-            "a press never reported released reads as unknown"
-        );
-        assert_eq!(
-            held(pressed, None, Some(at(4_990)), at(6_000)),
+            held(None, Some(at(4_990)), at(5_500)),
             Some(true),
             "repeats keep a long hold held"
         );
         assert_eq!(
-            held(at(500), Some(at(400)), None, at(600)),
+            super::held(at(500), Some(at(400)), None, at(600), silence),
             Some(true),
             "an earlier release doesn't end a newer press"
         );
     }
 
     #[test]
+    fn a_modifier_released_first_stops_holding_back_pastes_once_no_repeat_comes() {
+        // GNOME sends no `Deactivated` when Super comes up before the letter.
+        let pressed = Instant::now();
+        let at = |ms| pressed + Duration::from_millis(ms);
+        let silence = silence_window(repeat_after(500));
+        let held = |activated, now| held(pressed, None, activated, now, silence);
+        assert_eq!(
+            held(None, at(599)),
+            Some(true),
+            "a chord still held would repeat by now, give or take the margin"
+        );
+        assert_eq!(
+            held(None, at(600)),
+            None,
+            "no repeat came: the modifier is up, and the paste goes out"
+        );
+        assert_eq!(
+            held(Some(at(700)), at(1_299)),
+            Some(true),
+            "after a hold's last repeat, the same silence"
+        );
+        assert_eq!(held(Some(at(700)), at(1_300)), None);
+        // A shorter repeat delay is known sooner, a longer one later.
+        assert_eq!(
+            silence_window(repeat_after(250)),
+            Duration::from_millis(350)
+        );
+        assert_eq!(
+            silence_window(repeat_after(2_000)),
+            Duration::from_millis(2_100)
+        );
+        // Without keyboard repeat a hold stays silent too.
+        assert_eq!(silence_window(None), STALE_REPEAT + REPEAT_MARGIN);
+    }
+
+    #[test]
     fn a_held_chords_repeats_never_toggle() {
         let start = Instant::now();
         let at = |ms| start + Duration::from_millis(ms);
-        let delay = Some(Duration::from_millis(500));
+        let repeat = repeat_after(500);
         let down = Shortcut {
             pressed: Some(at(0)),
             activated: Some(at(0)),
             ..Shortcut::default()
         };
         assert!(
-            is_repeat(&down, at(500), delay),
+            is_repeat(&down, at(500), repeat),
             "the first repeat, after the delay"
         );
         let repeating = Shortcut {
             pressed: Some(at(0)),
             activated: Some(at(530)),
+            repeating: true,
             ..Shortcut::default()
         };
         assert!(
-            is_repeat(&repeating, at(560), delay),
+            is_repeat(&repeating, at(560), repeat),
             "repeats about every 30 ms"
+        );
+        assert!(
+            is_repeat(&repeating, at(900), repeat),
+            "a stalled repeat is still one"
         );
         let up = Shortcut {
             pressed: Some(at(0)),
             released: Some(at(600)),
             activated: Some(at(560)),
+            repeating: true,
             ..Shortcut::default()
         };
         assert!(
-            !is_repeat(&up, at(700), delay),
+            !is_repeat(&up, at(700), repeat),
             "a press after the release toggles"
         );
-        let lost_release = Shortcut {
-            pressed: Some(at(0)),
-            activated: Some(at(0)),
-            ..Shortcut::default()
-        };
         assert!(
-            !is_repeat(&lost_release, at(2_000), delay),
-            "after a silence no hold leaves, a press toggles even with Deactivated lost"
+            !is_repeat(&down, at(2_000), repeat),
+            "after a silence no hold leaves, a press toggles with no Deactivated"
         );
         assert!(
             is_repeat(&down, at(800), None),
             "without keyboard repeat a lost release still can't swallow presses for long"
         );
         assert!(!is_repeat(&down, at(1_000), None));
+    }
+
+    #[test]
+    fn a_press_soon_after_the_modifier_came_up_first_toggles() {
+        // No `Deactivated` followed the press: Super was let go before the letter.
+        let start = Instant::now();
+        let at = |ms| start + Duration::from_millis(ms);
+        let repeat = repeat_after(500);
+        let pressed = Shortcut {
+            pressed: Some(at(0)),
+            activated: Some(at(0)),
+            ..Shortcut::default()
+        };
+        assert!(
+            !is_repeat(&pressed, at(250), repeat),
+            "too soon for the first repeat, too slow for a repeat's rhythm: a press"
+        );
+        assert!(
+            !is_repeat(&pressed, at(399), repeat),
+            "still before the first repeat could come"
+        );
+        assert!(
+            is_repeat(&pressed, at(400), repeat),
+            "where the first repeat may fall, it counts as one"
+        );
+        assert!(is_repeat(&pressed, at(599), repeat));
+        assert!(
+            !is_repeat(&pressed, at(600), repeat),
+            "past the first repeat's time the chord had gone silent: a press"
+        );
+        // A first repeat that came late toggled as a press; the rest of its
+        // train, at the repeat interval, doesn't.
+        let late = Shortcut {
+            pressed: Some(at(650)),
+            activated: Some(at(650)),
+            ..Shortcut::default()
+        };
+        assert!(is_repeat(&late, at(680), repeat));
+        // After a long hold's last repeat, the same silence ends it.
+        let held = Shortcut {
+            pressed: Some(at(0)),
+            activated: Some(at(900)),
+            repeating: true,
+            ..Shortcut::default()
+        };
+        assert!(!is_repeat(&held, at(1_500), repeat));
     }
 
     #[test]

@@ -501,6 +501,63 @@ try:
                 'modifierWaitMs': answered['ok']['pasteMetrics']['modifierWaitMs']}
     check('heldShortcut', held_shortcut)
 
+    def modifier_first():
+        # GNOME sends Deactivated only when the letter comes up under Super.
+        # Let go of Super first, as people often do, and nothing more arrives:
+        # the paste goes out once a held chord would have repeated, about
+        # 600 ms after the press, and never waits out its own 1.5 s.
+        session = begin('modifier-first')
+        field.clear()
+        before = voco.counts()
+        key(SUPER, True); time.sleep(.03)
+        pressed = time.monotonic(); key(X, True)
+        assert wait_for(lambda: voco.counts()['toggles'] == before['toggles'] + 1, 2), 'Activated did not toggle'
+        time.sleep(.08)
+        key(SUPER, False); time.sleep(.05); key(X, False)
+        assert voco.counts()['keysHeld'] is True, 'a press GNOME reported no release for was not held'
+        mark = time.monotonic()
+        voco.send('paste', text='superfirst')
+        answered = voco.reply(5)
+        assert 'ok' in answered, answered
+        assert wait_for(lambda: field.text() == 'superfirst', 3), field.text()
+        inserts = field.seen('insert', mark)
+        assert len(inserts) == 1 and inserts[0]['shift'], inserts
+        after_press = inserts[0]['t'] - pressed
+        assert .5 <= after_press < 1.2, f'the Insert came {after_press:.3f} s after the press'
+        assert voco.counts()['keysHeld'] is None, voco.counts()
+        end(session)
+        return {'insertAfterPressMs': round(after_press * 1000, 1),
+                'modifierWaitMs': answered['ok']['pasteMetrics']['modifierWaitMs']}
+    check('modifierFirst', modifier_first)
+
+    def held_past_repeat():
+        # A chord held past the repeat delay keeps repeating, so its paste
+        # still waits for the release and the modifier's grace.
+        session = begin('held-past-repeat')
+        field.clear()
+        toggles = voco.counts()['toggles']
+        key(SUPER, True); time.sleep(.03)
+        key(X, True)
+        assert wait_for(lambda: voco.counts()['toggles'] == toggles + 1, 2), 'Activated did not toggle'
+        mark = time.monotonic()
+        voco.send('paste', text='heldlong')
+        time.sleep(.8)
+        assert field.text() == '', f'a paste went out under the held chord: {field.text()!r}'
+        released = time.monotonic(); key(X, False); time.sleep(.03)
+        super_released = time.monotonic(); key(SUPER, False)
+        answered = voco.reply(5)
+        assert 'ok' in answered, answered
+        assert wait_for(lambda: field.text() == 'heldlong', 3), field.text()
+        inserts = field.seen('insert', mark)
+        assert len(inserts) == 1 and inserts[0]['shift'], inserts
+        after_release = inserts[0]['t'] - released
+        assert .4 <= after_release < 1.0, f'the Insert came {after_release:.3f} s after the release'
+        assert inserts[0]['t'] > super_released, 'the paste went out while Super was down'
+        assert voco.counts()['toggles'] == toggles + 1, 'the held chord toggled again'
+        end(session)
+        return {'insertAfterReleaseMs': round(after_release * 1000, 1)}
+    check('heldPastRepeat', held_past_repeat)
+
     def repeated_shortcut():
         # GNOME's grab repeats Activated while the chord is held, every 30 ms
         # after the keyboard's repeat delay; only the press toggles.
