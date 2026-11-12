@@ -11,7 +11,7 @@
     "steps": [
       {
         "label": "Shortcut",
-        "detail": "You press Alt+D, or the shortcut you chose. The same shortcut, or Stop dictation in VOCO's menu, ends the recording."
+        "detail": "You press Super+X, or the shortcut you chose. The same shortcut, or Stop dictation in VOCO's menu, ends the recording."
       },
       {
         "label": "Microphone",
@@ -200,18 +200,18 @@
     "title": "One press, one recording.",
     "intro": "A shortcut makes a small promise: one press starts a recording, and the next press finishes it.",
     "story": [
-      "The shortcut is Alt+D unless you change it. Change shortcut in VOCO's menu offers Alt+D, Alt+Shift+D and Custom shortcut\u2026, which opens the shortcut settings. A custom shortcut needs Alt, Control or Super plus one main key.",
-      "How the key press reaches VOCO depends on the desktop. On X11, VOCO grabs the shortcut. On Wayland, VOCO reads the keyboards for the two preset shortcuts, or the GNOME companion grabs them inside the Shell.",
+      "A new setup uses Super+X. Change shortcut in VOCO's menu offers Super+X, Alt+D, Alt+Shift+D and Custom shortcut\u2026, which opens the shortcut settings. A custom shortcut needs Alt, Control or Super plus one main key, and a shortcut you saved is never changed for you.",
+      "How the key press reaches VOCO depends on the desktop. On X11, VOCO grabs the shortcut. On Wayland, VOCO reads the keyboards for the three preset shortcuts, or the GNOME companion grabs them inside the Shell. The snap reads no keyboards, so on GNOME Wayland the companion or GNOME itself holds its shortcut.",
       "Every route ends at the same gate. It ignores a second toggle that arrives within 120 ms of the first, so one press never counts twice."
     ],
     "steps": [
       {
         "label": "Choose",
-        "detail": "VOCO checks the saved shortcut at startup. An invalid one is reset to Alt+D, and VOCO tells you why."
+        "detail": "VOCO checks the saved shortcut at startup. An invalid one is reset to Super+X, and VOCO tells you why."
       },
       {
         "label": "Route",
-        "detail": "The press arrives through the X11 grab, the companion's grab, keyboard reading, the VOCO Dictation IBus input source or voco --toggle."
+        "detail": "The press arrives through the X11 grab, the companion's grab, keyboard reading, the VOCO Dictation IBus input source, GNOME's shortcut portal in the snap or voco --toggle."
       },
       {
         "label": "Consume",
@@ -232,12 +232,16 @@
         "text": "While the chord is held, VOCO's grab receives every key. VOCO waits for the release before it toggles, so the paste keys reach the app."
       },
       {
+        "title": "Why Super+X",
+        "text": "The companion's grab and GNOME's shortcut portal take only the chord's letter, so the focused app sees the modifier pressed and released alone. After a lone Alt, Firefox, Thunderbird, LibreOffice and Electron editors open their menu bar, which swallows the Shift+Insert pastes that follow. Those apps open no menu bar for a lone Super, and Mutter doesn't open the overview once it has seen the X."
+      },
+      {
         "title": "Passive keys also reach the app",
-        "text": "When VOCO reads the keyboards, the focused app gets the shortcut as well. Browsers move the cursor to the address bar, so your words land there, and terminals delete a word. Once per launch VOCO shows \"Your shortcut also reached the app\" with a way to avoid it."
+        "text": "When VOCO reads the keyboards, the focused app gets the shortcut as well. With Alt+D, browsers move the cursor to the address bar, so your words land there, and terminals delete a word. Apps rarely act on Super+X, so for it VOCO says only that an app that has its own use for it acts on it too. Once per launch VOCO shows \"Your shortcut also reached the app\" with a way to avoid it."
       },
       {
         "title": "One toggle, however it arrives",
-        "text": "The GNOME companion holds a 2.5-second lease on the shortcut, and while it is fresh VOCO ignores the same keys from the keyboards. The IBus source holds a 1-second lease, and VOCO also releases its X11 grab so the source receives the keys."
+        "text": "The GNOME companion holds a 2.5-second lease on the shortcut, and while it is fresh VOCO ignores the same keys from the keyboards. The IBus source holds a 1-second lease, and VOCO also releases its X11 grab so the source receives the keys. In the snap, the companion's lease also closes GNOME's shortcut portal session until the lease lapses, so one grab holds the chord."
       },
       {
         "title": "voco --toggle",
@@ -245,19 +249,31 @@
       },
       {
         "title": "Other shortcuts on Wayland",
-        "text": "Keyboard reading covers only Alt+D and Alt+Shift+D, so any other shortcut on Wayland needs a desktop binding that runs voco --toggle. VOCO registers a shortcut through Tauri's global-shortcut plugin only outside Wayland, and only while no IBus source takes the chord. Whenever settings can't confirm that the shortcut works, they advise: \"To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.\""
+        "text": "Keyboard reading covers only Super+X, Alt+D and Alt+Shift+D, so any other shortcut on Wayland needs a desktop binding that runs voco --toggle. VOCO registers a shortcut through Tauri's global-shortcut plugin only outside Wayland, and only while no IBus source takes the chord. Whenever settings can't confirm that the shortcut works, they advise: \"To dictate into other apps, start dictation from the tray or assign voco --toggle to a shortcut in your desktop settings.\""
       },
       {
         "title": "Reading keyboards",
-        "text": "VOCO reads the keyboards in /dev/input that have an Alt key and a D key, and watches for keyboards you plug in later. It needs read access to those devices. It skips two synthetic keyboards by name, VOCO's own virtual keyboard and the device another tool's ydotoold creates, so their keys never count as the shortcut or a held modifier."
+        "text": "VOCO reads the keyboards in /dev/input that can type one of the presets, and watches for keyboards you plug in later. A press counts only with exactly the chord's own modifiers held, on any keyboard: Super+X never with Alt, Control or Shift, and Alt+D never with Super, Control or Shift. It needs read access to those devices. It skips two synthetic keyboards by name, VOCO's own virtual keyboard and the device another tool's ydotoold creates, so their keys never count as the shortcut or a held modifier."
       },
       {
         "title": "When nothing hears the shortcut",
-        "text": "If no keyboard is readable and neither the GNOME companion nor the IBus source takes Alt+D or Alt+Shift+D, the shortcut does nothing at all. 20 seconds after the keyboard reader starts, VOCO says \"Your shortcut can't reach VOCO yet\" once and names the fix, such as enabling the VOCO panel or assigning voco --toggle to a shortcut."
+        "text": "If no keyboard is readable and neither the GNOME companion nor the IBus source takes the preset, the shortcut does nothing at all. 20 seconds after the keyboard reader starts, VOCO says \"Your shortcut can't reach VOCO yet\" once and names the fix, such as enabling the VOCO panel or assigning voco --toggle to a shortcut."
+      },
+      {
+        "title": "The snap's shortcut on GNOME",
+        "text": "The snap reads no keyboards. On GNOME 48 and later it asks GNOME's GlobalShortcuts portal for one shortcut, toggle, described as Start or stop dictation, with your shortcut as its preferred trigger in the portal's spelling, such as LOGO+x for Super+X. Only the Add button in setup or Settings binds it the first time, which shows GNOME's dialog. VOCO records that, and each later start binds it again without a dialog. Each Activated signal toggles through the same 120 ms gate. GNOME Settings, under Apps, can change the trigger: VOCO saves each trigger GNOME reports as its own shortcut, so its labels name the key GNOME listens for. While GNOME holds it, the tray's presets are greyed out and Settings shows no shortcut editor, only \"To change it, open GNOME Settings, then Apps, then VOCO.\""
+      },
+      {
+        "title": "A held chord repeats",
+        "text": "GNOME's grab, unlike the companion's, repeats a held chord's press about every 30 ms once the keyboard's repeat delay has passed. VOCO reads that delay once from GNOME's keyboard settings, and takes 500 ms when it can't. An Activated that comes before GNOME reports the release, and within the repeat delay, at least 900 ms, plus 100 ms of the last one, is a repeat and toggles nothing."
+      },
+      {
+        "title": "GNOME 46",
+        "text": "GNOME 46 has no shortcut portal, so the snap's Add button writes a GNOME custom shortcut named VOCO that runs /snap/bin/voco --toggle, for a preset only. If a GNOME window shortcut or another custom shortcut already uses the chord, VOCO names it and changes nothing. GNOME's schema for those keys isn't in the snap's runtime, so the snap carries one with the same IDs, paths and types. GNOME runs the command again for each repeat, and each run is a snap launch, so repeats arrive late and unevenly: a voco --toggle within the repeat delay plus 400 ms of the last one toggles nothing. Reset removes VOCO's custom shortcut."
       },
       {
         "title": "Plain status",
-        "text": "Shortcut help in Settings explains the current route in plain words, for example \"VOCO's GNOME panel handles this shortcut.\" or \"A live synchronized keyboard supports the configured shortcut.\""
+        "text": "Shortcut help in Settings explains the current route in plain words, for example \"VOCO's GNOME panel handles this shortcut.\", \"GNOME holds this shortcut for VOCO.\" or \"A live synchronized keyboard supports the configured shortcut.\""
       }
     ],
     "files": [
@@ -284,6 +300,22 @@
       {
         "path": "apps/desktop/src-tauri/src/panel.rs",
         "why": "The GNOME companion's D-Bus service and its shortcut lease."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_shortcut.rs",
+        "why": "The snap's shortcut through GNOME's GlobalShortcuts portal, the repeat filter and the trigger VOCO follows."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/gnome_custom_shortcut.rs",
+        "why": "The snap's GNOME custom shortcut on GNOME 46, added only when nothing else uses the chord."
+      },
+      {
+        "path": "packaging/snap/schemas/voco-gnome-custom-shortcut.gschema.xml",
+        "why": "GNOME's custom-shortcut keys, which the snap carries."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/config.rs",
+        "why": "DEFAULT_HOTKEY, the shortcut of a new setup and of a reset."
       },
       {
         "path": "apps/desktop/src-tauri/src/ibus_shortcut.rs",
@@ -318,9 +350,9 @@
         "why": "Turns the shortcut's status into the words settings show."
       }
     ],
-    "caution": "Reading the keyboards only observes. The companion's grab keeps the keys out of every app, and the IBus source keeps them out of IBus-aware fields.",
+    "caution": "Reading the keyboards only observes. The companion's grab and GNOME's shortcut portal keep the chord's letter out of every app, though the app still sees the modifier alone, and the IBus source keeps the chord out of IBus-aware fields.",
     "quiz": {
-      "question": "On Wayland without the GNOME companion, you press Alt+D in a browser. What happens?",
+      "question": "You chose Alt+D. On Wayland without the GNOME companion, you press it in a browser. What happens?",
       "answers": [
         "Only VOCO sees the key press",
         "The browser may also act on Alt+D, for example by focusing its address bar",
@@ -365,7 +397,7 @@
     "facts": [
       {
         "title": "No microphone chosen yet",
-        "text": "VOCO still counts as ready when the system default is a microphone it can record from: the tray reads \"VOCO \u2014 Ready \u00b7 microphone checks on first use\", and Start dictation chooses that default. Without such a default it reads \"VOCO \u2014 Microphone setup required\". VOCO opens no microphone until a recording, a voice test or a Say it check starts."
+        "text": "VOCO still counts as ready when the system default is a microphone it can record from: the tray reads \"VOCO \u2014 Ready \u00b7 microphone checks on first use\", and Start dictation chooses that default. Without such a default it reads \"VOCO \u2014 Microphone setup required\". Until you choose one, the window names the microphone System default. VOCO opens no microphone until a recording, a voice test or a Say it check starts."
       },
       {
         "title": "No default microphone",
@@ -448,6 +480,10 @@
       {
         "path": "apps/desktop/src/lib/dictationPresentation.ts",
         "why": "Keeps VOCO ready when no microphone is chosen yet."
+      },
+      {
+        "path": "apps/desktop/src/lib/shortcutPresentation.ts",
+        "why": "Names the microphone in the window, System default until you choose one."
       }
     ],
     "caution": "A long pause keeps the recording open. Press the shortcut again when you finish, or VOCO keeps listening until the ten-minute limit.",
@@ -805,13 +841,13 @@
     "intro": "The last step puts words into another app. VOCO does it the way you would: copy, then paste.",
     "story": [
       "insertion.rs pastes one group of words at a time. It puts the words on the clipboard, then presses Shift+Insert. In the code's words, \"Shift+Insert is the paste key shared by GTK, Qt, Chromium, Firefox, Electron and terminal emulators.\"",
-      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, access to its own virtual keyboard, and it waits for you to release the shortcut's keys.",
+      "Terminals paste the PRIMARY selection instead of the clipboard, so VOCO fills both. Each live paste ends between two characters that aren't spaces, so its spaces travel inside it. Two spaces go alone: the one before the next words after a quiet release, and the one Stop adds after a finished sentence. Before each paste VOCO checks the helper programs and, on Wayland, access to its own virtual keyboard, or in the snap its typing session with GNOME, and it waits for you to release the shortcut's keys.",
       "An optional Chromium extension offers a second route. In a tab where you enable it, VOCO inserts words at the caret of one plain text field, and the extension confirms each insert with a receipt."
     ],
     "steps": [
       {
         "label": "Check",
-        "detail": "The text must be 1 to 100,000 bytes and the helpers ready. On Wayland this session must be the active one, and VOCO's own virtual keyboard must exist unless the GNOME companion will press the keys."
+        "detail": "The text must be 1 to 100,000 bytes and the helpers ready. On Wayland this session must be the active one, and VOCO's own virtual keyboard must exist unless the GNOME companion will press the keys. In the snap without the companion, GNOME's typing session must be open."
       },
       {
         "label": "Clean",
@@ -827,7 +863,7 @@
       },
       {
         "label": "Press",
-        "detail": "VOCO waits up to 1.5 seconds for the shortcut's modifier keys to be released, and on X11 also while the X server reports Shift, Control, Alt, Super or AltGr held. Then it sends Shift+Insert."
+        "detail": "VOCO waits up to 1.5 seconds for the shortcut's modifier keys to be released, and on X11 also while the X server reports Shift, Control, Alt, Super or AltGr held. If they are still down then, it sends no keys. Otherwise it sends Shift+Insert."
       }
     ],
     "facts": [
@@ -845,7 +881,19 @@
       },
       {
         "title": "Keys from inside GNOME Shell",
-        "text": "On GNOME Wayland, while the companion is attached and the copy GNOME has loaded asks VOCO for work, the companion presses Shift and Insert from inside the Shell with a keyboard of its own, 12 ms apart. It keeps one NextRequest call waiting on VOCO; VOCO answers it with the paste and waits up to 1 second for PasteDone, which carries the moment the Insert press went out. A refusal, because a modifier is held or another paste is in flight, sends no keys, so the words wait, and so does a paste no call took in that second, which VOCO then withdraws. A paste taken but not reported in time is uncertain. Everywhere else, VOCO's own virtual keyboard presses the keys, except in the snap, which has none."
+        "text": "On GNOME Wayland, while the companion is attached and the copy GNOME has loaded asks VOCO for work, the companion presses Shift and Insert from inside the Shell with a keyboard of its own, 12 ms apart. It keeps one NextRequest call waiting on VOCO; VOCO answers it with the paste and waits up to 1 second for PasteDone, which carries the moment the Insert press went out. A refusal, because a modifier is held or another paste is in flight, sends no keys, so the words wait, and so does a paste no call took in that second, which VOCO then withdraws. A paste taken but not reported in time is uncertain. Everywhere else, VOCO's own virtual keyboard presses the keys, except in the snap, which can't open /dev/uinput."
+      },
+      {
+        "title": "Keys through GNOME's portal",
+        "text": "In the snap on GNOME Wayland, when the companion doesn't ask for work, the keys go through GNOME's RemoteDesktop portal, in a session that has only a keyboard. Allow typing, in setup or Settings, shows GNOME's dialog once: turn on Allow Remote Interaction, then choose Share. GNOME returns a restore token, which VOCO keeps beside its settings as remote-desktop-token, so each later session starts without a dialog. Each paste sends Shift, Insert and their releases with NotifyKeyboardKeycode, 12 ms apart, and never another key. A failure after Shift went out is uncertain, and VOCO then releases Shift."
+      },
+      {
+        "title": "A session only while you dictate",
+        "text": "VOCO opens GNOME's typing session when a desktop dictation starts and closes it once VOCO is idle again, after Stop's last paste and space, at a lock, when the window is replaced and at quit. A session still open after two idle checks, 3 seconds apart, closes by itself. While one exists, GNOME shows its orange remote-access icon, and choosing Stop there ends the dictation as Stop does, copying the rest of your words. A paste before the session has started waits up to 400 ms, then changes nothing: \"VOCO's typing connection to GNOME isn't ready, so it sent no paste keys.\" After GNOME's Stop: \"GNOME's Stop ended VOCO's typing, so it sent no paste keys.\""
+      },
+      {
+        "title": "Keys up, through the portal",
+        "text": "Through the portal VOCO can't read the keyboard, so a press of its GNOME shortcut counts as held until GNOME reports the release, then 400 ms more, because people often let go of Super or Alt a moment after the letter. Keys sent while it is down would make another chord, which pastes nothing. A press GNOME never reports released stops counting after 5 seconds. After a voco --toggle in the snap, which reports no release, a paste waits 400 ms, or the repeat delay plus 400 ms when that is longer, after the last one."
       },
       {
         "title": "Three failure outcomes",
@@ -853,7 +901,7 @@
       },
       {
         "title": "Checked before recording",
-        "text": "If a helper is missing, or on Wayland the virtual keyboard can't be used, the recording doesn't start. VOCO shows \"Dictation setup incomplete\" with the reason."
+        "text": "If a helper is missing, or on Wayland the virtual keyboard can't be used, the recording doesn't start. VOCO shows \"Dictation setup incomplete\" with the reason. In the snap on GNOME Wayland, until GNOME allows typing or the companion asks for work, the reason reads \"VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME's dialog and choose Share.\""
       },
       {
         "title": "Checking the originating session",
@@ -861,7 +909,7 @@
       },
       {
         "title": "Nothing while the screen is locked",
-        "text": "VOCO follows logind's LockedHint for the session it started in. While the screen is locked, a paste fails with \"The screen is locked, so VOCO sent no paste keys.\" and no shortcut starts dictation. Locking the screen during a dictation stops it, and VOCO shows \"Dictation stopped\" with \"VOCO stopped listening when the screen locked.\""
+        "text": "VOCO follows logind's LockedHint for the session it started in. While the screen is locked, a paste fails with \"The screen is locked, so VOCO sent no paste keys.\" and no shortcut starts dictation. Locking the screen during a dictation stops it, and VOCO shows \"Dictation stopped\" with \"VOCO stopped listening when the screen locked.\" GNOME doesn't end a remote desktop session at the lock, so VOCO closes the snap's typing session itself."
       },
       {
         "title": "VOCO steps aside",
@@ -892,6 +940,22 @@
       {
         "path": "apps/desktop/src-tauri/src/selection_owner.rs",
         "why": "The GNOME copies: xclip helpers that keep both selections and report each read."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_keys.rs",
+        "why": "The snap's paste keys through GNOME's RemoteDesktop portal: Allow typing, the restore token and a session only while you dictate."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal.rs",
+        "why": "One thread that holds every portal request, session and signal, so waiting for GNOME's dialog never blocks GTK's main thread."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_shortcut.rs",
+        "why": "Holds a paste while the snap's GNOME shortcut is down, then 400 ms more."
+      },
+      {
+        "path": "apps/desktop/src/components/PortalSetup.tsx",
+        "why": "Allow typing and the shortcut's Add button, in the snap's setup and Settings."
       },
       {
         "path": "apps/desktop/src-tauri/src/desktop_session.rs",
@@ -1181,7 +1245,7 @@
     "facts": [
       {
         "title": "Ten fields",
-        "text": "hotkey, which defaults to Alt+D; selectedMic; onboardingCompleted; startAtLogin, which defaults to true; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; myWordsHeard, the versions VOCO learned when you said a word; and installChannel."
+        "text": "hotkey, which defaults to Super+X; selectedMic; onboardingCompleted; startAtLogin, which defaults to true; updateChannel; automaticUpdateChecks, which defaults to true; englishSpelling, unset until chosen, which means British; myWords, empty until you add a word; myWordsHeard, the versions VOCO learned when you said a word; and installChannel."
       },
       {
         "title": "Update checks",
@@ -1213,7 +1277,7 @@
       },
       {
         "title": "Reset is confirmed",
-        "text": "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file. It keeps the old file as a recovery backup and deletes config.json.last and the backups of earlier resets."
+        "text": "Reset to defaults asks \"Reset local settings?\" and needs Confirm reset before it replaces the file. It keeps the old file as a recovery backup and deletes config.json.last and the backups of earlier resets. In the snap it also forgets GNOME's permissions, the restore token in remote-desktop-token and the record of a bound shortcut in global-shortcut, and removes VOCO's GNOME custom shortcut, so setup asks GNOME again."
       },
       {
         "title": "Back from an earlier version",
@@ -1224,6 +1288,10 @@
       {
         "path": "apps/desktop/src-tauri/src/config.rs",
         "why": "Loads, patches and saves the settings and their copy, and restores what an earlier VOCO dropped."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_keys.rs",
+        "why": "Keeps GNOME's typing permission beside the settings, and forgets it at Reset."
       },
       {
         "path": "apps/desktop/src/components/ControlPanel.tsx",
@@ -1306,7 +1374,7 @@
     "story": [
       "Only one copy of VOCO runs per login. Launching it again brings the running copy forward and never starts a recording.",
       "Other programs reach VOCO through private sockets that check the caller's user ID. Notifications go through D-Bus, the desktop's message bus.",
-      "On Wayland, VOCO presses the paste keys through its own virtual keyboard, or on GNOME through the companion once it asks VOCO for work. A udev rule in the package lets the person at the computer use /dev/uinput, so there is no service, daemon or group to set up. The snap can't open /dev/uinput, so on Wayland only the companion types for it."
+      "On Wayland, VOCO presses the paste keys through its own virtual keyboard, or on GNOME through the companion once it asks VOCO for work. A udev rule in the package lets the person at the computer use /dev/uinput, so there is no service, daemon or group to set up. The snap can't open /dev/uinput, so on GNOME Wayland it types through the companion when it asks for work, and otherwise through GNOME's RemoteDesktop portal."
     ],
     "steps": [
       {
@@ -1349,7 +1417,7 @@
       },
       {
         "title": "Checking input",
-        "text": "voco --check-desktop-input checks the paste prerequisites without launching VOCO or sending keys: the clipboard helper, xdotool on X11, and on Wayland that /dev/uinput opens for reading and writing. In the snap on Wayland it instead asks the running VOCO, through CompanionAsking, whether the companion asks it for work, since only that VOCO knows. It exits with code 1 when something is missing."
+        "text": "voco --check-desktop-input checks the paste prerequisites without launching VOCO or sending keys: the clipboard helper, xdotool on X11, and on Wayland that /dev/uinput opens for reading and writing. In the snap on GNOME Wayland it instead passes when the running VOCO answers through CompanionAsking that the companion asks it for work, since only that VOCO knows, or when GNOME's typing permission is saved. It exits with code 1 when something is missing."
       },
       {
         "title": "Access from a udev rule",
@@ -1365,7 +1433,7 @@
       },
       {
         "title": "The snap",
-        "text": "When snapd names it voco, VOCO knows it runs as its snap and leaves out the virtual keyboard, the keyboard reader, the IBus listener and the update check. On Wayland only the GNOME companion types for it: \"On Wayland, the VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, or if it's already installed, sign out and back in.\" On other Wayland desktops Start is refused, and X11 keeps xdotool."
+        "text": "When snapd names it voco, VOCO knows it runs as its snap and leaves out the virtual keyboard, the keyboard reader, the IBus listener and the update check. On GNOME Wayland the companion types for it once it asks for work, and otherwise GNOME's RemoteDesktop portal does, after you allow it once: \"VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME's dialog and choose Share.\" On other Wayland desktops Start is refused: \"The VOCO snap types only on GNOME and in X11 sessions. On this desktop, install VOCO's .deb or RPM from its GitHub releases instead.\" X11 keeps xdotool."
       },
       {
         "title": "Connections the snap needs",
@@ -1408,6 +1476,14 @@
       {
         "path": "apps/desktop/src-tauri/src/confinement.rs",
         "why": "Knows when VOCO runs as its snap, and asks snapctl about its microphone connection."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/insertion.rs",
+        "why": "Chooses the snap's paste keys and says what it needs to type."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_keys.rs",
+        "why": "The snap's typing session through GNOME's RemoteDesktop portal."
       },
       {
         "path": "apps/desktop/src-tauri/tauri.conf.json",
@@ -1505,7 +1581,7 @@
       },
       {
         "title": "Paste keys for one person",
-        "text": "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift and Insert, and so can the GNOME companion's, which answers only the attached VOCO. Before copying and before sending keys, VOCO checks its originating session. An inactive or locked result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys."
+        "text": "The package's uaccess rule gives /dev/uinput to the user of the active local session alone, with no group, daemon or socket. VOCO's keyboard can press only Shift and Insert, and so can the GNOME companion's, which answers only the attached VOCO. The snap's typing session with GNOME's RemoteDesktop portal has only a keyboard, sends only Shift and Insert, and exists only while you dictate, with GNOME's orange remote-access icon showing. Before copying and before sending keys, VOCO checks its originating session. An inactive or locked result stops the paste; an unavailable result permits it. A switch after the check can still redirect keys."
       },
       {
         "title": "The snap's sandbox",
@@ -1564,6 +1640,10 @@
       {
         "path": "apps/desktop/src-tauri/src/virtual_keyboard.rs",
         "why": "Creates a keyboard with only Shift and Insert."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_keys.rs",
+        "why": "The snap's keyboard-only GNOME session, open only while you dictate."
       },
       {
         "path": "apps/desktop/src-tauri/src/worker_sandbox.rs",
@@ -1657,7 +1737,7 @@
       },
       {
         "title": "Which keyboard typed",
-        "text": "Each paste's record also names the keyboard that sent its keys: companion, uinput or xdotool. report-dictation-quality-events.py counts them for each session, so timings can be compared by keyboard."
+        "text": "Each paste's record also names the keyboard that sent its keys: companion, uinput, portal or xdotool. report-dictation-quality-events.py counts them for each session, so timings can be compared by keyboard."
       },
       {
         "title": "Descriptive statistics",
@@ -1721,7 +1801,7 @@
     "intro": "A test is a promise written as code: when this happens, VOCO does that. Running the tests checks that the promises still hold.",
     "story": [
       "npm test runs scripts/test-unit.sh, the fast checks that need no microphone, speech model or desktop session.",
-      "CI runs on every push and pull request to master, in nine jobs. Some start the real app in private desktop sessions and paste into real applications, one runs the speech runtime in Debian 13 and Fedora 44 containers, and one checks what strict confinement lets a snap do on the session bus.",
+      "CI runs on every push and pull request to master, in ten jobs. Some start the real app in private desktop sessions and paste into real applications, one types through GNOME's portals as the snap does, one runs the speech runtime in Debian 13 and Fedora 44 containers, and one checks what strict confinement lets a snap do on the session bus.",
       "Tests use only public or synthetic audio. No personal recording is part of any test."
     ],
     "steps": [
@@ -1748,8 +1828,8 @@
     ],
     "facts": [
       {
-        "title": "Nine CI jobs",
-        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns com.sergiopesch.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work."
+        "title": "Ten CI jobs",
+        "text": "Code Guide, RustSec Audit, Frontend Checks, Rust Check & Test, Application, GNOME 50 Companion, GNOME 51 Companion, GNOME 50 Portals, a runtime job that runs once for Debian 13 and once for Fedora 44, and Snap Confinement Probe. The probe builds a small strict snap that owns com.sergiopesch.voco.Panel and proves it answers an unconfined caller's waiting call but can't call it, which is why the companion asks VOCO for work."
       },
       {
         "title": "Private sessions",
@@ -1776,6 +1856,10 @@
         "text": "GNOME 50 and 51 have no nested mode, so the companion regression runs Shell headless and sends keys and clicks through a private RemoteDesktop session: GNOME 50 on Ubuntu 26.04, and GNOME 51 in rootless Podman, from a digest-pinned Fedora 45 image."
       },
       {
+        "title": "The snap's portals",
+        "text": "GNOME 50 Portals runs a headless GNOME Shell 50 with XWayland, PipeWire, the real xdg-desktop-portal and its GNOME backend, and answers GNOME's dialogs over AT-SPI. VOCO's portal code runs as the snap through a test fixture. Without permission a paste is refused before the copy. Allow typing shows GNOME's dialog once, and later dictations restore it without one. Ten pastes land exactly in a GTK field on Wayland and ten under XWayland, the remote-access icon's Stop ends the dictation with no key after it, and an idle session closes by itself. Super+X toggles through Activated and never reaches the field, a paste waits for its release and 400 ms more, a chord held past the repeat delay toggles once, and the companion's lease suspends the shortcut, which binds again without a dialog."
+      },
+      {
         "title": "Each distribution's names",
         "text": "The Debian 13 and Fedora 44 jobs install VOCO's package dependencies by that distribution's names, as distro-dependencies.py prints them, so a renamed package fails in CI before a release."
       },
@@ -1799,7 +1883,19 @@
       },
       {
         "path": ".github/workflows/ci.yml",
-        "why": "The nine CI jobs."
+        "why": "The ten CI jobs."
+      },
+      {
+        "path": "scripts/test-gnome-portals.py",
+        "why": "Types and takes the shortcut through GNOME's real portals, as the snap does."
+      },
+      {
+        "path": "scripts/test-gnome-portals.sh",
+        "why": "Starts the portal suite's private session."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_fixture.rs",
+        "why": "Runs VOCO's portal code as the snap for the portal suite."
       },
       {
         "path": "scripts/test-snap-dbus-probe.py",
@@ -1929,7 +2025,7 @@
       },
       {
         "title": "The snap",
-        "text": "With VOCO_RELEASE_SNAP=1 the assembler also builds the snap, for the Snap Store rather than the GitHub release. snap_package.py leaves out the uinput rule and module file, the IBus engine, the companion and the Chromium host, and verify-snap-package.sh proves the snap holds the Debian package's other files byte for byte."
+        "text": "With VOCO_RELEASE_SNAP=1 the assembler also builds the snap, for the Snap Store rather than the GitHub release. snap_package.py leaves out the uinput rule and module file, the IBus engine, the companion and the Chromium host, and verify-snap-package.sh proves the snap holds the Debian package's other files byte for byte. The snap alone also carries GNOME's custom-shortcut schema from packaging/snap/schemas, as its source and compiled with glib-compile-schemas --strict, and the check requires exactly those files, unchanged."
       },
       {
         "title": "Programs in their own folders",
@@ -1984,6 +2080,10 @@
       {
         "path": "packaging/snap/wrappers/python3",
         "why": "Runs the speech worker's Python from the snap's own folder."
+      },
+      {
+        "path": "packaging/snap/schemas/voco-gnome-custom-shortcut.gschema.xml",
+        "why": "The GNOME custom-shortcut keys only the snap carries."
       },
       {
         "path": "packaging/rpm/voco.spec.in",
@@ -2285,8 +2385,8 @@
     "intro": "On GNOME, VOCO can live in the top bar near the clock, with bars that move while you speak.",
     "story": [
       "The optional companion for GNOME 46, 48, 50 and 51 shows VOCO's microphone in the top bar. While you dictate, a seven-bar meter opens on its left when there is room beside the clock.",
-      "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing. The snap can't enable extensions, so its setup and Help offer Get the VOCO panel, which opens the companion's page on extensions.gnome.org.",
-      "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs Alt+D or Alt+Shift+D inside the Shell, so other apps never see the shortcut, and presses VOCO's paste keys."
+      "The installer runs voco --setup-panel, and VOCO's setup and Help offer Enable live panel. Enabling adds only this extension, may need you to sign out and back in, and never restarts the Shell. The package alone never enables it, and voco --check-panel changes nothing. The snap can't enable extensions and types without the companion, so its setup never asks for it, and Help offers Get the VOCO panel, which opens the companion's page on extensions.gnome.org.",
+      "Once the companion attaches, VOCO hides its tray icon. On Wayland the companion grabs the configured preset, Super+X, Alt+D or Alt+Shift+D, inside the Shell, so other apps never see the shortcut, and presses VOCO's paste keys."
     ],
     "steps": [
       {
@@ -2352,12 +2452,12 @@
         "text": "Active: \"Live panel bars and Stop are active.\" Disabled: \"Enable live microphone bars and the VOCO menu in your top panel.\" After enabling: \"Panel enabled. Sign out and back in to load it; saving your work first is recommended.\" After an update, including a copy the Shell marked out of date at login: \"Panel update installed. Save your work, then sign out and back in to load the current panel and shortcut.\" GNOME loads a copy in your own extensions folder in place of the package's, so setup reports one that isn't the current version as blocked, and never removes it. Its message names the folder after \"Another copy of the VOCO panel, in\" and ends \"Remove that folder, then save your work and sign out and back in.\""
       },
       {
-        "title": "The snap's panel step",
-        "text": "The snap's VOCO can't enable extensions. On GNOME Wayland, where only the companion types for it, setup says \"The VOCO snap types through the VOCO panel. Install it from extensions.gnome.org, and setup continues by itself. If it's already installed, sign out and back in.\" Get the VOCO panel opens the companion's page, and Install without the website offers a gdbus command to copy into Terminal, which opens GNOME's own install prompt through InstallRemoteExtension, for a browser without GNOME's browser integration. Setup's own check answers once, so when the once-a-second diagnostics turn ready, as when the companion attaches, setup checks again by itself. On X11, where the snap types with xdotool: \"Optional: the VOCO panel adds live microphone bars and Stop to your top bar. Get it from extensions.gnome.org.\""
+        "title": "The panel and the snap",
+        "text": "The snap's VOCO can't enable extensions, and it types without the companion, so the panel is optional there. On GNOME Wayland Help says \"Optional: the VOCO panel adds live microphone bars and Stop to your top bar, and VOCO then types without GNOME's orange icon. Get it from extensions.gnome.org.\" On X11, where the snap types with xdotool, the note has no clause about the orange icon. Once the companion attaches and asks for work, it types for the snap instead of GNOME's portal, and setup skips its typing step. GNOME's shortcut steps aside only while the companion's lease holds the saved chord, because a companion before version 23 grabs only Alt chords, so with Super+X GNOME's shortcut is still needed. Setup's own check answers once, so when the once-a-second diagnostics turn ready, as when the companion attaches, setup checks again by itself."
       },
       {
         "title": "Other desktops",
-        "text": "On other GNOME versions: \"The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives Alt+D and Alt+Shift+D. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.\" On other desktops: \"Use the VOCO tray menu for status and Stop. Labels depend on your desktop.\""
+        "text": "On other GNOME versions: \"The VOCO panel supports GNOME 46, 48, 50 and 51. Dictation still works, but without the panel the focused app also receives the shortcut. To avoid that, choose another shortcut in VOCO and configure it in your desktop to run voco --toggle.\" On other desktops: \"Use the VOCO tray menu for status and Stop. Labels depend on your desktop.\""
       },
       {
         "title": "From GNOME 50",
@@ -2377,7 +2477,7 @@
       },
       {
         "title": "Before the companion loads",
-        "text": "A running Shell finds a companion the package just installed only at the next login, and keeps running an older copy it already loaded until then. A first install from extensions.gnome.org, as the snap's setup offers, loads at once. While the focused app also gets Alt+D, setup's last step leads with VOCO's note on what the shortcut does there and the fix, and the dictation instruction follows it. The note comes from the once-a-second diagnostics, so it changes when you enable the panel."
+        "text": "A running Shell finds a companion the package just installed only at the next login, and keeps running an older copy it already loaded until then. A first install from extensions.gnome.org, as the snap's Help offers, loads at once. While the focused app also gets the shortcut, setup's last step leads with VOCO's note on what the shortcut does there and the fix, and the dictation instruction follows it. The note comes from the once-a-second diagnostics, so it changes when you enable the panel."
       }
     ],
     "files": [
@@ -2407,11 +2507,11 @@
       },
       {
         "path": "integrations/gnome/voco-panel@sergiopesch.com/model.js",
-        "why": "The bar weights, the height formula and when Stop can be offered."
+        "why": "The bar weights, the height formula, when Stop can be offered and which presets the Shell may grab."
       },
       {
         "path": "integrations/gnome/voco-panel@sergiopesch.com/metadata.json",
-        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 22 as its version-name, which extensions.gnome.org keeps."
+        "why": "Declares GNOME 46, 48, 50 and 51 and companion version 23 as its version-name, which extensions.gnome.org keeps."
       },
       {
         "path": "apps/desktop/src-tauri/src/panel.rs",
@@ -2439,7 +2539,7 @@
       },
       {
         "path": "apps/desktop/src/components/PanelSetup.tsx",
-        "why": "Enable live panel, or the snap's Get the VOCO panel and Install without the website, in setup and Help."
+        "why": "Enable live panel, or the snap's Get the VOCO panel, in setup and Help."
       },
       {
         "path": "apps/desktop/src/components/ControlPanel.tsx",
@@ -2485,7 +2585,7 @@
     "intro": "Linux desktops differ in how programs may read keys and send them. VOCO picks a helper for each job from the session it runs in.",
     "story": [
       "VOCO reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY. If XDG_SESSION_TYPE says wayland, VOCO takes the Wayland path. If it says x11, VOCO takes X11 even when WAYLAND_DISPLAY is set. When XDG_SESSION_TYPE is tty, unset or empty, WAYLAND_DISPLAY chooses Wayland and DISPLAY alone chooses X11; neither variable means no desktop session.",
-      "On Wayland, keys go through VOCO's own virtual keyboard, a uinput device named VOCO virtual keyboard, or on GNOME through the companion's keyboard inside the Shell once it asks VOCO for work. On GNOME with an X display, xclip sets the clipboard through XWayland: GNOME lacks the wlroots data-control protocol, wl-copy's temporary focus surface can stall, and XWayland bridges the clipboard without taking focus. Other Wayland desktops use wl-copy.",
+      "On Wayland, keys go through VOCO's own virtual keyboard, a uinput device named VOCO virtual keyboard, or on GNOME through the companion's keyboard inside the Shell once it asks VOCO for work. The snap, which can't open /dev/uinput, types on GNOME Wayland through GNOME's RemoteDesktop portal when the companion doesn't. On GNOME with an X display, xclip sets the clipboard through XWayland: GNOME lacks the wlroots data-control protocol, wl-copy's temporary focus surface can stall, and XWayland bridges the clipboard without taking focus. Other Wayland desktops use wl-copy.",
       "On X11, xdotool sends the keys and xclip sets the clipboard. The table below shows each combination."
     ],
     "steps": [
@@ -2495,11 +2595,11 @@
       },
       {
         "label": "Shortcut",
-        "detail": "On X11 VOCO grabs the chord. On Wayland the GNOME companion grabs it, or VOCO reads the keyboards for the two presets."
+        "detail": "On X11 VOCO grabs the chord. On Wayland the GNOME companion grabs it, or VOCO reads the keyboards for the three presets. The snap on GNOME Wayland asks GNOME to hold it."
       },
       {
         "label": "Keys",
-        "detail": "On Wayland the GNOME companion presses Shift+Insert once it asks for work, and VOCO's virtual keyboard otherwise. X11 uses xdotool."
+        "detail": "On Wayland the GNOME companion presses Shift+Insert once it asks for work, and VOCO's virtual keyboard otherwise, or in the snap GNOME's RemoteDesktop portal. X11 uses xdotool."
       },
       {
         "label": "Clipboard",
@@ -2537,7 +2637,11 @@
       },
       {
         "title": "Keys stay on Wayland",
-        "text": "Even when xclip sets the clipboard on GNOME, the paste keys still go through the companion or the virtual keyboard."
+        "text": "Even when xclip sets the clipboard on GNOME, the paste keys still go through the companion, the virtual keyboard or, in the snap, GNOME's portal."
+      },
+      {
+        "title": "The snap's keys and shortcut",
+        "text": "In the snap on GNOME Wayland, the companion's keyboard types when it asks for work. Otherwise GNOME's RemoteDesktop portal does, through a keyboard-only session that exists only while you dictate, once you choose Allow typing. Its shortcut is the companion's grab, or GNOME's GlobalShortcuts portal on GNOME 48 and later, or on GNOME 46 a GNOME custom shortcut that runs voco --toggle."
       }
     ],
     "files": [
@@ -2564,6 +2668,18 @@
       {
         "path": "apps/desktop/src-tauri/src/confinement.rs",
         "why": "Knows when VOCO runs as its snap."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_keys.rs",
+        "why": "The snap's paste keys through GNOME's RemoteDesktop portal."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/portal_shortcut.rs",
+        "why": "The snap's shortcut through GNOME's GlobalShortcuts portal."
+      },
+      {
+        "path": "apps/desktop/src-tauri/src/gnome_custom_shortcut.rs",
+        "why": "The snap's GNOME custom shortcut on GNOME 46."
       },
       {
         "path": "integrations/gnome/voco-panel@sergiopesch.com/shortcut.js",
@@ -2603,7 +2719,7 @@
         "xdotool"
       ],
       "correct": 1,
-      "why": "GNOME lacks the data-control protocol, so with DISPLAY set VOCO uses xclip through XWayland, which needs no window that takes focus. The paste keys still go through the companion or VOCO's virtual keyboard."
+      "why": "GNOME lacks the data-control protocol, so with DISPLAY set VOCO uses xclip through XWayland, which needs no window that takes focus. The paste keys still go through the companion, VOCO's virtual keyboard or, in the snap, GNOME's portal."
     },
     "lab": "journey",
     "comparison": {
@@ -2617,13 +2733,13 @@
       "rows": [
         [
           "GNOME on Wayland",
-          "The companion's Shell grab of Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
+          "The companion's Shell grab of Super+X, Alt+D or Alt+Shift+D when attached; otherwise VOCO reads the keyboards for those presets, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
           "The companion's keyboard when its loaded copy asks for work, otherwise VOCO virtual keyboard, after Mutter's read of a new xclip copy (up to 100 ms), the modifier wait and the session check; unavailable session status permits keys",
           "xclip through XWayland when DISPLAY is set, run with -verbose so it reports each read; otherwise wl-copy"
         ],
         [
           "Other Wayland desktops",
-          "VOCO reads the keyboards for Alt+D and Alt+Shift+D, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
+          "VOCO reads the keyboards for Super+X, Alt+D and Alt+Shift+D, and the focused app also sees them; for another chord, a desktop binding that runs voco --toggle",
           "VOCO virtual keyboard, after the modifier wait and session check; unavailable session status permits keys",
           "wl-copy"
         ],
@@ -2635,8 +2751,8 @@
         ],
         [
           "The VOCO snap",
-          "The companion's Shell grab on GNOME Wayland, VOCO's global key grab on X11, or a desktop binding that runs voco --toggle; it never reads the keyboards or uses IBus",
-          "Only the companion's keyboard on GNOME Wayland, and Start is refused on other Wayland desktops; xdotool from the snap's own folder on X11",
+          "On GNOME Wayland the companion's Shell grab, otherwise GNOME's GlobalShortcuts portal on GNOME 48 and later or a GNOME custom shortcut that runs voco --toggle on GNOME 46; VOCO's global key grab on X11; or a desktop binding that runs voco --toggle; it never reads the keyboards or uses IBus",
+          "On GNOME Wayland the companion's keyboard when it asks for work, otherwise GNOME's RemoteDesktop portal once you allow typing, with the modifier wait; Start is refused on other Wayland desktops; xdotool from the snap's own folder on X11",
           "xclip from the snap's own folder"
         ],
         [
@@ -2649,6 +2765,6 @@
       "scope": "Code paths at the commit this guide records. Session detection reads XDG_SESSION_TYPE, WAYLAND_DISPLAY and DISPLAY as the table describes.",
       "limits": "Pasting replaces CLIPBOARD and PRIMARY and leaves the words there. Keys go to whichever app has focus. Each desktop and app still needs its own testing."
     },
-    "sourceNote": "The table follows insertion.rs (helpers and keys), selection_owner.rs (the GNOME copies), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes), confinement.rs (the snap), and the companion's shortcut.js (the GNOME grab) and paster.js (its keys). It describes code paths, not a compatibility promise."
+    "sourceNote": "The table follows insertion.rs (helpers and keys), selection_owner.rs (the GNOME copies), virtual_keyboard.rs (the Wayland keys), desktop_session.rs (the session check), lib.rs (shortcut routes), confinement.rs (the snap), portal_keys.rs and portal_shortcut.rs (the snap's GNOME portals), gnome_custom_shortcut.rs (its GNOME 46 shortcut), and the companion's shortcut.js (the GNOME grab) and paster.js (its keys). It describes code paths, not a compatibility promise."
   }
 ]
