@@ -238,12 +238,14 @@ and the update check. [The snap](#the-snap) lists its rules.
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
   after the press. Through the RemoteDesktop portal VOCO can't read modifiers, so
-  a portal shortcut press counts as held until its `Deactivated`, then 150 ms
-  for the modifier's own release, and the same 1.5 s wait sends no keys while
+  a portal shortcut press counts as held until its `Deactivated`, then 400 ms
+  for the modifier's own release, which people often let go of a moment after
+  the letter, and the same 1.5 s wait sends no keys while
   it is: keys sent under Super or Alt make another chord, which pastes nothing.
   A press with no `Deactivated` after 5 s reads as unknown, so a lost signal
   can't hold back every paste. After a `voco --toggle` in the snap, which
-  reports no release, a paste waits 400 ms. An X11 paste also waits, at most 1.5 s, while the X server's
+  reports no release, a paste waits 400 ms, or the repeat delay plus 100 ms
+  when it is longer, after the last one, its repeats included. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
@@ -310,7 +312,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   without it; every paste lands with its exact text in a GTK field on Wayland and
   under XWayland; dictation opens a session and its end closes it; the
   indicator's Stop stops the dictation with no key after it; the shortcut toggles
-  through `Activated` and the next paste waits for `Deactivated`.
+  through `Activated` and the next paste waits for `Deactivated`; a chord held
+  past the repeat delay toggles once, and the next press toggles again.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that
@@ -381,8 +384,12 @@ and the update check. [The snap](#the-snap) lists its rules.
   preferred trigger is the saved chord, in the shortcuts specification's
   spelling (`LOGO+x` for Super+X). Only setup's and Settings' explicit
   button binds it the first time, which shows GNOME's dialog; VOCO records that,
-  and later starts bind it again, which GNOME answers without one. Each
-  `Activated` toggles through the debounce. GNOME Settings, under Apps, changes
+  and later starts bind it again, which GNOME answers without one. An
+  `Activated` toggles through the debounce, unless it repeats a held chord:
+  GNOME's grab, unlike the companion's, repeats the press about every 30 ms
+  after the keyboard's repeat delay, so one that comes before `Deactivated` and
+  within the repeat delay, at least 900 ms, plus 100 ms of the last is ignored.
+  GNOME Settings, under Apps, changes
   the trigger: VOCO saves each trigger GNOME reports, at a bind or a
   `ShortcutsChanged`, as its shortcut when it can take it, so its labels name the
   key GNOME listens for, and its tray presets are disabled while GNOME holds it. While the
@@ -393,6 +400,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   nor another custom shortcut uses it, and never changes another. GNOME's schema
   for those keys isn't in the snap's runtime, so the snap carries one with the
   same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
+  That shortcut runs `voco --toggle` for each repeat too, so in the snap a
+  `voco --toggle` within the keyboard's repeat delay plus 100 ms of the last
+  one is a repeat and toggles nothing. VOCO reads GNOME's repeat setting once.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives the chord (on Alt+D browsers focus the address bar and
   terminals delete a word; few apps act on Super+X), and an evdev toggle while

@@ -2003,10 +2003,12 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                         debug!("Toggle received via socket");
                         trace_hotkey_event("socket_toggle_received", Some("socket"));
                         // In the snap a GNOME custom shortcut sends this, with no
-                        // release to wait for (portal_shortcut.rs).
+                        // release to wait for, and again for each repeat while
+                        // the chord is held (portal_shortcut.rs).
                         #[cfg(target_os = "linux")]
-                        if confinement::is_snap() {
-                            portal_shortcut::note_command_press();
+                        if confinement::is_snap() && !portal_shortcut::note_command_press() {
+                            trace_hotkey_event("socket_toggle_repeat_ignored", Some("socket"));
+                            continue;
                         }
                         eval_toggle_with_backend(&handle, "socket");
                     }
