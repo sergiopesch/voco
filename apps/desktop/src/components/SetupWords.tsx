@@ -60,6 +60,9 @@ export function SetupWords({ accountName, words, heard, saving, onSave, onStartC
 
   const others = words.filter(word => word !== savedName);
   const tidyName = tidyMyWord(name);
+  // The offered name is this computer's account name: say so until the person
+  // changes or saves it, so nobody wonders how VOCO knows it.
+  const fromAccount = !edited && !savedName && Boolean(tidyName) && tidyName === offered(accountName);
   const busy = saving || check.active;
 
   /** Saves, and keeps a failure's reason with the word it was for. */
@@ -177,7 +180,7 @@ export function SetupWords({ accountName, words, heard, saving, onSave, onStartC
       </div>
       {nameProblem || nameError ? <p id="voco-words-name-note" className="voco-inline-note voco-inline-note--error" role="alert">{nameProblem ?? nameError}</p>
         : nameChecking ? null
-        : <p id="voco-words-name-note" className="voco-words-name__hint">{tidyName ? "Say it the way you usually do. VOCO shows what it heard here, and nowhere else." : "Type your name the way you write it."}</p>}
+        : <p id="voco-words-name-note" className="voco-words-name__hint">{tidyName ? `${fromAccount ? "From your account on this computer. " : ""}Say it the way you usually do. VOCO shows what it heard here, and nowhere else.` : "Type your name the way you write it."}</p>}
       {nameChecking ? <CheckResult state={check.state} entry={savedName!} words={words} heard={heard} saving={saving} inSetup
         error={saveError?.entry === savedName ? saveError.message : null}
         onTeach={teaching => void teach(savedName!, teaching)} onSayAgain={() => void sayName()} /> : null}

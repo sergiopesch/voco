@@ -112,7 +112,8 @@ try {
     await load({ passedShot: 'setup-voice-passed' });
     assert.equal(await nameField().inputValue(), 'Siobhán Kelly');
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'voco-words-title');
-    await page.getByText('Say it the way you usually do.', { exact: false }).waitFor();
+    // The offered name says where it came from.
+    await page.getByText('From your account on this computer. Say it the way you usually do.', { exact: false }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Skip for now', exact: true }).count(), 1);
     // Setup names its step for screen readers; the marks show it.
     assert.equal(await page.locator('.voco-panel__eyebrow').textContent(), 'Setup, step 3 of 4');
@@ -213,13 +214,13 @@ try {
     // A source build can't start at login, so the last screen says where to reopen VOCO.
     const handoffCopy = () => page.locator('.voco-setup__handoff').innerText();
     assert.match(await handoffCopy(), /from your app launcher/);
-    assert.doesNotMatch(await handoffCopy(), /starts when you sign in/);
+    assert.doesNotMatch(await handoffCopy(), /each time you sign in/);
     await shot('setup-ready');
     results.push({ case: 'continue-reaches-the-handoff', passed: true });
 
     // A package or the snap starts at login once setup is done, unless the
     // setting is off; setup itself saves nothing about it.
-    const startsAtLogin = 'VOCO starts when you sign in. You can turn this off in Settings.';
+    const startsAtLogin = 'VOCO is running now, and starts by itself each time you sign in. You can turn that off in Settings.';
     await load({ login: true });
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
@@ -231,7 +232,7 @@ try {
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
     assert.match(await handoffCopy(), /from your app launcher/);
-    assert.doesNotMatch(await handoffCopy(), /starts when you sign in/);
+    assert.doesNotMatch(await handoffCopy(), /each time you sign in/);
     results.push({ case: 'the-handoff-says-voco-starts-at-login-where-it-will', passed: true });
 
     // A failed save while teaching keeps setup able to finish: Continue saves
@@ -418,6 +419,7 @@ try {
     await load();
     await nameField().fill('  Siobhán   Ní Kelly ');
     assert.equal(await page.getByRole('button', { name: 'Skip for now', exact: true }).count(), 1, 'Editing saves nothing yet');
+    assert.equal(await page.getByText('From your account on this computer.', { exact: false }).count(), 0, 'An edited name is the person\'s own');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
     assert.deepEqual(await saves(), [{ myWords: ['Siobhán Ní Kelly'], myWordsHeard: [] }]);
@@ -448,6 +450,7 @@ try {
     await load({ config: { myWords: ['Siobhán Kelly', 'GitHub'], myWordsHeard: [{ heard: 'Shivon', writes: 'Siobhán' }] } });
     assert.equal(await nameField().inputValue(), 'Siobhán Kelly');
     assert.equal(await page.getByRole('button', { name: 'Skip for now', exact: true }).count(), 0);
+    assert.equal(await page.getByText('From your account on this computer.', { exact: false }).count(), 0, 'A saved name is already theirs');
     // A name changed in an earlier setup isn't offered beside the account's again.
     await load({ config: { myWords: ['Shiv Kelly'] } });
     assert.equal(await nameField().inputValue(), '');

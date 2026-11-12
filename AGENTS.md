@@ -514,7 +514,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   Never paste or copy onboarding output. The test keeps its local retry.
 - After the voice test, setup offers My words with the user's name as its
   default entry: the full name of their account, read locally, when the list is
-  empty and the name could be an entry; otherwise the name starts empty. It is
+  empty and the name could be an entry; otherwise the name starts empty. Until
+  they change or save it, setup says the name came from their account on this
+  computer, so nobody wonders how VOCO knows it. It is
   saved only if they keep it and continue, or say it, and a name they edit is
   checked like any entry. Run setup again keeps the saved list and its versions:
   the account's name, if listed, shows as saved, and the step changes only the
@@ -534,7 +536,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   so with Super+X GNOME's shortcut is still asked for. A refusal keeps the step, says what happened
   and offers the button again; setup completes only once typing is allowed.
 - Setup's last step names the shortcut to press and, for a Super chord, says
-  Super is the key with the Windows or logo symbol.
+  Super is the key with the Windows or logo symbol. Where VOCO will start at
+  login, it says first that VOCO is running now: "starts when you sign in" on
+  its own reads as a request to sign in again.
 - Finish must flush capture and recognition successfully. Check the desktop input
   prerequisites without sending keys or changing the clipboard; only then save
   completion. Done returns straight to the hidden tray surface without presenting
