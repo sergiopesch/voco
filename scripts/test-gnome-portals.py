@@ -28,6 +28,8 @@ WAYLAND = 'voco-portal-test'
 FIELD = 'VOCO paste fixture'
 # Evdev codes for the probe's keyboard: Shift, Control, and Super+X, VOCO's default.
 SHIFT, CONTROL, SUPER, X = 42, 29, 125, 45
+# Control+Alt+K, the shortcut Settings changes to.
+ALT, K, F8 = 56, 37, 66
 # The refusals: the paste preflight's or portal_keys.rs's remedy without
 # GNOME's permission, and portal_keys.rs's after GNOME's Stop.
 NOT_ALLOWED, CLOSED_BY_GNOME = 'Choose Allow typing', "GNOME's Stop ended VOCO's typing"
@@ -88,6 +90,13 @@ def chord(hold=.08):
     """Super+X, as a hand presses it."""
     key(SUPER, True); time.sleep(.03); key(X, True); time.sleep(hold)
     key(X, False); time.sleep(.03); key(SUPER, False)
+
+
+def press(*codes, hold=.08):
+    """Any chord as a hand presses it: its modifiers, then its key, last."""
+    for code in codes[:-1]: key(code, True); time.sleep(.03)
+    key(codes[-1], True); time.sleep(hold); key(codes[-1], False)
+    for code in reversed(codes[:-1]): time.sleep(.03); key(code, False)
 
 
 def owner_pid(name):
@@ -706,6 +715,76 @@ try:
         assert voco.counts()['toggles'] == toggles + 1, voco.counts()
         return {'reboundWithoutDialog': True}
     check('companionLease', companion_lease)
+
+    def change_shortcut():
+        # Settings' Apply shortcut: VOCO proposes the new keys under its next
+        # ID, GNOME's dialog confirms them, and only the new keys toggle.
+        record = Path(os.environ['XDG_CONFIG_HOME']) / 'voco/global-shortcut-id'
+        assert not record.exists(), 'the first shortcut has no ID record'
+        field.focus(); field.clear()
+        # Cancelled in GNOME's dialog, the earlier shortcut stays and works.
+        voco.send('change-shortcut', text='Ctrl+Alt+K')
+        answer('dialog-change-shortcut-cancelled', 'Cancel')
+        cancelled = voco.reply(30)
+        assert 'kept your earlier shortcut' in cancelled.get('error', ''), cancelled
+        assert voco.ask('status')['trigger'] == 'Press <Super>x' and not record.exists()
+        toggles = voco.counts()['toggles']
+        chord(); time.sleep(.4)
+        assert voco.counts()['toggles'] == toggles + 1, 'a cancelled change broke the earlier shortcut'
+        # Added: GNOME reports the new keys, and they toggle.
+        voco.send('change-shortcut', text='Ctrl+Alt+K')
+        dialog = answer('dialog-change-shortcut', 'Add')
+        changed = voco.reply(30)
+        assert changed.get('ok') == 'Press <Control><Alt>k', changed
+        status = voco.ask('status')
+        assert status['trigger'] == 'Press <Control><Alt>k' and status['shortcutHeld'], status
+        assert record.read_text() == 'toggle-2', record.read_text()
+        field.focus(); time.sleep(.3)
+        toggles = voco.counts()['toggles']
+        press(CONTROL, ALT, K); time.sleep(.4)
+        assert voco.counts()['toggles'] == toggles + 1, 'the new shortcut did not toggle'
+        chord(); time.sleep(.4)
+        assert voco.counts()['toggles'] == toggles + 1, 'the earlier shortcut still toggled'
+        # A later bind, as at the next start, asks nobody and keeps the keys.
+        voco.ask('suspend'); voco.ask('resume')
+        assert wait_for(lambda: voco.ask('status')['shortcutHeld'], 10, step=.2), 'the shortcut did not bind again'
+        assert not dialogs(), f'binding again showed a dialog: {dialogs()}'
+        assert voco.ask('status')['trigger'] == 'Press <Control><Alt>k'
+        field.focus(); time.sleep(.3)
+        press(CONTROL, ALT, K); time.sleep(.4)
+        assert voco.counts()['toggles'] == toggles + 2, 'the shortcut did not toggle after binding again'
+        # Back to Super+X: keys GNOME held before are new keys to it again.
+        voco.send('change-shortcut', text='Super+X')
+        answer('dialog-change-shortcut-back', 'Add')
+        back = voco.reply(30)
+        assert back.get('ok') == 'Press <Super>x' and record.read_text() == 'toggle-3', (back, record.read_text())
+        field.focus(); time.sleep(.3)
+        chord(); time.sleep(.4)
+        press(CONTROL, ALT, K); time.sleep(.4)
+        assert voco.counts()['toggles'] == toggles + 3, voco.counts()
+        # GNOME's dialog lets the person alter the proposed keys. Keys VOCO
+        # can't take, here Shift+F8 with no Alt, Ctrl or Super, are refused:
+        # VOCO says so, holds no shortcut, and the Add button sets one again.
+        voco.send('change-shortcut', text='Shift+F8')
+        answer('dialog-change-shortcut-unusable', 'Add')
+        unusable = voco.reply(30)
+        assert "GNOME now holds Shift+F8, which VOCO can't use" in unusable.get('error', ''), unusable
+        status = voco.ask('status')
+        assert not status['shortcutBound'] and not status['shortcutHeld'] and not record.exists(), status
+        field.focus(); time.sleep(.3)
+        before = voco.counts()['toggles']
+        chord(); time.sleep(.4)
+        press(SHIFT, F8); time.sleep(.4)
+        assert voco.counts()['toggles'] == before, 'a refused shortcut still toggled'
+        voco.send('allow-shortcut', text='Super+X')
+        answer('dialog-shortcut-again', 'Add')
+        again = voco.reply(30)
+        assert again.get('ok') == 'Press <Super>x', again
+        field.focus(); field.clear(); time.sleep(.3)
+        chord(); time.sleep(.4)
+        assert voco.counts()['toggles'] == before + 1, voco.counts()
+        return {'dialog': dialog, 'changedTo': changed['ok'], 'backTo': back['ok'], 'refused': unusable['error']}
+    check('changeShortcut', change_shortcut)
 
     assert not typing_sessions(), typing_sessions()
     report['passed'] = True
