@@ -724,6 +724,15 @@ and the update check. [The snap](#the-snap) lists its rules.
   Start is refused with the `snap connect` remedy.
 - Its config, journal and logs live in `$SNAP_USER_DATA`. It never reads a
   package's config, and a package never reads its.
+- A clean exit of the snap, Quit VOCO included, ends the xclip helpers it left
+  holding the selections (`confinement::end_clipboard_helpers`). snapd counts
+  every process in the app's cgroup as the app still running and holds a
+  refresh back while one lives, so a helper that outlived Quit kept the Snap
+  Store's update waiting until the session ended. Only processes named xclip
+  in this run's own snapd scope are ended, found through `/proc`, never one of
+  another run or another program. GNOME's clipboard manager keeps
+  CLIPBOARD's text for the next paste; PRIMARY's goes with its helper.
+  Packages keep their helpers after VOCO exits, as before.
 - The store updates it. The maintainer builds it with the release
   (`VOCO_RELEASE_SNAP=1 scripts/assemble-release.sh`) and uploads it from the
   signing machine after the same checks as the packages, to `edge` first; hosted

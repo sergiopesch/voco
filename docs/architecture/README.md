@@ -494,7 +494,10 @@ presenting the old.
 ## The snap
 
 `confinement.rs` knows VOCO runs as its snap when snapd names it `voco`
-(`SNAP_NAME`). Strict confinement gives it no `/dev/uinput`, `/dev/input`,
+(`SNAP_NAME`). At a clean exit its `end_clipboard_helpers` kills the xclip
+processes still in this run's snapd scope (`snap.voco.voco-<id>.scope` in
+`/proc/<pid>/cgroup`), because snapd holds a store refresh back while any
+process of the app lives. Strict confinement gives it no `/dev/uinput`, `/dev/input`,
 IBus engine, systemd user manager or network, so the snap skips what needs
 them: the virtual keyboard, passive evdev, the IBus listener, the retired
 `voco-ydotoold.service` and the update check. On GNOME Wayland the companion
