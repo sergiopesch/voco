@@ -1,6 +1,6 @@
 # Install VOCO
 
-VOCO 2026.0.71 comes as a Debian package for Ubuntu and Debian, an RPM for
+VOCO 2026.0.72 comes as a Debian package for Ubuntu and Debian, an RPM for
 Fedora and a snap in the Snap Store. Each includes the English speech model and
 everything needed to run it, so VOCO needs no downloads after installation.
 
@@ -31,7 +31,7 @@ Open a terminal in your desktop session and run the installer as your normal
 user:
 
 ```bash
-wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.71/install && bash voco-install
+wget -qO voco-install https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.72/install && bash voco-install
 ```
 
 The installer asks for your password when APT or DNF needs it, and:
@@ -75,7 +75,7 @@ Set `TAG` to the release you want. Download the installer and read it before
 you run it.
 
 ```bash
-TAG="voco.2026.0.71"
+TAG="voco.2026.0.72"
 BASE="https://raw.githubusercontent.com/sergiopesch/voco"
 wget "$BASE/$TAG/install" -O voco-install
 less voco-install
@@ -165,7 +165,7 @@ sudo apt install curl gpg gpgv
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_amd64.deb
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_checksums.txt.asc
-  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.71/KEYS
+  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.72/KEYS
   fingerprints="$(gpg --show-keys --with-colons KEYS | awk -F: '$1 == "fpr" { print $10 }')"
   test "$fingerprints" = B33C7C6AAEC8C20433A7A837540796453D8E3865
   gpg --dearmor < KEYS > voco-release-keyring.gpg
@@ -193,7 +193,7 @@ sudo dnf install curl gnupg2
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_x86_64.rpm
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_rpm_checksums.txt
   curl -fLO https://github.com/sergiopesch/voco/releases/latest/download/voco_latest_rpm_checksums.txt.asc
-  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.71/KEYS
+  curl -fLo KEYS https://raw.githubusercontent.com/sergiopesch/voco/voco.2026.0.72/KEYS
   fingerprints="$(gpg --show-keys --with-colons KEYS | awk -F: '$1 == "fpr" { print $10 }')"
   test "$fingerprints" = B33C7C6AAEC8C20433A7A837540796453D8E3865
   gpg --dearmor < KEYS > voco-release-keyring.gpg
