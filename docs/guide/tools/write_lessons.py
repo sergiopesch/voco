@@ -250,7 +250,7 @@ lesson(
         ),
         (
             "The snap's shortcut on GNOME",
-            "The snap reads no keyboards. On GNOME 48 and later it asks GNOME's GlobalShortcuts portal for one shortcut, toggle, described as Start or stop dictation, with your shortcut as its preferred trigger in the portal's spelling, such as LOGO+x for Super+X. Only the Add button in setup or Settings binds it the first time, which shows GNOME's dialog. VOCO records that, and each later start binds it again without a dialog. Each Activated signal toggles through the same 120 ms gate. GNOME Settings, under Apps, can change the trigger: VOCO saves each trigger GNOME reports as its own shortcut, so its labels name the key GNOME listens for. While GNOME holds it, the tray's presets are greyed out and Settings shows no shortcut editor, only \"To change it, open GNOME Settings, then Apps, then VOCO.\"",
+            "The snap reads no keyboards. On GNOME 48 and later it asks GNOME's GlobalShortcuts portal for one shortcut, toggle, described as Start or stop dictation, with your shortcut as its preferred trigger in the portal's spelling, such as LOGO+x for Super+X. Only the Add button in setup or Settings binds it the first time, which shows GNOME's dialog. VOCO records that, and each later start binds it again without a dialog. Each Activated signal toggles through the same 120 ms gate. GNOME Settings, under Apps, can change the trigger: VOCO saves each trigger GNOME reports as its own shortcut, so its labels name the key GNOME listens for. VOCO's Settings and the tray's presets change it too. GNOME keeps the keys it stored for a shortcut's ID whatever an app proposes later, and asks only about an ID it hasn't seen, so each change binds the shortcut under its next ID, toggle-2 and then toggle-3, with the new keys proposed. GNOME shows them in its own dialog: Add makes the change, and Cancel keeps the earlier shortcut.",
         ),
         (
             "A held chord repeats",
@@ -258,7 +258,7 @@ lesson(
         ),
         (
             "GNOME 46",
-            "GNOME 46 has no shortcut portal, so the snap's Add button writes a GNOME custom shortcut named VOCO that runs /snap/bin/voco --toggle, for a preset only. If a GNOME window shortcut or another custom shortcut already uses the chord, VOCO names it and changes nothing. GNOME's schema for those keys isn't in the snap's runtime, so the snap carries one with the same IDs, paths and types. GNOME runs the command again for each repeat, and each run is a snap launch, so repeats arrive late and unevenly: a voco --toggle within the repeat delay plus 400 ms of the last one toggles nothing. Reset removes VOCO's custom shortcut.",
+            "GNOME 46 has no shortcut portal, so the snap's Add button writes a GNOME custom shortcut named VOCO for your shortcut. If a GNOME window shortcut or another custom shortcut already uses the chord, VOCO names it and changes nothing. GNOME's schema for those keys isn't in the snap's runtime, so the snap carries one with the same IDs, paths and types. The shortcut's command calls the running VOCO's Toggle over D-Bus with dbus-send, which takes a few milliseconds, and only where that fails launches /snap/bin/voco --toggle, which takes about 150 ms. GNOME runs the command again for each repeat while the chord is held: VOCO tells a repeat from a press by GNOME's repeat timing, and answers every call, so a repeat never falls back to a launch. Settings' Apply shortcut moves the shortcut to new keys with no dialog. Reset removes VOCO's custom shortcut.",
         ),
         (
             "Plain status",
@@ -277,6 +277,7 @@ lesson(
         (B + "panel.rs", "The GNOME companion's D-Bus service and its shortcut lease."),
         (B + "portal_shortcut.rs", "The snap's shortcut through GNOME's GlobalShortcuts portal, the repeat filter and the trigger VOCO follows."),
         (B + "gnome_custom_shortcut.rs", "The snap's GNOME custom shortcut on GNOME 46, added only when nothing else uses the chord."),
+        (B + "shortcut_chord.rs", "A shortcut in the spellings GNOME takes, and back from GNOME's description of its keys."),
         ("packaging/snap/schemas/voco-gnome-custom-shortcut.gschema.xml", "GNOME's custom-shortcut keys, which the snap carries."),
         (B + "config.rs", "DEFAULT_HOTKEY, the shortcut of a new setup and of a reset."),
         (B + "ibus_shortcut.rs", "Receives the shortcut from the VOCO Dictation input source."),
@@ -675,7 +676,7 @@ lesson(
         ),
         (
             "Keys through GNOME's portal",
-            "In the snap on GNOME Wayland, when the companion doesn't ask for work, the keys go through GNOME's RemoteDesktop portal, in a session that has only a keyboard. Allow typing, in setup or Settings, shows GNOME's dialog once: turn on Allow Remote Interaction, then choose Share. GNOME returns a restore token, which VOCO keeps beside its settings as remote-desktop-token, so each later session starts without a dialog. Each paste sends Shift, Insert and their releases with NotifyKeyboardKeycode, 12 ms apart, and never another key. A failure after Shift went out is uncertain, and VOCO then releases Shift.",
+            "In the snap on GNOME Wayland, when the companion doesn't ask for work, the keys go through GNOME's RemoteDesktop portal, in a session that has only a keyboard. Allow typing, in setup or Settings, shows GNOME's dialog once: turn on Allow Remote Interaction, then choose Share. GNOME returns a restore token, which VOCO keeps beside its settings as remote-desktop-token, so each later session starts without a dialog. Where GNOME's portal also holds the shortcut, the session asks for GNOME's own keyboard connection, which speaks libei's protocol, and from GNOME 50 GNOME reports over it which modifier keys are down. VOCO then sends its keys through that connection; elsewhere it sends them with the portal's NotifyKeyboardKeycode. Either way each paste sends Shift, Insert and their releases, 12 ms apart, and never another key. A failure after Shift went out is uncertain, and VOCO then releases Shift.",
         ),
         (
             "A session only while you dictate",
@@ -683,7 +684,7 @@ lesson(
         ),
         (
             "Keys up, through the portal",
-            "Through the portal VOCO can't read the keyboard, so a press of its GNOME shortcut counts as held until GNOME reports the release, then 400 ms more, because people often let go of Super or Alt a moment after the letter. Keys sent while it is down would make another chord, which pastes nothing. GNOME reports the release only when the letter comes up under its modifier; let go of Super first, as people often do, and it reports nothing. A chord still held repeats, so a press with no reported release counts as held only until the repeat delay plus 100 ms after its last Activated, 600 ms by default, or a second when the keyboard doesn't repeat. After a voco --toggle in the snap, which reports no release, a paste waits 400 ms, or the repeat delay plus 400 ms when that is longer, after the last one.",
+            "On GNOME 50 the keyboard connection tells VOCO whether Shift, Control, Alt, Super or AltGr is down, and nothing else about the keyboard, so a paste waits only while one really is: keys sent under Super or Alt would make another chord, which pastes nothing. VOCO reads them once more just before Insert, and when one went down under its own Shift it sends no Insert and keeps the words for the next paste. Where GNOME reports no modifiers, a press of VOCO's GNOME shortcut counts as held until GNOME reports the release, then 400 ms more, because people often let go of Super or Alt a moment after the letter. GNOME reports the release only when the letter comes up under its modifier; let go of Super first, as people often do, and it reports nothing. A chord still held repeats, so a press with no reported release counts as held only until the repeat delay plus 100 ms after its last Activated, 600 ms by default, or a second when the keyboard doesn't repeat. GNOME 46's shortcut reports no release at all, so a paste waits the repeat delay plus 400 ms after its last call, and as long after a voco --toggle.",
         ),
         (
             "Three failure outcomes",
@@ -720,6 +721,7 @@ lesson(
         (B + "panel.rs", "Hands the GNOME companion each paste through its waiting NextRequest call, once the Shell's loaded copy asks for work."),
         (B + "selection_owner.rs", "The GNOME copies: xclip helpers that keep both selections and report each read."),
         (B + "portal_keys.rs", "The snap's paste keys through GNOME's RemoteDesktop portal: Allow typing, the restore token and a session only while you dictate."),
+        (B + "portal_eis.rs", "That session's keyboard connection to GNOME: the paste keys, and the modifiers GNOME reports down."),
         (B + "portal.rs", "One thread that holds every portal request, session and signal, so waiting for GNOME's dialog never blocks GTK's main thread."),
         (B + "portal_shortcut.rs", "Holds a paste while the snap's GNOME shortcut is down, then 400 ms more."),
         (F + "components/PortalSetup.tsx", "Allow typing and the shortcut's Add button, in the snap's setup and Settings."),
@@ -1315,7 +1317,7 @@ lesson(
         ),
         (
             "The snap's portals",
-            "GNOME 50 Portals runs a headless GNOME Shell 50 with XWayland, PipeWire, the real xdg-desktop-portal and its GNOME backend, and answers GNOME's dialogs over AT-SPI. VOCO's portal code runs as the snap through a test fixture. Without permission a paste is refused before the copy. Allow typing shows GNOME's dialog once, and later dictations restore it without one. Ten pastes land exactly in a GTK field on Wayland and ten under XWayland, the remote-access icon's Stop ends the dictation with no key after it, and an idle session closes by itself. Super+X toggles through Activated and never reaches the field, a paste waits for its release and 400 ms more, with Super let go first the paste goes out about 600 ms after the press, a chord held past the repeat delay keeps its paste waiting and toggles once, and the companion's lease suspends the shortcut, which binds again without a dialog.",
+            "GNOME 50 Portals runs a headless GNOME Shell 50 with XWayland, PipeWire, the real xdg-desktop-portal and its GNOME backend, and answers GNOME's dialogs over AT-SPI. VOCO's portal code runs as the snap through a test fixture. Without permission a paste is refused before the copy. Allow typing shows GNOME's dialog once, and later dictations restore it without one. Ten pastes land exactly in a GTK field on Wayland and ten under XWayland, the remote-access icon's Stop ends the dictation with no key after it, and an idle session closes by itself. Super+X toggles through Activated and never reaches the field. With GNOME's keyboard connection a paste under the held chord goes out once Super is up, one after Super was let go first waits for nothing, one under Control alone waits for its release, and a modifier pressed under VOCO's own Shift gets no Insert. With the connection turned off the same pastes wait for the release and 400 ms more, or about 600 ms after a press GNOME reported no release for. A chord held past the repeat delay toggles once, the companion's lease suspends the shortcut, which binds again without a dialog, and a change of shortcut goes through GNOME's dialog, cancelled and then added.",
         ),
         (
             "Each distribution's names",
@@ -1795,7 +1797,7 @@ lesson(
         ),
         (
             "The snap's keys and shortcut",
-            "In the snap on GNOME Wayland, the companion's keyboard types when it asks for work. Otherwise GNOME's RemoteDesktop portal does, through a keyboard-only session that exists only while you dictate, once you choose Allow typing. Its shortcut is the companion's grab, or GNOME's GlobalShortcuts portal on GNOME 48 and later, or on GNOME 46 a GNOME custom shortcut that runs voco --toggle.",
+            "In the snap on GNOME Wayland, the companion's keyboard types when it asks for work. Otherwise GNOME's RemoteDesktop portal does, through a keyboard-only session that exists only while you dictate, once you choose Allow typing. Its shortcut is the companion's grab, or GNOME's GlobalShortcuts portal on GNOME 48 and later, or on GNOME 46 a GNOME custom shortcut that calls VOCO over D-Bus.",
         ),
     ],
     [
@@ -1846,7 +1848,7 @@ chapters[-1]["comparison"] = {
         ],
         [
             "The VOCO snap",
-            "On GNOME Wayland the companion's Shell grab, otherwise GNOME's GlobalShortcuts portal on GNOME 48 and later or a GNOME custom shortcut that runs voco --toggle on GNOME 46; VOCO's global key grab on X11; or a desktop binding that runs voco --toggle; it never reads the keyboards or uses IBus",
+            "On GNOME Wayland the companion's Shell grab, otherwise GNOME's GlobalShortcuts portal on GNOME 48 and later or a GNOME custom shortcut that calls VOCO over D-Bus on GNOME 46; VOCO's global key grab on X11; or a desktop binding that runs voco --toggle; it never reads the keyboards or uses IBus",
             "On GNOME Wayland the companion's keyboard when it asks for work, otherwise GNOME's RemoteDesktop portal once you allow typing, with the modifier wait; Start is refused on other Wayland desktops; xdotool from the snap's own folder on X11",
             "xclip from the snap's own folder",
         ],
