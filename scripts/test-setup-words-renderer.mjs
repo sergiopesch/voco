@@ -355,7 +355,7 @@ try {
     await handoffPermissions.getByRole('button', { name: 'Add Alt+D', exact: true }).click();
     await handoffPermissions.getByText('GNOME’s dialog is open. Choose Add.', { exact: true }).waitFor();
     await page.evaluate(() => window.answerShortcut());
-    await handoffPermissions.getByText('starts and stops dictation. To change it, open GNOME Settings, then Apps, then VOCO.', { exact: false }).waitFor();
+    await handoffPermissions.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
     assert.equal(await handoffPermissions.locator('strong').last().textContent(), 'Alt+D', 'GNOME\'s trigger, as VOCO writes shortcuts');
     await shot('setup-snap-ready');
     results.push({ case: 'the-snap-asks-gnome-for-typing-then-the-shortcut', passed: true });
@@ -389,7 +389,7 @@ try {
     assert.equal(await custom.getByText('choose Add', { exact: false }).count(), 0, 'GNOME 46 shows no dialog to answer');
     await shot('setup-snap-gnome46-add-shortcut');
     await custom.getByRole('button', { name: 'Add Super+X', exact: true }).click();
-    await custom.getByText('then Custom Shortcuts.', { exact: false }).waitFor();
+    await custom.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
     assert.equal(await custom.locator('strong').last().textContent(), 'Super+X');
     await shot('setup-snap-gnome46-ready');
     results.push({ case: 'gnome-46-adds-a-custom-shortcut', passed: true });
@@ -412,7 +412,7 @@ try {
     await olderPanel.getByText('GNOME asks you once: choose Add.', { exact: false }).waitFor();
     await shot('setup-snap-older-panel-add-shortcut');
     await olderPanel.getByRole('button', { name: 'Add Super+X', exact: true }).click();
-    await olderPanel.getByText('starts and stops dictation. To change it, open GNOME Settings, then Apps, then VOCO.', { exact: false }).waitFor();
+    await olderPanel.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
     results.push({ case: 'an-older-panel-still-gets-gnomes-shortcut', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.

@@ -494,7 +494,10 @@ presenting the old.
 ## The snap
 
 `confinement.rs` knows VOCO runs as its snap when snapd names it `voco`
-(`SNAP_NAME`). Strict confinement gives it no `/dev/uinput`, `/dev/input`,
+(`SNAP_NAME`). At a clean exit its `end_clipboard_helpers` kills the xclip
+processes still in this run's snapd scope (`snap.voco.voco-<id>.scope` in
+`/proc/<pid>/cgroup`), because snapd holds a store refresh back while any
+process of the app lives. Strict confinement gives it no `/dev/uinput`, `/dev/input`,
 IBus engine, systemd user manager or network, so the snap skips what needs
 them: the virtual keyboard, passive evdev, the IBus listener, the retired
 `voco-ydotoold.service` and the update check. On GNOME Wayland the companion
@@ -543,14 +546,30 @@ and the process doesn't ask again.
 `portal_shortcut.rs` binds one `toggle` shortcut through GlobalShortcuts (GNOME
 48 and later), first from setup's button, which shows GNOME's dialog, and records
 that in `global-shortcut` beside the config. At each start it binds again, which
-GNOME answers without a dialog. GNOME's grab repeats `Activated` while the
+GNOME answers without a dialog. GNOME stores the keys for each shortcut ID and
+ignores a later preferred trigger for an ID it knows, so `change`, behind
+Settings' **Apply shortcut**, binds the shortcut under the next ID
+(`toggle-2`, then `toggle-3`) with the new keys proposed, which shows GNOME's
+dialog again. Added, the new session replaces the old one, GNOME keeps only the
+new ID, and `global-shortcut-id` beside the config records it for later starts;
+cancelled, which GNOME answers with response 2, nothing changes.
+`shortcut_chord.rs` spells a shortcut for the portal (`CTRL+ALT+d`) and for GTK
+(`<Control><Alt>d`) by its key's X keysym, and reads GNOME's description back
+into VOCO's spelling. On GNOME 46 the same button rewrites VOCO's own custom
+shortcut. GNOME's grab repeats `Activated` while the
 chord is held, about every 30 ms after the keyboard's repeat delay; one before
 `Deactivated` at a repeat's time, the first within 100 ms of that delay after the
 press and the rest within the delay plus 100 ms of the last, is a repeat and
-toggles nothing. Any other is a press. GNOME 46's custom shortcut runs `voco --toggle` for
-each repeat too, so `note_command_press` treats a toggle within the repeat delay
-plus 400 ms of the last as one, since each is a snap launch that can arrive late;
-a paste waits as long after the last. A first `Activated` toggles through
+toggles nothing. Any other is a press. GNOME 46's custom shortcut calls
+`Toggle` on VOCO's bus name with `dbus-send`, for the press and for each
+repeat, and `panel.rs` hands each to `note_bus_press`, which keeps the same
+state as `Activated`: the calls arrive in a few milliseconds, so the same
+timing tells a repeat from a press. GNOME 46 reports no release of either key,
+so `bus_held` keeps a paste waiting the repeat delay plus 400 ms after the last
+call. Where the call fails the command runs `voco --toggle`,
+and `note_command_press` treats one within the repeat delay plus 400 ms of
+the last as a repeat, since each is a snap launch that can arrive late; a
+paste waits as long after the last. A first `Activated` toggles through
 `eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
 trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
 Super+X. Modifiers can't be

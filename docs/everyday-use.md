@@ -195,6 +195,13 @@ its Latin key.
 If your saved shortcut isn't valid, VOCO sets it back to `Super+X` and shows
 **Shortcut reset**. VOCO never changes a valid shortcut you saved.
 
+In the snap on GNOME, GNOME keeps the shortcut for VOCO. After **Apply
+shortcut**, or a shortcut chosen in the tray menu, GNOME shows the new shortcut
+in its own dialog: choose **Add**. If you choose
+**Cancel** there, your earlier shortcut stays. On Ubuntu 24.04 GNOME shows no
+dialog, and VOCO changes its entry in GNOME's keyboard shortcuts for you. VOCO
+says so when GNOME already uses a shortcut for something else.
+
 `Super+X` is the default because a shortcut made of Alt and a letter can lose
 words: when GNOME keeps the letter from your app, the app sees Alt pressed and
 released on its own, and Firefox, Thunderbird, LibreOffice and VS Code then open
