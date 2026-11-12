@@ -242,8 +242,12 @@ and the update check. [The snap](#the-snap) lists its rules.
   for the modifier's own release, which people often let go of a moment after
   the letter, and the same 1.5 s wait sends no keys while
   it is: keys sent under Super or Alt make another chord, which pastes nothing.
-  A press with no `Deactivated` after 5 s reads as unknown, so a lost signal
-  can't hold back every paste. After a `voco --toggle` in the snap, which
+  GNOME sends `Deactivated` only when the letter comes up under its modifier,
+  and nothing when the modifier comes up first, as it often does. A chord still
+  held repeats, so a press with no `Deactivated` counts as held only until the
+  keyboard's repeat delay plus 100 ms after its last `Activated`, 600 ms by
+  default, or 1 s when the keyboard doesn't repeat; then it reads as unknown
+  and holds back no paste. After a `voco --toggle` in the snap, which
   reports no release, a paste waits 400 ms, or the repeat delay plus 400 ms
   when it is longer, after the last one, its repeats included. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
@@ -312,8 +316,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   without it; every paste lands with its exact text in a GTK field on Wayland and
   under XWayland; dictation opens a session and its end closes it; the
   indicator's Stop stops the dictation with no key after it; the shortcut toggles
-  through `Activated` and the next paste waits for `Deactivated`; a chord held
-  past the repeat delay toggles once, and the next press toggles again.
+  through `Activated` and the next paste waits for `Deactivated`; with Super
+  let go first, which GNOME reports no release for, the paste goes out once no
+  repeat follows; a chord held past the repeat delay keeps its paste waiting
+  and toggles once, and the next press toggles again.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that
@@ -387,8 +393,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   and later starts bind it again, which GNOME answers without one. An
   `Activated` toggles through the debounce, unless it repeats a held chord:
   GNOME's grab, unlike the companion's, repeats the press about every 30 ms
-  after the keyboard's repeat delay, so one that comes before `Deactivated` and
-  within the repeat delay, at least 900 ms, plus 100 ms of the last is ignored.
+  after the keyboard's repeat delay, so one that comes before `Deactivated` at
+  a repeat's time is ignored: the first within 100 ms of one repeat delay after
+  the press, the rest within that delay plus 100 ms of the last. Any other is a
+  press, so one soon after the modifier came up first still toggles.
   GNOME Settings, under Apps, changes
   the trigger: VOCO saves each trigger GNOME reports, at a bind or a
   `ShortcutsChanged`, as its shortcut when it can take it, so its labels name the
