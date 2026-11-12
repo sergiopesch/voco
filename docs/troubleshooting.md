@@ -411,9 +411,10 @@ renames the file to `hotkey-trace.previous.jsonl` and starts a new one.
 ## Report a bug
 
 Open VOCO's **Settings**, then **Help**, and choose **Report a problem**. Your
-browser opens VOCO's bug form with your version, package and desktop filled
-in. VOCO sends nothing itself: you finish the form and decide whether to submit
-it. Or open an issue from the
+browser opens VOCO's bug form on GitHub with your version, package and desktop
+filled in; GitHub asks you to sign in first if you aren't. VOCO sends nothing
+itself: you finish the form and decide whether to submit it. Or open an issue
+from the
 [issue templates](https://github.com/sergiopesch/voco/issues/new/choose).
 Include:
 
