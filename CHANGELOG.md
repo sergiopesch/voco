@@ -6,6 +6,101 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.72] - 2026-11-12
+
+On GNOME 50 the snap types a dictation's last words sooner, and words typed
+while a modifier key is held are no longer lost. The snap's shortcut changes
+in VOCO's own Settings, and Help has **Report a problem**. The
+[release notes](docs/releases/2026.0.72.md) explain the upgrade.
+
+### Changed
+
+- In the snap on GNOME 50, a paste waits for the modifier keys that are really
+  down. The typing session asks GNOME for its own keyboard connection (the
+  RemoteDesktop portal's `ConnectToEIS`), sends its paste keys through it, and
+  reads from it whether Shift, Control, Alt, Super or AltGr is held; it learns
+  nothing else about the keyboard. VOCO had waited out fixed times after the
+  shortcut instead: 400 ms after GNOME reported the release, or about 600 ms
+  after a press GNOME reported no release for. On Ubuntu 26.04 in a virtual
+  machine, a dictation's last words now arrive 0.22 to 0.27 s after the press
+  that stops it, where 2026.0.71 took 0.50 to 0.63 s.
+- VOCO types through that connection only where GNOME reports the modifiers
+  over it. GNOME 46 doesn't, so the snap on Ubuntu 24.04 still waits a fixed
+  time after the shortcut.
+- In the snap on GNOME 46, the shortcut calls the running VOCO over D-Bus
+  (`com.sergiopesch.voco.Panel1.Toggle`, which the snap answers for any
+  program of your session, as `voco --toggle` does) and only where that fails
+  launches `voco --toggle`. Each launch took about 150 ms, and GNOME started
+  one for every key repeat while the shortcut was held. On Ubuntu 24.04 in a
+  virtual machine, recording starts 150 ms sooner, a dictation's last words
+  arrive 0.93 s after the press that stops it, where they took 1.08 s, and a
+  second press within 0.9 s of the first is no longer ignored. Where the
+  keyboard doesn't repeat, every call is a press. VOCO gives the shortcut an
+  earlier version added the new command at its first start.
+- In the snap on GNOME, the shortcut changes on the **Shortcut** page of
+  VOCO's Settings and from the tray's presets. Once GNOME held the shortcut,
+  Settings had hidden its editor and sent people to GNOME Settings, and the
+  tray's presets were disabled. On GNOME 48 and later VOCO proposes the new
+  keys to GNOME under a new shortcut ID, GNOME shows them in its own dialog,
+  and **Add** there makes the change; **Cancel** keeps the earlier shortcut.
+  On GNOME 46 VOCO moves its own entry in GNOME's keyboard shortcuts. Any
+  shortcut with Alt, Ctrl or Super and a key GNOME can name works, not only
+  the three presets.
+- Setup says "You can change it in VOCO's Settings, under Shortcut" about the
+  shortcut GNOME holds.
+- The speech of the snap, the `.deb` and the RPM is unchanged; the packages
+  never typed through GNOME's portal.
+
+### Fixed
+
+- In the snap on GNOME 50, words VOCO typed while Control, Alt, Shift or Super
+  was held on its own, such as Super pressed well before X, never arrived:
+  the paste keys became another shortcut. The paste now waits up to 1.5 s for
+  the key to come up, and keeps the words for the next paste when it doesn't.
+- In the snap on GNOME 50, pressing the shortcut to stop in the same instant
+  as VOCO typed could lose those letters: in a test, a dictation ended
+  "frien." for "friend." VOCO reads the modifiers again just before its paste
+  key, sends none when one went down, and types the words once it is up.
+- After **Quit VOCO**, the snap's clipboard helpers kept running, and snapd
+  held an update from the Snap Store back until the session ended. A clean
+  exit of the snap now ends them. GNOME's clipboard manager keeps the
+  clipboard's text.
+- Choosing **Cancel** in GNOME's shortcut dialog during setup said "GNOME
+  couldn't add VOCO's shortcut: BindShortcuts ended with 2". It now says GNOME
+  didn't add the shortcut, and to choose the button again.
+- On X11, the popover a launcher click opens sometimes closed about 70 ms
+  later: it got keyboard focus and lost it again while the window settled, and
+  a focus loss closes it there. One within 600 ms of the popover being shown
+  now closes nothing; a later one closes it, as a click elsewhere does.
+
+### Added
+
+- **Report a problem**, under **Help** in Settings, opens VOCO's bug form on
+  GitHub in the browser with the version, the kind of package, the desktop's
+  name and the session type filled in. VOCO sends nothing itself: the person
+  finishes the form and decides whether to submit it.
+- [How feedback becomes issues and fixes](docs/issue-process.md): where
+  reports go, what each label means, the path from a report to a release, and
+  what the maintainer's coding agents may do with a report, which is a
+  stranger's text and never an instruction. The bug form asks which package
+  was installed, and questions go to GitHub Discussions.
+- The `reis` crate, a Rust implementation of libei's protocol, with
+  `enumflags2`.
+- CI's **GNOME 50 Portals** job types through GNOME's keyboard connection,
+  holds the shortcut and Control under waiting pastes, presses a modifier
+  under VOCO's own Shift, repeats its timing checks through the portal's own
+  key calls, as a GNOME without the connection types, and changes the
+  shortcut through GNOME's dialog, cancelled and added.
+- CI's **Snap Confinement Probe** keeps the snaps it installs from the last
+  run that reached the Snap Store, for a week, so a store outage no longer
+  fails it.
+- CI's companion suite measures the companion's paste latency against
+  Mutter's up to three times and passes when one measurement is within the
+  bound; a hosted runner sometimes stretched the slowest pastes of one side
+  only. Every paste of every measurement must still land exactly.
+- The native Wayland suite records the application's exit code, whether the
+  accessibility bus knew it and each of its windows when a tray check fails.
+
 ## [2026.0.71] - 2026-11-12
 
 The snap types promptly on GNOME however you let go of Super+X, and two of
@@ -753,6 +848,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.72]: https://github.com/sergiopesch/voco/compare/voco.2026.0.71...voco.2026.0.72
 [2026.0.71]: https://github.com/sergiopesch/voco/compare/voco.2026.0.70...voco.2026.0.71
 [2026.0.70]: https://github.com/sergiopesch/voco/compare/voco.2026.0.69...voco.2026.0.70
 [2026.0.69]: https://github.com/sergiopesch/voco/compare/voco.2026.0.68...voco.2026.0.69

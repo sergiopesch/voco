@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.72" date="2026-11-12">
+      <description>
+        <p>On GNOME 50, the snap types a dictation's last words about a quarter of a second after you press to stop, where it took half a second or more: GNOME now tells VOCO when the shortcut's keys are up. Words VOCO types while you hold Control, Alt, Shift or Super wait for you to let go, instead of being lost. In the snap, you change the shortcut in VOCO's own Settings, and GNOME confirms it in one dialog.</p>
+      </description>
+    </release>
     <release version="2026.0.71" date="2026-11-12">
       <description>
         <p>The snap no longer makes your words wait five seconds after Super+X when you let go of Super before X, and a second press soon after the first works. Setup now says VOCO is running when it finishes, and that the name it offers came from your account on your computer.</p>
