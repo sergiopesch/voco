@@ -11,9 +11,9 @@ use webkit2gtk::gio;
 // Under the maintainer's own domain, as the Snap Store requires of the snap's
 // dbus slot. A companion from before this name speaks only org.voco.Panel and
 // never attaches here (AGENTS.md).
-const NAME: &str = "com.sergiopesch.voco.Panel";
-const PATH: &str = "/com/sergiopesch/voco/Panel";
-const INTERFACE: &str = "com.sergiopesch.voco.Panel1";
+pub(crate) const NAME: &str = "com.sergiopesch.voco.Panel";
+pub(crate) const PATH: &str = "/com/sergiopesch/voco/Panel";
+pub(crate) const INTERFACE: &str = "com.sergiopesch.voco.Panel1";
 const XML: &str = r#"<node><interface name="com.sergiopesch.voco.Panel1">
 <method name="Attach"><arg type="b" direction="out"/></method>
 <method name="GetState"><arg type="s" direction="out"/></method>
@@ -25,6 +25,7 @@ const XML: &str = r#"<node><interface name="com.sergiopesch.voco.Panel1">
 <method name="PasteRefused"><arg type="u" direction="in"/><arg type="s" direction="in"/></method>
 <method name="ModifiersState"><arg type="u" direction="in"/><arg type="b" direction="in"/></method>
 <method name="CompanionAsking"><arg type="b" direction="out"/></method>
+<method name="Toggle"/>
 </interface></node>"#;
 const NOT_ATTACHED: &str = "com.sergiopesch.voco.NotAttached";
 const UNAVAILABLE: &str = "com.sergiopesch.voco.Unavailable";
@@ -497,6 +498,9 @@ impl Lease {
 /// The application behind the bridge; tests substitute a recording double.
 trait Host {
     fn snapshot(&self) -> Option<serde_json::Value>;
+    /// A press of the snap's GNOME custom shortcut, or one of its repeats
+    /// while the chord is held.
+    fn shortcut_press(&self);
     /// The ordinary shortcut toggle, with native debounce and arbitration.
     fn toggle(&self);
     fn action(&self, action: &str, token: &str) -> bool;
@@ -506,6 +510,15 @@ trait Host {
 impl Host for tauri::AppHandle {
     fn snapshot(&self) -> Option<serde_json::Value> {
         crate::tray::panel_snapshot(self)
+    }
+
+    fn shortcut_press(&self) {
+        crate::trace_hotkey_event("bus_toggle_received", Some("gnome_shortcut"));
+        if crate::portal_shortcut::note_bus_press() {
+            crate::eval_toggle_with_backend(self, "gnome_shortcut");
+        } else {
+            crate::trace_hotkey_event("bus_toggle_repeat_ignored", Some("gnome_shortcut"));
+        }
     }
 
     fn toggle(&self) {
@@ -532,8 +545,24 @@ fn release(host: &impl Host, lease: &mut Lease) {
 
 type Reply = Result<Option<glib::Variant>, (&'static str, &'static str)>;
 
+/// Only the snap answers Toggle: a package's shortcut has other routes.
+fn toggle_admitted() -> bool {
+    #[cfg(test)]
+    if TOGGLE_ADMITTED.load(std::sync::atomic::Ordering::SeqCst) {
+        return true;
+    }
+    crate::confinement::is_snap()
+}
+
+/// The tests answer Toggle as the snap does.
+#[cfg(test)]
+static TOGGLE_ADMITTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Every method but Attach, answered only for the attached Shell connection,
-/// except CompanionAsking, which any caller may ask.
+/// except CompanionAsking, which any caller may ask, and in the snap Toggle:
+/// GNOME 46's custom shortcut calls it for each press, where launching
+/// `voco --toggle` took about 150 ms. Any program of the session may run that
+/// command, so any may call this.
 fn handle(
     host: &impl Host,
     lease: &mut Lease,
@@ -543,6 +572,12 @@ fn handle(
 ) -> Reply {
     if method == "CompanionAsking" {
         return Ok(Some((companion_asks_for_work(),).to_variant()));
+    }
+    if method == "Toggle" && toggle_admitted() {
+        // Answered whatever the press did, a repeat included: the shortcut's
+        // command falls back to `voco --toggle` only when this call fails.
+        host.shortcut_press();
+        return Ok(None);
     }
     if !lease.admits(sender) {
         return Err((NOT_ATTACHED, "Attach from GNOME Shell first"));
@@ -722,6 +757,7 @@ pub(crate) fn serve_for_fixture(timeout: Duration) -> Result<(), String> {
                 "description": "Ready", "canStop": false, "canOpen": false, "level": 0}),
             )
         }
+        fn shortcut_press(&self) {}
         fn toggle(&self) {}
         fn action(&self, _action: &str, _token: &str) -> bool {
             false
@@ -763,6 +799,7 @@ mod tests {
     #[derive(Default)]
     struct FakeHost {
         state: Option<serde_json::Value>,
+        presses: Cell<usize>,
         toggles: Cell<usize>,
         actions: RefCell<Vec<(String, String)>>,
         tray: Cell<Option<bool>>,
@@ -771,6 +808,10 @@ mod tests {
     impl Host for FakeHost {
         fn snapshot(&self) -> Option<serde_json::Value> {
             self.state.clone()
+        }
+
+        fn shortcut_press(&self) {
+            self.presses.set(self.presses.get() + 1);
         }
 
         fn toggle(&self) {
@@ -1141,6 +1182,39 @@ mod tests {
         let info = gio::DBusNodeInfo::for_xml(XML).unwrap();
         let interface = info.lookup_interface(INTERFACE).unwrap();
         assert!(interface.lookup_method("CompanionAsking").is_some());
+    }
+
+    #[test]
+    fn the_snaps_shortcut_calls_toggle_from_any_sender() {
+        use std::sync::atomic::Ordering;
+        let _serial = serial();
+        let host = fake(idle(None));
+        let toggle = |host: &FakeHost| {
+            handle(
+                host,
+                &mut Lease::default(),
+                ":1.77",
+                "Toggle",
+                &().to_variant(),
+            )
+            .map_err(|(name, _)| name)
+        };
+        // A package answers it as any other method: for the attached Shell only.
+        assert_eq!(toggle(&host), Err(NOT_ATTACHED));
+        assert_eq!(host.presses.get(), 0);
+        TOGGLE_ADMITTED.store(true, Ordering::SeqCst);
+        let answered = toggle(&host);
+        TOGGLE_ADMITTED.store(false, Ordering::SeqCst);
+        // An answer whatever the press did: the command behind GNOME's
+        // shortcut launches `voco --toggle` only when the call fails.
+        assert_eq!(answered, Ok(None));
+        assert_eq!((host.presses.get(), host.toggles.get()), (1, 0));
+        let info = gio::DBusNodeInfo::for_xml(XML).unwrap();
+        assert!(info
+            .lookup_interface(INTERFACE)
+            .unwrap()
+            .lookup_method("Toggle")
+            .is_some());
     }
 
     #[test]
