@@ -254,7 +254,7 @@ lesson(
         ),
         (
             "A held chord repeats",
-            "GNOME's grab, unlike the companion's, repeats a held chord's press about every 30 ms once the keyboard's repeat delay has passed. VOCO reads that delay once from GNOME's keyboard settings, and takes 500 ms when it can't. An Activated that comes before GNOME reports the release, and within the repeat delay, at least 900 ms, plus 100 ms of the last one, is a repeat and toggles nothing.",
+            "GNOME's grab, unlike the companion's, repeats a held chord's press about every 30 ms once the keyboard's repeat delay has passed. VOCO reads that delay and the repeat interval once from GNOME's keyboard settings, and takes 500 ms and 30 ms when it can't. An Activated that comes before GNOME reports the release is a repeat, and toggles nothing, only at a repeat's time: the first within 100 ms of one repeat delay after the press, the rest within that delay plus 100 ms of the last. Any other is a new press. That matters because GNOME reports the release only when the letter comes up under its modifier: let go of Super first and it reports nothing, yet a press soon after still toggles.",
         ),
         (
             "GNOME 46",
@@ -683,7 +683,7 @@ lesson(
         ),
         (
             "Keys up, through the portal",
-            "Through the portal VOCO can't read the keyboard, so a press of its GNOME shortcut counts as held until GNOME reports the release, then 400 ms more, because people often let go of Super or Alt a moment after the letter. Keys sent while it is down would make another chord, which pastes nothing. A press GNOME never reports released stops counting after 5 seconds. After a voco --toggle in the snap, which reports no release, a paste waits 400 ms, or the repeat delay plus 400 ms when that is longer, after the last one.",
+            "Through the portal VOCO can't read the keyboard, so a press of its GNOME shortcut counts as held until GNOME reports the release, then 400 ms more, because people often let go of Super or Alt a moment after the letter. Keys sent while it is down would make another chord, which pastes nothing. GNOME reports the release only when the letter comes up under its modifier; let go of Super first, as people often do, and it reports nothing. A chord still held repeats, so a press with no reported release counts as held only until the repeat delay plus 100 ms after its last Activated, 600 ms by default, or a second when the keyboard doesn't repeat. After a voco --toggle in the snap, which reports no release, a paste waits 400 ms, or the repeat delay plus 400 ms when that is longer, after the last one.",
         ),
         (
             "Three failure outcomes",
@@ -1315,7 +1315,7 @@ lesson(
         ),
         (
             "The snap's portals",
-            "GNOME 50 Portals runs a headless GNOME Shell 50 with XWayland, PipeWire, the real xdg-desktop-portal and its GNOME backend, and answers GNOME's dialogs over AT-SPI. VOCO's portal code runs as the snap through a test fixture. Without permission a paste is refused before the copy. Allow typing shows GNOME's dialog once, and later dictations restore it without one. Ten pastes land exactly in a GTK field on Wayland and ten under XWayland, the remote-access icon's Stop ends the dictation with no key after it, and an idle session closes by itself. Super+X toggles through Activated and never reaches the field, a paste waits for its release and 400 ms more, a chord held past the repeat delay toggles once, and the companion's lease suspends the shortcut, which binds again without a dialog.",
+            "GNOME 50 Portals runs a headless GNOME Shell 50 with XWayland, PipeWire, the real xdg-desktop-portal and its GNOME backend, and answers GNOME's dialogs over AT-SPI. VOCO's portal code runs as the snap through a test fixture. Without permission a paste is refused before the copy. Allow typing shows GNOME's dialog once, and later dictations restore it without one. Ten pastes land exactly in a GTK field on Wayland and ten under XWayland, the remote-access icon's Stop ends the dictation with no key after it, and an idle session closes by itself. Super+X toggles through Activated and never reaches the field, a paste waits for its release and 400 ms more, with Super let go first the paste goes out about 600 ms after the press, a chord held past the repeat delay keeps its paste waiting and toggles once, and the companion's lease suspends the shortcut, which binds again without a dialog.",
         ),
         (
             "Each distribution's names",
