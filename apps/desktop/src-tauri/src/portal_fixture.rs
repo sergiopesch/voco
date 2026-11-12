@@ -108,6 +108,13 @@ fn run(command: &Value) -> Value {
             );
             json!({ "ok": true })
         }
+        // VOCO's Shift stays down this long before Insert, so the suite can
+        // press a modifier under it.
+        "shift-hold" => {
+            crate::portal_eis::SHIFT_HOLD_MS
+                .store(command["ms"].as_u64().expect("ms"), Ordering::SeqCst);
+            json!({ "ok": true })
+        }
         "counts" => json!({}),
         other => panic!("Unknown portal fixture command: {other}"),
     }

@@ -56,6 +56,9 @@ const DENIED: &str = "GNOME didn't allow VOCO to type. Choose Allow typing again
 pub enum PortalPasteError {
     /// No key was sent.
     NoMutation(String),
+    /// Shift went out and came back, and nothing else: a modifier went down
+    /// under it. Nothing was typed, and the same text can go once it is up.
+    HeldBack(String),
     /// Some keys may have been sent.
     Uncertain(String),
 }

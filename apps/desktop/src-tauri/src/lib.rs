@@ -1043,6 +1043,7 @@ async fn paste_desktop_text(
         outcome: insertion::DeliveryOutcome::Uncertain,
         message: "Input task interrupted; review retained text before retrying.".into(),
         clipboard_changed: true,
+        held_back: false,
     })?
 }
 
@@ -1055,6 +1056,7 @@ async fn copy_desktop_text(text: String) -> Result<(), insertion::InsertionError
             outcome: insertion::DeliveryOutcome::Uncertain,
             message: "Copy task interrupted; check the clipboard before pasting.".into(),
             clipboard_changed: true,
+            held_back: false,
         })?
 }
 

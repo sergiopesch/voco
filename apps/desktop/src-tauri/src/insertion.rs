@@ -131,6 +131,10 @@ pub struct InsertionError {
     pub outcome: DeliveryOutcome,
     pub message: String,
     pub clipboard_changed: bool,
+    /// The keyboard held its paste keys back after the copy, having typed
+    /// nothing: the text stays pending, as after a wait for a modifier.
+    #[serde(skip)]
+    pub held_back: bool,
 }
 
 impl InsertionError {
@@ -139,6 +143,7 @@ impl InsertionError {
             outcome: DeliveryOutcome::Rejected,
             message: message.into(),
             clipboard_changed: false,
+            held_back: false,
         }
     }
 
@@ -147,6 +152,7 @@ impl InsertionError {
             outcome: DeliveryOutcome::NoMutation,
             message: message.into(),
             clipboard_changed: false,
+            held_back: false,
         }
     }
 
@@ -155,6 +161,7 @@ impl InsertionError {
             outcome: DeliveryOutcome::Uncertain,
             message: message.into(),
             clipboard_changed: false,
+            held_back: false,
         }
     }
 }
@@ -336,6 +343,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     if keys == PasteKeys::Portal {
         crate::portal_keys::ready().map_err(|failure| match failure {
             crate::portal_keys::PortalPasteError::NoMutation(message)
+            | crate::portal_keys::PortalPasteError::HeldBack(message)
             | crate::portal_keys::PortalPasteError::Uncertain(message) => {
                 InsertionError::no_mutation(message)
             }
@@ -754,6 +762,10 @@ fn send_paste_keys(keys: PasteKeys) -> Result<Option<Instant>, InsertionError> {
                     crate::portal_keys::PortalPasteError::NoMutation(message) => {
                         InsertionError::no_mutation(message)
                     }
+                    crate::portal_keys::PortalPasteError::HeldBack(message) => InsertionError {
+                        held_back: true,
+                        ..InsertionError::no_mutation(message)
+                    },
                     crate::portal_keys::PortalPasteError::Uncertain(message) => {
                         InsertionError::uncertain(message)
                     }
@@ -1081,10 +1093,16 @@ fn paste_transaction<T>(
     })?;
     let keys_started = Instant::now();
     let inserted = send_keys().map_err(|mut error| {
-        // Clipboard mutation already happened, even if no key was sent. No
+        error.clipboard_changed = true;
+        // A keyboard that saw a modifier go down under its Shift sent no
+        // Insert: nothing was typed, and the text goes again once the
+        // modifier is up, as after the wait above.
+        if error.held_back {
+            return error;
+        }
+        // Otherwise the clipboard changed and some key may have gone out. No
         // automatic retry or restoration is safe here.
         error.outcome = DeliveryOutcome::Uncertain;
-        error.clipboard_changed = true;
         error.message.push_str(
             " The clipboard was changed. Check your text field before pasting to avoid duplicates.",
         );
@@ -1174,6 +1192,7 @@ fn owner_error(error: OwnerError, primary_changed: bool) -> InsertionError {
                 "{message} Text may have been partially delivered; automatic retry was stopped."
             ),
             clipboard_changed: true,
+            held_back: false,
         },
     }
 }
@@ -1610,6 +1629,36 @@ mod tests {
         assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
         assert!(error.clipboard_changed);
         assert!(!keyboard_was_dispatched);
+    }
+
+    #[test]
+    fn keys_held_back_after_the_copy_keep_the_text_pending() {
+        // A keyboard that saw a modifier go down under its Shift sent no
+        // Insert: nothing typed, the clipboard changed, and no "uncertain".
+        let error = paste_transaction(
+            || Ok(()),
+            || Ok(()),
+            || {
+                Err(InsertionError {
+                    held_back: true,
+                    ..InsertionError::no_mutation("A modifier key went down.")
+                })
+            },
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(error.clipboard_changed);
+        assert_eq!(error.message, "A modifier key went down.");
+        // Any other failure at the keys stays uncertain, whatever it claims.
+        let error = paste_transaction(
+            || Ok(()),
+            || Ok(()),
+            || Err(InsertionError::no_mutation("The keyboard refused.")),
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
     }
 
     #[test]

@@ -23,7 +23,16 @@ const KEY_GAP: Duration = Duration::from_millis(12);
 /// evdev's wait covers. Caps Lock and Num Lock are states, not held keys.
 const CHORD_MODIFIERS: u32 = 0x01 | 0x04 | 0x08 | 0x40 | 0x80;
 
+/// The same without Shift, which is VOCO's own between its press and release.
+const OTHER_MODIFIERS: u32 = CHORD_MODIFIERS & !0x01;
+
 const NOT_READY: &str = "GNOME's keyboard for VOCO isn't ready, so it sent no paste keys.";
+const WENT_DOWN: &str = "A modifier key went down as VOCO typed, so it sent no paste keys.";
+/// The portal suite holds VOCO's Shift this long before Insert, to press a
+/// modifier under it.
+#[cfg(test)]
+pub(crate) static SHIFT_HOLD_MS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 /// Whether a depressed-modifier mask holds a key that would turn Shift+Insert
 /// into another chord.
@@ -167,6 +176,29 @@ impl Eis {
             ))
         };
         std::thread::sleep(KEY_GAP);
+        #[cfg(test)]
+        std::thread::sleep(Duration::from_millis(
+            SHIFT_HOLD_MS.load(std::sync::atomic::Ordering::SeqCst),
+        ));
+        // The paste's own check saw no modifier, but one can go down in the
+        // gap since, as the shortcut's does when it is pressed to stop just
+        // as words go out. Insert under it would paste nothing while VOCO
+        // counted the words as typed, so Shift comes back up alone.
+        let other_modifier = self
+            .shared
+            .state()
+            .depressed
+            .is_some_and(|depressed| depressed & OTHER_MODIFIERS != 0);
+        if other_modifier {
+            key(KEY_LEFTSHIFT, ei::keyboard::KeyState::Released).map_err(|error| {
+                PortalPasteError::Uncertain(format!(
+                    "VOCO's Shift may still be down: {error}. Automatic typing stopped."
+                ))
+            })?;
+            device.stop_emulating(link.connection.serial());
+            let _ = link.connection.flush();
+            return Err(PortalPasteError::HeldBack(WENT_DOWN.into()));
+        }
         key(KEY_INSERT, ei::keyboard::KeyState::Press).map_err(uncertain)?;
         let inserted = Instant::now();
         std::thread::sleep(KEY_GAP);

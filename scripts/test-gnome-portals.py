@@ -610,6 +610,34 @@ try:
         return {'insertAfterReleaseMs': round(after_release * 1000, 1), 'refused': refusal}
     check('heldModifier', held_modifier)
 
+    def modifier_under_shift():
+        # A modifier that goes down after the paste's own check, under VOCO's
+        # Shift, as the shortcut's does when it is pressed to stop just as
+        # words go out: no Insert follows, nothing is typed, the text stays
+        # pending, and it goes once the modifier is up.
+        session = begin('modifier-under-shift')
+        field.clear()
+        voco.ask('shift-hold', ms=1000)
+        try:
+            mark = time.monotonic()
+            voco.send('paste', text='undershift')
+            time.sleep(.5)
+            key(CONTROL, True)
+            answered = voco.reply(5)
+            error = answered.get('error') or {}
+            assert error.get('outcome') == 'no-mutation' and 'went down as VOCO typed' in error.get('message', ''), answered
+            assert error['clipboardChanged'] is True, error
+            time.sleep(.3)
+            assert field.text() == '' and not field.seen('insert', mark), 'Insert went out under Control'
+        finally:
+            key(CONTROL, False)
+            voco.ask('shift-hold', ms=0)
+        assert wait_for(lambda: voco.counts()['modifiersHeld'] is False, 1), voco.counts()
+        landed = paste(field, 'undershift')
+        end(session)
+        return {'refused': error['message'], 'thenLanded': landed}
+    check('modifierUnderShift', modifier_under_shift)
+
     def without_keyboard():
         # A GNOME that gives no keyboard connection: the keys go through the
         # portal's own calls, and the shortcut's signals say when they are up.
