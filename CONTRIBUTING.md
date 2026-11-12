@@ -9,7 +9,9 @@ contributions to it.
 
 Please follow the [code of conduct](CODE_OF_CONDUCT.md). Report vulnerabilities
 privately, as the [security policy](SECURITY.md) describes, never in a public
-issue. Bugs and feature ideas go in the issue forms on GitHub.
+issue. Bugs and feature ideas go in the issue forms on GitHub, and questions in
+Discussions. [Feedback and issues](docs/issue-process.md) says what happens to a
+report: triage, reproduction, the cause, then one pull request for one issue.
 
 ## Before you start
 

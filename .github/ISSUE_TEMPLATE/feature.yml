@@ -1,6 +1,6 @@
 name: Improvement idea
 description: Suggest a focused improvement to VOCO.
-labels: [enhancement]
+labels: [enhancement, needs-triage]
 body:
   - type: textarea
     id: problem
