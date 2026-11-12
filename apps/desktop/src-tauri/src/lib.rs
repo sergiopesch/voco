@@ -2028,6 +2028,8 @@ fn install_socket_cleanup_signal_handler() {
             native_capture_commands::shutdown();
             crash_recovery::clean_exit();
             cleanup_socket_files();
+            #[cfg(target_os = "linux")]
+            confinement::end_clipboard_helpers();
             std::process::exit(128 + received_signal);
         });
     }
@@ -2816,6 +2818,8 @@ pub fn run() -> Result<(), String> {
                 native_capture_commands::shutdown();
                 app.state::<ibus_shortcut::IbusShortcutService>().shutdown();
                 cleanup_socket_files();
+                #[cfg(target_os = "linux")]
+                confinement::end_clipboard_helpers();
             }
         });
 
