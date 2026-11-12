@@ -1,22 +1,33 @@
 name: Bug report
 description: Report a reproducible problem with VOCO.
-labels: [bug]
+labels: [bug, needs-triage]
 body:
   - type: markdown
     attributes:
       value: "Check [Troubleshooting](https://github.com/sergiopesch/voco/blob/master/docs/troubleshooting.md) first. Use made-up examples, and remove personal text, recordings, paths and credentials. Report vulnerabilities privately from the Security tab."
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install VOCO?
+      options:
+        - Snap Store or App Center
+        - The .deb (guided installer or manual)
+        - The RPM
+        - Built from source
+    validations:
+      required: true
   - type: input
     id: environment
     attributes:
       label: Version and environment
-      description: The output of `voco --version`, your distribution and desktop, X11 or Wayland, and the app you dictated into.
+      description: The output of `voco --version`, your distribution and desktop, X11 or Wayland, and the app you dictated into. **Report a problem** in VOCO's Help fills in what VOCO knows.
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
       label: What happened?
-      description: Steps to reproduce, what you expected and what happened.
+      description: The steps, one per line, what you expected and what happened instead. Say whether it happens every time.
     validations:
       required: true
   - type: textarea
