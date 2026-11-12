@@ -156,6 +156,9 @@ function ResizeHandles() {
   );
 }
 
+/** How long after the popover is shown an X11 focus loss doesn't close it. */
+export const POPOVER_FOCUS_SETTLE_MS = 600;
+
 export function App() {
   const nativeMicrophone = useNativeCaptureSettings();
   const status = useStore((state) => state.status);
@@ -1168,6 +1171,7 @@ export function App() {
     }
 
     const currentWindow = getCurrentWindow();
+    const shownAt = performance.now();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         dismissInteractiveSurface();
@@ -1178,7 +1182,16 @@ export function App() {
       currentWindow.onFocusChanged(({ payload: focused }) => {
         void traceHotkeyEvent(focused ? "popover_focus_gained" : "popover_focus_lost").catch(() => {});
         if (!isWaylandSession(runtimeSessionTypeRef.current)) {
-          if (!focused) dismissInteractiveSurface();
+          if (focused) return;
+          // X11 can report focus gained and lost again while a window that
+          // was just shown settles: a launcher start's popover closed about
+          // 70 ms after it opened (#204). A loss that soon closes nothing;
+          // a later one, as when the person clicks elsewhere, does.
+          if (performance.now() - shownAt < POPOVER_FOCUS_SETTLE_MS) {
+            void traceHotkeyEvent("popover_focus_loss_ignored").catch(() => {});
+            return;
+          }
+          dismissInteractiveSurface();
           return;
         }
         const version = surfaceSyncVersionRef.current;

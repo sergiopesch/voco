@@ -139,7 +139,9 @@ try:
         report['model'] = {'provided': model.exists()}
         if model.exists():
             report['model']['sha256'] = hashlib.sha256(model.read_bytes()).hexdigest()
-        def visible_app(pid):
+        def windows_of(pid):
+            """Every accessible window of the application, with its states."""
+            found = []
             desktop = Atspi.get_desktop(0)
             for i in range(desktop.get_child_count()):
                 app_node = desktop.get_child_at_index(i)
@@ -147,10 +149,24 @@ try:
                     continue
                 for j in range(app_node.get_child_count()):
                     window = app_node.get_child_at_index(j)
-                    states = window.get_state_set()
-                    if states.contains(Atspi.StateType.SHOWING) and states.contains(Atspi.StateType.VISIBLE):
-                        return {'name': window.get_name(), 'role': window.get_role_name()}
+                    found.append({'name': window.get_name(), 'role': window.get_role_name(),
+                                  'states': sorted(state.value_nick for state in window.get_state_set().get_states())})
+            return found
+        def visible_app(pid):
+            for window in windows_of(pid):
+                if {'showing', 'visible'} <= set(window['states']):
+                    return {'name': window['name'], 'role': window['role']}
             return None
+        def failed(cycle, check, exit_code):
+            """What a tray check's failure can't show afterwards: whether the
+            application was alive, how it exited, whether the accessibility bus
+            knew it and which windows it had. The assertion's message carries it
+            too, for the job's log."""
+            desktop = Atspi.get_desktop(0)
+            report['failure'] = {'cycle': cycle + 1, 'check': check, 'exitCode': exit_code,
+                                 'accessibilityRegistered': any(desktop.get_child_at_index(i).get_process_id() == app.pid for i in range(desktop.get_child_count())),
+                                 'windows': windows_of(app.pid) if exit_code is None else []}
+            return json.dumps(report['failure'])
         report['appSha256'] = hashlib.sha256((root / 'voco').read_bytes()).hexdigest()
         for cycle in range(2):
             items.clear()
@@ -176,9 +192,14 @@ try:
                     while time.monotonic() < deadline and visible is None:
                         pump(.1)
                         visible = visible_app(app.pid)
-                    assert visible is not None, 'Tray Open did not expose a visible application window'
+                    assert visible is not None, f'Tray Open did not expose a visible application window: {failed(cycle, "trayOpen", app.poll())}'
                     activate('Quit VOCO')
-                    assert app.wait(timeout=10) == 0, 'Tray Quit was not clean'
+                    # None: still running 10 s after Quit. Negative: ended by that signal.
+                    try:
+                        exit_code = app.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        exit_code = None
+                    assert exit_code == 0, f'Tray Quit was not clean: {failed(cycle, "trayQuit", exit_code)}'
                     report['application'].append({'cycle': cycle + 1, 'startup': True, 'trayOpenInvoked': True, 'visibleWindow': visible, 'modelCacheReady': model.exists(), 'trayQuitExitCode': 0})
                 finally:
                     if app.poll() is None:

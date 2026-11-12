@@ -72,6 +72,8 @@ fn run(command: &Value) -> Value {
         "status" => status(),
         "allow-typing" => outcome(crate::portal_keys::allow()),
         "allow-shortcut" => outcome(crate::portal_shortcut::allow(&text())),
+        // Settings' Apply shortcut, once GNOME holds the shortcut.
+        "change-shortcut" => outcome(crate::portal_shortcut::change(&text())),
         // A desktop dictation starts: the renderer asks for the session,
         // then reports the dictation starting.
         "begin" => {

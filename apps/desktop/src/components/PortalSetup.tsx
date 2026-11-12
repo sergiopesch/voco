@@ -23,9 +23,12 @@ type Asking = "typing" | "shortcut" | null;
  * permission to type, then its shortcut, each asked from the person's click,
  * with what GNOME will show said first. Nothing outside VOCO and GNOME.
  */
-export function PortalSetup({ hotkey, disabled = false, onChanged, onStatus }: {
+export function PortalSetup({ hotkey, disabled = false, changeHint = "You can change it in VOCO’s Settings, under Shortcut.", onChanged, onStatus }: {
   hotkey: string;
   disabled?: boolean;
+  /** Where to change a shortcut GNOME holds: Settings' Shortcut page, which
+   * has the editor under this, says so itself. */
+  changeHint?: string;
   /** After GNOME answered: setup checks its desktop input again. */
   onChanged?: (status: PortalSetupStatus) => void;
   /** Every status it shows, so Settings can tell GNOME holds the shortcut. */
@@ -81,9 +84,7 @@ export function PortalSetup({ hotkey, disabled = false, onChanged, onStatus }: {
           {asking === "typing" ? "Waiting for GNOME…" : "Allow typing"}</button>
         {asking === "typing" ? <p role="status">GNOME’s dialog is open. Turn on Allow Remote Interaction, then choose Share.</p> : null}
       </div>}
-    {typing ? status.shortcutBound ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span><strong>{shortcut}</strong> starts and stops dictation. {status.shortcutCustom
-        ? "To change it, open GNOME Settings, then Keyboard, then View and Customize Shortcuts, then Custom Shortcuts."
-        : "To change it, open GNOME Settings, then Apps, then VOCO."}</span></p>
+    {typing ? status.shortcutBound ? <p className="voco-portal-setup__done" role="status"><StatusMark state="success" /><span><strong>{shortcut}</strong> starts and stops dictation.{changeHint ? ` ${changeHint}` : ""}</span></p>
       : status.shortcutPortal ? <div className="voco-portal-setup__step">
         <p>GNOME can keep <strong>{hotkey}</strong> for VOCO, so the app you’re typing in never receives it. GNOME asks you once: choose <strong>Add</strong>.</p>
         <button className="voco-button voco-button--secondary" disabled={disabled} onClick={() => void ask("shortcut")}>
