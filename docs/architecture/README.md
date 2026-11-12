@@ -557,10 +557,16 @@ shortcut. GNOME's grab repeats `Activated` while the
 chord is held, about every 30 ms after the keyboard's repeat delay; one before
 `Deactivated` at a repeat's time, the first within 100 ms of that delay after the
 press and the rest within the delay plus 100 ms of the last, is a repeat and
-toggles nothing. Any other is a press. GNOME 46's custom shortcut runs `voco --toggle` for
-each repeat too, so `note_command_press` treats a toggle within the repeat delay
-plus 400 ms of the last as one, since each is a snap launch that can arrive late;
-a paste waits as long after the last. A first `Activated` toggles through
+toggles nothing. Any other is a press. GNOME 46's custom shortcut calls
+`Toggle` on VOCO's bus name with `dbus-send`, for the press and for each
+repeat, and `panel.rs` hands each to `note_bus_press`, which keeps the same
+state as `Activated`: the calls arrive in a few milliseconds, so the same
+timing tells a repeat from a press. GNOME 46 reports no release of either key,
+so `bus_held` keeps a paste waiting the repeat delay plus 400 ms after the last
+call. Where the call fails the command runs `voco --toggle`,
+and `note_command_press` treats one within the repeat delay plus 400 ms of
+the last as a repeat, since each is a snap launch that can arrive late; a
+paste waits as long after the last. A first `Activated` toggles through
 `eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
 trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
 Super+X. Modifiers can't be
