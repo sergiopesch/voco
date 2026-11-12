@@ -317,7 +317,22 @@ fn press(state: &mut Shortcut, now: Instant, repeat: Option<Repeat>) -> bool {
 pub fn note_bus_press() -> bool {
     let mut state = shortcut();
     state.bus = true;
-    press(&mut state, Instant::now(), repeat())
+    bus_press(&mut state, Instant::now(), repeat())
+}
+
+/// A Toggle call: a press, or a held chord's repeat of one. A keyboard that
+/// doesn't repeat sends no repeat to tell apart, and this route reports no
+/// release that would end a held press, so every call is then a press; the
+/// portal's rule would drop each one that came within a second of the last.
+fn bus_press(state: &mut Shortcut, now: Instant, repeat: Option<Repeat>) -> bool {
+    if repeat.is_none() {
+        state.activated = Some(now);
+        state.repeating = false;
+        state.pressed = Some(now);
+        state.released = None;
+        return true;
+    }
+    press(state, now, repeat)
 }
 
 /// How long after the last Toggle call, a repeat included, a paste waits.
@@ -859,15 +874,33 @@ mod tests {
         let start = Instant::now();
         let at = |ms: u64| start + Duration::from_millis(ms);
         let mut state = Shortcut::default();
-        assert!(press(&mut state, at(0), repeat), "the press");
+        assert!(bus_press(&mut state, at(0), repeat), "the press");
         // GNOME runs the command again at the repeat delay, then every 30 ms.
         for ms in [500, 530, 560, 590] {
-            assert!(!press(&mut state, at(ms), repeat), "the repeat at {ms} ms");
+            assert!(
+                !bus_press(&mut state, at(ms), repeat),
+                "the repeat at {ms} ms"
+            );
         }
         // The next press, after the chord came up.
-        assert!(press(&mut state, at(1800), repeat));
+        assert!(bus_press(&mut state, at(1800), repeat));
         // A quick second press, well before a repeat could come, toggles too.
-        assert!(press(&mut state, at(2050), repeat));
+        assert!(bus_press(&mut state, at(2050), repeat));
+    }
+
+    #[test]
+    fn without_keyboard_repeat_every_call_over_the_bus_is_a_press() {
+        // No repeat can arrive, and no release ever does: the portal's rule
+        // would read each call within a second of the last as a held chord.
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut state = Shortcut::default();
+        for ms in [0, 300, 800, 1300, 1500, 4000] {
+            assert!(bus_press(&mut state, at(ms), None), "the press at {ms} ms");
+        }
+        // The paste after the last one still waits out the modifier's grace.
+        assert_eq!(bus_held(state.activated, at(4100), None), Some(true));
+        assert_eq!(bus_held(state.activated, at(4500), None), None);
     }
 
     #[test]

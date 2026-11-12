@@ -463,7 +463,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
   GNOME runs that command for each repeat too. A `Toggle` call is told from a
   press as the portal's `Activated` is, by GNOME's repeat timing, and VOCO
-  answers it whatever it did, so a repeat never falls back. In the snap a
+  answers it whatever it did, so a repeat never falls back. Where the keyboard
+  doesn't repeat, every call is a press: no repeat can come, and this route
+  reports no release that would end a held one. In the snap a
   `voco --toggle` within the keyboard's repeat delay plus 400 ms of the last
   one is a repeat and toggles nothing: each is a snap launch, so repeats arrive
   late and unevenly. VOCO reads GNOME's repeat setting once.
