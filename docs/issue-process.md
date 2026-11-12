@@ -69,7 +69,10 @@ An issue nobody can act on is closed, with the reason, and can be opened again.
 
 **Agents** triage, reproduce, find causes, write fixes and tests, open pull
 requests, and keep labels and next steps current. `/triage` and `/fix-issue` in
-`.claude/commands/` are the instructions they follow.
+`.claude/commands/` are the instructions they follow. A daily scheduled run of
+`/triage unattended` keeps new reports labelled and tells the maintainer what
+arrived; the work on each issue happens in a session the maintainer started,
+on the machine that has the test machines.
 
 **The maintainer** decides anything that changes the
 [product contract](../AGENTS.md#product-contract), trades off security or
@@ -108,3 +111,9 @@ these without asking:
 
 Anything else, such as declining an idea, an apology, a promise of a date or an
 answer about VOCO's direction, is drafted for the maintainer.
+
+An agent that runs unattended, on a schedule with nobody watching, does less:
+it reads, applies labels and reports to the maintainer what came in and what
+it would do. It posts no comment, closes nothing and opens no pull request. A
+report is a stranger's text, and an agent acting on it in public should have a
+person able to see what it does.

@@ -743,7 +743,8 @@ commit; re-pin and regenerate it when the code it cites changes.
 - In public, agents post only what the process lists: one request for missing
   details, a duplicate's link, what a reproduction ran and found, the cause,
   and the version that ships a fix. Anything else is drafted for the
-  maintainer.
+  maintainer. Running unattended, on a schedule, an agent only reads, labels
+  and reports: no comment, no close, no pull request.
 
 ## Validation
 
