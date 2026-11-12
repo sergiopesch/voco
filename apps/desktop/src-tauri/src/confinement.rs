@@ -17,6 +17,78 @@ fn names_voco(snap_name: Option<&std::ffi::OsStr>) -> bool {
     snap_name.is_some_and(|name| name == "voco")
 }
 
+/// The cgroup snapd made for this run of the app, from a process's
+/// `/proc/<pid>/cgroup`: a path that ends in "snap.voco.<app>-<id>.scope".
+/// None anywhere else, such as a session's own scope, whose other processes
+/// aren't VOCO's.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn snap_scope(cgroup: &str) -> Option<&str> {
+    let path = cgroup
+        .lines()
+        .find_map(|line| line.strip_prefix("0::"))?
+        .trim();
+    let scope = path.rsplit('/').next()?;
+    (scope.starts_with("snap.voco.") && scope.ends_with(".scope")).then_some(path)
+}
+
+/// Whether a process is an xclip VOCO left in `scope`, its own run's cgroup.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn is_left_helper(comm: &str, cgroup: &str, scope: &str) -> bool {
+    comm.trim() == "xclip" && snap_scope(cgroup) == Some(scope)
+}
+
+/// A clean exit of the snap ends the xclip helpers it left holding the
+/// clipboard and the primary selection (AGENTS.md, The snap). snapd counts
+/// every process in the app's cgroup as the app still running, and holds a
+/// refresh from the Snap Store back while one lives, so after Quit VOCO the
+/// update the store had waiting never arrived. GNOME's clipboard manager
+/// keeps CLIPBOARD's text; PRIMARY's goes with its helper. Packages keep
+/// their helpers, as before.
+#[cfg(target_os = "linux")]
+pub fn end_clipboard_helpers() {
+    use std::os::unix::fs::MetadataExt;
+    if !is_snap() {
+        return;
+    }
+    let Ok(own) = std::fs::read_to_string("/proc/self/cgroup") else {
+        return;
+    };
+    let Some(scope) = snap_scope(&own) else {
+        return;
+    };
+    // SAFETY: geteuid has no preconditions.
+    let uid = unsafe { libc::geteuid() };
+    let me = std::process::id();
+    let Ok(processes) = std::fs::read_dir("/proc") else {
+        return;
+    };
+    for process in processes.flatten() {
+        let Some(pid) = process
+            .file_name()
+            .to_str()
+            .and_then(|name| name.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        // Only this user's processes: confinement refuses the others' files,
+        // and asking would fill the log with its denials.
+        if pid == me || !process.metadata().is_ok_and(|entry| entry.uid() == uid) {
+            continue;
+        }
+        let read = |file: &str| std::fs::read_to_string(process.path().join(file));
+        let (Ok(comm), Ok(cgroup)) = (read("comm"), read("cgroup")) else {
+            continue;
+        };
+        if is_left_helper(&comm, &cgroup, scope) {
+            // The helpers start with VOCO's signal mask, which blocks
+            // SIGTERM, and hold nothing a kill could lose.
+            // SAFETY: a signal to a process of this app's own cgroup, read
+            // just above.
+            unsafe { libc::kill(pid as libc::pid_t, libc::SIGKILL) };
+        }
+    }
+}
+
 /// Until the store connects the snap's audio-record plug on its own, setup
 /// names the command that does (AGENTS.md).
 pub const MICROPHONE_DETAIL: &str =
@@ -111,6 +183,40 @@ fn plug_state(code: Option<i32>) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SCOPE: &str = "/user.slice/user-1000.slice/user@1000.service/app.slice/snap.voco.voco-de92a011-db2a-4cc0-930b-f20ab2ae3d5f.scope";
+
+    #[test]
+    fn only_snapds_scope_for_this_run_counts_as_vocos() {
+        assert_eq!(snap_scope(&format!("0::{SCOPE}\n")), Some(SCOPE));
+        // A session's scope, a service's, another snap's, or cgroup v1 lines:
+        // nothing there is known to be VOCO's.
+        for other in [
+            "0::/user.slice/user-1000.slice/session-2.scope\n",
+            "0::/user.slice/user-1000.slice/user@1000.service/app.slice/run-p3850-i13269.service\n",
+            "0::/user.slice/user-1000.slice/user@1000.service/app.slice/snap.firefox.firefox-1234.scope\n",
+            "12:pids:/user.slice\n1:name=systemd:/user.slice/user-1000.slice/session-2.scope\n",
+            "",
+        ] {
+            assert_eq!(snap_scope(other), None, "{other:?}");
+        }
+    }
+
+    #[test]
+    fn a_clean_exit_ends_only_xclip_in_its_own_scope() {
+        let own = format!("0::{SCOPE}\n");
+        assert!(is_left_helper("xclip\n", &own, SCOPE));
+        // The worker and WebKit's processes end with VOCO by themselves.
+        assert!(!is_left_helper("python3.12\n", &own, SCOPE));
+        // Someone's own xclip, and another run of the snap's.
+        assert!(!is_left_helper(
+            "xclip\n",
+            "0::/user.slice/user-1000.slice/session-2.scope\n",
+            SCOPE
+        ));
+        let other_run = own.replace("de92a011", "5972a9ce");
+        assert!(!is_left_helper("xclip\n", &other_run, SCOPE));
+    }
     use std::ffi::OsStr;
 
     #[test]

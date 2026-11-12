@@ -646,6 +646,9 @@ pub fn allow() -> Result<(), String> {
                 token.ok_or_else(|| "GNOME didn't remember the permission.".to_string())
             }
             Err(Refusal::Denied) => Err(DENIED.to_string()),
+            Err(Refusal::Ended) => {
+                Err("GNOME closed its typing dialog. Choose Allow typing again.".to_string())
+            }
             Err(Refusal::TimedOut) => {
                 Err("GNOME's dialog wasn't answered. Choose Allow typing again.".to_string())
             }

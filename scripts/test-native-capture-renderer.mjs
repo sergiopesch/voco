@@ -385,10 +385,19 @@ try {
       const shown=await page.evaluate(()=>window.calls.find(c=>c[0]==='traceHotkeyEvent'&&c[1]==='interactive_surface_shown')[2]);
       assert.ok(Number.isInteger(shown?.durationMs)&&shown.durationMs>=0,JSON.stringify(shown));
       await page.waitForFunction(()=>window.calls.some(c=>c[0]==='getRuntimeDiagnostics'));
+      // X11 can report focus gained and lost again as the shown window settles.
+      // That closed the popover about 70 ms after it opened; it now stays.
+      await page.evaluate(()=>{window.focusListeners.forEach(listener=>listener({payload:true}));window.focusListeners.forEach(listener=>listener({payload:false}));});
+      await page.waitForFunction(()=>window.calls.some(c=>c[0]==='traceHotkeyEvent'&&c[1]==='popover_focus_loss_ignored'));
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(()=>window.store.getState().surface),'popover','a focus loss while the popover settles closed it');
+      results.push({case:'an-x11-focus-loss-as-the-popover-opens-closes-nothing',passed:true});
+      // Once it has settled, a focus loss closes it, as a click elsewhere does.
+      await page.waitForTimeout(500);
       await page.evaluate(()=>window.focusListeners.forEach(listener=>listener({payload:false})));
       await page.waitForFunction(()=>window.store.getState().surface==='hidden');
       const surfaceTrace=await page.evaluate(()=>window.calls.filter(c=>c[0]==='traceHotkeyEvent'&&/^(popover_focus|interactive_surface)_/.test(c[1])).map(c=>c[1]));
-      assert.deepEqual(surfaceTrace,['interactive_surface_shown','popover_focus_lost','interactive_surface_dismissed']);
+      assert.deepEqual(surfaceTrace,['interactive_surface_shown','popover_focus_gained','popover_focus_lost','popover_focus_loss_ignored','popover_focus_lost','interactive_surface_dismissed']);
       results.push({case:'an-x11-focus-loss-closes-the-popover-and-says-so',passed:true});
       await page.setViewportSize({width:1100,height:800});
       await loadTest();

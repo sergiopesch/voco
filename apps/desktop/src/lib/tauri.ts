@@ -120,6 +120,12 @@ export function allowPortalTyping(): Promise<PortalSetupStatus> {
 export function allowPortalShortcut(): Promise<PortalSetupStatus> {
   return invoke("allow_portal_shortcut");
 }
+/** Settings' Apply shortcut once GNOME holds the shortcut: GNOME takes the new
+ * keys, after its own dialog where it has one. Rejects with why not, and the
+ * earlier shortcut then stays. */
+export function changePortalShortcut(hotkey: string): Promise<PortalSetupStatus> {
+  return invoke("change_portal_shortcut", { hotkey });
+}
 /** A desktop dictation starts: the snap opens its typing session with GNOME. */
 export function beginDesktopTyping(): Promise<void> {
   return invoke("begin_desktop_typing");
