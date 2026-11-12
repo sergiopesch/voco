@@ -302,7 +302,8 @@ main {
 }
 .reading-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …): a long file name ellipsizes instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 38px;
   margin: 34px 0 42px;
 }
@@ -328,6 +329,7 @@ main {
   font-size: 12px;
 }
 .source-links code {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -734,7 +736,7 @@ dialog::backdrop {
     display: none;
   }
   .reading-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 28px;
   }
   .source-links {
