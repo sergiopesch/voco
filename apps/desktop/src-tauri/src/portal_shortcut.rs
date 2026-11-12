@@ -86,9 +86,10 @@ fn repeat_delay() -> Option<Duration> {
 /// margin; the first comes after the delay, the rest about every 30 ms.
 const REPEAT_MARGIN: Duration = Duration::from_millis(100);
 
-fn within_repeat(last: Option<Instant>, now: Instant, delay: Option<Duration>) -> bool {
-    match (last, delay) {
-        (Some(last), Some(delay)) => now.saturating_duration_since(last) < delay + REPEAT_MARGIN,
+/// Within `window` of the last press or repeat; never without a window.
+fn within_repeat(last: Option<Instant>, now: Instant, window: Option<Duration>) -> bool {
+    match (last, window) {
+        (Some(last), Some(window)) => now.saturating_duration_since(last) < window,
         _ => false,
     }
 }
@@ -104,7 +105,7 @@ fn is_repeat(state: &Shortcut, now: Instant, delay: Option<Duration>) -> bool {
     down && within_repeat(
         state.activated,
         now,
-        Some(delay.unwrap_or_default().max(STALE_REPEAT)),
+        Some(delay.unwrap_or_default().max(STALE_REPEAT) + REPEAT_MARGIN),
     )
 }
 
@@ -172,13 +173,22 @@ pub fn custom_present(hotkey: &str) -> bool {
 /// no release to wait for: a paste waits this long after it, or after its last
 /// repeat, for the chord's keys to come up (AGENTS.md, Delivery).
 const COMMAND_GRACE: Duration = Duration::from_millis(400);
+/// Each `voco --toggle` is a snap launch, about 150 ms on an idle machine and
+/// longer while GNOME starts one per repeat, so repeats reach VOCO late and
+/// unevenly: the gap between the press's and the first repeat's can exceed
+/// the repeat delay by a few hundred milliseconds.
+const COMMAND_LAUNCH_MARGIN: Duration = Duration::from_millis(400);
 /// The last `voco --toggle`, a held chord's repeats included.
 static COMMAND_PRESS: Mutex<Option<Instant>> = Mutex::new(None);
 
+/// How long after one `voco --toggle` the next is a repeat, and a paste waits
+/// for the keys to come up: the repeat delay and the launch margin.
+fn command_window(delay: Option<Duration>) -> Option<Duration> {
+    delay.map(|delay| delay + COMMAND_LAUNCH_MARGIN)
+}
+
 fn command_grace(delay: Option<Duration>) -> Duration {
-    delay.map_or(COMMAND_GRACE, |delay| {
-        COMMAND_GRACE.max(delay + REPEAT_MARGIN)
-    })
+    command_window(delay).map_or(COMMAND_GRACE, |window| COMMAND_GRACE.max(window))
 }
 
 /// A `voco --toggle` reached the snap. False for a held chord's repeat, which
@@ -188,7 +198,7 @@ pub fn note_command_press() -> bool {
     let mut last = COMMAND_PRESS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let repeat = within_repeat(*last, now, repeat_delay());
+    let repeat = within_repeat(*last, now, command_window(repeat_delay()));
     *last = Some(now);
     !repeat
 }
@@ -720,25 +730,28 @@ mod tests {
     fn a_custom_shortcuts_repeats_never_toggle() {
         let start = Instant::now();
         let at = |ms| start + Duration::from_millis(ms);
-        let delay = Some(Duration::from_millis(500));
+        let window = command_window(Some(Duration::from_millis(500)));
         assert!(
-            !within_repeat(None, at(0), delay),
+            !within_repeat(None, at(0), window),
             "the first press toggles"
         );
         assert!(
-            within_repeat(Some(at(0)), at(500), delay),
-            "the first repeat doesn't"
+            within_repeat(Some(at(0)), at(820), window),
+            "the first repeat doesn't, even when its launch was slow"
         );
-        assert!(within_repeat(Some(at(500)), at(530), delay));
+        assert!(within_repeat(Some(at(820)), at(850), window));
         assert!(
-            !within_repeat(Some(at(530)), at(1_400), delay),
+            !within_repeat(Some(at(850)), at(1_800), window),
             "a press after the release does"
         );
         assert!(
             !within_repeat(Some(at(0)), at(50), None),
             "no repeat, no filter"
         );
-        assert_eq!(command_grace(delay), Duration::from_millis(600));
+        assert_eq!(
+            command_grace(Some(Duration::from_millis(500))),
+            Duration::from_millis(900)
+        );
         assert_eq!(command_grace(None), COMMAND_GRACE);
     }
 }

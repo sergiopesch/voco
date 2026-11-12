@@ -244,7 +244,7 @@ and the update check. [The snap](#the-snap) lists its rules.
   it is: keys sent under Super or Alt make another chord, which pastes nothing.
   A press with no `Deactivated` after 5 s reads as unknown, so a lost signal
   can't hold back every paste. After a `voco --toggle` in the snap, which
-  reports no release, a paste waits 400 ms, or the repeat delay plus 100 ms
+  reports no release, a paste waits 400 ms, or the repeat delay plus 400 ms
   when it is longer, after the last one, its repeats included. An X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
@@ -401,8 +401,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   for those keys isn't in the snap's runtime, so the snap carries one with the
   same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
   That shortcut runs `voco --toggle` for each repeat too, so in the snap a
-  `voco --toggle` within the keyboard's repeat delay plus 100 ms of the last
-  one is a repeat and toggles nothing. VOCO reads GNOME's repeat setting once.
+  `voco --toggle` within the keyboard's repeat delay plus 400 ms of the last
+  one is a repeat and toggles nothing: each is a snap launch, so repeats arrive
+  late and unevenly. VOCO reads GNOME's repeat setting once.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives the chord (on Alt+D browsers focus the address bar and
   terminals delete a word; few apps act on Super+X), and an evdev toggle while
