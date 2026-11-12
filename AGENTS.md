@@ -23,6 +23,10 @@ setup and pull requests.
   through the system package manager, after the system's own password prompt,
   and then restarts itself. It never updates on its own. The snap has no
   network access at all: the Snap Store updates it, so it never checks.
+  Feedback is never sent by VOCO either. Help's **Report a problem** opens
+  VOCO's bug form on GitHub in the person's browser, at an address Rust builds
+  (`problem_report.rs`) with only the version, the kind of package, the
+  desktop's name and the session type, and the person decides what to submit.
 - One output path: streaming dictation pasted into whatever has keyboard focus.
   The optional Chromium exact field uses the same recognizer with its own delivery.
 - No assistant, conversation, enhancement, appearance or per-app settings.

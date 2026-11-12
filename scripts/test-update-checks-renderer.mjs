@@ -146,6 +146,14 @@ try {
     assert.equal(await loginSwitch.count(), 0, 'A source build has no switch');
     results.push({ case: 'login-start-hidden-where-unavailable', passed: true });
 
+    // Help's Report a problem opens VOCO's bug form through Rust, which
+    // builds the address; the window passes nothing.
+    await page.getByRole('button', { name: 'Help', exact: true }).click();
+    await page.getByRole('button', { name: 'Report a problem', exact: true }).click();
+    assert.deepEqual(await page.evaluate(() => window.calls.filter(([name]) => name === 'openProblemReport')), [['openProblemReport']]);
+    assert.equal(await page.evaluate(() => window.calls.some(([name]) => name === 'openExternalUrl')), false);
+    results.push({ case: 'help-reports-a-problem-through-rust', passed: true });
+
     await load({ onboardingCompleted: true, startAtLogin: true }, false, false, true);
     await page.evaluate(() => window.store.getState().setSurface('settings'));
     await loginSwitch.waitFor();

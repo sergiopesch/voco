@@ -247,6 +247,12 @@ export async function showNotification(summary: string, body: string): Promise<v
   return invoke("show_notification", { summary, body });
 }
 
+/** Opens VOCO's bug form in the browser with the version, the package and
+ * the desktop filled in. Rust builds the address; VOCO sends nothing. */
+export async function openProblemReport(): Promise<void> {
+  return invoke("open_problem_report");
+}
+
 export async function openExternalUrl(url: string): Promise<void> {
   return invoke("open_external_url", { url });
 }
