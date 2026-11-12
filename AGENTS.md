@@ -435,7 +435,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   trigger. GNOME shows its dialog: when the person adds it, the earlier session
   closes, GNOME keeps only the new ID and VOCO saves the keys GNOME reports,
   which that dialog lets the person alter; cancelled, the earlier keys stay
-  and still toggle. Any chord whose key has an X keysym VOCO knows
+  and still toggle. Altered there to keys VOCO can't take, such as a key
+  with no Alt, Ctrl or Super, VOCO refuses them and says so: it closes both
+  sessions and drops its records, so it holds no shortcut and the Add button
+  offers its own again, and no start ever shows GNOME's dialog. Any chord whose key has an X keysym VOCO knows
   (`shortcut_chord.rs`) can be proposed. While the
   companion's lease is fresh VOCO closes the portal session, so one grab holds the
   chord, and binds again when the lease lapses. On GNOME 46, which has no

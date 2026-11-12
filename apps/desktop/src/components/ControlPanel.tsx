@@ -236,6 +236,9 @@ export function ControlPanel({
   // keyboard shortcuts take it without one.
   const [gnomeConfirmsShortcut, setGnomeConfirmsShortcut] = useState(false);
   const [askingGnome, setAskingGnome] = useState(false);
+  // A change GNOME refused or altered can leave it holding other keys or
+  // none, so the status above is asked again after every attempt.
+  const [gnomeAsked, setGnomeAsked] = useState(0);
   const [hotkeyError, setHotkeyError] = useState<string | null>(null);
   const nativePreviewDisabled = Boolean(nativeMicrophone && nativeMicrophone.mode !== "webkit");
   const waylandDesktop = isWaylandSession(runtimeDiagnostics?.sessionType ?? null);
@@ -739,6 +742,7 @@ export function ControlPanel({
         return false;
       } finally {
         setAskingGnome(false);
+        setGnomeAsked((count) => count + 1);
       }
     }
     // The native shortcut parser validates supported aliases and reserved shortcuts.
@@ -993,7 +997,7 @@ export function ControlPanel({
                   <div className="voco-preferences__heading"><h2 tabIndex={-1}>Shortcut</h2></div>
                   <div className="voco-preferences__group">
                     <div className="voco-preferences__card voco-preferences__form">
-                      {updatesByStore && waylandDesktop ? <PortalSetup key={config.hotkey} hotkey={config.hotkey} disabled={saving || dictationBusy} changeHint=""
+                      {updatesByStore && waylandDesktop ? <PortalSetup key={`${config.hotkey}:${gnomeAsked}`} hotkey={config.hotkey} disabled={saving || dictationBusy} changeHint=""
                         onStatus={status => {
                           setGnomeHoldsShortcut(status.applies && !status.panelHoldsShortcut && status.shortcutBound);
                           setGnomeConfirmsShortcut(status.shortcutPortal);

@@ -626,15 +626,22 @@ fn change_keys(accelerator: &str) -> Result<String, String> {
     }
     let label = accelerator.to_owned();
     let accelerator = accelerator.to_owned();
-    let (id, trigger) = portal::run(move |connection| {
+    let changed = portal::run(move |connection| {
         if !portal::has_interface(connection, INTERFACE, 1) {
             return Err("This GNOME has no shortcut portal.".to_string());
         }
         let id = next_id(&saved_id());
         match bind(connection, &id, &accelerator, DIALOG_TIMEOUT) {
+            // GNOME's dialog lets the person alter the proposed keys. Keys
+            // VOCO can't take, such as a key with no Alt, Ctrl or Super,
+            // would leave its labels naming a shortcut GNOME doesn't hold.
+            Ok((session, Some(trigger))) if hotkey_from_trigger(&trigger).is_none() => {
+                portal::close_session(connection, &session);
+                Ok(Err(trigger))
+            }
             Ok((session, Some(trigger))) => {
                 adopt(connection, session, &id, Some(trigger.clone()));
-                Ok((id, trigger))
+                Ok(Ok((id, trigger)))
             }
             // Added with its keys cleared in GNOME's dialog: nothing to press.
             Ok((session, None)) => {
@@ -653,9 +660,38 @@ fn change_keys(accelerator: &str) -> Result<String, String> {
         }
     })
     .unwrap_or_else(|| Err("VOCO can't reach GNOME's portal.".to_string()))?;
-    record_id(&id);
-    record_bound(Some(&trigger));
-    Ok(trigger)
+    match changed {
+        Ok((id, trigger)) => {
+            record_id(&id);
+            record_bound(Some(&trigger));
+            Ok(trigger)
+        }
+        // GNOME replaced the keys it held for VOCO with ones VOCO refuses,
+        // so it holds none VOCO uses: the earlier session closes too, and
+        // setup's and Settings' Add button offers VOCO's shortcut again.
+        Err(trigger) => {
+            unbind();
+            // "<Shift>F8" as a person writes it: "Shift+F8".
+            let keys = trigger
+                .trim()
+                .trim_start_matches("Press")
+                .trim()
+                .replace('<', "")
+                .replace('>', "+");
+            Err(format!(
+                "GNOME now holds {keys}, which VOCO can't use: its shortcut needs Alt, Ctrl or Super and a key VOCO can name. Choose the Add button to set VOCO's shortcut again."
+            ))
+        }
+    }
+}
+
+/// GNOME no longer holds keys VOCO uses: close the session and drop the
+/// records, so the next bind is the Add button's, never a start's.
+fn unbind() {
+    close();
+    for path in [bound_path(), id_path()].into_iter().flatten() {
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 fn close() {

@@ -29,7 +29,7 @@ FIELD = 'VOCO paste fixture'
 # Evdev codes for the probe's keyboard: Shift, Control, and Super+X, VOCO's default.
 SHIFT, CONTROL, SUPER, X = 42, 29, 125, 45
 # Control+Alt+K, the shortcut Settings changes to.
-ALT, K = 56, 37
+ALT, K, F8 = 56, 37, 66
 # The refusals: the paste preflight's or portal_keys.rs's remedy without
 # GNOME's permission, and portal_keys.rs's after GNOME's Stop.
 NOT_ALLOWED, CLOSED_BY_GNOME = 'Choose Allow typing', "GNOME's Stop ended VOCO's typing"
@@ -762,7 +762,28 @@ try:
         chord(); time.sleep(.4)
         press(CONTROL, ALT, K); time.sleep(.4)
         assert voco.counts()['toggles'] == toggles + 3, voco.counts()
-        return {'dialog': dialog, 'changedTo': changed['ok'], 'backTo': back['ok']}
+        # GNOME's dialog lets the person alter the proposed keys. Keys VOCO
+        # can't take, here Shift+F8 with no Alt, Ctrl or Super, are refused:
+        # VOCO says so, holds no shortcut, and the Add button sets one again.
+        voco.send('change-shortcut', text='Shift+F8')
+        answer('dialog-change-shortcut-unusable', 'Add')
+        unusable = voco.reply(30)
+        assert "GNOME now holds Shift+F8, which VOCO can't use" in unusable.get('error', ''), unusable
+        status = voco.ask('status')
+        assert not status['shortcutBound'] and not status['shortcutHeld'] and not record.exists(), status
+        field.focus(); time.sleep(.3)
+        before = voco.counts()['toggles']
+        chord(); time.sleep(.4)
+        press(SHIFT, F8); time.sleep(.4)
+        assert voco.counts()['toggles'] == before, 'a refused shortcut still toggled'
+        voco.send('allow-shortcut', text='Super+X')
+        answer('dialog-shortcut-again', 'Add')
+        again = voco.reply(30)
+        assert again.get('ok') == 'Press <Super>x', again
+        field.focus(); field.clear(); time.sleep(.3)
+        chord(); time.sleep(.4)
+        assert voco.counts()['toggles'] == before + 1, voco.counts()
+        return {'dialog': dialog, 'changedTo': changed['ok'], 'backTo': back['ok'], 'refused': unusable['error']}
     check('changeShortcut', change_shortcut)
 
     assert not typing_sessions(), typing_sessions()

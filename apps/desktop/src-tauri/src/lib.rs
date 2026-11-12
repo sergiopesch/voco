@@ -1006,7 +1006,9 @@ fn change_gnome_shortcut(app: &tauri::AppHandle, hotkey: &str) -> Result<String,
     #[cfg(target_os = "linux")]
     let hotkey = {
         let trigger = portal_shortcut::change(&hotkey)?;
-        shortcut_chord::hotkey_from_trigger(&trigger).unwrap_or(hotkey)
+        // `change` returns only keys VOCO can take, in GNOME's spelling.
+        shortcut_chord::hotkey_from_trigger(&trigger)
+            .ok_or_else(|| format!("GNOME reported keys VOCO can't read: {trigger}"))?
     };
     persist_config_patch(app, AppConfigPatch::with_hotkey(hotkey.clone()), true)?;
     Ok(hotkey)

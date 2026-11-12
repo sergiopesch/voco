@@ -232,7 +232,9 @@ toggles; while the companion's lease holds the chord
 Super+X doesn't toggle, and after it the shortcut binds again without a dialog;
 Settings' change of shortcut shows GNOME's dialog, whose Cancel keeps Super+X
 working and whose Add makes Control+Alt+K toggle and Super+X not, a later bind
-keeps the new keys without a dialog, and changing back to Super+X works.
+keeps the new keys without a dialog, and changing back to Super+X works; keys
+VOCO can't take, Shift+F8, are refused, leave no shortcut held, and the Add
+button sets Super+X again.
 Without a tauri app the fixture counts the stops and toggles the portal code
 asks for instead. `VOCO_PORTAL_EVIDENCE_DIR` receives `results.json`, the
 dialogs' and the remote-access icon's screenshots, and each service's log.
