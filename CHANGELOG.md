@@ -6,6 +6,35 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.71] - 2026-11-12
+
+The snap types promptly on GNOME however you let go of Super+X, and two of
+setup's sentences are clearer. The
+[release notes](docs/releases/2026.0.71.md) explain the upgrade.
+
+### Fixed
+
+- In the snap on GNOME 48 and later, words appeared about five seconds after
+  Super+X, and a dictation's last words were often copied instead of typed, when
+  Super was let go before X. GNOME's GlobalShortcuts portal reports the release
+  only when the letter comes up under its modifier, so VOCO counted the press as
+  held for its full five-second bound. A press with no reported release now
+  counts as held only while the chord could still repeat: the keyboard's repeat
+  delay plus 100 ms after its last press or repeat, 600 ms by default.
+- In the snap on GNOME 48 and later, a second Super+X within a second of one
+  that let go of Super first did nothing, because it was dropped as a key
+  repeat. A repeat is now told from a press by GNOME's repeat timing.
+
+### Changed
+
+- Setup's last step says "VOCO is running now, and starts by itself each time
+  you sign in." It said only "VOCO starts when you sign in", which reads as a
+  request to sign in again.
+- Setup's My words step says the name it offers came from your account on this
+  computer, until you change or save it.
+- CI's **GNOME 50 Portals** job presses the shortcut with Super let go first,
+  and holds it past the repeat delay with a paste waiting.
+
 ## [2026.0.70] - 2026-11-12
 
 The snap from the Snap Store and App Center types on GNOME with nothing else to
@@ -724,6 +753,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.71]: https://github.com/sergiopesch/voco/compare/voco.2026.0.70...voco.2026.0.71
 [2026.0.70]: https://github.com/sergiopesch/voco/compare/voco.2026.0.69...voco.2026.0.70
 [2026.0.69]: https://github.com/sergiopesch/voco/compare/voco.2026.0.68...voco.2026.0.69
 [2026.0.68]: https://github.com/sergiopesch/voco/compare/voco.2026.0.67...voco.2026.0.68
