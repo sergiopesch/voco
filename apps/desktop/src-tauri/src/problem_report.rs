@@ -9,9 +9,10 @@ use std::path::Path;
 
 const BUG_FORM: &str = "https://github.com/sergiopesch/voco/issues/new?template=bug.yml";
 
-/// How VOCO was installed, in the words of the form's own dropdown, which
-/// GitHub selects only for an exact match (`options` in
-/// `.github/ISSUE_TEMPLATE/bug.yml`; a test keeps the two together).
+/// How VOCO was installed, in the words of the form's own dropdown (`options`
+/// in `.github/ISSUE_TEMPLATE/bug.yml`; a test keeps the two together).
+/// GitHub documents the prefill for a form's text fields only, so the text
+/// field names the package too, in case the dropdown stays empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Install {
     Snap,
@@ -30,6 +31,15 @@ impl Install {
             Self::Deb => "The .deb (guided installer or manual)",
             Self::Rpm => "The RPM",
             Self::Source => "Built from source",
+        }
+    }
+
+    fn short(self) -> &'static str {
+        match self {
+            Self::Snap => "snap",
+            Self::Deb => ".deb",
+            Self::Rpm => "RPM",
+            Self::Source => "built from source",
         }
     }
 
@@ -86,7 +96,8 @@ fn desktop_name(raw: &str) -> String {
 /// The form's address with its two fields filled in.
 pub(crate) fn url(version: &str, install: Install, desktop: &str, session: &str) -> String {
     let environment = format!(
-        "VOCO {version}, {} on {session}. Add your distribution and the app you dictated into.",
+        "VOCO {version} ({}), {} on {session}. Add your distribution and the app you dictated into.",
+        install.short(),
         desktop_name(desktop)
     );
     format!(
@@ -119,7 +130,7 @@ mod tests {
             address,
             "https://github.com/sergiopesch/voco/issues/new?template=bug.yml\
              &install=Snap%20Store%20or%20App%20Center\
-             &environment=VOCO%202026.0.72%2C%20ubuntu%3AGNOME%20on%20Wayland.%20Add%20your%20distribution%20and%20the%20app%20you%20dictated%20into."
+             &environment=VOCO%202026.0.72%20%28snap%29%2C%20ubuntu%3AGNOME%20on%20Wayland.%20Add%20your%20distribution%20and%20the%20app%20you%20dictated%20into."
         );
         // Whatever the desktop variable holds, the address stays the form's
         // own, with nothing a browser or GitHub would read as more fields.
