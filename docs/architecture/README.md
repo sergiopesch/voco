@@ -524,6 +524,10 @@ returns on its own thread, with the `reis` crate's implementation of libei's
 protocol: it connects as a sender, binds the seat's keyboard and waits for
 GNOME to resume the device, about 10 ms. The paste keys then go out on that
 socket, each with its frame, between `start_emulating` and `stop_emulating`.
+Before Insert it reads the reported modifiers again, and when one other than
+its own Shift is down it releases Shift and returns `HeldBack`:
+`paste_transaction` keeps that `no-mutation`, where any other failure at the
+keys is uncertain, so the text stays pending.
 From GNOME 50 the same socket carries `ei_keyboard.modifiers` whenever the
 seat's modifier state changes, from any keyboard, so `modifiers_held` knows
 whether Shift, Control, Alt, Super or AltGr is down, and the paste's modifier

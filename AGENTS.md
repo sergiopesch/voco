@@ -292,8 +292,14 @@ and the update check. [The snap](#the-snap) lists its rules.
   the keyboard resumes. A connection GNOME refuses, whose keyboard isn't ready
   within 2 s, or that has reported no modifiers 300 ms after that, isn't asked
   for again by that process: the session, opened again if it had connected,
-  sends its keys with the portal's `NotifyKeyboardKeycode`, as on GNOME 46. Either way each paste sends Shift, Insert and their releases,
-  12 ms apart, never another key. A
+  sends its keys with the portal's `NotifyKeyboardKeycode`, as on GNOME 46.
+  Either way each paste sends Shift, Insert and their releases, 12 ms apart,
+  never another key. Through the keyboard connection it reads the modifiers
+  once more just before Insert: one that went down under its Shift, as the
+  shortcut's does when it is pressed to stop just as words go out, would make
+  the paste another chord that types nothing while VOCO counted the words as
+  typed. Shift then comes back up alone, and the paste is `no-mutation`
+  though the clipboard changed, its text pending like any other. A
   paste before the session has started, a session that failed to start, or one
   GNOME closed, typed nothing: `no-mutation`. A key that fails after Shift went
   out is uncertain, and VOCO then releases Shift. Only setup's and Settings'
@@ -336,7 +342,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   toggles again. With the connection turned off, as on a GNOME that gives
   none, the same pastes go through the portal's key calls and wait for
   `Deactivated`, or until no repeat follows; and a connection taken as
-  reporting no modifiers closes its session, and a plain one types.
+  reporting no modifiers closes its session, and a plain one types. A
+  modifier pressed under VOCO's Shift gets no Insert, and the same text lands
+  once it is up.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that
