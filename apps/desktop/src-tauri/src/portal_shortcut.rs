@@ -48,6 +48,9 @@ struct Shortcut {
     activated: Option<Instant>,
     /// That `Activated` was a repeat: the chord was still held then.
     repeating: bool,
+    /// The last press came from GNOME 46's custom shortcut, over D-Bus, with
+    /// no portal session behind it and no release to come.
+    bus: bool,
 }
 
 static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
@@ -59,6 +62,7 @@ static SHORTCUT: Mutex<Shortcut> = Mutex::new(Shortcut {
     released: None,
     activated: None,
     repeating: false,
+    bus: false,
 });
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 /// The toggles `Activated` asked for. The portal suite (portal_fixture.rs)
@@ -291,6 +295,60 @@ fn command_grace(delay: Option<Duration>) -> Duration {
     command_window(delay).map_or(COMMAND_GRACE, |window| COMMAND_GRACE.max(window))
 }
 
+/// A press GNOME reported, or a held chord's repeat of one. True for a press,
+/// which toggles; a repeat only keeps the chord counted as held.
+fn press(state: &mut Shortcut, now: Instant, repeat: Option<Repeat>) -> bool {
+    let repeated = is_repeat(state, now, repeat);
+    state.activated = Some(now);
+    state.repeating = repeated;
+    if repeated {
+        return false;
+    }
+    state.pressed = Some(now);
+    state.released = None;
+    true
+}
+
+/// GNOME 46's custom shortcut called VOCO's Toggle over D-Bus (panel.rs),
+/// as it does for the press and for each repeat while the chord is held.
+/// The call arrives within a few milliseconds, so repeats come at GNOME's
+/// own timing and are told from presses as the portal's are. False for a
+/// repeat, which doesn't toggle.
+pub fn note_bus_press() -> bool {
+    let mut state = shortcut();
+    state.bus = true;
+    bus_press(&mut state, Instant::now(), repeat())
+}
+
+/// A Toggle call: a press, or a held chord's repeat of one. A keyboard that
+/// doesn't repeat sends no repeat to tell apart, and this route reports no
+/// release that would end a held press, so every call is then a press; the
+/// portal's rule would drop each one that came within a second of the last.
+fn bus_press(state: &mut Shortcut, now: Instant, repeat: Option<Repeat>) -> bool {
+    if repeat.is_none() {
+        state.activated = Some(now);
+        state.repeating = false;
+        state.pressed = Some(now);
+        state.released = None;
+        return true;
+    }
+    press(state, now, repeat)
+}
+
+/// How long after the last Toggle call, a repeat included, a paste waits.
+/// GNOME 46 reports no release of either key. Without a repeat the letter
+/// came up within the repeat delay, and the modifier gets the grace it gets
+/// after a portal `Deactivated`: people often let go of it a moment later.
+fn bus_grace(delay: Option<Duration>) -> Duration {
+    delay.map_or(MODIFIER_GRACE, |delay| delay + MODIFIER_GRACE)
+}
+
+/// Whether a press over D-Bus still counts as held: unknown once its grace
+/// has passed, which holds back no paste.
+fn bus_held(last: Option<Instant>, now: Instant, delay: Option<Duration>) -> Option<bool> {
+    (now.saturating_duration_since(last?) < bus_grace(delay)).then_some(true)
+}
+
 /// A `voco --toggle` reached the snap. False for a held chord's repeat, which
 /// GNOME's custom shortcut runs too: it doesn't toggle.
 pub fn note_command_press() -> bool {
@@ -341,17 +399,12 @@ fn watch(connection: &gio::DBusConnection) {
                     return;
                 }
                 if signal == "Activated" {
-                    let now = Instant::now();
                     #[cfg(test)]
                     ACTIVATIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let repeated = is_repeat(&state, now, repeat());
-                    state.activated = Some(now);
-                    state.repeating = repeated;
-                    if repeated {
+                    state.bus = false;
+                    if !press(&mut state, Instant::now(), repeat()) {
                         return;
                     }
-                    state.pressed = Some(now);
-                    state.released = None;
                     drop(state);
                     #[cfg(test)]
                     TOGGLES_REQUESTED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -511,6 +564,11 @@ fn adopt(connection: &gio::DBusConnection, session: String, id: &str, trigger: O
 /// At startup: bind again what the person already added, without a dialog.
 pub fn setup(app: &tauri::AppHandle, accelerator: &str) {
     let _ = APP.set(app.clone());
+    // GNOME 46: VOCO's own custom shortcut, added by an earlier VOCO, takes
+    // this VOCO's command.
+    if custom_applies() {
+        crate::gnome_custom_shortcut::update_command();
+    }
     if applies() && bound() {
         rebind(accelerator.to_owned());
     }
@@ -745,6 +803,9 @@ pub fn keys_held() -> Option<bool> {
         return Some(true);
     }
     let state = shortcut();
+    if state.bus {
+        return bus_held(state.activated, Instant::now(), repeat_delay());
+    }
     state.session.as_ref()?;
     let pressed = state.pressed?;
     held(
@@ -786,6 +847,60 @@ mod tests {
             delay: Duration::from_millis(delay_ms),
             interval: Duration::from_millis(30),
         })
+    }
+
+    #[test]
+    fn a_press_over_the_bus_holds_back_pastes_for_the_modifiers_grace() {
+        let delay = Some(Duration::from_millis(500));
+        let pressed = Instant::now();
+        let at = |ms: u64| pressed + Duration::from_millis(ms);
+        // No release ever comes: held through the repeat delay, when a held
+        // chord would have repeated, and the modifier's 400 ms after it.
+        assert_eq!(bus_held(Some(pressed), at(0), delay), Some(true));
+        assert_eq!(bus_held(Some(pressed), at(899), delay), Some(true));
+        assert_eq!(bus_held(Some(pressed), at(900), delay), None);
+        // A repeat moves the wait on: the chord was still down then.
+        assert_eq!(bus_held(Some(at(800)), at(1699), delay), Some(true));
+        assert_eq!(bus_held(Some(at(800)), at(1700), delay), None);
+        // A keyboard that doesn't repeat: the grace alone.
+        assert_eq!(bus_held(Some(pressed), at(399), None), Some(true));
+        assert_eq!(bus_held(Some(pressed), at(400), None), None);
+        assert_eq!(bus_held(None, at(0), delay), None);
+    }
+
+    #[test]
+    fn presses_over_the_bus_toggle_and_their_repeats_dont() {
+        let repeat = repeat_after(500);
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut state = Shortcut::default();
+        assert!(bus_press(&mut state, at(0), repeat), "the press");
+        // GNOME runs the command again at the repeat delay, then every 30 ms.
+        for ms in [500, 530, 560, 590] {
+            assert!(
+                !bus_press(&mut state, at(ms), repeat),
+                "the repeat at {ms} ms"
+            );
+        }
+        // The next press, after the chord came up.
+        assert!(bus_press(&mut state, at(1800), repeat));
+        // A quick second press, well before a repeat could come, toggles too.
+        assert!(bus_press(&mut state, at(2050), repeat));
+    }
+
+    #[test]
+    fn without_keyboard_repeat_every_call_over_the_bus_is_a_press() {
+        // No repeat can arrive, and no release ever does: the portal's rule
+        // would read each call within a second of the last as a held chord.
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut state = Shortcut::default();
+        for ms in [0, 300, 800, 1300, 1500, 4000] {
+            assert!(bus_press(&mut state, at(ms), None), "the press at {ms} ms");
+        }
+        // The paste after the last one still waits out the modifier's grace.
+        assert_eq!(bus_held(state.activated, at(4100), None), Some(true));
+        assert_eq!(bus_held(state.activated, at(4500), None), None);
     }
 
     #[test]
