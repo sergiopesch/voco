@@ -54,7 +54,10 @@ setup and pull requests.
   `activation.rs` counts a start as a launcher click only when GIO names
   `VOCO.desktop` and this process, and reads that before GTK removes
   `DESKTOP_AUTOSTART_ID`. A start from a terminal or a login autostart stays in
-  the tray. The desktop entry keeps `StartupNotify=false`: a tray start shows no
+  the tray. On X11 the popover closes when it loses focus, as when the person
+  clicks elsewhere, but not within 600 ms of being shown: X11 can report focus
+  gained and lost again while a just-shown window settles, which closed a
+  launcher start's popover about 70 ms after it opened. The desktop entry keeps `StartupNotify=false`: a tray start shows no
   window, so it can't complete a launcher's startup sequence, and GNOME would
   show its busy cursor until a 15 s timeout.
 - Settings are the microphone, the shortcut, English spelling, My words with

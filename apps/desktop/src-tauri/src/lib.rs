@@ -274,6 +274,7 @@ fn trace_frontend_hotkey_event(
         | "interactive_surface_dismissed"
         | "popover_focus_gained"
         | "popover_focus_lost"
+        | "popover_focus_loss_ignored"
         | "frontend_hotkey_listener_registered" => {
             trace_hotkey_event_with_fields(&event, None, fields.as_ref());
             Ok(())
