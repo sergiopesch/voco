@@ -66,6 +66,8 @@ mod gnome_custom_shortcut;
 mod panel;
 #[cfg(target_os = "linux")]
 mod portal;
+#[cfg(target_os = "linux")]
+mod portal_eis;
 #[cfg(all(test, target_os = "linux"))]
 mod portal_fixture;
 #[cfg(target_os = "linux")]
@@ -1041,6 +1043,7 @@ async fn paste_desktop_text(
         outcome: insertion::DeliveryOutcome::Uncertain,
         message: "Input task interrupted; review retained text before retrying.".into(),
         clipboard_changed: true,
+        held_back: false,
     })?
 }
 
@@ -1053,6 +1056,7 @@ async fn copy_desktop_text(text: String) -> Result<(), insertion::InsertionError
             outcome: insertion::DeliveryOutcome::Uncertain,
             message: "Copy task interrupted; check the clipboard before pasting.".into(),
             clipboard_changed: true,
+            held_back: false,
         })?
 }
 

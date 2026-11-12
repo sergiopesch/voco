@@ -282,7 +282,12 @@ for work. On GNOME Wayland the companion types for it when you added it;
 otherwise GNOME's RemoteDesktop portal does, in a keyboard-only session that VOCO
 opens only while you dictate and that sends only Shift and Insert. GNOME asks
 you once, in its own dialog, and shows its orange remote-access icon for as long
-as a session exists; its Stop ends the session and the dictation. VOCO keeps
+as a session exists; its Stop ends the session and the dictation. On GNOME 48
+and later the session's keys travel over GNOME's own keyboard connection, and
+from GNOME 50 GNOME tells VOCO over it whether Shift, Control, Alt, Super or
+AltGr is down, so a paste never goes out under a held modifier. That is all it
+carries back: VOCO never learns which keys you press, and it keeps and logs
+none of it. VOCO keeps
 GNOME's restore token in its own settings folder, owner-only, and never logs it.
 GNOME's shortcut portal holds the snap's shortcut, after you allowed that once,
 so the focused app never receives it. On X11 `xdotool` types, as for the

@@ -22,6 +22,8 @@ fn counts() -> Value {
         "toggles": crate::portal_shortcut::TOGGLES_REQUESTED.load(Ordering::SeqCst),
         "activations": crate::portal_shortcut::ACTIVATIONS.load(Ordering::SeqCst),
         "keysHeld": crate::portal_shortcut::keys_held(),
+        "modifiersHeld": crate::portal_keys::modifiers_held(),
+        "keyboard": crate::portal_keys::has_keyboard(),
     })
 }
 
@@ -95,6 +97,22 @@ fn run(command: &Value) -> Value {
         }
         "resume" => {
             crate::portal_shortcut::resume();
+            json!({ "ok": true })
+        }
+        // The next sessions type as on a GNOME without the keyboard
+        // connection, or with one that reports no modifiers, or with it again.
+        "keyboard" => {
+            crate::portal_keys::use_keyboard(
+                command["wanted"].as_bool().expect("wanted"),
+                command["silent"].as_bool().unwrap_or(false),
+            );
+            json!({ "ok": true })
+        }
+        // VOCO's Shift stays down this long before Insert, so the suite can
+        // press a modifier under it.
+        "shift-hold" => {
+            crate::portal_eis::SHIFT_HOLD_MS
+                .store(command["ms"].as_u64().expect("ms"), Ordering::SeqCst);
             json!({ "ok": true })
         }
         "counts" => json!({}),
