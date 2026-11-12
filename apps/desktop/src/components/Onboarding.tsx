@@ -129,7 +129,7 @@ export function Onboarding({ microphone, status, passed,
         : <PanelSetup disabled={busy || blocked} note={shortcutNote} />
         : storeSetup ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} /> : null}
       <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.{superKeyHint(hotkey) ? ` ${superKeyHint(hotkey)}` : null}</p>
-      <p>{startsAtLogin ? "VOCO starts when you sign in. You can turn this off in Settings."
+      <p>{startsAtLogin ? "VOCO is running now, and starts by itself each time you sign in. You can turn that off in Settings."
         : "VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher."}</p>
       {shortcutNote || storeSetup ? null : <PanelSetup disabled={busy || blocked} />}
       {!wordsChecked ? <p className="voco-setup__later">You can always come back and personalise VOCO in Settings, under My words.</p> : null}

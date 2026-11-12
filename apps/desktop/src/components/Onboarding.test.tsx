@@ -151,7 +151,7 @@ it("leads the handoff with the fix while the shortcut also reaches the focused a
   expect(ready).toContain("Checking your panel");
 });
 
-it("says VOCO starts when you sign in only where it will", () => {
+it("says VOCO is running and starts at sign-in only where it will", () => {
   const props = {
     microphone: "System default", status: "idle" as const, passed: true, failed: false, attempted: true,
     setupError: null, desktopSetupError: null, checkingDesktopSetup: false, preparing: false, saving: false,
@@ -159,10 +159,11 @@ it("says VOCO starts when you sign in only where it will", () => {
     wordsDone: true, wordsChecked: true,
   };
   const starts = renderToStaticMarkup(<Onboarding {...props} startsAtLogin />);
-  expect(starts).toContain("VOCO starts when you sign in. You can turn this off in Settings.");
+  // Running now comes first: read alone, "starts when you sign in" sent people to sign out.
+  expect(starts).toContain("VOCO is running now, and starts by itself each time you sign in. You can turn that off in Settings.");
   expect(starts).not.toContain("from your app launcher");
   // The setting is off, or a source build, which can't start at login.
   const reopens = renderToStaticMarkup(<Onboarding {...props} />);
   expect(reopens).toContain("After you sign in again, open it from your app launcher.");
-  expect(reopens).not.toContain("starts when you sign in");
+  expect(reopens).not.toContain("each time you sign in");
 });
