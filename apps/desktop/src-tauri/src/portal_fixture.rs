@@ -22,6 +22,8 @@ fn counts() -> Value {
         "toggles": crate::portal_shortcut::TOGGLES_REQUESTED.load(Ordering::SeqCst),
         "activations": crate::portal_shortcut::ACTIVATIONS.load(Ordering::SeqCst),
         "keysHeld": crate::portal_shortcut::keys_held(),
+        "modifiersHeld": crate::portal_keys::modifiers_held(),
+        "keyboard": crate::portal_keys::has_keyboard(),
     })
 }
 
@@ -95,6 +97,12 @@ fn run(command: &Value) -> Value {
         }
         "resume" => {
             crate::portal_shortcut::resume();
+            json!({ "ok": true })
+        }
+        // The next sessions type as on a GNOME without the keyboard
+        // connection, or with it again.
+        "keyboard" => {
+            crate::portal_keys::use_keyboard(command["wanted"].as_bool().expect("wanted"));
             json!({ "ok": true })
         }
         "counts" => json!({}),

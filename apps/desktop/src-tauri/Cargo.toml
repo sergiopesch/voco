@@ -67,6 +67,8 @@ inotify = "0.11"
 libc = "0.2"
 # The X server's held modifiers before an X11 paste; global-hotkey already builds it.
 x11rb = "0.13"
+# libei's protocol, for the keyboard connection GNOME gives the snap's typing session.
+reis = "=0.7.1"
 
 [patch.crates-io]
 global-hotkey = { path = "../../../vendor/global-hotkey" }

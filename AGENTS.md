@@ -237,11 +237,14 @@ and the update check. [The snap](#the-snap) lists its rules.
   modifiers to be released (evdev, else the companion's modifier check). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every
   key while the chord is held, so a paste waits for its release, at most 1.5 s
-  after the press. Through the RemoteDesktop portal VOCO can't read modifiers, so
+  after the press. In the snap's portal session, GNOME's keyboard connection
+  (below) reports from GNOME 50 which modifiers are down, and the same 1.5 s
+  wait sends no keys while Shift, Control, Alt, Super or AltGr is: keys sent
+  under Super or Alt make another chord, which pastes nothing. Until GNOME
+  reports them, which GNOME 46 never does, VOCO can't read modifiers there, so
   a portal shortcut press counts as held until its `Deactivated`, then 400 ms
   for the modifier's own release, which people often let go of a moment after
-  the letter, and the same 1.5 s wait sends no keys while
-  it is: keys sent under Super or Alt make another chord, which pastes nothing.
+  the letter.
   GNOME sends `Deactivated` only when the letter comes up under its modifier,
   and nothing when the modifier comes up first, as it often does. A chord still
   held repeats, so a press with no `Deactivated` counts as held only until the
@@ -280,10 +283,18 @@ and the update check. [The snap](#the-snap) lists its rules.
   paste and space, at a lock, when the renderer is replaced and at quit; it never
   holds one while idle. GNOME shows its orange remote-access icon while a session
   exists, at least 5 s, and its Stop closes the session: VOCO then stops the
-  dictation as Stop does, copying the rest. Each paste sends Shift, Insert and
-  their releases with `NotifyKeyboardKeycode`, 12 ms apart, never another key. A
+  dictation as Stop does, copying the rest. Where GNOME's portal also holds
+  the shortcut (GNOME 48 and later), the session asks for GNOME's keyboard
+  connection with `ConnectToEIS` (`portal_eis.rs`, libei's protocol through
+  the `reis` crate), as a sender that binds only the keyboard. The paste keys
+  go through it, and it carries back which modifiers are down, never a key. A
+  connection GNOME refuses, or whose keyboard isn't ready within 2 s, isn't
+  asked for again by that process: the session, opened again if it had
+  connected, sends its keys with the portal's `NotifyKeyboardKeycode`, as on
+  GNOME 46. Either way each paste sends Shift, Insert and their releases,
+  12 ms apart, never another key. A
   paste before the session has started, a session that failed to start, or one
-  GNOME closed, typed nothing: `no-mutation`. A call that fails after Shift went
+  GNOME closed, typed nothing: `no-mutation`. A key that fails after Shift went
   out is uncertain, and VOCO then releases Shift. Only setup's and Settings'
   explicit button starts a session without a restore token, which shows GNOME's
   dialog; dictation without a token is refused with that remedy. Each Start's new
@@ -316,10 +327,14 @@ and the update check. [The snap](#the-snap) lists its rules.
   without it; every paste lands with its exact text in a GTK field on Wayland and
   under XWayland; dictation opens a session and its end closes it; the
   indicator's Stop stops the dictation with no key after it; the shortcut toggles
-  through `Activated` and the next paste waits for `Deactivated`; with Super
-  let go first, which GNOME reports no release for, the paste goes out once no
-  repeat follows; a chord held past the repeat delay keeps its paste waiting
-  and toggles once, and the next press toggles again.
+  through `Activated`; a paste under the held chord, or under Control alone,
+  waits until GNOME's keyboard connection says the modifier is up, and types
+  nothing when it stays down past 1.5 s; with Super let go first, which GNOME
+  reports no release for, the paste goes out at once; a chord held past the
+  repeat delay keeps its paste waiting and toggles once, and the next press
+  toggles again. With the connection turned off, as on a GNOME that gives
+  none, the same pastes go through the portal's key calls and wait for
+  `Deactivated`, or until no repeat follows.
 - Keys reach seat0's active session. Bind the originating local login at startup
   through process membership or a validated session ID, where it is graphical or
   the text console a compositor such as Sway was started from (logind types that

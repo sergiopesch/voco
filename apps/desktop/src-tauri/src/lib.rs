@@ -66,6 +66,8 @@ mod gnome_custom_shortcut;
 mod panel;
 #[cfg(target_os = "linux")]
 mod portal;
+#[cfg(target_os = "linux")]
+mod portal_eis;
 #[cfg(all(test, target_os = "linux"))]
 mod portal_fixture;
 #[cfg(target_os = "linux")]

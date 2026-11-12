@@ -26,8 +26,8 @@ fixtures = Path(__file__).resolve().parent / 'fixtures'
 PORTAL, PORTAL_PATH = 'org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop'
 WAYLAND = 'voco-portal-test'
 FIELD = 'VOCO paste fixture'
-# Evdev codes for the probe's keyboard: Shift, and Super+X, VOCO's default.
-SHIFT, SUPER, X = 42, 125, 45
+# Evdev codes for the probe's keyboard: Shift, Control, and Super+X, VOCO's default.
+SHIFT, CONTROL, SUPER, X = 42, 29, 125, 45
 # The refusals: the paste preflight's or portal_keys.rs's remedy without
 # GNOME's permission, and portal_keys.rs's after GNOME's Stop.
 NOT_ALLOWED, CLOSED_BY_GNOME = 'Choose Allow typing', "GNOME's Stop ended VOCO's typing"
@@ -266,13 +266,16 @@ def refused(field, text, detail, outcomes=('no-mutation',)):
     return {'outcome': error['outcome'], 'message': error['message'], 'clipboardChanged': error['clipboardChanged']}
 
 
-def begin(label):
-    """A dictation starts: GNOME restores VOCO's permission without a dialog."""
+def begin(label, keyboard=True):
+    """A dictation starts: GNOME restores VOCO's permission without a dialog.
+    The session types through GNOME's keyboard connection unless the fixture
+    was told to do without it, as on a GNOME that offers none."""
     answered = voco.ask('begin')
     if not answered['session']: screenshot(label + '-no-session')
     assert answered['session'], f'no typing session started: {dialogs()}'
     assert not dialogs(), f'a restored session showed a dialog: {dialogs()}'
     assert wait_for(lambda: answered['session'].rsplit('/', 1)[1] in typing_sessions(), 2), typing_sessions()
+    assert answered['counts']['keyboard'] is keyboard, answered['counts']
     return answered['session']
 
 
@@ -472,20 +475,24 @@ try:
         return {'dialog': dialog, 'trigger': answered['ok'], 'toggles': 3}
     check('shortcut', shortcut)
 
-    def held_shortcut():
-        # A paste while the chord is down waits for Deactivated, then 400 ms.
-        session = begin('held')
+    def held_shortcut(keyboard=True):
+        # A paste while the chord is down waits. With GNOME's keyboard
+        # connection it goes out once Super is really up; without it, 400 ms
+        # after Deactivated.
+        session = begin('held', keyboard)
         field.clear()
         toggles = voco.counts()['toggles']
         key(SUPER, True); time.sleep(.03)
         pressed = time.monotonic(); key(X, True)
         assert wait_for(lambda: voco.counts()['toggles'] == toggles + 1, 2), 'Activated did not toggle'
-        assert voco.counts()['keysHeld'] is True
+        held = voco.counts()
+        assert held['keysHeld'] is True and held['modifiersHeld'] is (True if keyboard else None), held
         mark = time.monotonic()
         voco.send('paste', text='heldx')
         time.sleep(.4)
         # People often let go of Super a moment after the letter.
         released = time.monotonic(); key(X, False); time.sleep(.3)
+        assert field.text() == '', f'a paste went out under Super: {field.text()!r}'
         super_released = time.monotonic(); key(SUPER, False)
         answered = voco.reply(5)
         assert 'ok' in answered, answered
@@ -493,20 +500,23 @@ try:
         inserts = field.seen('insert', mark)
         assert len(inserts) == 1 and inserts[0]['shift'], inserts
         after_release = inserts[0]['t'] - released
-        assert .4 <= after_release < 1.2, f'the Insert came {after_release:.3f} s after the release'
-        assert inserts[0]['t'] > super_released, 'the paste went out while Super was down'
+        after_super = inserts[0]['t'] - super_released
+        assert after_super > 0, 'the paste went out while Super was down'
+        if keyboard: assert after_super < .25, f'the Insert came {after_super:.3f} s after Super came up'
+        else: assert .4 <= after_release < 1.2, f'the Insert came {after_release:.3f} s after the release'
         assert inserts[0]['t'] - pressed < 2, 'the paste waited past 1.5 s from the press'
         end(session)
-        return {'insertAfterReleaseMs': round(after_release * 1000, 1),
+        return {'insertAfterReleaseMs': round(after_release * 1000, 1), 'insertAfterSuperMs': round(after_super * 1000, 1),
                 'modifierWaitMs': answered['ok']['pasteMetrics']['modifierWaitMs']}
     check('heldShortcut', held_shortcut)
 
-    def modifier_first():
+    def modifier_first(keyboard=True):
         # GNOME sends Deactivated only when the letter comes up under Super.
-        # Let go of Super first, as people often do, and nothing more arrives:
-        # the paste goes out once a held chord would have repeated, about
-        # 600 ms after the press, and never waits out its own 1.5 s.
-        session = begin('modifier-first')
+        # Let go of Super first, as people often do, and nothing more arrives.
+        # GNOME's keyboard connection says Super is up, so the paste goes out
+        # at once; without it, once a held chord would have repeated, about
+        # 600 ms after the press. It never waits out its own 1.5 s.
+        session = begin('modifier-first', keyboard)
         field.clear()
         before = voco.counts()
         key(SUPER, True); time.sleep(.03)
@@ -514,7 +524,9 @@ try:
         assert wait_for(lambda: voco.counts()['toggles'] == before['toggles'] + 1, 2), 'Activated did not toggle'
         time.sleep(.08)
         key(SUPER, False); time.sleep(.05); key(X, False)
-        assert voco.counts()['keysHeld'] is True, 'a press GNOME reported no release for was not held'
+        after = voco.counts()
+        assert after['keysHeld'] is True, 'a press GNOME reported no release for was not held'
+        if keyboard: assert wait_for(lambda: voco.counts()['modifiersHeld'] is False, 1), voco.counts()
         mark = time.monotonic()
         voco.send('paste', text='superfirst')
         answered = voco.reply(5)
@@ -523,17 +535,21 @@ try:
         inserts = field.seen('insert', mark)
         assert len(inserts) == 1 and inserts[0]['shift'], inserts
         after_press = inserts[0]['t'] - pressed
-        assert .5 <= after_press < 1.2, f'the Insert came {after_press:.3f} s after the press'
-        assert voco.counts()['keysHeld'] is None, voco.counts()
+        wait = answered['ok']['pasteMetrics']['modifierWaitMs']
+        if keyboard:
+            assert wait < 50, f'the paste waited {wait} ms for keys GNOME said were up'
+        else:
+            assert .5 <= after_press < 1.2, f'the Insert came {after_press:.3f} s after the press'
+            assert voco.counts()['keysHeld'] is None, voco.counts()
         end(session)
-        return {'insertAfterPressMs': round(after_press * 1000, 1),
-                'modifierWaitMs': answered['ok']['pasteMetrics']['modifierWaitMs']}
+        return {'insertAfterPressMs': round(after_press * 1000, 1), 'modifierWaitMs': wait}
     check('modifierFirst', modifier_first)
 
-    def held_past_repeat():
+    def held_past_repeat(keyboard=True):
         # A chord held past the repeat delay keeps repeating, so its paste
-        # still waits for the release and the modifier's grace.
-        session = begin('held-past-repeat')
+        # still waits: for Super to come up, or without GNOME's keyboard
+        # connection for the release and the modifier's grace.
+        session = begin('held-past-repeat', keyboard)
         field.clear()
         toggles = voco.counts()['toggles']
         key(SUPER, True); time.sleep(.03)
@@ -551,12 +567,60 @@ try:
         inserts = field.seen('insert', mark)
         assert len(inserts) == 1 and inserts[0]['shift'], inserts
         after_release = inserts[0]['t'] - released
-        assert .4 <= after_release < 1.0, f'the Insert came {after_release:.3f} s after the release'
-        assert inserts[0]['t'] > super_released, 'the paste went out while Super was down'
+        after_super = inserts[0]['t'] - super_released
+        assert after_super > 0, 'the paste went out while Super was down'
+        if keyboard: assert after_super < .25, f'the Insert came {after_super:.3f} s after Super came up'
+        else: assert .4 <= after_release < 1.0, f'the Insert came {after_release:.3f} s after the release'
         assert voco.counts()['toggles'] == toggles + 1, 'the held chord toggled again'
         end(session)
-        return {'insertAfterReleaseMs': round(after_release * 1000, 1)}
+        return {'insertAfterReleaseMs': round(after_release * 1000, 1), 'insertAfterSuperMs': round(after_super * 1000, 1)}
     check('heldPastRepeat', held_past_repeat)
+
+    def held_modifier():
+        # A modifier held with no shortcut press, as Control under a finger:
+        # GNOME's keyboard connection reports it, so the paste waits for it
+        # instead of becoming Control+Shift+Insert, which pastes nothing.
+        session = begin('held-modifier')
+        field.clear()
+        key(CONTROL, True)
+        assert wait_for(lambda: voco.counts()['modifiersHeld'] is True, 1), voco.counts()
+        mark = time.monotonic()
+        voco.send('paste', text='afterctrl')
+        time.sleep(.5)
+        assert field.text() == '' and not field.seen('insert', mark), 'a paste went out under Control'
+        released = time.monotonic(); key(CONTROL, False)
+        answered = voco.reply(5)
+        assert 'ok' in answered, answered
+        assert wait_for(lambda: field.text() == 'afterctrl', 3), field.text()
+        inserts = field.seen('insert', mark)
+        assert len(inserts) == 1 and inserts[0]['shift'], inserts
+        after_release = inserts[0]['t'] - released
+        assert 0 < after_release < .25, f'the Insert came {after_release:.3f} s after Control came up'
+        # Held past the 1.5 s wait, the paste types nothing and says why.
+        key(CONTROL, True)
+        assert wait_for(lambda: voco.counts()['modifiersHeld'] is True, 1), voco.counts()
+        try: refusal = refused(field, 'underctrl', 'Release the keyboard modifiers')
+        finally: key(CONTROL, False)
+        assert wait_for(lambda: voco.counts()['modifiersHeld'] is False, 1), voco.counts()
+        paste(field, 'ctrlisup')
+        end(session)
+        return {'insertAfterReleaseMs': round(after_release * 1000, 1), 'refused': refusal}
+    check('heldModifier', held_modifier)
+
+    def without_keyboard():
+        # A GNOME that gives no keyboard connection: the keys go through the
+        # portal's own calls, and the shortcut's signals say when they are up.
+        voco.ask('keyboard', wanted=False)
+        try:
+            session = begin('plain', keyboard=False)
+            assert voco.counts()['modifiersHeld'] is None
+            pastes = [paste_expect(field, text, landing) for text, landing in zip(texts[:4], expected[:4])]
+            end(session)
+            return {'pastes': len(pastes), 'heldShortcut': held_shortcut(False), 'modifierFirst': modifier_first(False),
+                    'heldPastRepeat': held_past_repeat(False)}
+        finally:
+            voco.ask('keyboard', wanted=True)
+    check('withoutKeyboard', without_keyboard)
 
     def repeated_shortcut():
         # GNOME's grab repeats Activated while the chord is held, every 30 ms

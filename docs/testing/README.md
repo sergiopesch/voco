@@ -216,9 +216,13 @@ typing shows GNOME's dialog once; each dictation restores the permission without
 a dialog and closes its session when it ends; the remote-access icon's Stop
 stops the dictation, and the next paste sends no key; a session no dictation
 reports needing closes by itself; the shortcut dialog appears once, Super+X then
-toggles and never reaches the field, and a paste while the chord is down waits
-for `Deactivated` and 400 ms more; with Super let go before X, which GNOME
-reports no release for, the paste goes out about 600 ms after the press; a
+toggles and never reaches the field, and a paste while the chord is down goes
+out within 250 ms of Super coming up, by GNOME's keyboard connection; with
+Super let go before X, which GNOME reports no release for, the paste waits for
+nothing; a paste under Control alone waits for its release, and types nothing
+when it is held past 1.5 s; with the connection turned off, as on a GNOME that
+gives none, a paste waits for `Deactivated` and 400 ms more, or about 600 ms
+after a press GNOME reported no release for; a
 chord held past the repeat delay keeps its paste waiting for the release; a
 chord held for 1.5 s, which GNOME repeats, toggles once, and the next press
 toggles; while the companion's lease holds the chord
