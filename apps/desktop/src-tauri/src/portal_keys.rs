@@ -5,11 +5,18 @@
 //! returns lets every later session start without a dialog. A session exists
 //! only while a desktop dictation runs, because GNOME shows its remote-access
 //! icon for as long as one does.
+//!
+//! Where GNOME also holds the shortcut through its portal (GNOME 48 and
+//! later), the session asks for GNOME's own keyboard connection
+//! (portal_eis.rs). GNOME 50 says over it which modifiers are down, and the
+//! keys then go through it. Elsewhere, or when that connection fails or
+//! reports no modifiers, the keys go through the portal's own calls.
 
 use crate::portal::{self, Refusal};
+use crate::portal_eis::Eis;
 use glib::variant::ToVariant;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 use webkit2gtk::gio;
 
@@ -30,6 +37,13 @@ const RESTORE_TIMEOUT: Duration = Duration::from_secs(120);
 const DIALOG_TIMEOUT: Duration = Duration::from_secs(300);
 /// How long a paste waits for a session still starting.
 const STARTING_WAIT: Duration = Duration::from_millis(400);
+/// GNOME's keyboard is ready within about 10 ms of the connection; without it
+/// by now the session opens again without one.
+const KEYBOARD_WAIT: Duration = Duration::from_secs(2);
+/// GNOME 50 reports the modifiers as it resumes the keyboard. A GNOME that
+/// has reported none this long after never will, and its connection would
+/// only be another way to send the same keys.
+const MODIFIERS_WAIT: Duration = Duration::from_millis(300);
 const TOKEN_FILE: &str = "remote-desktop-token";
 
 pub const NOT_ALLOWED: &str = "VOCO isn't allowed to type yet. Open VOCO's Settings and choose Allow typing, then turn on Allow Remote Interaction in GNOME's dialog.";
@@ -42,6 +56,9 @@ const DENIED: &str = "GNOME didn't allow VOCO to type. Choose Allow typing again
 pub enum PortalPasteError {
     /// No key was sent.
     NoMutation(String),
+    /// Shift went out and came back, and nothing else: a modifier went down
+    /// under it. Nothing was typed, and the same text can go once it is up.
+    HeldBack(String),
     /// Some keys may have been sent.
     Uncertain(String),
 }
@@ -49,6 +66,8 @@ pub enum PortalPasteError {
 #[derive(Default)]
 struct Typing {
     session: Option<String>,
+    /// The session's keyboard connection to GNOME, where it types through one.
+    keyboard: Option<Arc<Eis>>,
     /// A session is starting for this generation.
     opening: Option<u64>,
     /// Each begin and end starts a new generation, so a session that finishes
@@ -60,6 +79,7 @@ struct Typing {
 
 static TYPING: Mutex<Typing> = Mutex::new(Typing {
     session: None,
+    keyboard: None,
     opening: None,
     generation: 0,
     closed_by_gnome: false,
@@ -72,6 +92,13 @@ pub(crate) static STOPS_REQUESTED: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 /// The renderer's dictation status: starting, recording or processing.
 static DICTATING: AtomicBool = AtomicBool::new(false);
+/// GNOME's keyboard connection failed or reported no modifiers once, so this
+/// process stops asking.
+static NO_KEYBOARD: AtomicBool = AtomicBool::new(false);
+/// The portal suite has GNOME 50's connection count as one that reports no
+/// modifiers, as an earlier GNOME's would.
+#[cfg(test)]
+static SILENT_KEYBOARD: AtomicBool = AtomicBool::new(false);
 /// How often an open session checks that a dictation still needs it.
 const IDLE_CHECK: Duration = Duration::from_secs(3);
 
@@ -205,6 +232,134 @@ fn open(
     }
 }
 
+/// Asks GNOME for `session`'s keyboard connection. Once GNOME has given one,
+/// the session no longer takes the portal's own key calls. Portal thread only.
+fn connect_keyboard(connection: &gio::DBusConnection, session: &str) -> Result<Eis, String> {
+    use gio::prelude::*;
+    use std::os::fd::{FromRawFd, OwnedFd};
+    let parameters =
+        glib::Variant::tuple_from_iter([portal::object_path(session)?, portal::options(&[])]);
+    let (reply, descriptors) = connection
+        .call_with_unix_fd_list_sync(
+            Some(portal::DESTINATION),
+            portal::OBJECT,
+            INTERFACE,
+            "ConnectToEIS",
+            Some(&parameters),
+            Some(glib::VariantTy::new("(h)").expect("static type")),
+            gio::DBusCallFlags::NONE,
+            5_000,
+            None::<&gio::UnixFDList>,
+            gio::Cancellable::NONE,
+        )
+        .map_err(|error| error.to_string())?;
+    let index = reply
+        .child_value(0)
+        .get::<glib::variant::Handle>()
+        .ok_or("GNOME returned no connection.")?
+        .0;
+    let descriptor = descriptors.get(index).map_err(|error| error.to_string())?;
+    // SAFETY: g_unix_fd_list_get returns a duplicate that its caller owns.
+    let descriptor = unsafe { OwnedFd::from_raw_fd(descriptor) };
+    Eis::connect(descriptor).map_err(|error| error.to_string())
+}
+
+/// What a new keyboard connection turned out to be.
+#[derive(Debug, PartialEq, Eq)]
+enum Keyboard {
+    /// Ready, and GNOME reports the modifiers over it.
+    Informed,
+    /// Ready, but GNOME reports no modifiers.
+    Silent,
+    /// GNOME closed it, or its keyboard never became ready.
+    Unready,
+}
+
+/// Waits for GNOME's keyboard and its first modifier report while the portal
+/// thread's signals keep flowing, the shortcut's among them.
+fn keyboard_state(keyboard: &Eis) -> Keyboard {
+    #[cfg(test)]
+    if SILENT_KEYBOARD.load(Ordering::SeqCst) {
+        return if keyboard.ready(KEYBOARD_WAIT) {
+            Keyboard::Silent
+        } else {
+            Keyboard::Unready
+        };
+    }
+    let context = glib::MainContext::ref_thread_default();
+    let mut deadline = Instant::now() + KEYBOARD_WAIT;
+    let mut ready = false;
+    loop {
+        if keyboard.informed(Duration::from_millis(5)) {
+            return Keyboard::Informed;
+        }
+        if !ready && keyboard.ready(Duration::ZERO) {
+            ready = true;
+            deadline = Instant::now() + MODIFIERS_WAIT;
+        }
+        if keyboard.closed() {
+            return Keyboard::Unready;
+        }
+        if Instant::now() >= deadline {
+            return if ready {
+                Keyboard::Silent
+            } else {
+                Keyboard::Unready
+            };
+        }
+        while context.iteration(false) {}
+    }
+}
+
+/// Whether a new session asks GNOME for its keyboard connection: where GNOME
+/// also holds the shortcut through its portal, so GNOME 46 keeps the portal's
+/// own key calls, and not after the connection failed once.
+fn wants_keyboard() -> bool {
+    !NO_KEYBOARD.load(Ordering::SeqCst) && crate::portal_shortcut::available()
+}
+
+/// A dictation's session with its keyboard connection, where GNOME gives one
+/// that reports the modifiers. A session that connected for nothing no longer
+/// takes the portal's own key calls, so it closes and a plain one opens.
+/// Portal thread only.
+fn open_typing(
+    connection: &gio::DBusConnection,
+    token: &str,
+) -> Result<(String, Option<Arc<Eis>>), Refusal> {
+    let (session, renewed) = open(connection, Some(token), RESTORE_TIMEOUT)?;
+    if let Some(renewed) = &renewed {
+        save_token(renewed);
+    }
+    if !wants_keyboard() {
+        return Ok((session, None));
+    }
+    match connect_keyboard(connection, &session).map(|keyboard| {
+        let state = keyboard_state(&keyboard);
+        (keyboard, state)
+    }) {
+        Ok((keyboard, Keyboard::Informed)) => return Ok((session, Some(Arc::new(keyboard)))),
+        Ok((_, state)) => {
+            // Expected on a GNOME before 50, which reports no modifiers.
+            log::info!("GNOME's keyboard connection is {state:?}; using the portal's key calls");
+            NO_KEYBOARD.store(true, Ordering::SeqCst);
+        }
+        Err(error) => {
+            log::warn!(
+                "GNOME gave VOCO no keyboard connection ({error}); using the portal's key calls"
+            );
+            NO_KEYBOARD.store(true, Ordering::SeqCst);
+            return Ok((session, None));
+        }
+    }
+    portal::close_session(connection, &session);
+    let token = renewed.as_deref().unwrap_or(token);
+    let (session, renewed) = open(connection, Some(token), RESTORE_TIMEOUT)?;
+    if let Some(renewed) = &renewed {
+        save_token(renewed);
+    }
+    Ok((session, None))
+}
+
 thread_local! {
     /// The Closed subscription for the current session, on the portal thread.
     static CLOSED_WATCH: std::cell::RefCell<Option<gio::SignalSubscriptionId>> =
@@ -228,6 +383,7 @@ fn watch_closed(connection: &gio::DBusConnection, session: &str) {
                 return;
             }
             state.session = None;
+            state.keyboard = None;
             state.closed_by_gnome = true;
             drop(state);
             log::info!("GNOME closed VOCO's typing session");
@@ -311,18 +467,16 @@ pub fn begin() {
         state.generation
     };
     let spawned = portal::spawn(move |connection| {
-        let opened = open(connection, Some(&token), RESTORE_TIMEOUT);
+        let opened = open_typing(connection, &token);
         let mut state = typing();
         if state.opening == Some(generation) {
             state.opening = None;
         }
         match opened {
-            Ok((session, token)) => {
-                if let Some(token) = token {
-                    save_token(&token);
-                }
+            Ok((session, keyboard)) => {
                 if state.generation == generation {
                     state.session = Some(session.clone());
+                    state.keyboard = keyboard;
                     drop(state);
                     watch_closed(connection, &session);
                     watch_idle(generation);
@@ -349,6 +503,8 @@ pub fn end() {
         let mut state = typing();
         state.generation += 1;
         state.opening = None;
+        // Dropped here: the connection closes with its session.
+        state.keyboard = None;
         state.session.take()
     };
     if let Some(session) = session {
@@ -359,12 +515,13 @@ pub fn end() {
     }
 }
 
-fn current_session() -> Result<String, PortalPasteError> {
+/// The open session and its keyboard connection, if it types through one.
+fn current_session() -> Result<(String, Option<Arc<Eis>>), PortalPasteError> {
     let deadline = Instant::now() + STARTING_WAIT;
     loop {
         let state = typing();
         if let Some(session) = &state.session {
-            return Ok(session.clone());
+            return Ok((session.clone(), state.keyboard.clone()));
         }
         if state.closed_by_gnome {
             return Err(PortalPasteError::NoMutation(CLOSED_BY_GNOME.into()));
@@ -410,13 +567,48 @@ fn key(
 /// A session is open, or opens within the starting wait: checked before the
 /// clipboard copy, so a missing session typed nothing and changed nothing.
 pub fn ready() -> Result<(), PortalPasteError> {
-    current_session().map(|_| ())
+    match current_session()? {
+        (_, Some(keyboard)) if !keyboard.ready(STARTING_WAIT) => {
+            Err(PortalPasteError::NoMutation(NOT_READY.into()))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Whether Shift, Control, Alt, Super or AltGr is down, as GNOME reports it
+/// through the open session's keyboard connection: from GNOME 50, and only
+/// while a session is open. Unknown otherwise, and the shortcut's own
+/// signals then say what they can (portal_shortcut.rs).
+pub fn modifiers_held() -> Option<bool> {
+    typing()
+        .keyboard
+        .as_ref()
+        .and_then(|keyboard| keyboard.modifiers_held())
+}
+
+/// Whether the open session types through GNOME's keyboard connection, for
+/// the portal suite (portal_fixture.rs).
+#[cfg(test)]
+pub(crate) fn has_keyboard() -> bool {
+    typing().keyboard.is_some()
+}
+
+/// The portal suite runs GNOME 50 three ways: with the keyboard connection,
+/// as a GNOME that offers none, and as one whose connection reports no
+/// modifiers.
+#[cfg(test)]
+pub(crate) fn use_keyboard(wanted: bool, silent: bool) {
+    NO_KEYBOARD.store(!wanted, Ordering::SeqCst);
+    SILENT_KEYBOARD.store(silent, Ordering::SeqCst);
 }
 
 /// Shift, Insert and their releases, 12 ms apart, never another key. Returns
 /// when the Insert press went out.
 pub fn paste() -> Result<Instant, PortalPasteError> {
-    let session = current_session()?;
+    let (session, keyboard) = current_session()?;
+    if let Some(keyboard) = keyboard {
+        return keyboard.paste();
+    }
     let connection = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE)
         .map_err(|error| PortalPasteError::NoMutation(error.to_string()))?;
     key(&connection, &session, KEY_LEFTSHIFT, true).map_err(|error| {
