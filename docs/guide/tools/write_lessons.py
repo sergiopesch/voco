@@ -230,7 +230,7 @@ lesson(
         ),
         (
             "One toggle, however it arrives",
-            "The GNOME companion holds a 2.5-second lease on the shortcut, and while it is fresh VOCO ignores the same keys from the keyboards. The IBus source holds a 1-second lease, and VOCO also releases its X11 grab so the source receives the keys.",
+            "The GNOME companion holds a 2.5-second lease on the shortcut, and while it is fresh VOCO ignores the same keys from the keyboards. The IBus source holds a 1-second lease, and VOCO also releases its X11 grab so the source receives the keys. When VOCO closes its channel to the source, as when its window loads again, the source stops taking the keys at once, so the lease ends with the channel and VOCO registers its X11 grab again at once.",
         ),
         (
             "voco --toggle",
@@ -646,7 +646,7 @@ lesson(
         ),
         (
             "Settle",
-            "VOCO lets the app read the previous paste first. Where xclip copies on GNOME Wayland, it watches for that read, for up to 300 ms after the Insert press; elsewhere, and whenever it can't tell, it waits until 150 ms after the previous paste's keys.",
+            "VOCO lets the app read the previous paste first. Where xclip copies on GNOME Wayland, it watches for that read, for up to 300 ms after the Insert press. On X11 it waits until 150 ms after the previous paste's keys, then for the first read since those keys were started, at most 300 ms after that. Elsewhere, and whenever it can't tell, it waits until 150 ms after the previous paste's keys.",
         ),
         (
             "Copy",
@@ -664,7 +664,7 @@ lesson(
         ),
         (
             "Seeing the app read",
-            "On GNOME Wayland with DISPLAY set, where xclip copies, each copy runs it in the foreground with -verbose, which reports every request it answers except TARGETS, and keeps the selection until the next copy. Mutter's clipboard manager reads each new CLIPBOARD once. When that read is in by the Insert press, the first answer after the press is the app's read, and the next copy follows at once. A read before the press, during the wait for a young keyboard or the gap after Shift, never counts. A read shows that the app asked for the text, not that the words arrived.",
+            "On GNOME Wayland with DISPLAY set, where xclip copies, each copy runs it in the foreground with -verbose, which reports every request it answers except TARGETS, and keeps the selection until the next copy. Mutter's clipboard manager reads each new CLIPBOARD once. When that read is in by the Insert press, the first answer after the press is the app's read, and the next copy follows at once. A read before the press, during the wait for a young keyboard or the gap after Shift, never counts. On X11 the copies run the same way, CLIPBOARD first, but there a clipboard manager's read can't be told from the app's, so a read only ever makes the next copy wait longer. A read shows that the app asked for the text, not that the words arrived.",
         ),
         (
             "Waiting for GNOME's switch",
@@ -863,7 +863,7 @@ lesson(
         ),
         (
             "When the window crashes",
-            "WebKit runs VOCO's window in a process of its own. If that process crashes, VOCO loads the window again, its unfinished entry moves to Review, and VOCO shows \"Dictation interrupted\" if you were dictating. If it crashes again after three reloads in five minutes, VOCO leaves it closed and shows \"VOCO stopped working\".",
+            "WebKit runs VOCO's window in a process of its own. If that process crashes, VOCO loads the window again, its unfinished entry moves to Review, and VOCO shows \"Dictation interrupted\" if you were dictating. A shortcut pressed while the window loads waits for it. If it crashes again after three reloads in five minutes, VOCO leaves it closed and shows \"VOCO stopped working\".",
         ),
         (
             "Review is explicit",
@@ -1803,7 +1803,7 @@ lesson(
     [
         (B + "insertion.rs", "Chooses the clipboard helper and the paste keys for each session."),
         (B + "virtual_keyboard.rs", "VOCO's keyboard: two keys, 12 ms apart."),
-        (B + "selection_owner.rs", "Runs xclip with -verbose where it copies on GNOME Wayland, and reports each read."),
+        (B + "selection_owner.rs", "Runs xclip with -verbose where it copies, on GNOME Wayland and X11, and reports each read."),
         (B + "desktop_session.rs", "Binds the originating desktop session and checks whether it is active and locked."),
         (B + "lib.rs", "Shortcut routes for each session, and the keyboard created at startup."),
         (B + "confinement.rs", "Knows when VOCO runs as its snap."),
@@ -1844,7 +1844,7 @@ chapters[-1]["comparison"] = {
             "X11",
             "VOCO's global key grab, toggling on release",
             "xdotool key --clearmodifiers shift+Insert, once the shortcut is released and the X server reports no Shift, Control, Alt, Super or AltGr held, waiting at most 1.5 seconds",
-            "xclip",
+            "xclip, run with -verbose so it reports each read",
         ],
         [
             "The VOCO snap",
