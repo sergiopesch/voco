@@ -224,8 +224,13 @@ and the update check. [The snap](#the-snap) lists its rules.
 - Give the app time to read a paste before the next copy replaces it. On GNOME
   Wayland (`selection_owner.rs`) each copy runs xclip in the foreground with
   `-verbose`, which reports every request it answers except TARGETS, and keeps
-  the selection until the next copy; it ignores SIGPIPE, so it outlives VOCO
-  holding the text, as a forked xclip does. A helper reports owning its
+  the selection until the next copy. It outlives VOCO holding the text, as a
+  forked xclip does: the pipe it reports on always has a reader, the helper
+  itself, which holds a read end as the standard output xclip never uses, so a
+  report written after VOCO has gone can't kill it, and the write end never
+  blocks. Never give a helper a step between fork and exec, such as ignoring
+  the signal there: the standard library then forks all of VOCO for each
+  helper instead of spawning it, about 10 ms a paste. A helper reports owning its
   selection just before the X server gets its request, and until the server
   has it an app pastes the previous copy. So before the keys VOCO waits up to
   100 ms for Mutter's clipboard manager, which reads each new CLIPBOARD once

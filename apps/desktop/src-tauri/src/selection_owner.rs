@@ -5,12 +5,12 @@
 //! program's read can't be told from the app's, the next copy waits for one.
 //!
 //! Each helper keeps its selection until another owner takes it, as a forked
-//! xclip does, and outlives VOCO: it ignores SIGPIPE, so a request after VOCO
-//! has gone still gets the text. A thread per helper writes its text, reads its
-//! reports to the end and reaps it.
+//! xclip does, and outlives VOCO: the pipe it reports on always has a reader
+//! (report_pipe), so a request after VOCO has gone still gets the text. A
+//! thread per helper writes its text, reads its reports to the end and reaps it.
 
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::process::CommandExt;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::process::{Child, Stdio};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -112,25 +112,20 @@ impl SelectionOwners {
         text: &[u8],
         timeout: Duration,
     ) -> Result<(), OwnerError> {
+        let (reports, helper_reader, helper_writer) = report_pipe().map_err(|error| {
+            OwnerError::Spawn(format!("Could not start the input helper: {error}"))
+        })?;
         let mut command = process_runner::command(program);
         command
             .args(["-verbose", "-selection", selection.as_str(), "-in"])
             .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped());
-        // SAFETY: between fork and exec the closure only sets a signal's
-        // disposition, with a struct on its own stack.
-        unsafe {
-            command.pre_exec(|| {
-                let mut ignore: libc::sigaction = std::mem::zeroed();
-                ignore.sa_sigaction = libc::SIG_IGN;
-                if libc::sigaction(libc::SIGPIPE, &raw const ignore, std::ptr::null_mut()) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-        let mut child = command.spawn().map_err(|error| {
+            .stdout(Stdio::from(helper_reader))
+            .stderr(Stdio::from(helper_writer));
+        let spawned = command.spawn();
+        // The command holds this process's copies of the helper's ends: with
+        // the write end still open here, the reports would never end.
+        drop(command);
+        let mut child = spawned.map_err(|error| {
             OwnerError::Spawn(format!("Could not start the input helper: {error}"))
         })?;
         let index = {
@@ -140,7 +135,7 @@ impl SelectionOwners {
         };
         let pid = child.id() as libc::pid_t;
         self.helpers.push(Helper { selection, pid });
-        let (input, reports) = (child.stdin.take(), child.stderr.take());
+        let (input, reports) = (child.stdin.take(), Some(std::fs::File::from(reports)));
         let child = Arc::new(Mutex::new(Some(child)));
         let shared = Arc::clone(&self.shared);
         let owned_child = Arc::clone(&child);
@@ -280,12 +275,38 @@ impl SelectionOwners {
     }
 }
 
+/// The pipe a helper reports on: this process's read end, then the helper's
+/// standard output and standard error. A helper must outlive VOCO, still
+/// holding the text, and a report written once VOCO has gone would kill it
+/// with SIGPIPE. So the helper holds a read end itself, as the standard output
+/// xclip never uses: the pipe then always has a reader. Its write end doesn't
+/// block, so reports nobody reads any more are dropped once the pipe is full.
+/// Ignoring the signal in the helper instead would need a step between fork
+/// and exec, and with one the standard library forks this whole process for
+/// every helper rather than spawning it.
+fn report_pipe() -> std::io::Result<(OwnedFd, OwnedFd, OwnedFd)> {
+    let mut ends = [0; 2];
+    // SAFETY: pipe2 fills the two descriptors it is given room for.
+    if unsafe { libc::pipe2(ends.as_mut_ptr(), libc::O_CLOEXEC) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: both descriptors are new and owned by nothing else.
+    let (reader, writer) =
+        unsafe { (OwnedFd::from_raw_fd(ends[0]), OwnedFd::from_raw_fd(ends[1])) };
+    // SAFETY: fcntl only changes the flags of the description `writer` owns.
+    if unsafe { libc::fcntl(writer.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let helper_reader = reader.try_clone()?;
+    Ok((reader, helper_reader, writer))
+}
+
 /// Writes the text, then reads the helper's reports until it exits, and reaps it.
 fn serve(
     shared: Arc<Shared>,
     index: usize,
     input: Option<std::process::ChildStdin>,
-    reports: Option<std::process::ChildStderr>,
+    reports: Option<std::fs::File>,
     text: Vec<u8>,
     child: Arc<Mutex<Option<Child>>>,
 ) {
@@ -536,9 +557,9 @@ done
             std::thread::spawn(move || {
                 while !stop.load(Ordering::Relaxed) {
                     let mut child = std::process::Command::new("/bin/true");
-                    // SAFETY: an empty closure; it makes the spawn fork, as
-                    // VOCO's helpers do, rather than use posix_spawn.
-                    unsafe { child.pre_exec(|| Ok(())) };
+                    // SAFETY: an empty closure; it makes the spawn fork
+                    // rather than use posix_spawn.
+                    unsafe { std::os::unix::process::CommandExt::pre_exec(&mut child, || Ok(())) };
                     let _ = child.status();
                 }
             })
@@ -623,21 +644,24 @@ done
     }
 
     #[test]
-    fn helpers_ignore_broken_pipes_and_are_reaped_when_they_lose_the_selection() {
+    fn helpers_can_always_report_and_are_reaped_when_they_lose_the_selection() {
         let program = fake_xclip("selection-reap");
         let owners = own_both(&program, b"text");
         for helper in &owners.helpers {
-            let status = std::fs::read_to_string(format!("/proc/{}/status", helper.pid)).unwrap();
-            let ignored = status
+            // The helper holds a read end of its own report pipe, so no report
+            // can meet a pipe without a reader, and its write end never blocks.
+            let end =
+                |fd: u32| std::fs::read_link(format!("/proc/{}/fd/{fd}", helper.pid)).unwrap();
+            assert!(end(2).to_string_lossy().starts_with("pipe:"));
+            assert_eq!(end(1), end(2), "standard output must be the report pipe");
+            let flags = std::fs::read_to_string(format!("/proc/{}/fdinfo/2", helper.pid)).unwrap();
+            let flags = flags
                 .lines()
-                .find_map(|line| line.strip_prefix("SigIgn:"))
-                .map(|mask| u64::from_str_radix(mask.trim(), 16).unwrap())
+                .find_map(|line| line.strip_prefix("flags:"))
+                .map(|flags| i32::from_str_radix(flags.trim(), 8).unwrap())
                 .unwrap();
-            assert_ne!(
-                ignored & (1 << (libc::SIGPIPE - 1)),
-                0,
-                "SIGPIPE must be ignored"
-            );
+            assert_ne!(flags & libc::O_NONBLOCK, 0, "reports must never block");
+            assert_eq!(flags & libc::O_ACCMODE, libc::O_WRONLY);
         }
         release(&program);
         for helper in &owners.helpers {

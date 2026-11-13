@@ -3,7 +3,13 @@
 # here; Ubuntu's program of that name and its libraries live under helpers/
 # beside this file, so the app's own libraries stay the GNOME platform's.
 set -eu
-here=$(dirname "$(readlink -f "$0")")
+# snapd names the snap's folder for every program in it. Finding this file by
+# its link instead starts two more programs for each helper, on every paste.
+if [ -n "${SNAP:-}" ] && [ -x "$SNAP/usr/lib/voco/snap/helpers/usr/bin/${0##*/}" ]; then
+    here=$SNAP/usr/lib/voco/snap
+else
+    here=$(dirname "$(readlink -f "$0")")
+fi
 lib=$here/helpers/usr/lib/x86_64-linux-gnu
 LD_LIBRARY_PATH=$lib
 export LD_LIBRARY_PATH
