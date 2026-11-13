@@ -196,7 +196,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   list without them gives the output it gave before.
 - Select the default microphone automatically only on an explicit Start test,
   Say it or recording when no microphone is chosen. No idle recording, and no silent device
-  switching during capture.
+  switching during capture. Where the window captures, on X11, the default is
+  the sound server's default source: VOCO asks for its label
+  (`default_microphone_label`) and opens the WebKit device of that label, since
+  WebKit left to itself opens the first device it lists, whichever the
+  system's default is. Where WebKit lists no device of that label, as for a
+  virtual source, WebKit chooses. The trace says only whether the default was
+  found, never its label.
 
 ### Delivery
 

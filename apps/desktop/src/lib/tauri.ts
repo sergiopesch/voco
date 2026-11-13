@@ -174,6 +174,12 @@ export async function copyDesktopText(text: string): Promise<void> {
   await invoke("copy_desktop_text", { text });
 }
 
+/** The label of the system's default microphone, or null where the sound
+ * server names none; rejects where it can't be asked. */
+export async function defaultMicrophoneLabel(): Promise<string | null> {
+  return invoke<string | null>("default_microphone_label");
+}
+
 export async function refreshShortcutHeartbeat(ready: boolean): Promise<void> {
   return invoke<void>("refresh_shortcut_heartbeat", { ready });
 }
@@ -216,6 +222,7 @@ export async function beginRuntimeStatusSession(): Promise<number> {
 
 export interface HotkeyTraceFields {
   selectedDeviceConfigured?: boolean;
+  systemDefaultResolved?: boolean;
   trackSampleRate?: number;
   durationMs?: number;
   dictationSessionId?: number;

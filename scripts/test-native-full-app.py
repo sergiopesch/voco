@@ -35,6 +35,10 @@ manager (fixtures/x11-modifier-grab.py) keeps the Super key as Mutter does, repl
 keys pressed under it. A replayed key skips grabs on the root window, so VOCO's shortcut
 must also be grabbed on the top-level windows: Super+X must start and stop the dictation,
 and no x may reach the field (#334). Otherwise it delivers as in delivery.
+default-microphone: the sound server lists a silent microphone before the fixture's, the
+fixture's is the system default, no microphone is chosen in VOCO and nothing in VOCO's
+environment names a source. The window's capture must record from the system default, not
+from the first microphone WebKit lists (#335). Otherwise it delivers as in delivery.
 Every dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -65,7 +69,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone', 'launcher', 'autostart'], 'Unsupported native application case'
 # What the harness presses, for xdotool and for the stop gesture's fixture.
 SHORTCUT = dict(keys='super+x', name='Super+X') if case == 'super-key' else dict(keys='alt+d', name='Alt+D')
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
@@ -354,6 +358,9 @@ Gio.bus_own_name_on_connection(tray_bus, 'org.kde.StatusNotifierWatcher', Gio.Bu
 pump(.1)
 log = (root / 'evidence/full-app.log').open('w')
 app_env = {**os.environ, 'RUST_LOG': 'info', 'VOCO_HOTKEY_TRACE': '1'}
+if case == 'default-microphone':
+    # Only the sound server says which microphone is the default.
+    del app_env['PULSE_SOURCE']
 system_bus = logind = modifier_grab = None
 if case == 'super-key':
     modifier_grab = subprocess.Popen(['/usr/bin/python3', str(repo / 'scripts/fixtures/x11-modifier-grab.py'), str(root / 'modifier-grab.ready')],
@@ -529,6 +536,16 @@ try:
     note_focus('recording')
     pulse_outputs = subprocess.check_output([os.environ['VOCO_NATIVE_PACTL'], 'list', 'source-outputs'], text=True)
     observable_fields = ('Source Output #', 'Driver:', 'Source:', 'Sample Specification:', 'Corked:', 'Mute:', 'application.name =', 'application.process.binary =')
+    if case == 'default-microphone':
+        # The window's stream is on the system default, the fixture's source, and
+        # VOCO found it by its label instead of leaving the choice to WebKit.
+        indexes = dict(line.split('\t')[1::-1] for line in subprocess.check_output(
+            [os.environ['VOCO_NATIVE_PACTL'], 'list', 'short', 'sources'], text=True).splitlines())
+        streams = [block for block in pulse_outputs.split('Source Output #') if 'WebKitWebProcess' in block]
+        assert len(streams) == 1, 'Expected one WebKit recording stream: %r' % pulse_outputs
+        assert re.search(r'^\s*Source: (\d+)$', streams[0], re.M).group(1) == indexes['voco_fixture'], 'VOCO did not record from the system default microphone'
+        opened = [x for x in traces() if x.get('event') == 'recording_get_user_media_done']
+        assert opened and opened[-1].get('system_default_resolved') is True, 'VOCO did not open the system default microphone by its label: %r' % opened[-1:]
     (root / 'evidence/pulse-source-outputs.txt').write_text('\n'.join(line for line in pulse_outputs.splitlines() if line.strip().startswith(observable_fields)) + '\n')
     pump(.5)
     if case == 'modifier-hold':
@@ -571,7 +588,7 @@ try:
     assert len(changes) <= c['dictation_desktop_paste_dispatched'] + c['dictation_desktop_stop_space_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
     if case == 'super-key':
         assert c['hotkey_event_received_global_shortcut'] >= 2, 'Super+X did not start and stop the dictation through VOCO\'s X11 grab'
-    if case in ('delivery', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key'):
+    if case in ('delivery', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
     elif case == 'spelling':

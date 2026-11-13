@@ -96,6 +96,7 @@ fn lifecycle_payload(record: &Value) -> Option<Value> {
         "duration_ms",
         "track_sample_rate",
         "selected_device_configured",
+        "system_default_resolved",
     ] {
         if record[key].is_number() || record[key].is_boolean() {
             safe[key] = record[key].clone();

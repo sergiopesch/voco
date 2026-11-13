@@ -155,6 +155,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
     }
     traceDictationEvent("recording_get_user_media_done", {
       selectedDeviceConfigured: result.selectedDeviceConfigured,
+      systemDefaultResolved: result.systemDefaultResolved,
     }).catch(() => {});
     if (result.fallbackStage === "default-device" && result.selectedDeviceConfigured) {
       const notice = "Your selected microphone is unavailable. VOCO is using the system default microphone for this recording.";

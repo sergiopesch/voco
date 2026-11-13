@@ -51,6 +51,7 @@ export const openProblemReport = async () => { calls.push(['openProblemReport'])
 export const beginDesktopTyping = async () => { calls.push(['beginDesktopTyping']); };
 export const openExternalUrl = async (url) => { calls.push(['openExternalUrl', url]); };
 export const microphoneAccess = async () => ({allowed: true});
+export const defaultMicrophoneLabel = async () => null;
 export const takeLauncherActivation = async () => false;
 export const getDesktopPasteStatus = async () => ({enabled:Boolean(window.desktopPaste),streamingEnabled:Boolean(window.desktopStream),available:!window.pasteUnavailable,detail:'Paste helper unavailable'});
 // Model the native paste and clipboard contract; no desktop input is touched.

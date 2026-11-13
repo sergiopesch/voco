@@ -215,6 +215,9 @@ fn trace_hotkey_event_with_fields(
             record["selected_device_configured"] =
                 serde_json::Value::Bool(selected_device_configured);
         }
+        if let Some(system_default_resolved) = fields.system_default_resolved {
+            record["system_default_resolved"] = serde_json::Value::Bool(system_default_resolved);
+        }
         if let Some(track_sample_rate) = fields.track_sample_rate {
             record["track_sample_rate"] = serde_json::Value::Number(track_sample_rate.into());
         }
@@ -364,6 +367,9 @@ fn is_supported_dictation_trace_event(event: &str) -> bool {
 #[serde(rename_all = "camelCase")]
 struct FrontendTraceFields {
     selected_device_configured: Option<bool>,
+    /// With no microphone chosen, whether the window's capture opened the
+    /// system's default one by its label. Never the label.
+    system_default_resolved: Option<bool>,
     track_sample_rate: Option<u64>,
     duration_ms: Option<u64>,
     dictation_session_id: Option<u64>,
@@ -2613,6 +2619,7 @@ pub fn run() -> Result<(), String> {
             crash_recovery::keep_crash_journal,
             speech_stream::speech_stream,
             native_capture_commands::native_capture_capabilities,
+            native_capture_commands::default_microphone_label,
             native_capture_commands::native_capture_list_sources,
             native_capture_commands::native_capture_select_source,
             native_capture_commands::native_capture_begin,
@@ -3012,6 +3019,7 @@ mod tests {
     fn frontend_trace_fields_accept_only_bounded_values() {
         assert!(FrontendTraceFields {
             selected_device_configured: Some(true),
+            system_default_resolved: None,
             track_sample_rate: Some(48000),
             duration_ms: Some(42),
             dictation_session_id: Some(1),
@@ -3021,6 +3029,7 @@ mod tests {
 
         assert!(FrontendTraceFields {
             selected_device_configured: None,
+            system_default_resolved: None,
             track_sample_rate: Some(1),
             duration_ms: None,
             dictation_session_id: None,
@@ -3031,6 +3040,7 @@ mod tests {
 
         assert!(FrontendTraceFields {
             selected_device_configured: None,
+            system_default_resolved: None,
             track_sample_rate: None,
             duration_ms: Some(3_600_001),
             dictation_session_id: None,
@@ -3041,6 +3051,7 @@ mod tests {
 
         assert!(FrontendTraceFields {
             selected_device_configured: None,
+            system_default_resolved: None,
             track_sample_rate: None,
             duration_ms: None,
             dictation_session_id: Some(0),
