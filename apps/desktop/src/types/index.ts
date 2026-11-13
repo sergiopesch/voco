@@ -87,7 +87,7 @@ export interface InsertionSupport {
 
 export interface ShortcutDiagnostics {
   hotkey: string;
-  route: "ibus" | "global-shortcut" | "evdev" | "gnome-panel" | "gnome-portal" | null;
+  route: "ibus" | "global-shortcut" | "evdev" | "gnome-panel" | "gnome-shortcut" | null;
   state: "available" | "focus-required" | "unavailable" | "unknown";
   detail: string;
 }

@@ -54,6 +54,10 @@ struct State {
     /// The depressed modifiers GNOME last reported; unknown until it does,
     /// which GNOME before 50 never does.
     depressed: Option<u32>,
+    /// When GNOME first reported them to this keyboard, and when it last
+    /// reported none of the chord's held.
+    informed: Option<Instant>,
+    lifted: Option<Instant>,
     closed: bool,
     /// Each emulation names a new sequence.
     sequence: u32,
@@ -146,6 +150,15 @@ impl Eis {
     /// keyboard state. Unknown until GNOME reports it.
     pub(crate) fn modifiers_held(&self) -> Option<bool> {
         self.shared.state().depressed.map(holds_modifier)
+    }
+
+    /// Whether Shift, Control, Alt, Super and AltGr were all up at some
+    /// moment since `since`, by GNOME's reports: a chord pressed after that
+    /// moment is a new press, never a held one's repeat. False when GNOME
+    /// reported throughout and never said so; unknown when it reports
+    /// nothing, or began after `since`.
+    pub(crate) fn modifiers_lifted_since(&self, since: Instant) -> Option<bool> {
+        lifted_since(&self.shared.state(), since)
     }
 
     /// Shift, Insert and their releases, 12 ms apart, never another key.
@@ -265,7 +278,7 @@ fn follow(context: &ei::Context, shared: &Shared) {
             EiEvent::DevicePaused(paused) => forget(&mut state, &paused.device),
             EiEvent::DeviceRemoved(removed) => forget(&mut state, &removed.device),
             EiEvent::KeyboardModifiers(modifiers) => {
-                state.depressed = Some(modifiers.depressed);
+                note_modifiers(&mut state, modifiers.depressed, Instant::now());
             }
             EiEvent::Disconnected(_) => return,
             _ => {}
@@ -283,7 +296,25 @@ fn forget(state: &mut State, device: &Device) {
     {
         state.link = None;
         state.depressed = None;
+        state.informed = None;
+        state.lifted = None;
     }
+}
+
+fn note_modifiers(state: &mut State, depressed: u32, now: Instant) {
+    state.depressed = Some(depressed);
+    state.informed.get_or_insert(now);
+    if !holds_modifier(depressed) {
+        state.lifted = Some(now);
+    }
+}
+
+fn lifted_since(state: &State, since: Instant) -> Option<bool> {
+    state.depressed?;
+    if state.lifted.is_some_and(|at| at >= since) {
+        return Some(true);
+    }
+    state.informed.filter(|at| *at <= since).map(|_| false)
 }
 
 #[cfg(test)]
@@ -305,6 +336,38 @@ mod tests {
             assert!(holds_modifier(bit), "{name}");
             assert!(holds_modifier(bit | 0x10), "{name} with Num Lock");
         }
+    }
+
+    #[test]
+    fn modifiers_gnome_reported_up_tell_a_new_press_from_a_held_one() {
+        const SUPER: u32 = 0x40;
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut state = State::default();
+        // Nothing reported, as on GNOME before 50: unknown.
+        assert_eq!(lifted_since(&state, at(0)), None);
+        // Super goes down with the shortcut at 100 ms and stays down: a call
+        // after that was no new press, as far as the modifiers say.
+        note_modifiers(&mut state, SUPER, at(100));
+        assert_eq!(lifted_since(&state, at(120)), Some(false));
+        // It comes up at 300 ms: whatever is pressed after 120 ms is new.
+        note_modifiers(&mut state, 0, at(300));
+        assert_eq!(lifted_since(&state, at(120)), Some(true));
+        // Down again and held: nothing lifted since 400 ms.
+        note_modifiers(&mut state, SUPER, at(350));
+        assert_eq!(lifted_since(&state, at(120)), Some(true));
+        assert_eq!(lifted_since(&state, at(400)), Some(false));
+        // Reports that began after the moment asked about say nothing of it,
+        // unless they have shown the modifiers up since.
+        let mut late = State::default();
+        note_modifiers(&mut late, SUPER, at(500));
+        assert_eq!(lifted_since(&late, at(200)), None);
+        note_modifiers(&mut late, 0, at(600));
+        assert_eq!(lifted_since(&late, at(200)), Some(true));
+        // Caps Lock and Num Lock are no chord: reported alone, all are up.
+        let mut locks = State::default();
+        note_modifiers(&mut locks, 0x02 | 0x10, at(700));
+        assert_eq!(lifted_since(&locks, at(650)), Some(true));
     }
 
     #[test]

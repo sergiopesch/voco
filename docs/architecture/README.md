@@ -319,7 +319,7 @@ and VOCO releases its X11 grab so the engine receives it. On Wayland, a shortcut
 other than the three presets needs a desktop binding that runs `voco --toggle`.
 
 The presets are `Preset` in `lib.rs`: Super+X, the default, then Alt+D and
-Alt+Shift+D, in the tray's order. The companion and GNOME's shortcut portal
+Alt+Shift+D, in the tray's order. The companion and GNOME's keyboard shortcuts
 consume only the letter of a chord, so the focused app still sees its modifier
 pressed and released alone. For Alt that opens the menu bar in Firefox,
 Thunderbird, LibreOffice and Electron editors, and the menu takes the
@@ -521,7 +521,8 @@ dictation ends as Stop does and copies the rest. A paste sends Shift, Insert
 and their releases; one before the session has started waits up to 400 ms, then
 typed nothing.
 
-Where the GlobalShortcuts portal exists, `open_typing` then calls
+On GNOME 48 and later, which `gnome_has_shortcut_portal` tells by the
+GlobalShortcuts portal that came with it, `open_typing` then calls
 `ConnectToEIS` on the session, and `portal_eis.rs` follows the socket GNOME
 returns on its own thread, with the `reis` crate's implementation of libei's
 protocol: it connects as a sender, binds the seat's keyboard and waits for
@@ -534,54 +535,48 @@ keys is uncertain, so the text stays pending.
 From GNOME 50 the same socket carries `ei_keyboard.modifiers` whenever the
 seat's modifier state changes, from any keyboard, so `modifiers_held` knows
 whether Shift, Control, Alt, Super or AltGr is down, and the paste's modifier
-wait uses that in place of the shortcut's signals. GNOME 50 sends the first
+wait uses that in place of the timing of the shortcut's calls. GNOME 50 sends the first
 such event as it resumes the keyboard, and VOCO types through the connection
 only once it has one. GNOME 46 sends none, so there, and wherever the
 connection is refused, its keyboard isn't ready within 2 s or no report has
 come 300 ms after that, the session types with `NotifyKeyboardKeycode` and the
-shortcut's signals say when the keys are up. A session that has connected no
+timing of the shortcut's calls says how long to wait for its keys. A session that has connected no
 longer accepts those calls, so `open_typing` closes it and opens a plain one,
 and the process doesn't ask again.
 
-`portal_shortcut.rs` binds one `toggle` shortcut through GlobalShortcuts (GNOME
-48 and later), first from setup's button, which shows GNOME's dialog, and records
-that in `global-shortcut` beside the config. At each start it binds again, which
-GNOME answers without a dialog. GNOME stores the keys for each shortcut ID and
-ignores a later preferred trigger for an ID it knows, so `change`, behind
-Settings' **Apply shortcut**, binds the shortcut under the next ID
-(`toggle-2`, then `toggle-3`) with the new keys proposed, which shows GNOME's
-dialog again. Added, the new session replaces the old one, GNOME keeps only the
-new ID, and `global-shortcut-id` beside the config records it for later starts;
-cancelled, which GNOME answers with response 2, nothing changes.
-`shortcut_chord.rs` spells a shortcut for the portal (`CTRL+ALT+d`) and for GTK
-(`<Control><Alt>d`) by its key's X keysym, and reads GNOME's description back
-into VOCO's spelling. On GNOME 46 the same button rewrites VOCO's own custom
-shortcut. GNOME's grab repeats `Activated` while the
-chord is held, about every 30 ms after the keyboard's repeat delay; one before
-`Deactivated` at a repeat's time, the first within 100 ms of that delay after the
-press and the rest within the delay plus 100 ms of the last, is a repeat and
-toggles nothing. Any other is a press. GNOME 46's custom shortcut calls
-`Toggle` on VOCO's bus name with `dbus-send`, for the press and for each
-repeat, and `panel.rs` hands each to `note_bus_press`, which keeps the same
-state as `Activated`: the calls arrive in a few milliseconds, so the same
-timing tells a repeat from a press. GNOME 46 reports no release of either key,
-so `bus_held` keeps a paste waiting the repeat delay plus 400 ms after the last
-call. Where the call fails the command runs `voco --toggle`,
-and `note_command_press` treats one within the repeat delay plus 400 ms of
-the last as a repeat, since each is a snap launch that can arrive late; a
-paste waits as long after the last. A first `Activated` toggles through
-`eval_toggle_with_backend(…, "gnome_portal")` on GTK's thread. The preferred
-trigger spells VOCO's shortcut the shortcuts specification's way, `LOGO+x` for
-Super+X. Modifiers can't be
-read through the portal, so `keys_held` counts a press as held until
-`Deactivated`, then 400 ms more for the modifier's own release, and the paste's usual 1.5 s wait sends no keys
-while it is held: keys under Super or Alt make another chord and paste nothing.
-GNOME sends `Deactivated` only when the letter comes up under its modifier, so
-a press with none counts as held only while the chord could still repeat: until
-the repeat delay plus 100 ms after its last `Activated`, or 1 s when the keyboard
-doesn't repeat. Then it reads as unknown. The companion's `ReserveShortcut`
-suspends the portal session and its release binds again, so one grab holds the
-chord.
+`gnome_shortcut.rs` keeps the snap's shortcut as VOCO's own entry in GNOME's
+custom keyboard shortcuts, which `gnome_custom_shortcut.rs` reads and writes
+through GSettings: GNOME's media keys daemon grabs the keys in the Shell and
+runs the entry's command. Nothing asks the person, so setup's last screen
+calls `hold_gnome_shortcut` by itself, and `persist_config_patch` calls
+`keep_in_step` before it applies a changed shortcut, from Settings, the tray
+or setup: the entry is added or moved first, and GNOME's keys being taken, by
+one of its window shortcuts or another custom shortcut, refuses the save.
+`shortcut_chord.rs` spells a shortcut for GTK (`<Control><Alt>d`) by its key's
+X keysym and reads GNOME's keys back into VOCO's spelling; `setup` watches the
+entry's keys and, once setup is complete, saves a change made in GNOME
+Settings as VOCO's shortcut. A start never adds the entry, except once for a
+VOCO from 2026.0.70 to 2026.0.72 that held the chord through GNOME's
+GlobalShortcuts portal (`hand_over_from_portal`).
+
+The entry's command calls `Toggle` on VOCO's bus name with `dbus-send`, for
+the press and for each repeat GNOME makes while the chord is held, about every
+30 ms after the keyboard's repeat delay. `panel.rs` hands each call to
+`note_bus_press`. GNOME reports no release of either key, so `is_repeat` tells
+a repeat by its timing: the first within 100 ms of the repeat delay after a
+press, the rest sooner than that after the last. `bus_press` first asks
+`portal_keys::modifiers_lifted_since`: while a dictation's typing session is
+open, GNOME's keyboard connection says from GNOME 50 whether every modifier
+was up since the last call, and a chord pressed after that is a new press
+whatever its timing. A press toggles through
+`eval_toggle_with_backend(…, "gnome_shortcut")` on GTK's thread. For a paste,
+`modifiers_held` answers where GNOME reports the modifiers; elsewhere
+`bus_held` keeps it waiting the repeat delay plus 400 ms after the last call,
+and the paste's usual 1.5 s wait sends no keys while the chord counts as held:
+keys under Super or Alt make another chord and paste nothing. Where the call
+fails the command runs `voco --toggle`, and `note_command_press` treats one
+within the repeat delay plus 400 ms of the last as a repeat, since each is a
+snap launch that can arrive late; a paste waits as long after the last.
 
 `voco --check-desktop-input` and `--check-panel` run apart from the VOCO the
 companion works for, so they ask it with `CompanionAsking`, which answers any

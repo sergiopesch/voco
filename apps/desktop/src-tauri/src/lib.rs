@@ -63,6 +63,7 @@ pub fn toggle_running_application() -> Result<(), String> {
 }
 #[cfg(target_os = "linux")]
 mod gnome_custom_shortcut;
+mod gnome_shortcut;
 #[cfg(target_os = "linux")]
 mod panel;
 #[cfg(target_os = "linux")]
@@ -74,7 +75,6 @@ mod portal_fixture;
 #[cfg(target_os = "linux")]
 mod portal_keys;
 #[cfg(target_os = "linux")]
-mod portal_shortcut;
 #[cfg(target_os = "linux")]
 mod shortcut_chord;
 mod tray;
@@ -404,7 +404,7 @@ fn has_pending_hotkey_toggle() -> bool {
 /// in tray menu order, the default first. Every other shortcut is custom.
 ///
 /// Super+X is the default (`config::DEFAULT_HOTKEY`) because a grab that takes
-/// only an Alt chord's letter, as the companion's and GNOME's shortcut portal
+/// only an Alt chord's letter, as the companion's and GNOME's keyboard shortcuts
 /// do, leaves apps seeing Alt pressed and released alone. Firefox, Thunderbird,
 /// LibreOffice and Electron editors then open their menu bar, which swallows the
 /// Shift+Insert pastes that follow. A lone Super opens nothing in an app, and
@@ -680,7 +680,7 @@ fn reset_config_to_defaults(app: tauri::AppHandle) -> Result<ConfigSnapshot, Str
     #[cfg(target_os = "linux")]
     {
         portal_keys::forget();
-        portal_shortcut::forget();
+        gnome_shortcut::forget();
     }
     Ok(publish_config(&app, config, "recovered"))
 }
@@ -737,12 +737,17 @@ fn persist_config_patch(
     let previous = AppConfig::load().map_err(|error| error.to_string())?;
     let config = apply_and_validate_patch(&previous, patch)?;
     let hotkey_changed = previous.hotkey != config.hotkey;
-    let rebind = |hotkey: &str| apply_hotkey_runtime_state(app, hotkey);
+    // In the snap on GNOME Wayland GNOME's keyboard shortcuts hold the chord:
+    // they take the new keys first, and refuse keys something else uses.
+    let rebind = |hotkey: &str| {
+        #[cfg(target_os = "linux")]
+        gnome_shortcut::keep_in_step(hotkey)?;
+        apply_hotkey_runtime_state(app, hotkey)
+    };
 
     if hotkey_changed {
         validate_dictation_hotkey(&config.hotkey)?;
-        apply_hotkey_runtime_state(app, &config.hotkey)
-            .map_err(|error| restore_hotkey(&previous.hotkey, error, rebind))?;
+        rebind(&config.hotkey).map_err(|error| restore_hotkey(&previous.hotkey, error, rebind))?;
     }
     let restore_after = |error: String| {
         if hotkey_changed {
@@ -878,81 +883,66 @@ fn with_panel_recommendation(
     if input.available {
         if let Some(detail) = stop_shortcut_setup_issue(app) {
             input.detail = detail;
-            input.setup_area = Some(shortcut_setup_area(app));
+            input.setup_area = Some(shortcut_setup_area());
         }
     }
     input
 }
 
-/// Where setup fixes the shortcut: GNOME's portal in the snap, else the panel.
-fn shortcut_setup_area(app: &tauri::AppHandle) -> &'static str {
+/// Where setup fixes the shortcut: GNOME's own setup step in the snap on
+/// GNOME Wayland, else the panel.
+fn shortcut_setup_area() -> &'static str {
     #[cfg(target_os = "linux")]
-    if portal_keys::applies() && !panel::reserves_current_shortcut(app) {
+    if gnome_shortcut::applies() {
         return "portal";
     }
-    let _ = app;
     "panel"
 }
 
-/// The snap's shortcut on GNOME Wayland: None once GNOME's portal holds it.
+/// The snap's shortcut on GNOME Wayland: None once VOCO's GNOME shortcut or
+/// the companion holds the chord. Nothing else there does.
 #[cfg(target_os = "linux")]
-fn portal_shortcut_issue(hotkey: &str) -> Option<String> {
-    if portal_shortcut::custom_applies() {
-        return (!portal_shortcut::custom_present(hotkey)).then(|| format!(
-            "{hotkey} doesn't reach VOCO yet. Choose Add {hotkey}, and VOCO adds it to GNOME's keyboard shortcuts."
-        ));
-    }
-    if portal_shortcut::bound() {
+fn gnome_shortcut_issue(app: &tauri::AppHandle, hotkey: &str) -> Option<String> {
+    if gnome_shortcut::present(hotkey) || panel::reserves_current_shortcut(app) {
         return None;
     }
-    Some(if portal_shortcut::available() {
-        format!("GNOME can keep {hotkey} for VOCO, so the app you're dictating into never receives it. Choose Add {hotkey}, then Add in GNOME's dialog.")
+    Some(if gnome_shortcut::available() {
+        format!("{hotkey} doesn't reach VOCO yet. Choose Add {hotkey}, and VOCO adds it to GNOME's keyboard shortcuts.")
     } else {
         format!("{hotkey} doesn't reach VOCO yet. In GNOME Settings, under Keyboard, add a custom shortcut for {hotkey} that runs voco --toggle.")
     })
 }
 
-/// What the snap's portal setup shows: whether GNOME lets VOCO type, and
-/// whether it holds VOCO's shortcut.
+/// What the snap's GNOME setup shows: whether GNOME lets VOCO type, and
+/// whether its keyboard shortcuts hold VOCO's.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PortalSetupStatus {
-    /// The snap on GNOME Wayland, where these portals apply.
+    /// The snap on GNOME Wayland, where this setup applies.
     applies: bool,
     typing_allowed: bool,
     /// The companion types instead.
     panel_attached: bool,
-    /// The companion also holds the saved chord. A companion before version
-    /// 23 holds only Alt chords, so with Super+X GNOME's portal still must.
+    /// The companion also holds the saved chord. One before version 23
+    /// holds only Alt chords.
     panel_holds_shortcut: bool,
-    /// This GNOME has the GlobalShortcuts portal (48 and later).
-    shortcut_portal: bool,
-    /// Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead.
-    shortcut_custom: bool,
+    /// VOCO can keep its shortcut in GNOME's keyboard shortcuts.
+    shortcut_available: bool,
+    /// GNOME's keyboard shortcuts hold VOCO's, for the saved chord. GNOME
+    /// Settings can remove it, so this asks GNOME each time.
     shortcut_bound: bool,
-    /// GNOME's description of the trigger, such as "Press <Alt>d".
-    shortcut_trigger: Option<String>,
 }
 
 #[cfg(target_os = "linux")]
 fn portal_setup_status(app: &tauri::AppHandle, hotkey: &str) -> PortalSetupStatus {
     let applies = portal_keys::applies();
-    let shortcut_portal = applies && portal_shortcut::available();
-    let shortcut_custom = applies && !shortcut_portal && portal_shortcut::custom_applies();
     PortalSetupStatus {
         applies,
         typing_allowed: applies && portal_keys::allowed(),
         panel_attached: panel::is_attached(),
         panel_holds_shortcut: panel::reserves_current_shortcut(app),
-        shortcut_portal,
-        shortcut_custom,
-        // GNOME Settings can remove a custom shortcut, so ask GNOME, not the record.
-        shortcut_bound: if shortcut_custom {
-            portal_shortcut::custom_present(hotkey)
-        } else {
-            applies && portal_shortcut::bound()
-        },
-        shortcut_trigger: portal_shortcut::trigger(),
+        shortcut_available: gnome_shortcut::available(),
+        shortcut_bound: gnome_shortcut::present(hotkey),
     }
 }
 
@@ -963,10 +953,8 @@ fn portal_setup_status(_app: &tauri::AppHandle, _hotkey: &str) -> PortalSetupSta
         typing_allowed: false,
         panel_attached: false,
         panel_holds_shortcut: false,
-        shortcut_portal: false,
-        shortcut_custom: false,
+        shortcut_available: false,
         shortcut_bound: false,
-        shortcut_trigger: None,
     }
 }
 
@@ -990,70 +978,39 @@ fn allow_portal_typing(app: tauri::AppHandle) -> Result<PortalSetupStatus, Strin
     ))
 }
 
-/// Setup's and Settings' shortcut button: GNOME shows its dialog once.
+/// Setup, by itself, and Settings' Add button: VOCO's shortcut joins GNOME's
+/// keyboard shortcuts with the saved keys, which asks nobody. Refused, with
+/// what uses them, when something else in GNOME does.
 #[tauri::command(async)]
-fn allow_portal_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
+fn hold_gnome_shortcut(app: tauri::AppHandle) -> Result<PortalSetupStatus, String> {
     let hotkey = configured_or_default_hotkey(&app);
     #[cfg(target_os = "linux")]
-    portal_shortcut::allow(&hotkey)?;
+    gnome_shortcut::hold(&hotkey)?;
     Ok(portal_setup_status(&app, &hotkey))
 }
 
-/// Settings' Apply shortcut in the snap once GNOME holds the shortcut: GNOME
-/// takes the new keys, after its own dialog where it has one, and VOCO saves
-/// the keys GNOME reports. Refused or cancelled, nothing changes.
+/// Setup's other shortcuts, offered when GNOME can't hold the saved one:
+/// saves the choice, and GNOME's keyboard shortcuts take it with the save.
+/// Refused, with what uses those keys too, nothing changes.
 #[tauri::command(async)]
-fn change_portal_shortcut(
+fn choose_gnome_shortcut(
     app: tauri::AppHandle,
     hotkey: String,
 ) -> Result<PortalSetupStatus, String> {
-    let hotkey = change_gnome_shortcut(&app, &hotkey)?;
+    let hotkey = hotkey.trim().to_owned();
+    validate_dictation_hotkey(&hotkey)?;
+    persist_config_patch(&app, AppConfigPatch::with_hotkey(hotkey.clone()), true)?;
     Ok(portal_setup_status(&app, &hotkey))
 }
 
-/// Changes the keys of the shortcut GNOME holds for the snap, and saves the
-/// keys GNOME reports. Waits for GNOME's dialog, so never on GTK's thread.
-fn change_gnome_shortcut(app: &tauri::AppHandle, hotkey: &str) -> Result<String, String> {
-    let hotkey = hotkey.trim().to_owned();
-    validate_dictation_hotkey(&hotkey)?;
-    #[cfg(target_os = "linux")]
-    let hotkey = {
-        let trigger = portal_shortcut::change(&hotkey)?;
-        // `change` returns only keys VOCO can take, in GNOME's spelling.
-        shortcut_chord::hotkey_from_trigger(&trigger)
-            .ok_or_else(|| format!("GNOME reported keys VOCO can't read: {trigger}"))?
-    };
-    persist_config_patch(app, AppConfigPatch::with_hotkey(hotkey.clone()), true)?;
-    Ok(hotkey)
-}
-
-/// A preset chosen in the tray's menu. Where GNOME holds the snap's
-/// shortcut, GNOME takes the change, after its own dialog where it has one;
-/// cancelled there, the earlier shortcut stays.
+/// A preset chosen in the tray's menu. A change that didn't happen says why:
+/// the menu has nowhere to show it, and in the snap GNOME refuses keys
+/// something else uses.
 pub(crate) fn change_hotkey_from_tray(app: &tauri::AppHandle, hotkey: &str) {
-    #[cfg(target_os = "linux")]
-    if gnome_keeps_shortcut(app) {
-        let (app, hotkey) = (app.clone(), hotkey.to_owned());
-        tauri::async_runtime::spawn_blocking(move || {
-            if let Err(error) = change_gnome_shortcut(&app, &hotkey) {
-                warn!("The tray's change of shortcut to {hotkey} didn't happen: {error}");
-            }
-        });
-        return;
-    }
     if let Err(error) = change_hotkey_runtime(app, hotkey) {
         error!("Failed to change hotkey: {error}");
+        send_notification("VOCO kept your shortcut", &error);
     }
-}
-
-/// GNOME holds the snap's shortcut now: through its portal, or as VOCO's own
-/// GNOME custom shortcut for the saved keys.
-#[cfg(target_os = "linux")]
-fn gnome_keeps_shortcut(app: &tauri::AppHandle) -> bool {
-    portal_shortcut::holds()
-        || (portal_shortcut::custom_applies()
-            && tray::current_hotkey(app)
-                .is_ok_and(|hotkey| portal_shortcut::custom_present(&hotkey)))
 }
 
 /// A desktop dictation starts: open the snap's typing session, if it types
@@ -1085,14 +1042,13 @@ fn get_desktop_paste_status() -> insertion::DesktopPasteStatus {
 
 fn stop_shortcut_setup_issue(app: &tauri::AppHandle) -> Option<String> {
     let hotkey = tray::current_hotkey(app).unwrap_or_else(|_| DEFAULT_HOTKEY.into());
-    let preset = wayland_preset(is_wayland_session(), &hotkey)?;
-    // The snap holds its chord through GNOME's shortcut portal instead, unless
-    // the companion holds it: one attached before version 23 grabs only Alt
-    // chords, so attachment alone doesn't hold Super+X.
+    // The snap on GNOME Wayland holds any chord, a preset or not, through
+    // GNOME's keyboard shortcuts or the companion.
     #[cfg(target_os = "linux")]
-    if portal_keys::applies() && !panel::reserves_current_shortcut(app) {
-        return portal_shortcut_issue(preset.label());
+    if gnome_shortcut::applies() {
+        return gnome_shortcut_issue(app, &hotkey);
     }
+    let preset = wayland_preset(is_wayland_session(), &hotkey)?;
     panel_setup::stop_shortcut_setup_detail(
         preset.label(),
         panel_setup::cached_check(),
@@ -1178,12 +1134,12 @@ fn get_runtime_diagnostics(
 }
 
 #[cfg(target_os = "linux")]
-fn portal_shortcut_holds() -> bool {
-    portal_shortcut::holds()
+fn gnome_shortcut_holds(hotkey: &str) -> bool {
+    gnome_shortcut::present(hotkey)
 }
 
 #[cfg(not(target_os = "linux"))]
-fn portal_shortcut_holds() -> bool {
+fn gnome_shortcut_holds(_hotkey: &str) -> bool {
     false
 }
 
@@ -1230,7 +1186,7 @@ fn shortcut_runtime_status(
         configured_preset: Preset::of(&config.hotkey),
         bridge_available,
         panel_reserved,
-        portal_bound: portal_shortcut_holds(),
+        gnome_bound: gnome_shortcut_holds(&config.hotkey),
     })
 }
 
@@ -1696,14 +1652,17 @@ fn suppress_passive_shortcut(app_handle: &tauri::AppHandle, backend: &str) -> bo
     false
 }
 
-/// GNOME Settings changed the snap's shortcut (portal_shortcut.rs): VOCO's
-/// config follows, off the portal thread. A trigger VOCO can't take is logged
-/// and left alone.
+/// GNOME Settings changed the keys of the snap's shortcut
+/// (gnome_shortcut.rs): VOCO's config follows, off GTK's thread. Not before
+/// setup is complete: a new setup starts from VOCO's own shortcut, and moves
+/// an entry an earlier installation left in GNOME to it.
 #[cfg(target_os = "linux")]
 pub(crate) fn follow_gnome_shortcut(app_handle: &tauri::AppHandle, hotkey: String) {
     let app = app_handle.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        if tray::current_hotkey(&app).is_ok_and(|current| current == hotkey) {
+        if tray::current_hotkey(&app).is_ok_and(|current| current == hotkey)
+            || !AppConfig::load().is_ok_and(|config| config.onboarding_completed)
+        {
             return;
         }
         let patch = config::AppConfigPatch {
@@ -1714,18 +1673,6 @@ pub(crate) fn follow_gnome_shortcut(app_handle: &tauri::AppHandle, hotkey: Strin
             warn!("VOCO's shortcut didn't follow GNOME's {hotkey}: {error}");
         }
     });
-}
-
-/// A press of the snap's GNOME shortcut (portal_shortcut.rs), from the portal
-/// thread: toggle on GTK's thread, as every other route does.
-#[cfg(target_os = "linux")]
-pub(crate) fn toggle_from_portal(app_handle: &tauri::AppHandle) {
-    let app = app_handle.clone();
-    if let Err(error) = app_handle.run_on_main_thread(move || {
-        eval_toggle_with_backend(&app, "gnome_portal");
-    }) {
-        error!("Could not toggle from GNOME's shortcut: {error}");
-    }
 }
 
 fn emit_toggle_event(app_handle: &tauri::AppHandle, backend_used: &str) {
@@ -2080,11 +2027,11 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                         }
                         debug!("Toggle received via socket");
                         trace_hotkey_event("socket_toggle_received", Some("socket"));
-                        // In the snap a GNOME custom shortcut sends this, with no
-                        // release to wait for, and again for each repeat while
-                        // the chord is held (portal_shortcut.rs).
+                        // In the snap GNOME's shortcut sends this where it can't
+                        // call VOCO, with no release to wait for, and again for
+                        // each repeat while the chord is held (gnome_shortcut.rs).
                         #[cfg(target_os = "linux")]
-                        if confinement::is_snap() && !portal_shortcut::note_command_press() {
+                        if confinement::is_snap() && !gnome_shortcut::note_command_press() {
                             trace_hotkey_event("socket_toggle_repeat_ignored", Some("socket"));
                             continue;
                         }
@@ -2654,8 +2601,8 @@ pub fn run() -> Result<(), String> {
             begin_desktop_typing,
             get_portal_setup_status,
             allow_portal_typing,
-            allow_portal_shortcut,
-            change_portal_shortcut,
+            hold_gnome_shortcut,
+            choose_gnome_shortcut,
             open_problem_report,
             activation::take_launcher_activation,
             paste_desktop_text,
@@ -2737,7 +2684,7 @@ pub fn run() -> Result<(), String> {
             #[cfg(target_os = "linux")]
             {
                 portal_keys::setup(app.handle());
-                portal_shortcut::setup(app.handle(), &hotkey);
+                gnome_shortcut::setup(app.handle(), &hotkey);
             }
             EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();

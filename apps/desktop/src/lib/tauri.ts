@@ -90,24 +90,22 @@ export function getPanelSetupStatus(): Promise<PanelSetupStatus> {
 export function enableGnomePanel(): Promise<PanelSetupStatus> {
   return invoke("enable_gnome_panel");
 }
-/** The snap's GNOME portals (AGENTS.md): typing through RemoteDesktop and the
- * shortcut through GlobalShortcuts, each allowed once in GNOME's dialog. */
+/** The snap's setup with GNOME (AGENTS.md): typing through GNOME's
+ * RemoteDesktop portal, allowed once in GNOME's dialog, and the shortcut as
+ * VOCO's own entry in GNOME's keyboard shortcuts, which asks nobody. */
 export interface PortalSetupStatus {
-  /** The snap on GNOME Wayland, where these portals apply. */
+  /** The snap on GNOME Wayland, where this setup applies. */
   applies: boolean;
   typingAllowed: boolean;
   /** The VOCO panel types instead. */
   panelAttached: boolean;
   /** The panel also holds the saved shortcut; one before version 23 holds
-   * only Alt chords, so GNOME's shortcut portal still holds Super+X. */
+   * only Alt chords. */
   panelHoldsShortcut: boolean;
-  /** This GNOME has the shortcut portal (GNOME 48 and later). */
-  shortcutPortal: boolean;
-  /** Without it (GNOME 46), VOCO adds a GNOME custom shortcut instead. */
-  shortcutCustom: boolean;
+  /** VOCO can keep its shortcut in GNOME's keyboard shortcuts. */
+  shortcutAvailable: boolean;
+  /** GNOME's keyboard shortcuts hold VOCO's, for the saved keys. */
   shortcutBound: boolean;
-  /** GNOME's description of the trigger, such as "Press <Super>x". */
-  shortcutTrigger: string | null;
 }
 export function getPortalSetupStatus(): Promise<PortalSetupStatus> {
   return invoke("get_portal_setup_status");
@@ -116,15 +114,16 @@ export function getPortalSetupStatus(): Promise<PortalSetupStatus> {
 export function allowPortalTyping(): Promise<PortalSetupStatus> {
   return invoke("allow_portal_typing");
 }
-/** Opens GNOME's shortcut dialog and waits for the answer; rejects with why not. */
-export function allowPortalShortcut(): Promise<PortalSetupStatus> {
-  return invoke("allow_portal_shortcut");
+/** Adds VOCO's shortcut to GNOME's keyboard shortcuts with the saved keys,
+ * which asks nobody. Rejects with what already uses them. */
+export function holdGnomeShortcut(): Promise<PortalSetupStatus> {
+  return invoke("hold_gnome_shortcut");
 }
-/** Settings' Apply shortcut once GNOME holds the shortcut: GNOME takes the new
- * keys, after its own dialog where it has one. Rejects with why not, and the
- * earlier shortcut then stays. */
-export function changePortalShortcut(hotkey: string): Promise<PortalSetupStatus> {
-  return invoke("change_portal_shortcut", { hotkey });
+/** Saves another shortcut when GNOME can't hold the saved one; GNOME's
+ * keyboard shortcuts take it with the save. Rejects with what already uses
+ * those keys, and nothing changes. */
+export function chooseGnomeShortcut(hotkey: string): Promise<PortalSetupStatus> {
+  return invoke("choose_gnome_shortcut", { hotkey });
 }
 /** A desktop dictation starts: the snap opens its typing session with GNOME. */
 export function beginDesktopTyping(): Promise<void> {

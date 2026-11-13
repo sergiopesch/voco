@@ -84,7 +84,7 @@ Suites that type through VOCO's virtual keyboard also need the
 | --- | --- | --- |
 | None | `test-private-ibus-engine.sh` | VOCO's IBus engine against a private IBus daemon, with no display or session bus |
 | `--gnome-panel` | `test-gnome-panel.sh` | GNOME Shell with the [companion](../../integrations/gnome/README.md#files-and-tests) and synthetic app status; with `VOCO_PANEL_APP_BINARY`, the app's tray bridge too, or only the bridge with `VOCO_PANEL_SUITE=bridge` |
-| `--gnome-portals` | `test-gnome-portals.sh` | GNOME Shell 50 with PipeWire, xdg-desktop-portal and its GNOME backend, and the snap's [portal code](#the-portal-suite) through the lib test binary that `VOCO_PORTAL_TEST_BINARY` names |
+| `--gnome-portals` | `test-gnome-portals.sh` | GNOME Shell 50 with PipeWire, xdg-desktop-portal, its GNOME backend and GNOME's media keys daemon, and the snap's [typing and shortcut code](#the-portal-suite) through the lib test binary that `VOCO_PORTAL_TEST_BINARY` names |
 | `--native-desktop` | `test-native-desktop.sh` | Real GTK and WebKit widgets with private X11, D-Bus and IBus |
 | `--native-wayland` | `test-native-wayland.sh` | Real Wayland surfaces in headless Weston; with `VOCO_WAYLAND_APP_BINARY`, the app starting, opening and quitting from its tray |
 | `--native-pulse-latency` | `test-native-capture-pulse-latency.py` | VOCO's C capture from a private PulseAudio whose fixture source carries the `object.serial` PipeWire would set: a short clip, a long clip, and a starved run that must fail with `capture-duration-deficit` |
@@ -193,50 +193,52 @@ which sets each selection through the private Shell probe.
 
 ### The portal suite
 
-`test-gnome-portals.sh` proves the snap's typing and shortcut through GNOME's
-portals (AGENTS.md, Delivery and Shortcut). It needs GNOME Shell 50 and a lib
-test binary: `cargo test --locked --lib --no-run` prints its path. In the
-namespace it starts PipeWire, a headless Shell with XWayland and the
-`gnome-portal-probe` extension, and xdg-desktop-portal with its GNOME backend,
-which starts gnome-control-center's shortcut provider. VOCO is that binary's
-ignored `portal_fixture::serve_the_portal_suite` with `SNAP_NAME=voco`: it runs
-the real `portal_keys.rs`, `portal_shortcut.rs` and production desktop paste,
-one command from the suite at a time. No snapd runs here, so the portal names
-every caller through its own test hook (`XDG_DESKTOP_PORTAL_TEST_APP_INFO_KIND`)
-from the metadata `snap routine portal-info` gives the `voco` snap, under the
-app ID `voco_voco`, with a stand-in for the desktop entry snapd installs.
+`test-gnome-portals.sh` proves the snap's typing through GNOME's portal and
+its shortcut through GNOME's keyboard shortcuts (AGENTS.md, Delivery and
+Shortcut). It needs GNOME Shell 50 and a lib test binary:
+`cargo test --locked --lib --no-run` prints its path. In the namespace it
+starts PipeWire, a headless Shell with XWayland and the `gnome-portal-probe`
+extension, xdg-desktop-portal with its GNOME backend, and GNOME's media keys
+daemon, which grabs custom shortcuts in the Shell and runs their commands.
+VOCO is that binary's ignored `portal_fixture::serve_the_portal_suite` with
+`SNAP_NAME=voco`: it runs the real `portal_keys.rs`, `gnome_shortcut.rs`,
+`panel.rs`'s `Toggle` and production desktop paste, one command from the suite
+at a time. No snapd runs here, so the portal names every caller through its
+own test hook (`XDG_DESKTOP_PORTAL_TEST_APP_INFO_KIND`) from the metadata
+`snap routine portal-info` gives the `voco` snap, under the app ID
+`voco_voco`, with a stand-in for the desktop entry snapd installs.
 
-The suite answers GNOME's dialogs over AT-SPI: Allow Remote Interaction, then
-Share, and the shortcut dialog's Add. The probe's Clutter keyboard inside the
-Shell presses Super+X, VOCO's default, so the tester's keys open no remote
-desktop session of their own. Each paste goes to `fixtures/paste-field.py` on Wayland and under
-XWayland and must land exactly, from one Shift+Insert. It checks, in order:
-dictation without GNOME's permission opens no session and types nothing; Allow
-typing shows GNOME's dialog once; each dictation restores the permission without
-a dialog and closes its session when it ends; the remote-access icon's Stop
-stops the dictation, and the next paste sends no key; a session no dictation
-reports needing closes by itself; the shortcut dialog appears once, Super+X then
-toggles and never reaches the field, and a paste while the chord is down goes
-out within 250 ms of Super coming up, by GNOME's keyboard connection; with
-Super let go before X, which GNOME reports no release for, the paste waits for
-nothing; a paste under Control alone waits for its release, and types nothing
-when it is held past 1.5 s; with the connection turned off, as on a GNOME that
-gives none, a paste waits for `Deactivated` and 400 ms more, or about 600 ms
-after a press GNOME reported no release for; a connection taken as reporting
-no modifiers closes its session, and a plain one opens and types; a modifier
-pressed while the fixture holds VOCO's Shift gets no Insert, and the same text
-lands once it is up; a
-chord held past the repeat delay keeps its paste waiting for the release; a
-chord held for 1.5 s, which GNOME repeats, toggles once, and the next press
-toggles; while the companion's lease holds the chord
-Super+X doesn't toggle, and after it the shortcut binds again without a dialog;
-Settings' change of shortcut shows GNOME's dialog, whose Cancel keeps Super+X
-working and whose Add makes Control+Alt+K toggle and Super+X not, a later bind
-keeps the new keys without a dialog, and changing back to Super+X works; keys
-VOCO can't take, Shift+F8, are refused, leave no shortcut held, and the Add
-button sets Super+X again.
-Without a tauri app the fixture counts the stops and toggles the portal code
-asks for instead. `VOCO_PORTAL_EVIDENCE_DIR` receives `results.json`, the
+The suite answers GNOME's one dialog over AT-SPI: Allow Remote Interaction,
+then Share. The probe's Clutter keyboard inside the Shell presses Super+X,
+VOCO's default, so the tester's keys open no remote desktop session of their
+own, and GNOME's daemon runs the shortcut's real command, which calls the
+fixture's `Toggle`. Each paste goes to `fixtures/paste-field.py` on Wayland
+and under XWayland and must land exactly, from one Shift+Insert. It checks, in
+order: dictation without GNOME's permission opens no session and types
+nothing; Allow typing shows GNOME's dialog once; each dictation restores the
+permission without a dialog and closes its session when it ends; the
+remote-access icon's Stop stops the dictation, and the next paste sends no
+key; a session no dictation reports needing closes by itself; VOCO's shortcut
+joins GNOME's keyboard shortcuts with no dialog, as GNOME's own schema reads
+it, Super+X then toggles and never reaches the field, and a paste while the
+chord is down goes out within 250 ms of Super coming up, by GNOME's keyboard
+connection; with Super let go before X the paste waits for nothing; a chord
+held past the repeat delay, whose every repeat runs the command, toggles once
+and keeps its paste waiting; a press half a second after the last, during a
+dictation, toggles; a paste under Control alone waits for its release, and
+types nothing when it is held past 1.5 s; a modifier pressed while the fixture
+holds VOCO's Shift gets no Insert, and the same text lands once it is up; with
+the connection turned off, as on a GNOME that gives none, a paste waits the
+repeat delay plus 400 ms after the shortcut's last call, and one that outwaits
+its 1.5 s under a held chord types nothing and lands afterwards; a connection
+taken as reporting no modifiers closes its session, and a plain one opens and
+types; a chord held for 1.5 s with no dictation toggles once, and the next
+press toggles; a saved change moves the shortcut at once, three times over,
+after which only the new keys toggle; keys another custom shortcut or a GNOME
+window shortcut uses are refused and change nothing; and Reset removes VOCO's
+entry and leaves the other.
+Without a tauri app the fixture counts the stops and toggles the code asks
+for instead. `VOCO_PORTAL_EVIDENCE_DIR` receives `results.json`, the
 dialogs' and the remote-access icon's screenshots, and each service's log.
 
 ## Speech suites

@@ -237,52 +237,57 @@ try {
       assert.equal(await page.getByRole('button',{name:'Change shortcut',exact:true}).count(),0);
       await page.getByRole('button',{name:'Shortcut',exact:true}).click();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
+      // The editor opens already recording, with the field focused: Change
+      // shortcut, then the keys, and the keys pressed are applied at once.
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
       const shortcutInput = page.getByLabel('Start and stop dictation',{exact:true});
       assert.equal(await shortcutInput.evaluate(el => document.activeElement === el),true);
+      assert.equal(await shortcutInput.inputValue(),'Press your shortcut…');
+      // Escape leaves recording for the field, where a shortcut can be typed.
+      await shortcutInput.press('Escape');
+      assert.equal(await shortcutInput.inputValue(),'Alt+D');
       await shortcutInput.fill('Ctrl+Alt+K');
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       assert.equal(await page.getByRole('button',{name:'Change shortcut',exact:true}).evaluate(el => document.activeElement === el),true);
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
-      await page.getByRole('button',{name:'Record keys',exact:true}).click();
       await shortcutInput.press('Control+Alt+k');
-      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
       await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Alt+K');
+      assert.equal(await page.getByRole('button',{name:'Change shortcut',exact:true}).evaluate(el => document.activeElement === el),true);
       // Shift+1 types "!", so the recorder names the key through React's own event.
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
-      await page.getByRole('button',{name:'Record keys',exact:true}).click();
       await shortcutInput.press('Control+Shift+Digit1');
-      assert.equal(await shortcutInput.inputValue(),'Ctrl+Shift+1');
-      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
       await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Shift+1');
       // WebKitGTK reports Super as a key of its own and never as a modifier of
       // the keys pressed with it, so the recorder counts that key itself.
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
-      await page.getByRole('button',{name:'Record keys',exact:true}).click();
       const bare = { bubbles:true, cancelable:true, ctrlKey:false, altKey:false, shiftKey:false, metaKey:false };
       await shortcutInput.dispatchEvent('keydown',{...bare,key:'Super',code:'OSLeft'});
       assert.equal(await shortcutInput.inputValue(),'Press your shortcut…');
       await shortcutInput.dispatchEvent('keydown',{...bare,key:'j',code:'KeyJ'});
-      assert.equal(await shortcutInput.inputValue(),'Super+J');
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Super+J');
       // Once Super is up again, a letter alone records nothing.
-      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
       await shortcutInput.dispatchEvent('keydown',{...bare,key:'Super',code:'OSLeft'});
       await shortcutInput.dispatchEvent('keyup',{...bare,key:'Super',code:'OSLeft'});
       await shortcutInput.dispatchEvent('keydown',{...bare,key:'j',code:'KeyJ'});
       assert.equal(await shortcutInput.inputValue(),'Press your shortcut…');
-      await shortcutInput.press('Escape');
+      // Tab leaves the field as it always does: recording never traps focus.
+      await shortcutInput.press('Tab');
+      assert.equal(await page.getByRole('button',{name:'Record keys',exact:true}).evaluate(el => document.activeElement === el),true);
       assert.equal(await shortcutInput.inputValue(),'Super+J');
-      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
-      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
-      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Super+J');
-      await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
-      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      // Record keys records again, and a typed shortcut applies from its button.
+      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      assert.equal(await shortcutInput.inputValue(),'Press your shortcut…');
+      await shortcutInput.press('Escape');
       await shortcutInput.fill('Alt+D');
       await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Alt+D');
       await capture('shortcut');
       await page.setViewportSize({width:760,height:560});

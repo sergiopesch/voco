@@ -186,21 +186,25 @@ is typed or copied, and your spelling choice doesn't apply.
 
 To change the shortcut, choose **Change shortcut** in the tray menu, then
 **Super+X**, **Alt+D**, **Alt+Shift+D** or **Custom shortcut…**. On the
-**Shortcut** page, choose **Change shortcut**, type a shortcut or choose
-**Record keys**, then choose **Apply shortcut**. A shortcut needs Alt, Ctrl or
-Super plus another key.
-**Record keys** names the key you press rather than the symbol it types, so
+**Shortcut** page, choose **Change shortcut** and press the keys you want:
+VOCO saves them at once. A shortcut needs Alt, Ctrl or Super plus another key.
+To type a shortcut instead, press Esc, type it and choose **Apply shortcut**;
+**Record keys** records again.
+Recording names the key you press rather than the symbol it types, so
 Ctrl+Shift+1 records as `Ctrl+Shift+1`, and a letter on a non-Latin layout as
-its Latin key.
+its Latin key. Keys your desktop already uses for something else, such as
+Super+L, don't reach VOCO, so they can't be recorded.
 If your saved shortcut isn't valid, VOCO sets it back to `Super+X` and shows
 **Shortcut reset**. VOCO never changes a valid shortcut you saved.
 
-In the snap on GNOME, GNOME keeps the shortcut for VOCO. After **Apply
-shortcut**, or a shortcut chosen in the tray menu, GNOME shows the new shortcut
-in its own dialog: choose **Add**. If you choose
-**Cancel** there, your earlier shortcut stays. On Ubuntu 24.04 GNOME shows no
-dialog, and VOCO changes its entry in GNOME's keyboard shortcuts for you. VOCO
-says so when GNOME already uses a shortcut for something else.
+In the snap on GNOME, GNOME's keyboard shortcuts keep the shortcut for VOCO:
+setup adds an entry named VOCO, and a change in VOCO moves it at once, with
+nothing to confirm. You can see it in GNOME's **Settings** → **Keyboard** →
+**View and Customize Shortcuts** → **Custom Shortcuts**, and a change you make
+there shows in VOCO too. When another of GNOME's shortcuts already uses the
+keys, VOCO says which and keeps your earlier shortcut. If you remove VOCO's
+entry there, the **Shortcut** page says so and offers **Add** with your
+shortcut.
 
 `Super+X` is the default because a shortcut made of Alt and a letter can lose
 words: when GNOME keeps the letter from your app, the app sees Alt pressed and
@@ -263,9 +267,9 @@ until you discard them.
 The snap keeps the same files in its own folder, `~/snap/voco`: for example,
 its settings are in `~/snap/voco/current/.config/voco/config.json` and its logs
 in `~/snap/voco/current/.local/state/voco/`. Beside its settings it keeps
-GNOME's answers: `remote-desktop-token`, which lets it type without asking
-GNOME again, and `global-shortcut`, which records that GNOME holds its
-shortcut. It never reads the packages' folders, and they never read its.
+GNOME's answer, `remote-desktop-token`, which lets it type without asking
+GNOME again. Its shortcut is in GNOME's own keyboard shortcuts. It never reads
+the packages' folders, and they never read its.
 
 Only your account can read VOCO's settings and recovery files. VOCO doesn't
 save audio in normal use. It also uses private sockets in your session's runtime

@@ -39,6 +39,8 @@ try {
         window.nativeHandlers.getAccountName = () => window.accountName;
         // Rust says whether this VOCO can start at login: a package or the snap.
         if (new URLSearchParams(location.search).get('login') === '1') window.nativeHandlers.loginStartAvailable = () => true;
+        // The Snap Store's VOCO, whose last screen always shows GNOME's setup.
+        if (new URLSearchParams(location.search).get('store') === '1') window.nativeHandlers.storeUpdates = () => true;
         window.nativeHandlers.getDesktopInputStatus = () => ({ available: true, detail: '' });
         window.nativeHandlers.getPanelSetupStatus = () => ({ status: 'other-desktop', detail: 'Use the VOCO tray menu for status and Stop.', canEnable: false });
         window.nativeHandlers.saveConfigPatch = ([patch]) => {
@@ -68,10 +70,11 @@ try {
             }
         };
     });
-    const load = async ({ config = {}, name = 'Siobhán Kelly', passedShot = null, desktopInput = null, panel = null, login = false } = {}) => {
+    const load = async ({ config = {}, name = 'Siobhán Kelly', passedShot = null, desktopInput = null, panel = null, login = false, store = false } = {}) => {
         const query = new URLSearchParams({ config: JSON.stringify({ onboardingCompleted: false, englishSpelling: 'british', myWords: [], ...config }) });
         if (name !== null) query.set('name', name);
         if (login) query.set('login', '1');
+        if (store) query.set('store', '1');
         await page.goto(origin + '/app-microphone-check?' + query);
         await page.waitForFunction(() => window.store?.getState().config);
         // Setup checks desktop input once the voice test passes.
@@ -300,10 +303,14 @@ try {
     results.push({ case: 'enabling-the-panel-updates-the-shortcut-note', passed: true });
 
     // The snap on GNOME Wayland types through GNOME's RemoteDesktop portal, which
-    // asks once, from the person's click: setup asks for that, then the shortcut,
-    // and never sends anyone outside VOCO and GNOME (AGENTS.md, Onboarding).
+    // asks once, from the person's click. Its shortcut then joins GNOME's keyboard
+    // shortcuts by itself, which asks nobody, and Done waits until GNOME holds it:
+    // nothing else there reaches VOCO (AGENTS.md, Onboarding).
     const needsTyping = 'VOCO types into your apps through GNOME, which asks you once. Choose Allow typing, then turn on Allow Remote Interaction in GNOME\'s dialog and choose Share.';
-    const portal = { applies: true, typingAllowed: false, panelAttached: false, panelHoldsShortcut: false, shortcutPortal: true, shortcutCustom: false, shortcutBound: false, shortcutTrigger: null };
+    const needsShortcut = (hotkey) => `${hotkey} doesn't reach VOCO yet. Choose Add ${hotkey}, and VOCO adds it to GNOME's keyboard shortcuts.`;
+    const portal = { applies: true, typingAllowed: false, panelAttached: false, panelHoldsShortcut: false, shortcutAvailable: true, shortcutBound: false };
+    const shortcutCalls = () => page.evaluate(() => window.calls.filter(([name]) => name === 'holdGnomeShortcut').length);
+    const doneButton = page.getByRole('button', { name: 'Done', exact: true });
     await load({
         desktopInput: { available: false, setupArea: 'portal', detail: needsTyping },
         panel: { status: 'optional', canEnable: false, url: 'https://extensions.gnome.org/extension/11710/voco/',
@@ -314,8 +321,9 @@ try {
         // GNOME's dialog stays open until the test answers it.
         window.nativeHandlers.allowPortalTyping = () => new Promise(resolve => { window.answerTyping = () => {
             window.portal.typingAllowed = true; resolve({ ...window.portal }); }; });
-        window.nativeHandlers.allowPortalShortcut = () => new Promise(resolve => { window.answerShortcut = () => {
-            Object.assign(window.portal, { shortcutBound: true, shortcutTrigger: 'Press <Alt>d' }); resolve({ ...window.portal }); }; });
+        // GNOME's keyboard shortcuts answer at once; held here to see setup wait.
+        window.nativeHandlers.holdGnomeShortcut = () => new Promise(resolve => { window.answerShortcut = () => {
+            window.portal.shortcutBound = true; resolve({ ...window.portal }); }; });
     }, portal);
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     const setup = page.getByRole('region', { name: 'Voice setup' }).or(page.locator('.voco-setup'));
@@ -332,33 +340,39 @@ try {
     // A second click while GNOME's dialog is open asks nothing more.
     await permissions.getByRole('button', { name: 'Waiting for GNOME…', exact: true }).click();
     assert.equal(await page.evaluate(() => window.calls.filter(([name]) => name === 'allowPortalTyping').length), 1);
+    assert.equal(await shortcutCalls(), 0, 'The typing step adds no shortcut');
     await shot('setup-snap-waiting-for-gnome');
     // GNOME allowed it: setup checks desktop input again and moves on with no other click.
-    await page.evaluate(() => {
-        const ready = { available: true, detail: 'GNOME can keep Alt+D for VOCO, so the app you\'re dictating into never receives it. Choose Add Alt+D, then Add in GNOME\'s dialog.', setupArea: 'portal' };
+    await page.evaluate((detail) => {
+        const ready = { available: true, detail, setupArea: 'portal' };
         window.nativeHandlers.getDesktopInputStatus = () => ready;
         const earlier = window.nativeHandlers.getRuntimeDiagnostics;
         window.nativeHandlers.getRuntimeDiagnostics = (args) => ({ ...(earlier ? earlier(args) : {}),
             sessionType: 'wayland', typeSimulation: { available: true, missingCommands: [] }, clipboard: { available: true, missingCommands: [] },
             ibusShortcut: { setupState: 'not-installed', available: false }, desktopInput: ready,
-            desktopPaste: { enabled: true, available: true, detail: '' }, shortcut: { hotkey: 'Alt+D', route: 'gnome_portal', state: 'available', detail: '' } });
+            desktopPaste: { enabled: true, available: true, detail: '' }, shortcut: { hotkey: 'Alt+D', route: null, state: 'unknown', detail: '' } });
         window.answerTyping();
-    });
+    }, needsShortcut('Alt+D'));
     await handoff.waitFor({ timeout: 5000 });
     await page.getByRole('heading', { name: 'Your voice, ready.' }).waitFor();
-    // The shortcut comes next, in the same words: what GNOME shows, what to choose.
+    // The shortcut comes next with no click at all, and Done waits for it.
     const handoffPermissions = handoff.getByRole('group', { name: 'Typing and shortcut' });
     await handoffPermissions.getByText('VOCO can type into your apps.', { exact: false }).waitFor();
-    await handoffPermissions.getByText('GNOME asks you once: choose Add.', { exact: false }).waitFor();
+    await handoffPermissions.getByText('to GNOME’s keyboard shortcuts…', { exact: false }).waitFor();
+    assert.equal(await shortcutCalls(), 1, 'Setup adds the shortcut by itself');
+    assert.equal(await doneButton.isDisabled(), true, 'Done waits until GNOME holds the shortcut');
+    assert.equal(await handoff.getByRole('button', { name: /^Add /, exact: false }).count(), 0, 'No button to find and choose');
+    assert.equal(await page.getByRole('button', { name: 'Finish without a shortcut', exact: true }).count(), 0);
     assert.equal(await handoff.getByRole('button', { name: 'Get the VOCO panel', exact: true }).count(), 0, 'The handoff never asks for the panel');
-    await shot('setup-snap-add-shortcut');
-    await handoffPermissions.getByRole('button', { name: 'Add Alt+D', exact: true }).click();
-    await handoffPermissions.getByText('GNOME’s dialog is open. Choose Add.', { exact: true }).waitFor();
+    await shot('setup-snap-adding-shortcut');
     await page.evaluate(() => window.answerShortcut());
     await handoffPermissions.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
-    assert.equal(await handoffPermissions.locator('strong').last().textContent(), 'Alt+D', 'GNOME\'s trigger, as VOCO writes shortcuts');
+    assert.equal(await handoffPermissions.locator('strong').last().textContent(), 'Alt+D');
+    assert.equal(await doneButton.isEnabled(), true, 'The shortcut is ready when setup ends');
+    assert.equal(await shortcutCalls(), 1);
+    await handoff.getByText('Choose Done, click where you want the text and press', { exact: false }).waitFor();
     await shot('setup-snap-ready');
-    results.push({ case: 'the-snap-asks-gnome-for-typing-then-the-shortcut', passed: true });
+    results.push({ case: 'the-snap-asks-gnome-for-typing-then-adds-its-shortcut-itself', passed: true });
 
     // GNOME refused: setup says so in its words and offers the button again.
     await load({ desktopInput: { available: false, setupArea: 'portal', detail: needsTyping }, panel: { status: 'optional', canEnable: false, detail: 'Optional.' } });
@@ -374,46 +388,108 @@ try {
     await shot('setup-snap-typing-refused');
     results.push({ case: 'a-refusal-keeps-the-step-and-offers-it-again', passed: true });
 
-    // GNOME 46 has no shortcut portal: VOCO adds a GNOME custom shortcut itself,
-    // with no dialog, and says where GNOME keeps it.
-    await load({ desktopInput: { available: true, setupArea: 'portal', detail: 'Super+X doesn\'t reach VOCO yet. Choose Add Super+X, and VOCO adds it to GNOME\'s keyboard shortcuts.' },
+    // Something else in GNOME already uses the keys: setup says what, keeps
+    // Done waiting, and offers VOCO's other shortcuts. Choosing one saves it,
+    // and a refused choice is no failed save: setup stays on its last screen.
+    const taken = 'Super+X is already your custom shortcut “Terminal”. Choose another shortcut, or free Super+X in GNOME Settings, under Keyboard.';
+    await load({ desktopInput: { available: true, setupArea: 'portal', detail: needsShortcut('Super+X') },
         config: { hotkey: 'Super+X' }, panel: { status: 'optional', canEnable: false, detail: 'Optional.' } });
-    await page.evaluate(status => {
-        window.portal46 = { ...status, typingAllowed: true, shortcutPortal: false, shortcutCustom: true };
-        window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portal46 });
-        window.nativeHandlers.allowPortalShortcut = () => { Object.assign(window.portal46, { shortcutBound: true, shortcutTrigger: 'Press <Super>x' }); return { ...window.portal46 }; };
-    }, portal);
+    await page.evaluate(([status, refusal]) => {
+        window.portalTaken = { ...status, typingAllowed: true };
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portalTaken });
+        window.nativeHandlers.holdGnomeShortcut = () => Promise.reject(refusal);
+        // Rust saves the choice, moves GNOME's shortcut with the save and
+        // tells the window its new config; refused, nothing changes.
+        window.nativeHandlers.chooseGnomeShortcut = ([hotkey]) => {
+            if (hotkey === 'Alt+D') return Promise.reject('Alt+D is already GNOME\'s show-desktop shortcut. Choose another shortcut, or free Alt+D in GNOME Settings, under Keyboard.');
+            window.portalTaken.shortcutBound = true;
+            const { config, setConfig } = window.store.getState();
+            setConfig({ ...config, hotkey });
+            return { ...window.portalTaken };
+        };
+    }, [portal, taken]);
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
-    const custom = handoff.getByRole('group', { name: 'Typing and shortcut' });
-    await custom.getByText('VOCO can add Super+X to GNOME’s keyboard shortcuts', { exact: false }).waitFor();
-    assert.equal(await custom.getByText('choose Add', { exact: false }).count(), 0, 'GNOME 46 shows no dialog to answer');
-    await shot('setup-snap-gnome46-add-shortcut');
-    await custom.getByRole('button', { name: 'Add Super+X', exact: true }).click();
-    await custom.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
-    assert.equal(await custom.locator('strong').last().textContent(), 'Super+X');
-    await shot('setup-snap-gnome46-ready');
-    results.push({ case: 'gnome-46-adds-a-custom-shortcut', passed: true });
+    const refused = handoff.getByRole('group', { name: 'Typing and shortcut' });
+    await refused.getByRole('alert').filter({ hasText: 'Super+X is already your custom shortcut “Terminal”.' }).waitFor();
+    assert.equal(await doneButton.isDisabled(), true, 'Done waits while no shortcut reaches VOCO');
+    await refused.getByRole('button', { name: 'Try Super+X again', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Finish without a shortcut', exact: true }).waitFor();
+    assert.equal(await handoff.getByText('click where you want the text and press', { exact: false }).count(), 0, 'Setup names no shortcut that does nothing');
+    await shot('setup-snap-shortcut-taken');
+    await refused.getByRole('button', { name: 'Try Super+X again', exact: true }).click();
+    await refused.getByRole('alert').filter({ hasText: 'Super+X is already your custom shortcut “Terminal”.' }).waitFor();
+    assert.equal(await shortcutCalls(), 2, 'Once by itself, once from the button');
+    // Another preset that is taken too says so, and the choices stay.
+    await refused.getByRole('button', { name: 'Use Alt+D', exact: true }).click();
+    await refused.getByRole('alert').filter({ hasText: 'Alt+D is already GNOME\'s show-desktop shortcut.' }).waitFor();
+    assert.equal(await page.evaluate(() => window.store.getState().config.hotkey), 'Super+X');
+    assert.equal(await doneButton.isDisabled(), true);
+    await refused.getByRole('button', { name: 'Use Alt+Shift+D', exact: true }).click();
+    await refused.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
+    assert.equal(await refused.locator('strong').last().textContent(), 'Alt+Shift+D');
+    assert.equal(await page.evaluate(() => window.store.getState().config.hotkey), 'Alt+Shift+D');
+    await handoff.getByText('Choose Done, click where you want the text and press', { exact: false }).waitFor();
+    assert.equal(await handoff.locator('kbd').first().innerText(), 'Alt+Shift+D', 'The last screen names the shortcut that works');
+    assert.equal(await doneButton.isEnabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Finish without a shortcut', exact: true }).count(), 0);
+    assert.equal(await shortcutCalls(), 2, 'The save moved GNOME\'s shortcut; setup asks nothing more');
+    await shot('setup-snap-other-shortcut');
+    results.push({ case: 'a-taken-shortcut-offers-vocos-others', passed: true });
 
     // A panel from extensions.gnome.org before version 23 types but grabs only
-    // Alt chords: with Super+X, setup still offers GNOME's shortcut, never
+    // Alt chords: with Super+X, setup still adds GNOME's shortcut, never
     // claiming the panel holds it.
-    await load({ desktopInput: { available: true, setupArea: 'portal', detail: 'GNOME can keep Super+X for VOCO, so the app you\'re dictating into never receives it. Choose Add Super+X, then Add in GNOME\'s dialog.' },
+    await load({ desktopInput: { available: true, setupArea: 'portal', detail: needsShortcut('Super+X') },
         config: { hotkey: 'Super+X' }, panel: { status: 'active', canEnable: false, detail: 'The VOCO panel is active.' } });
     await page.evaluate(status => {
         window.portalPanel = { ...status, panelAttached: true, panelHoldsShortcut: false };
         window.nativeHandlers.getPortalSetupStatus = () => ({ ...window.portalPanel });
-        window.nativeHandlers.allowPortalShortcut = () => { Object.assign(window.portalPanel, { shortcutBound: true, shortcutTrigger: 'Press <Super>x' }); return { ...window.portalPanel }; };
+        window.nativeHandlers.holdGnomeShortcut = () => { window.portalPanel.shortcutBound = true; return { ...window.portalPanel }; };
     }, portal);
     await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
     const olderPanel = handoff.getByRole('group', { name: 'Typing and shortcut' });
     await olderPanel.getByText('The VOCO panel types for VOCO.', { exact: true }).waitFor();
     assert.equal(await olderPanel.getByText('holds Super+X', { exact: false }).count(), 0, 'An older panel never holds Super+X');
     assert.equal(await olderPanel.getByRole('button', { name: 'Allow typing', exact: true }).count(), 0, 'The panel types, so GNOME needn\'t');
-    await olderPanel.getByText('GNOME asks you once: choose Add.', { exact: false }).waitFor();
-    await shot('setup-snap-older-panel-add-shortcut');
-    await olderPanel.getByRole('button', { name: 'Add Super+X', exact: true }).click();
     await olderPanel.getByText('starts and stops dictation. You can change it in VOCO’s Settings, under Shortcut.', { exact: false }).waitFor();
+    assert.equal(await shortcutCalls(), 1);
+    assert.equal(await doneButton.isEnabled(), true);
+    await shot('setup-snap-older-panel-ready');
     results.push({ case: 'an-older-panel-still-gets-gnomes-shortcut', passed: true });
+
+    // A panel that holds the saved chord itself: nothing to add. The store's
+    // VOCO shows GNOME's setup on its last screen whatever the shortcut's state.
+    await load({ store: true, desktopInput: { available: true, detail: '' }, config: { hotkey: 'Alt+D' }, panel: { status: 'active', canEnable: false, detail: 'The VOCO panel is active.' } });
+    await page.evaluate(status => {
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...status, panelAttached: true, panelHoldsShortcut: true });
+        window.nativeHandlers.holdGnomeShortcut = () => { throw new Error('Setup must not add a shortcut the panel holds'); };
+    }, portal);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await handoff.getByText('The VOCO panel types for VOCO and holds', { exact: false }).waitFor();
+    assert.equal(await doneButton.isEnabled(), true);
+    assert.equal(await shortcutCalls(), 0);
+    results.push({ case: 'a-panel-that-holds-the-shortcut-needs-none-added', passed: true });
+
+    // GNOME's keyboard shortcuts out of VOCO's reach: setup says how to add
+    // one by hand and never holds Done for something it can't do. On X11 the
+    // snap grabs the chord itself and shows none of this.
+    await load({ store: true, desktopInput: { available: true, detail: '' }, config: { hotkey: 'Super+X' }, panel: { status: 'optional', canEnable: false, detail: 'Optional.' } });
+    await page.evaluate(status => {
+        window.nativeHandlers.getPortalSetupStatus = () => ({ ...status, typingAllowed: true, shortcutAvailable: false });
+        window.nativeHandlers.holdGnomeShortcut = () => { throw new Error('Nothing to add here'); };
+    }, portal);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await handoff.getByText('Add a shortcut named VOCO with the command', { exact: false }).waitFor();
+    assert.equal(await doneButton.isEnabled(), true);
+    assert.equal(await shortcutCalls(), 0);
+    await load({ store: true, desktopInput: { available: true, detail: '' }, panel: { status: 'other-desktop', canEnable: false, detail: 'Use the tray menu.' } });
+    await page.evaluate(status => { window.nativeHandlers.getPortalSetupStatus = () => ({ ...status, applies: false, shortcutAvailable: false }); }, portal);
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
+    await handoff.waitFor();
+    await page.waitForFunction(() => !document.querySelector('.voco-setup__actions .voco-button--primary')?.disabled);
+    assert.equal(await handoff.getByRole('group', { name: 'Typing and shortcut' }).count(), 0);
+    assert.equal(await shortcutCalls(), 0);
+    results.push({ case: 'setup-never-waits-for-a-shortcut-it-cannot-add', passed: true });
 
     // Continue without saying it keeps the name, edited if they changed it.
     await load();

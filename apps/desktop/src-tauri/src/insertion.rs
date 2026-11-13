@@ -480,11 +480,11 @@ fn shortcut_modifiers_held() -> Option<bool> {
 }
 
 /// In the snap's portal session: the modifiers GNOME reports down, where it
-/// reports them (portal_keys.rs), else what the portal shortcut's signals
-/// say after a press (portal_shortcut.rs).
+/// reports them (portal_keys.rs), else what the timing of the GNOME
+/// shortcut's presses says (gnome_shortcut.rs).
 #[cfg(target_os = "linux")]
 fn portal_keys_held() -> Option<bool> {
-    crate::portal_keys::modifiers_held().or_else(crate::portal_shortcut::keys_held)
+    crate::portal_keys::modifiers_held().or_else(crate::gnome_shortcut::keys_held)
 }
 
 #[cfg(not(target_os = "linux"))]

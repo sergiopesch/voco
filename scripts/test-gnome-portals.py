@@ -1,10 +1,12 @@
 #!/usr/bin/python3
-"""CI's portal suite: the snap's typing and shortcut through GNOME's portals.
+"""CI's portal suite: the snap's typing through GNOME's portal, and its
+shortcut through GNOME's keyboard shortcuts.
 
 An actual headless GNOME Shell 50 with XWayland, PipeWire, xdg-desktop-portal
-and its GNOME backend, whose dialogs this answers over AT-SPI. VOCO is the lib
-test binary's portal fixture (portal_fixture.rs) as the snap (SNAP_NAME=voco).
-The portal names it through its own test hook, from the metadata `snap routine
+and its GNOME backend, whose dialog this answers over AT-SPI, and GNOME's
+media keys daemon, which runs custom shortcuts. VOCO is the lib test binary's
+portal fixture (portal_fixture.rs) as the snap (SNAP_NAME=voco). The portal
+names it through its own test hook, from the metadata `snap routine
 portal-info` gives a snap, since no snapd runs here. The tester's keys come from
 the probe extension's Clutter keyboard inside the Shell. Synthetic text only."""
 import json
@@ -28,8 +30,14 @@ WAYLAND = 'voco-portal-test'
 FIELD = 'VOCO paste fixture'
 # Evdev codes for the probe's keyboard: Shift, Control, and Super+X, VOCO's default.
 SHIFT, CONTROL, SUPER, X = 42, 29, 125, 45
-# Control+Alt+K, the shortcut Settings changes to.
-ALT, K, F8 = 56, 37, 66
+# Control+Alt+K, the shortcut Settings changes to, and Control+Alt+J,
+# which another custom shortcut already uses.
+ALT, K, J = 56, 37, 36
+# GNOME's own list of custom shortcuts, and VOCO's entry in it.
+MEDIA_KEYS = 'org.gnome.settings-daemon.plugins.media-keys'
+CUSTOM = MEDIA_KEYS + '.custom-keybinding'
+CUSTOM_ROOT = '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/'
+VOCO_SHORTCUT, OTHER_SHORTCUT = CUSTOM_ROOT + 'voco/', CUSTOM_ROOT + 'terminal/'
 # The refusals: the paste preflight's or portal_keys.rs's remedy without
 # GNOME's permission, and portal_keys.rs's after GNOME's Stop.
 NOT_ALLOWED, CLOSED_BY_GNOME = 'Choose Allow typing', "GNOME's Stop ended VOCO's typing"
@@ -90,6 +98,21 @@ def chord(hold=.08):
     """Super+X, as a hand presses it."""
     key(SUPER, True); time.sleep(.03); key(X, True); time.sleep(hold)
     key(X, False); time.sleep(.03); key(SUPER, False)
+
+
+def gsettings(*arguments):
+    """GNOME's own tool with GNOME's own schemas, as GNOME Settings reads and
+    writes the shortcuts."""
+    return subprocess.run(['gsettings', *arguments], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def custom_shortcuts(): return GLib.Variant.parse(GLib.VariantType('as'), gsettings('get', MEDIA_KEYS, 'custom-keybindings')).unpack()
+def custom(path, name): return GLib.Variant.parse(None, gsettings('get', f'{CUSTOM}:{path}', name)).unpack()
+
+
+def toggled(count, timeout=2):
+    """GNOME's daemon runs the shortcut's command, which calls VOCO."""
+    return wait_for(lambda: voco.counts()['toggles'] == count, timeout)
 
 
 def press(*codes, hold=.08):
@@ -366,13 +389,18 @@ try:
     assert wait_for(lambda: owner_pid(PORTAL) == frontend.pid, 30), 'no desktop portal'
     report['portal'] = {'remoteDesktop': portal_version('org.freedesktop.portal.RemoteDesktop'),
                         'globalShortcuts': portal_version('org.freedesktop.portal.GlobalShortcuts')}
+    # A GNOME session runs this daemon, which grabs custom shortcuts in the
+    # Shell and runs their commands.
+    media_keys = launch('media-keys', ['/usr/libexec/gsd-media-keys'], env=desktop_env)
+    assert wait_for(lambda: owner_pid('org.gnome.SettingsDaemon.MediaKeys') == media_keys.pid, 30), 'no media keys daemon'
     report['shell'] = subprocess.check_output(['gnome-shell', '--version'], text=True).strip()
     field = PasteField({**desktop_env, 'GDK_BACKEND': 'wayland'})
     voco = Fixture({**desktop_env, 'SNAP_NAME': 'voco', 'RUST_BACKTRACE': '1'})
     status = voco.ask('status')
     voco_bus_name = status['busName']
     report['before'] = status
-    assert status['applies'] and status['shortcutPortal'] and not status['typingAllowed'] and not status['shortcutBound'], status
+    assert status['applies'] and status['shortcutPortal'] and status['shortcutAvailable'], status
+    assert not status['typingAllowed'] and status['binding'] is None and not custom_shortcuts(), status
 
     def without_permission():
         # Dictation without GNOME's permission opens nothing and types nothing.
@@ -469,39 +497,55 @@ try:
     check('idleGuard', idle_guard)
 
     def shortcut():
-        # Setup's shortcut button: GNOME asks once; Super+X then toggles and
-        # never reaches the focused app.
-        voco.send('allow-shortcut', text='Super+X')
-        dialog = answer('dialog-global-shortcuts', 'Add')
-        answered = voco.reply(30)
+        # Setup adds VOCO's shortcut to GNOME's keyboard shortcuts, which asks
+        # nobody. GNOME's own daemon then runs its command for Super+X, the
+        # command calls VOCO, and the keys never reach the focused app.
+        served = voco.ask('serve-shortcut')
+        assert 'ok' in served, served
+        answered = voco.ask('hold-shortcut', text='Super+X')
         assert 'ok' in answered, answered
+        assert not dialogs(), f'adding the shortcut showed a dialog: {dialogs()}'
+        # What GNOME Settings shows under Keyboard, read with GNOME's schema.
+        assert custom_shortcuts() == [VOCO_SHORTCUT], custom_shortcuts()
+        entry = {name: custom(VOCO_SHORTCUT, name) for name in ('name', 'binding', 'command')}
+        assert entry['name'] == 'VOCO' and entry['binding'] == '<Super>x', entry
+        assert 'com.sergiopesch.voco.Panel1.Toggle' in entry['command'] and entry['command'].endswith("--toggle'"), entry
         status = voco.ask('status')
-        assert status['shortcutBound'] and status['shortcutHeld'], status
+        assert status['binding'] == '<Super>x' and status['command'] == entry['command'], status
+        assert voco.ask('shortcut-present', text='Super+X')['present'] and not voco.ask('shortcut-present', text='Alt+D')['present']
+        # Asked again, as when setup runs again: nothing changes, nobody is asked.
+        assert 'ok' in voco.ask('hold-shortcut', text='Super+X') and custom_shortcuts() == [VOCO_SHORTCUT]
         field.focus(); field.clear()
-        time.sleep(.5)
+        toggles = voco.counts()['toggles']
+        # The daemon grabs the keys once it has read the new entry.
+        assert wait_for(lambda: (chord(), time.sleep(.8), voco.counts()['toggles'] > toggles)[2], 15, step=0), 'Super+X never reached VOCO'
+        # A press before the daemon's grab went to the field.
+        field.clear(); time.sleep(.8)
         toggles = voco.counts()['toggles']
         for _ in range(3):
-            chord(); time.sleep(.4)
+            chord(); time.sleep(.8)
         assert voco.counts()['toggles'] == toggles + 3, voco.counts()
         assert field.text() == '', f'Super+X reached the focused app: {field.text()!r}'
-        return {'dialog': dialog, 'trigger': answered['ok'], 'toggles': 3}
+        return {'entry': entry, 'toggles': 3}
     check('shortcut', shortcut)
 
     def held_shortcut(keyboard=True):
         # A paste while the chord is down waits. With GNOME's keyboard
-        # connection it goes out once Super is really up; without it, 400 ms
-        # after Deactivated.
+        # connection it goes out once Super is really up; without it, GNOME
+        # reports no release of either key, so it waits the repeat delay and
+        # the modifier's grace after the shortcut's last call.
+        time.sleep(.8)
         session = begin('held', keyboard)
         field.clear()
         toggles = voco.counts()['toggles']
         key(SUPER, True); time.sleep(.03)
         pressed = time.monotonic(); key(X, True)
-        assert wait_for(lambda: voco.counts()['toggles'] == toggles + 1, 2), 'Activated did not toggle'
+        assert toggled(toggles + 1), 'the press did not toggle'
         held = voco.counts()
         assert held['keysHeld'] is True and held['modifiersHeld'] is (True if keyboard else None), held
         mark = time.monotonic()
         voco.send('paste', text='heldx')
-        time.sleep(.4)
+        time.sleep(.3)
         # People often let go of Super a moment after the letter.
         released = time.monotonic(); key(X, False); time.sleep(.3)
         assert field.text() == '', f'a paste went out under Super: {field.text()!r}'
@@ -511,29 +555,30 @@ try:
         assert wait_for(lambda: field.text() == 'heldx', 3), field.text()
         inserts = field.seen('insert', mark)
         assert len(inserts) == 1 and inserts[0]['shift'], inserts
-        after_release = inserts[0]['t'] - released
+        after_press = inserts[0]['t'] - pressed
         after_super = inserts[0]['t'] - super_released
         assert after_super > 0, 'the paste went out while Super was down'
         if keyboard: assert after_super < .25, f'the Insert came {after_super:.3f} s after Super came up'
-        else: assert .4 <= after_release < 1.2, f'the Insert came {after_release:.3f} s after the release'
-        assert inserts[0]['t'] - pressed < 2, 'the paste waited past 1.5 s from the press'
+        else: assert .85 <= after_press < 1.7, f'the Insert came {after_press:.3f} s after the press'
+        assert after_press < 2, 'the paste waited past 1.5 s from the press'
+        assert voco.counts()['toggles'] == toggles + 1, 'the held chord toggled again'
         end(session)
-        return {'insertAfterReleaseMs': round(after_release * 1000, 1), 'insertAfterSuperMs': round(after_super * 1000, 1),
+        return {'insertAfterPressMs': round(after_press * 1000, 1), 'insertAfterSuperMs': round(after_super * 1000, 1),
                 'modifierWaitMs': answered['ok']['pasteMetrics']['modifierWaitMs']}
     check('heldShortcut', held_shortcut)
 
     def modifier_first(keyboard=True):
-        # GNOME sends Deactivated only when the letter comes up under Super.
-        # Let go of Super first, as people often do, and nothing more arrives.
-        # GNOME's keyboard connection says Super is up, so the paste goes out
-        # at once; without it, once a held chord would have repeated, about
-        # 600 ms after the press. It never waits out its own 1.5 s.
+        # Super let go first, as people often do. GNOME's keyboard connection
+        # says Super is up, so the paste goes out at once; without it the
+        # paste waits out the press's grace, about 900 ms after it, and never
+        # its own 1.5 s.
+        time.sleep(.8)
         session = begin('modifier-first', keyboard)
         field.clear()
         before = voco.counts()
         key(SUPER, True); time.sleep(.03)
         pressed = time.monotonic(); key(X, True)
-        assert wait_for(lambda: voco.counts()['toggles'] == before['toggles'] + 1, 2), 'Activated did not toggle'
+        assert toggled(before['toggles'] + 1), 'the press did not toggle'
         time.sleep(.08)
         key(SUPER, False); time.sleep(.05); key(X, False)
         after = voco.counts()
@@ -551,42 +596,83 @@ try:
         if keyboard:
             assert wait < 50, f'the paste waited {wait} ms for keys GNOME said were up'
         else:
-            assert .5 <= after_press < 1.2, f'the Insert came {after_press:.3f} s after the press'
+            assert .85 <= after_press < 1.4, f'the Insert came {after_press:.3f} s after the press'
             assert voco.counts()['keysHeld'] is None, voco.counts()
         end(session)
         return {'insertAfterPressMs': round(after_press * 1000, 1), 'modifierWaitMs': wait}
     check('modifierFirst', modifier_first)
 
     def held_past_repeat(keyboard=True):
-        # A chord held past the repeat delay keeps repeating, so its paste
-        # still waits: for Super to come up, or without GNOME's keyboard
-        # connection for the release and the modifier's grace.
+        # A chord held past the repeat delay keeps repeating: GNOME runs the
+        # command again for each repeat, and none of them toggles. With
+        # GNOME's keyboard connection the paste goes out once Super is up.
+        # Without it the chord counts as held until its repeats stop, so a
+        # paste that outwaits its 1.5 s types nothing, keeps its text
+        # pending, and lands once the keys have been up for their grace.
+        time.sleep(.8)
         session = begin('held-past-repeat', keyboard)
         field.clear()
-        toggles = voco.counts()['toggles']
+        before = voco.counts()
         key(SUPER, True); time.sleep(.03)
         key(X, True)
-        assert wait_for(lambda: voco.counts()['toggles'] == toggles + 1, 2), 'Activated did not toggle'
+        assert toggled(before['toggles'] + 1), 'the press did not toggle'
         mark = time.monotonic()
         voco.send('paste', text='heldlong')
-        time.sleep(.8)
-        assert field.text() == '', f'a paste went out under the held chord: {field.text()!r}'
-        released = time.monotonic(); key(X, False); time.sleep(.03)
-        super_released = time.monotonic(); key(SUPER, False)
-        answered = voco.reply(5)
-        assert 'ok' in answered, answered
-        assert wait_for(lambda: field.text() == 'heldlong', 3), field.text()
-        inserts = field.seen('insert', mark)
-        assert len(inserts) == 1 and inserts[0]['shift'], inserts
-        after_release = inserts[0]['t'] - released
-        after_super = inserts[0]['t'] - super_released
-        assert after_super > 0, 'the paste went out while Super was down'
-        if keyboard: assert after_super < .25, f'the Insert came {after_super:.3f} s after Super came up'
-        else: assert .4 <= after_release < 1.0, f'the Insert came {after_release:.3f} s after the release'
-        assert voco.counts()['toggles'] == toggles + 1, 'the held chord toggled again'
+        result = {}
+        try:
+            if keyboard:
+                time.sleep(1.0)
+                assert field.text() == '', f'a paste went out under the held chord: {field.text()!r}'
+            else:
+                answered = voco.reply(5)
+                error = answered.get('error') or {}
+                assert error.get('outcome') == 'no-mutation' and 'Release the keyboard modifiers' in error.get('message', ''), answered
+                assert field.text() == '' and not field.seen('insert', mark), 'a refused paste sent keys'
+                result['refused'] = error['message']
+        finally:
+            key(X, False); time.sleep(.03)
+            super_released = time.monotonic(); key(SUPER, False)
+        if keyboard:
+            answered = voco.reply(5)
+            assert 'ok' in answered, answered
+            assert wait_for(lambda: field.text() == 'heldlong', 3), field.text()
+            inserts = field.seen('insert', mark)
+            assert len(inserts) == 1 and inserts[0]['shift'], inserts
+            after_super = inserts[0]['t'] - super_released
+            assert 0 < after_super < .25, f'the Insert came {after_super:.3f} s after Super came up'
+            result['insertAfterSuperMs'] = round(after_super * 1000, 1)
+        else:
+            assert voco.counts()['keysHeld'] is True, 'the last repeat was not held'
+            assert wait_for(lambda: voco.counts()['keysHeld'] is None, 2), voco.counts()
+            waited = time.monotonic() - super_released
+            assert waited >= .8, f'the chord stopped counting as held {waited:.3f} s after its keys came up'
+            paste(field, 'heldlong')
+        after = voco.counts()
+        repeats = after['calls'] - before['calls'] - 1
+        assert repeats > 0, f'GNOME ran the command for no repeat: {after}'
+        assert after['toggles'] == before['toggles'] + 1, 'the held chord toggled again'
         end(session)
-        return {'insertAfterReleaseMs': round(after_release * 1000, 1), 'insertAfterSuperMs': round(after_super * 1000, 1)}
+        return {'repeats': repeats, **result}
     check('heldPastRepeat', held_past_repeat)
+
+    def quick_stop():
+        # Pressed again half a second after the last press, the time a held
+        # chord's first repeat takes, as when a dictation is stopped just
+        # after it started: GNOME's keyboard connection saw Super come up in
+        # between, so the second press toggles too.
+        time.sleep(.8)
+        session = begin('quick-stop')
+        toggles = voco.counts()['toggles']
+        first = time.monotonic(); chord()
+        assert toggled(toggles + 1), 'the press did not toggle'
+        assert wait_for(lambda: voco.counts()['modifiersHeld'] is False, 1), voco.counts()
+        time.sleep(max(0, first + .5 - time.monotonic()))
+        gap = time.monotonic() - first; chord()
+        assert .45 <= gap < .58, f'the second press came {gap:.3f} s after the first'
+        assert toggled(toggles + 2), 'a press half a second after the last was taken for a held chord'
+        end(session)
+        return {'gapMs': round(gap * 1000, 1)}
+    check('quickStop', quick_stop)
 
     def held_modifier():
         # A modifier held with no shortcut press, as Control under a finger:
@@ -649,7 +735,8 @@ try:
 
     def without_keyboard():
         # A GNOME that gives no keyboard connection: the keys go through the
-        # portal's own calls, and the shortcut's signals say when they are up.
+        # portal's own calls, and the timing of the shortcut's calls says how
+        # long to wait for its keys.
         voco.ask('keyboard', wanted=False)
         try:
             session = begin('plain', keyboard=False)
@@ -682,108 +769,69 @@ try:
     check('silentKeyboard', silent_keyboard)
 
     def repeated_shortcut():
-        # GNOME's grab repeats Activated while the chord is held, every 30 ms
-        # after the keyboard's repeat delay; only the press toggles.
+        # Idle, with no session to report the modifiers: GNOME runs the
+        # command for the press and for every repeat of a held chord, every
+        # 30 ms after the keyboard's repeat delay, and only the press toggles.
         field.focus(); field.clear()
-        time.sleep(.5)
+        time.sleep(.8)
         before = voco.counts()
-        chord(hold=1.5); time.sleep(.5)
+        chord(hold=1.5); time.sleep(.8)
         after = voco.counts()
-        repeats = after['activations'] - before['activations'] - 1
-        assert repeats > 0, f'GNOME sent no repeats to filter: {after}'
+        repeats = after['calls'] - before['calls'] - 1
+        assert repeats > 0, f'GNOME ran the command for no repeat: {after}'
         assert after['toggles'] == before['toggles'] + 1, f'a held chord toggled {after["toggles"] - before["toggles"]} times'
         assert field.text() == '', f'Super+X reached the focused app: {field.text()!r}'
-        chord(); time.sleep(.5)
-        assert voco.counts()['toggles'] == before['toggles'] + 2, 'the press after the release did not toggle'
+        chord()
+        assert toggled(before['toggles'] + 2), 'the press after the release did not toggle'
         return {'repeats': repeats}
     check('repeatedShortcut', repeated_shortcut)
 
-    def companion_lease():
-        # While the companion's lease holds the chord the portal lets it go,
-        # and binds again, without a dialog, once the lease lapses.
-        voco.ask('suspend')
-        assert not voco.ask('status')['shortcutHeld']
-        time.sleep(.5)
-        toggles = voco.counts()['toggles']
-        chord(); time.sleep(.5)
-        assert voco.counts()['toggles'] == toggles, 'a suspended shortcut toggled'
-        voco.ask('resume')
-        assert wait_for(lambda: voco.ask('status')['shortcutHeld'], 10, step=.2), 'the shortcut did not bind again'
-        assert not dialogs(), f'binding again showed a dialog: {dialogs()}'
-        field.focus(); time.sleep(.3)
-        chord(); time.sleep(.5)
-        assert voco.counts()['toggles'] == toggles + 1, voco.counts()
-        return {'reboundWithoutDialog': True}
-    check('companionLease', companion_lease)
-
     def change_shortcut():
-        # Settings' Apply shortcut: VOCO proposes the new keys under its next
-        # ID, GNOME's dialog confirms them, and only the new keys toggle.
-        record = Path(os.environ['XDG_CONFIG_HOME']) / 'voco/global-shortcut-id'
-        assert not record.exists(), 'the first shortcut has no ID record'
-        field.focus(); field.clear()
-        # Cancelled in GNOME's dialog, the earlier shortcut stays and works.
-        voco.send('change-shortcut', text='Ctrl+Alt+K')
-        answer('dialog-change-shortcut-cancelled', 'Cancel')
-        cancelled = voco.reply(30)
-        assert 'kept your earlier shortcut' in cancelled.get('error', ''), cancelled
-        assert voco.ask('status')['trigger'] == 'Press <Super>x' and not record.exists()
+        # A saved change of shortcut moves VOCO's entry in GNOME's keyboard
+        # shortcuts at once, with no dialog, any number of times; only the
+        # new keys toggle.
+        field.focus(); field.clear(); time.sleep(.8)
+        changes = []
+        for hotkey, binding, keys, earlier in (('Ctrl+Alt+K', '<Control><Alt>k', (CONTROL, ALT, K), (SUPER, X)),
+                                              ('Super+X', '<Super>x', (SUPER, X), (CONTROL, ALT, K)),
+                                              ('Ctrl+Alt+K', '<Control><Alt>k', (CONTROL, ALT, K), (SUPER, X))):
+            t0 = time.monotonic()
+            changed = voco.ask('keep-shortcut', text=hotkey)
+            assert 'ok' in changed, changed
+            assert not dialogs(), f'a change showed a dialog: {dialogs()}'
+            assert custom_shortcuts() == [VOCO_SHORTCUT] and custom(VOCO_SHORTCUT, 'binding') == binding, custom(VOCO_SHORTCUT, 'binding')
+            toggles = voco.counts()['toggles']
+            assert wait_for(lambda: (press(*keys), time.sleep(.8), voco.counts()['toggles'] > toggles)[2], 15, step=0), f'{hotkey} never reached VOCO'
+            changes.append({'to': hotkey, 'toggledAfterS': round(time.monotonic() - t0, 1)})
+            time.sleep(.8)
+            toggles = voco.counts()['toggles']
+            press(*earlier); time.sleep(.8)
+            assert voco.counts()['toggles'] == toggles, f'the earlier keys still toggled after the change to {hotkey}'
+            field.clear()
+        # Keys another custom shortcut uses, or one of GNOME's window
+        # shortcuts: refused with what uses them, and nothing changes.
+        gsettings('set', f'{CUSTOM}:{OTHER_SHORTCUT}', 'name', 'Terminal')
+        gsettings('set', f'{CUSTOM}:{OTHER_SHORTCUT}', 'command', 'true')
+        gsettings('set', f'{CUSTOM}:{OTHER_SHORTCUT}', 'binding', '<Control><Alt>j')
+        gsettings('set', MEDIA_KEYS, 'custom-keybindings', str([VOCO_SHORTCUT, OTHER_SHORTCUT]))
+        taken = voco.ask('keep-shortcut', text='Ctrl+Alt+J')
+        assert 'Ctrl+Alt+J is already your custom shortcut “Terminal”' in taken.get('error', ''), taken
+        window = voco.ask('keep-shortcut', text='Alt+F4')
+        assert "Alt+F4 is already GNOME's close shortcut" in window.get('error', ''), window
+        assert custom(VOCO_SHORTCUT, 'binding') == '<Control><Alt>k' and custom(OTHER_SHORTCUT, 'binding') == '<Control><Alt>j'
         toggles = voco.counts()['toggles']
-        chord(); time.sleep(.4)
-        assert voco.counts()['toggles'] == toggles + 1, 'a cancelled change broke the earlier shortcut'
-        # Added: GNOME reports the new keys, and they toggle.
-        voco.send('change-shortcut', text='Ctrl+Alt+K')
-        dialog = answer('dialog-change-shortcut', 'Add')
-        changed = voco.reply(30)
-        assert changed.get('ok') == 'Press <Control><Alt>k', changed
-        status = voco.ask('status')
-        assert status['trigger'] == 'Press <Control><Alt>k' and status['shortcutHeld'], status
-        assert record.read_text() == 'toggle-2', record.read_text()
-        field.focus(); time.sleep(.3)
-        toggles = voco.counts()['toggles']
-        press(CONTROL, ALT, K); time.sleep(.4)
-        assert voco.counts()['toggles'] == toggles + 1, 'the new shortcut did not toggle'
-        chord(); time.sleep(.4)
-        assert voco.counts()['toggles'] == toggles + 1, 'the earlier shortcut still toggled'
-        # A later bind, as at the next start, asks nobody and keeps the keys.
-        voco.ask('suspend'); voco.ask('resume')
-        assert wait_for(lambda: voco.ask('status')['shortcutHeld'], 10, step=.2), 'the shortcut did not bind again'
-        assert not dialogs(), f'binding again showed a dialog: {dialogs()}'
-        assert voco.ask('status')['trigger'] == 'Press <Control><Alt>k'
-        field.focus(); time.sleep(.3)
-        press(CONTROL, ALT, K); time.sleep(.4)
-        assert voco.counts()['toggles'] == toggles + 2, 'the shortcut did not toggle after binding again'
-        # Back to Super+X: keys GNOME held before are new keys to it again.
-        voco.send('change-shortcut', text='Super+X')
-        answer('dialog-change-shortcut-back', 'Add')
-        back = voco.reply(30)
-        assert back.get('ok') == 'Press <Super>x' and record.read_text() == 'toggle-3', (back, record.read_text())
-        field.focus(); time.sleep(.3)
-        chord(); time.sleep(.4)
-        press(CONTROL, ALT, K); time.sleep(.4)
-        assert voco.counts()['toggles'] == toggles + 3, voco.counts()
-        # GNOME's dialog lets the person alter the proposed keys. Keys VOCO
-        # can't take, here Shift+F8 with no Alt, Ctrl or Super, are refused:
-        # VOCO says so, holds no shortcut, and the Add button sets one again.
-        voco.send('change-shortcut', text='Shift+F8')
-        answer('dialog-change-shortcut-unusable', 'Add')
-        unusable = voco.reply(30)
-        assert "GNOME now holds Shift+F8, which VOCO can't use" in unusable.get('error', ''), unusable
-        status = voco.ask('status')
-        assert not status['shortcutBound'] and not status['shortcutHeld'] and not record.exists(), status
-        field.focus(); time.sleep(.3)
-        before = voco.counts()['toggles']
-        chord(); time.sleep(.4)
-        press(SHIFT, F8); time.sleep(.4)
-        assert voco.counts()['toggles'] == before, 'a refused shortcut still toggled'
-        voco.send('allow-shortcut', text='Super+X')
-        answer('dialog-shortcut-again', 'Add')
-        again = voco.reply(30)
-        assert again.get('ok') == 'Press <Super>x', again
-        field.focus(); field.clear(); time.sleep(.3)
-        chord(); time.sleep(.4)
-        assert voco.counts()['toggles'] == before + 1, voco.counts()
-        return {'dialog': dialog, 'changedTo': changed['ok'], 'backTo': back['ok'], 'refused': unusable['error']}
+        press(CONTROL, ALT, K)
+        assert toggled(toggles + 1), 'a refused change broke the earlier shortcut'
+        press(CONTROL, ALT, J); time.sleep(.8)
+        assert voco.counts()['toggles'] == toggles + 1, 'another shortcut\'s keys toggled VOCO'
+        # Reset removes VOCO's entry and only it.
+        voco.ask('forget-shortcut')
+        assert custom_shortcuts() == [OTHER_SHORTCUT] and custom(OTHER_SHORTCUT, 'name') == 'Terminal', custom_shortcuts()
+        assert voco.ask('status')['binding'] is None
+        time.sleep(.8)
+        press(CONTROL, ALT, K); time.sleep(.8)
+        assert voco.counts()['toggles'] == toggles + 1, 'a removed shortcut still toggled'
+        return {'changes': changes, 'taken': taken['error'], 'windowShortcut': window['error']}
     check('changeShortcut', change_shortcut)
 
     assert not typing_sessions(), typing_sessions()

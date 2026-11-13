@@ -136,7 +136,7 @@ denials.
 | `$XDG_RUNTIME_DIR/voco-activate.sock` | A second `voco` launch, such as a click on VOCO's launcher | The same directory, mode and peer check as the trigger socket. Each connection only presents VOCO's window; it never starts or stops dictation. |
 | `$XDG_RUNTIME_DIR/voco/ibus-engine.sock` | VOCO, talking to its IBus engine | Directory 0700, socket 0600, peer checks on both sides, 1-second timeout, requests up to 65,536 bytes and replies up to 64,000. Protocol 6 rejects every text operation. |
 | `$XDG_RUNTIME_DIR/voco-browser/exact-field.sock` | `voco-browser-host` | Directory 0700 and a socket owned by you with no group or other access; peer user ID must match. |
-| `com.sergiopesch.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. `CompanionAsking` tells any caller whether the attached companion asks for work, for the snap's `voco --check-desktop-input` and `--check-panel`. In the snap, `Toggle` starts or stops dictation for any caller on your session bus, as `voco --toggle` does for any program you run: GNOME 46's keyboard shortcut calls it. Every other method answers only the attached connection, and VOCO accepts the companion's paste and modifier reports only for the request it has open. |
+| `com.sergiopesch.voco.Panel1` on the session bus | The GNOME companion | `Attach` succeeds only for the current owner of `org.gnome.Shell`. `CompanionAsking` tells any caller whether the attached companion asks for work, for the snap's `voco --check-desktop-input` and `--check-panel`. In the snap, `Toggle` starts or stops dictation for any caller on your session bus, as `voco --toggle` does for any program you run: VOCO's entry in GNOME's keyboard shortcuts calls it. Every other method answers only the attached connection, and VOCO accepts the companion's paste and modifier reports only for the request it has open. |
 
 Peer checks use `SO_PEERCRED`. Without `XDG_RUNTIME_DIR`, the trigger and
 activation sockets move to `voco-<uid>` in the temporary directory, which must
@@ -289,8 +289,10 @@ AltGr is down, so a paste never goes out under a held modifier. That is all it
 carries back: VOCO never learns which keys you press, and it keeps and logs
 none of it. VOCO keeps
 GNOME's restore token in its own settings folder, owner-only, and never logs it.
-GNOME's shortcut portal holds the snap's shortcut, after you allowed that once,
-so the focused app never receives it. On X11 `xdotool` types, as for the
+GNOME's keyboard shortcuts hold the snap's shortcut, as an entry named VOCO
+that setup adds and Reset removes, so the focused app never receives it. VOCO
+adds or moves that entry only when no other GNOME shortcut uses the keys, and
+never changes another. Its command only calls the running VOCO's `Toggle`. On X11 `xdotool` types, as for the
 packages. Until `login-session-observe` is connected, logind refuses
 the snap, and it sends no paste keys; until `audio-record` is connected, the
 snap opens no microphone and names the `snap connect` command.
