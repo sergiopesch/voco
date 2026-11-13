@@ -239,8 +239,15 @@ and the update check. [The snap](#the-snap) lists its rules.
   next answer after the press, on either selection, is the app's read: the
   paste ends there, or 300 ms after the press with none. A read before it,
   during the wait for a young keyboard or the gap after Shift, never counts.
-  Otherwise, and with wl-copy or on X11, the next copy waits until 150 ms after
-  the keys. A read is not proof of insertion, and never changes a paste's outcome.
+  Otherwise, and with wl-copy, the next copy waits until 150 ms after the keys.
+  On X11 the copies run the same foreground xclip, CLIPBOARD first, but nothing
+  there reads each new CLIPBOARD once, so a clipboard manager's read can't be
+  told from the app's and a read only ever lengthens the wait: the next copy
+  waits 150 ms after the keys and then for the first request a helper answers
+  since the keys were started, at most 300 ms after that. An app that reads
+  later than 150 ms would otherwise paste the next copy's text. Helpers that
+  lost their selection hold back nothing. A read is not proof of insertion,
+  and never changes a paste's outcome.
 - Wayland paste keys are raw key events, so wait at most 1.5 s for the shortcut's
   modifiers to be released (evdev, else the companion's modifier check). Unknown
   state doesn't block; a timeout sends no keys. On X11 the passive grab takes every

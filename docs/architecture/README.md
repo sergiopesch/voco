@@ -176,11 +176,17 @@ Each chunk the stream delivers goes to `insertion.rs`, one paste at a time:
 2. ASCII control characters, including newlines and tabs, become spaces, so a
    terminal never receives Enter.
 3. Unless VOCO saw the app read the previous paste, it waits until 150 ms have
-   passed after that paste's keys, so the app can read the clipboard first.
+   passed after that paste's keys, so the app can read the clipboard first. On
+   X11 it then waits for the first request the previous paste's helpers answer
+   since those keys were started, at most 300 ms after that: an app that reads
+   later than 150 ms would otherwise paste this copy's text. No compositor
+   reads each new CLIPBOARD once on X11, so a clipboard manager's read can't be
+   told from the app's, and a read only lengthens the wait.
 4. It copies the text to CLIPBOARD, then PRIMARY. PRIMARY is best effort; a
-   failure there only logs a warning. On GNOME Wayland the helpers are xclip in
-   the foreground (`selection_owner.rs`), which report each request they answer
-   and keep their selection until the next copy. There PRIMARY goes first, then
+   failure there only logs a warning. On GNOME Wayland and on X11 the helpers
+   are xclip in the foreground (`selection_owner.rs`), which report each request
+   they answer and keep their selection until the next copy. On GNOME Wayland
+   PRIMARY goes first, then
    CLIPBOARD, and VOCO waits up to 100 ms for Mutter's clipboard manager to read
    the new CLIPBOARD. A helper reports owning its selection just before the X
    server gets its request, and an app pasting before the server has it gets the
