@@ -6,6 +6,54 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.74] - 2026-11-13
+
+On X11, the default shortcut works in GNOME's session, VOCO records from the
+system's default microphone, and a slow app no longer gets the wrong text.
+A live paste is faster on GNOME Wayland. The
+[release notes](docs/releases/2026.0.74.md) explain the upgrade.
+
+### Fixed
+
+- In GNOME's X11 session, Super+X, the default shortcut, started nothing and
+  typed an `x` into the focused app. GNOME's window manager grabs Super on the
+  root window for the overview and replays the keys pressed under it, and the
+  X server delivers a replayed key ignoring grabs on the root, where VOCO's
+  only grab was. VOCO now also grabs its shortcut on every top-level window
+  and follows windows as they appear.
+- On X11, with no microphone chosen, VOCO showed **System default** and
+  recorded from the first microphone in its list where WebKit lists PipeWire's
+  devices, as on Ubuntu 24.04. It now asks the sound server for the label of
+  its default source and opens the device with that label. A default the list
+  doesn't offer, such as a virtual source, still leaves the choice to WebKit.
+- On X11, an app that read the clipboard more than 150 ms after a paste's keys
+  received the next copy's text: with Stop's space following the last words at
+  once, the last letters were lost and the space arrived twice. The next copy
+  now waits 150 ms after the keys and then for the app's read, at most 300 ms.
+- After VOCO's window loaded again following a crash of its web process, a
+  shortcut press in the first quarter of a second could be lost: VOCO had
+  closed its channel to its input source, which stops taking the keys at once,
+  while its own X11 grab stayed away for up to a second longer. The grab now
+  comes back with the close, and a press while the window loads waits for it.
+
+### Changed
+
+- A paste starts its two clipboard helpers without forking VOCO, and in the
+  snap the helpers' wrapper no longer starts two extra programs for each. With
+  the snap in an Ubuntu 26.04 test machine on GNOME Wayland, a live paste
+  takes a median 44 ms instead of 62, its copy step 6 ms instead of 24. The
+  time from Stop to the last words is unchanged.
+- On X11 the clipboard helpers are the ones GNOME Wayland uses, `xclip` in the
+  foreground, which report each request they answer. A paste there takes as
+  long as before.
+
+### Added
+
+- Four full-application test cases: a shortcut pressed while VOCO's window
+  loads again, a field that reads the clipboard late, Super+X under a stand-in
+  that keeps the Super key as GNOME's window manager does, and a silent
+  microphone listed before the system default.
+
 ## [2026.0.73] - 2026-11-13
 
 In the snap on GNOME, the shortcut works as soon as setup ends, and changing
@@ -928,6 +976,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.74]: https://github.com/sergiopesch/voco/compare/voco.2026.0.73...voco.2026.0.74
 [2026.0.73]: https://github.com/sergiopesch/voco/compare/voco.2026.0.72...voco.2026.0.73
 [2026.0.72]: https://github.com/sergiopesch/voco/compare/voco.2026.0.71...voco.2026.0.72
 [2026.0.71]: https://github.com/sergiopesch/voco/compare/voco.2026.0.70...voco.2026.0.71

@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.74" date="2026-11-13">
+      <description>
+        <p>On X11, Super+X now works in GNOME's session, where it started nothing and typed an x. With no microphone chosen, VOCO records from your system's default microphone, not the first in its list. A slow app no longer loses a dictation's last letters, and a shortcut press just after VOCO's window restarts is kept. Each piece of text also reaches your app sooner on GNOME Wayland.</p>
+      </description>
+    </release>
     <release version="2026.0.73" date="2026-11-13">
       <description>
         <p>In the snap on GNOME, the shortcut works as soon as setup ends: VOCO adds it to GNOME's keyboard shortcuts itself, where setup could finish without one. Changing it is two steps, Change shortcut and the keys you want, with no GNOME dialog, as often as you like. The shortcut editor now records shortcuts with the Super key. If your shortcut never worked after setup, this update adds it the first time VOCO starts.</p>
