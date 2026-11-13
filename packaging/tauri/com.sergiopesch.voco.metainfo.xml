@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.73" date="2026-11-13">
+      <description>
+        <p>In the snap on GNOME, the shortcut works as soon as setup ends: VOCO adds it to GNOME's keyboard shortcuts itself, where setup could finish without one. Changing it is two steps, Change shortcut and the keys you want, with no GNOME dialog, as often as you like. The shortcut editor now records shortcuts with the Super key. If your shortcut never worked after setup, this update adds it the first time VOCO starts.</p>
+      </description>
+    </release>
     <release version="2026.0.72" date="2026-11-12">
       <description>
         <p>On GNOME 50, the snap types a dictation's last words about a quarter of a second after you press to stop, where it took half a second or more: GNOME now tells VOCO when the shortcut's keys are up. Words VOCO types while you hold Control, Alt, Shift or Super wait for you to let go, instead of being lost. In the snap, you change the shortcut in VOCO's own Settings, and GNOME confirms it in one dialog.</p>

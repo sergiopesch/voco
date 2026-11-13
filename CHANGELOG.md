@@ -6,6 +6,86 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.73] - 2026-11-13
+
+In the snap on GNOME, the shortcut works as soon as setup ends, and changing
+it takes two steps with no GNOME dialog. The shortcut editor records Super
+shortcuts. The [release notes](docs/releases/2026.0.73.md) explain the
+upgrade.
+
+### Changed
+
+- In the snap on GNOME Wayland, the shortcut is VOCO's own entry in GNOME's
+  custom keyboard shortcuts on every GNOME, as it was on GNOME 46. From
+  2026.0.70 the snap held it on GNOME 48 and later through GNOME's
+  GlobalShortcuts portal, which shows GNOME's dialog for every new set of
+  keys. GNOME's keyboard shortcuts ask nobody. GNOME's media keys daemon
+  grabs the keys and runs the entry's command, which calls the running VOCO
+  (`com.sergiopesch.voco.Panel1.Toggle`). VOCO binds nothing through the
+  portal any more.
+- Setup adds the shortcut by itself on its last screen, and **Done** waits
+  until GNOME holds it. It had offered an "Add Super+X" button that Done
+  didn't wait for. When something else in GNOME uses the keys, setup says
+  what, offers the same keys again and VOCO's other shortcuts, and only then
+  **Finish without a shortcut**.
+- A saved change of shortcut, from Settings or the tray's presets, moves
+  VOCO's entry at once. Keys that one of GNOME's window shortcuts or another
+  custom shortcut uses are refused with what uses them, and nothing changes;
+  the tray says so in a notification.
+- Settings' **Change shortcut** opens the editor already recording, and the
+  keys pressed next are saved at once, in every package. Escape leaves
+  recording for the field, where a shortcut can be typed and applied with
+  **Apply shortcut**.
+- GNOME reports no release of the shortcut's keys on this route. On GNOME 50
+  its keyboard connection reports the modifiers, so a paste waits for the keys
+  really held, as before: on Ubuntu 26.04 in a virtual machine a dictation's
+  last words arrived 0.24 to 0.33 s after the press that stops it, where
+  2026.0.72 measured 0.22 to 0.30 s. On GNOME 48 and 49, which report no
+  modifiers, that paste now waits the keyboard's repeat delay plus 400 ms
+  after the press, about 0.9 s, as on GNOME 46; the portal's release signal
+  ended the wait sooner there. Ubuntu 24.04 is unchanged at 0.93 s.
+- GNOME runs the shortcut's command again for every repeat of a held
+  shortcut. VOCO tells those from presses by GNOME's repeat timing, as on
+  GNOME 46, and during a dictation on GNOME 50 also by the keyboard
+  connection's report that the modifier came up, so a dictation stopped half
+  a second after it started still stops.
+- VOCO's shortcut shows in GNOME's **Settings** → **Keyboard** → **View and
+  Customize Shortcuts** → **Custom Shortcuts** as **VOCO**. A change of its
+  keys there shows in VOCO; one removed there stays removed until **Add** on
+  VOCO's **Shortcut** page or a change of shortcut. Resetting VOCO's settings
+  removes it, and removing the snap doesn't.
+- Beside its settings the snap keeps `gnome-shortcut`, a note that it added
+  its entry, in place of `global-shortcut` and `global-shortcut-id`.
+- The speech of the snap, the `.deb` and the RPM is unchanged, and so is how
+  the packages hold their shortcut.
+
+### Fixed
+
+- In the snap on GNOME 48 and later, setup could finish with no shortcut at
+  all: **Done** didn't wait for the "Add Super+X" button, and nothing else in
+  the snap listens for the keys. Super+X then did nothing, and the app in
+  front received the keys
+  ([#325](https://github.com/sergiopesch/voco/issues/325)).
+- Changing the snap's shortcut needed GNOME's dialog each time, and while it
+  was open VOCO's editor was disabled for up to five minutes.
+- **Record keys** never registered a shortcut with Super, VOCO's default
+  included: WebKitGTK reports Super as a key of its own and never as a
+  modifier of the keys pressed with it. The recorder now counts Super as held
+  from that key's press to its release
+  ([#326](https://github.com/sergiopesch/voco/issues/326)).
+- An installation whose setup finished without the shortcut gets it at the
+  first start of this version, once. One that held it through GNOME's portal
+  is handed over the same way, with the keys it had.
+
+### Added
+
+- CI's **GNOME 50 Portals** job runs GNOME's media keys daemon and presses
+  Super+X through it: VOCO's entry joins GNOME's keyboard shortcuts with no
+  dialog, toggles through the entry's real command, holds a paste under the
+  held shortcut until Super is up, toggles once for a held shortcut's
+  repeats, moves three times in a row, and is refused keys another shortcut
+  uses.
+
 ## [2026.0.72] - 2026-11-12
 
 On GNOME 50 the snap types a dictation's last words sooner, and words typed
@@ -848,6 +928,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.73]: https://github.com/sergiopesch/voco/compare/voco.2026.0.72...voco.2026.0.73
 [2026.0.72]: https://github.com/sergiopesch/voco/compare/voco.2026.0.71...voco.2026.0.72
 [2026.0.71]: https://github.com/sergiopesch/voco/compare/voco.2026.0.70...voco.2026.0.71
 [2026.0.70]: https://github.com/sergiopesch/voco/compare/voco.2026.0.69...voco.2026.0.70
