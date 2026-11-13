@@ -6,14 +6,15 @@ use std::time::{Duration, Instant};
 use crate::process_runner;
 use crate::selection_owner::{OwnerError, Selection, SelectionOwners};
 
-// One clipboard transaction at a time. The value is when the latest paste keys
-// were sent, while VOCO doesn't know that the app has read that paste: the next
-// copy then first waits for PASTE_SETTLE, so it can't replace the clipboard
-// before a slow app reads it. On GNOME the helpers report the app's read
+// One clipboard transaction at a time. The value is the latest paste whose
+// keys went out while VOCO doesn't know that the app has read it: the next copy
+// first waits for it (settle), so it can't replace the clipboard before a slow
+// app reads it. On GNOME the helpers report the app's read
 // (selection_owner.rs), and the next copy follows it at once.
-static DELIVERY: Mutex<Option<Instant>> = Mutex::new(None);
+static DELIVERY: Mutex<Option<Unread>> = Mutex::new(None);
 const PASTE_SETTLE: Duration = Duration::from_millis(150);
-// How long a GNOME paste waits after its keys for the app to read the selection.
+// How long a GNOME paste waits after its keys for the app to read the
+// selection, and the longest an X11 copy waits for a read of the paste before it.
 const READ_TIMEOUT: Duration = Duration::from_millis(300);
 // How long a GNOME paste waits before its keys for Mutter's read of the new
 // CLIPBOARD, which shows the X server has made the copy current.
@@ -291,8 +292,18 @@ fn validate_text(text: &str) -> Result<(), InsertionError> {
     Ok(())
 }
 
-fn delivery_slot() -> MutexGuard<'static, Option<Instant>> {
-    // The slot holds only a timestamp; a panicked delivery cannot corrupt it.
+/// A paste whose keys went out, and whose read by the app VOCO doesn't know of.
+struct Unread {
+    /// When its keys had been sent.
+    sent: Instant,
+    /// On X11, the helpers that hold its text, with the time its keys were
+    /// started: they report each read, though not whose.
+    held: Option<(SelectionOwners, Instant)>,
+}
+
+fn delivery_slot() -> MutexGuard<'static, Option<Unread>> {
+    // The slot holds a timestamp and helper handles; a panicked delivery
+    // cannot corrupt either.
     DELIVERY
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -302,15 +313,26 @@ fn elapsed_ms(started: Instant) -> u64 {
     started.elapsed().as_millis() as u64
 }
 
-/// Give the previous recipient time to read the clipboard before replacing it.
-fn settle(last_paste: Option<Instant>) -> u64 {
-    let wait = last_paste.map_or(Duration::ZERO, |sent| {
-        PASTE_SETTLE.saturating_sub(sent.elapsed())
-    });
+/// Give the previous recipient time to read the clipboard before replacing it:
+/// PASTE_SETTLE after the keys, and on X11 until a helper has answered a
+/// request since those keys were started, at most READ_TIMEOUT after that. An
+/// app that reads later than PASTE_SETTLE would otherwise paste the next copy's
+/// text. A read only ever lengthens the wait: no compositor reads each new
+/// CLIPBOARD once there, so a clipboard manager's read can't be told from the
+/// app's. Helpers that lost their selection hold nothing left to read.
+fn settle(last_paste: Option<&Unread>) -> u64 {
+    let Some(unread) = last_paste else {
+        return 0;
+    };
+    let started = Instant::now();
+    let wait = PASTE_SETTLE.saturating_sub(unread.sent.elapsed());
     if !wait.is_zero() {
         std::thread::sleep(wait);
     }
-    wait.as_millis() as u64
+    if let Some((owners, keys_started)) = &unread.held {
+        owners.read_after(*keys_started, READ_TIMEOUT);
+    }
+    elapsed_ms(started)
 }
 
 /// Paste into whichever application has keyboard focus. Shift+Insert is the
@@ -357,7 +379,7 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
     let payload = routed.as_str();
     let helper = desktop_clipboard_helper();
     let preflight_ms = elapsed_ms(started);
-    let settle_ms = settle(*last_paste);
+    let settle_ms = settle(last_paste.as_ref());
     // Behind a locked screen keys would reach the lock screen, not the app,
     // and on Wayland they reach whichever login owns the seat. Checked after
     // the waits, just before the copy, and again before keys, on every route.
@@ -376,16 +398,27 @@ pub fn desktop_paste(text: &str) -> Result<InsertionResult, InsertionError> {
         modifier_wait_ms = wait_for_modifier_release(MODIFIER_RELEASE_TIMEOUT, held)?;
         check_session(wayland)
     };
-    let result = if reads_observable(preflight.session, helper) {
-        observed_transaction(helper, payload, before_paste, || send_paste_keys(keys))
-    } else {
-        let (mut clipboard, mut primary) = copy_commands();
-        clipboard_transaction(payload, &mut clipboard, &mut primary, before_paste, || {
+    let mut held = None;
+    let result = match reads_for(preflight.session, helper) {
+        Reads::Told => {
+            observed_transaction(helper, payload, before_paste, || send_paste_keys(keys))
+        }
+        Reads::Seen => seen_transaction(helper, payload, before_paste, || {
             send_paste_keys(keys).map(|_| ())
         })
-        .map(|(clipboard_ms, keyboard_ms)| (clipboard_ms, keyboard_ms, PasteRead::Unobserved))
+        .map(|(clipboard_ms, keyboard_ms, helpers)| {
+            held = Some(helpers);
+            (clipboard_ms, keyboard_ms, PasteRead::Unobserved)
+        }),
+        Reads::Unseen => {
+            let (mut clipboard, mut primary) = copy_commands();
+            clipboard_transaction(payload, &mut clipboard, &mut primary, before_paste, || {
+                send_paste_keys(keys).map(|_| ())
+            })
+            .map(|(clipboard_ms, keyboard_ms)| (clipboard_ms, keyboard_ms, PasteRead::Unobserved))
+        }
     };
-    *last_paste = settle_from(result.as_ref().ok().map(|(_, _, read)| *read));
+    *last_paste = settle_from(result.as_ref().ok().map(|(_, _, read)| *read), held);
     let (clipboard_ms, keyboard_ms, read) = result?;
     Ok(InsertionResult {
         paste_metrics: PasteMetrics {
@@ -412,7 +445,8 @@ enum PasteRead {
     Read(crate::selection_owner::SelectionRead),
     /// No read within READ_TIMEOUT: the focused widget may not paste.
     None,
-    /// These helpers can't tell when the app reads.
+    /// These helpers can't tell when the app reads, or, on X11, whose read
+    /// they answered: there the next copy waits for one instead (settle).
     Unobserved,
 }
 
@@ -433,21 +467,43 @@ impl PasteRead {
     }
 }
 
-/// When the next copy must wait from. Once the app has read the paste, or
+/// What the next copy must wait for. Once the app has read the paste, or
 /// READ_TIMEOUT has passed since its Insert press, nothing is left to wait for;
-/// after a failure some keys may have been sent.
-fn settle_from(read: Option<PasteRead>) -> Option<Instant> {
+/// after a failure some keys may have been sent. `held` is an X11 paste's
+/// helpers with the time its keys were started.
+fn settle_from(
+    read: Option<PasteRead>,
+    held: Option<(SelectionOwners, Instant)>,
+) -> Option<Unread> {
     match read {
         Some(PasteRead::Read(_) | PasteRead::None) => None,
-        Some(PasteRead::Unobserved) | None => Some(Instant::now()),
+        Some(PasteRead::Unobserved) | None => Some(Unread {
+            sent: Instant::now(),
+            held,
+        }),
     }
 }
 
-/// On GNOME the helper is xclip, which reports each request it answers, and
-/// Mutter's clipboard manager reads a new CLIPBOARD once, right after the copy.
-/// Elsewhere a read can't be told from another program's, or isn't reported.
-fn reads_observable(session: SessionKind, helper: &str) -> bool {
-    matches!(session, SessionKind::Wayland) && helper == "xclip"
+/// What the clipboard helpers say about an app reading a paste.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reads {
+    /// GNOME Wayland: xclip reports each request it answers, and Mutter's
+    /// clipboard manager reads a new CLIPBOARD once, right after the copy, so
+    /// the next read is the app's.
+    Told,
+    /// X11: xclip reports the same, but another program's read can't be told
+    /// from the app's.
+    Seen,
+    /// wl-copy reports nothing.
+    Unseen,
+}
+
+fn reads_for(session: SessionKind, helper: &str) -> Reads {
+    match (session, helper) {
+        (SessionKind::Wayland, "xclip") => Reads::Told,
+        (SessionKind::X11OrOther, "xclip") => Reads::Seen,
+        _ => Reads::Unseen,
+    }
 }
 
 /// Put undelivered dictation on the clipboard without sending keys, so the
@@ -461,7 +517,7 @@ pub fn copy_desktop_text(text: &str) -> Result<(), InsertionError> {
         )));
     }
     let last_paste = delivery_slot();
-    settle(*last_paste);
+    settle(last_paste.as_ref());
     let (mut clipboard, mut primary) = copy_commands();
     copy_selections(&paste_text(text), &mut clipboard, &mut primary)
 }
@@ -1171,6 +1227,49 @@ fn observed_transaction(
     Ok((transaction.clipboard_ms, transaction.keyboard_ms, read))
 }
 
+/// The X11 paste: xclip helpers that keep both selections and report what they
+/// answer, CLIPBOARD first and PRIMARY best effort as with forked helpers, then
+/// the keys. It returns the helpers with the time the keys were started; the
+/// next copy waits for a read after it (settle). xdotool reports no Insert
+/// press, and a read before the keys were started can't be the app's paste.
+fn seen_transaction(
+    program: &str,
+    text: &str,
+    before_paste: impl FnOnce() -> Result<(), InsertionError>,
+    send_keys: impl FnOnce() -> Result<(), InsertionError>,
+) -> Result<(u64, u64, (SelectionOwners, Instant)), InsertionError> {
+    let mut keys_started = Instant::now();
+    let transaction = paste_transaction(
+        || {
+            let mut owners = SelectionOwners::new();
+            owners
+                .own(
+                    program,
+                    Selection::Clipboard,
+                    text.as_bytes(),
+                    HELPER_TIMEOUT,
+                )
+                .map_err(|error| owner_error(error, false))?;
+            if let Err(error) =
+                owners.own(program, Selection::Primary, text.as_bytes(), HELPER_TIMEOUT)
+            {
+                log::warn!("Could not update the primary selection: {error}");
+            }
+            Ok(owners)
+        },
+        before_paste,
+        || {
+            keys_started = Instant::now();
+            send_keys().map(|()| None)
+        },
+    )?;
+    Ok((
+        transaction.clipboard_ms,
+        transaction.keyboard_ms,
+        (transaction.copied, keys_started),
+    ))
+}
+
 /// A CLIPBOARD helper that never started typed nothing, though PRIMARY may
 /// already hold the text; one that started may have taken the selection, as
 /// run_helper treats a failed exit.
@@ -1318,10 +1417,12 @@ mod tests {
 
     #[test]
     fn next_copy_waits_only_for_the_remaining_settle_interval() {
+        let unread = |sent| Unread { sent, held: None };
         assert_eq!(settle(None), 0);
-        assert_eq!(settle(Instant::now().checked_sub(PASTE_SETTLE)), 0);
+        let settled = Instant::now().checked_sub(PASTE_SETTLE).unwrap();
+        assert_eq!(settle(Some(&unread(settled))), 0);
         let started = Instant::now();
-        settle(Some(started));
+        assert!(settle(Some(&unread(started))) >= PASTE_SETTLE.as_millis() as u64);
         assert!(started.elapsed() >= PASTE_SETTLE);
     }
 
@@ -1783,7 +1884,10 @@ mod tests {
         assert_eq!(read.selection, Selection::Clipboard);
         assert!(read.after >= Duration::from_millis(10));
         assert!(elapsed < READ_TIMEOUT, "{elapsed:?}");
-        assert_eq!(settle(settle_from(Some(PasteRead::Read(read)))), 0);
+        assert_eq!(
+            settle(settle_from(Some(PasteRead::Read(read)), None).as_ref()),
+            0
+        );
         assert_eq!(
             std::fs::read(program.with_file_name("primary.text")).unwrap(),
             b"Synthetic phrase."
@@ -1809,7 +1913,7 @@ mod tests {
         .unwrap();
         assert_eq!(read, PasteRead::Unobserved);
         let started = Instant::now();
-        settle(settle_from(Some(read)));
+        settle(settle_from(Some(read), None).as_ref());
         assert!(started.elapsed() >= PASTE_SETTLE);
         release(&program);
         std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
@@ -1832,7 +1936,7 @@ mod tests {
         assert_eq!(read, PasteRead::None);
         assert_eq!(read.label(), "none");
         assert!(started.elapsed() >= READ_TIMEOUT);
-        assert_eq!(settle_from(Some(read)), None);
+        assert!(settle_from(Some(read), None).is_none());
         release(&program);
         std::fs::remove_dir_all(program.parent().unwrap()).unwrap();
     }
@@ -2008,12 +2112,126 @@ mod tests {
     }
 
     #[test]
-    fn reads_are_observed_only_through_xclip_on_wayland() {
-        assert!(reads_observable(SessionKind::Wayland, "xclip"));
-        assert!(!reads_observable(SessionKind::Wayland, "wl-copy"));
-        assert!(!reads_observable(SessionKind::X11OrOther, "xclip"));
+    fn xclip_tells_the_apps_read_on_gnome_and_only_shows_reads_on_x11() {
+        assert_eq!(reads_for(SessionKind::Wayland, "xclip"), Reads::Told);
+        assert_eq!(reads_for(SessionKind::Wayland, "wl-copy"), Reads::Unseen);
+        assert_eq!(reads_for(SessionKind::X11OrOther, "xclip"), Reads::Seen);
         assert_eq!(PasteRead::Unobserved.label(), "unobserved");
         assert_eq!(PasteRead::None.after_ms(), None);
+    }
+
+    /// An X11 paste of `text` through the stand-in, whose keys do `keys`.
+    fn x11_paste(program: &Path, keys: impl FnOnce()) -> Option<Unread> {
+        let (_, _, helpers) = seen_transaction(
+            program.to_str().unwrap(),
+            "Synthetic phrase.",
+            || Ok(()),
+            || {
+                keys();
+                Ok(())
+            },
+        )
+        .unwrap();
+        settle_from(Some(PasteRead::Unobserved), Some(helpers))
+    }
+
+    #[test]
+    fn the_next_x11_copy_waits_for_an_app_that_reads_late() {
+        let program = fake_xclip("x11-late-read");
+        let _folder = Folder::of(&program);
+        let unread = x11_paste(&program, || {});
+        assert_eq!(
+            std::fs::read_to_string(program.with_file_name("order")).unwrap(),
+            "clipboard\nprimary\n",
+            "CLIPBOARD is copied first on X11"
+        );
+        // The app reads 180 ms after the keys, later than the fixed settle.
+        let app = program.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(180));
+            signal(&app, Selection::Clipboard, "serve");
+        });
+        let started = Instant::now();
+        let waited = settle(unread.as_ref());
+        let elapsed = started.elapsed();
+        assert!(elapsed >= Duration::from_millis(175), "{elapsed:?}");
+        assert!(elapsed < READ_TIMEOUT, "{elapsed:?}");
+        assert!(waited >= 175, "{waited}");
+        release(&program);
+    }
+
+    #[test]
+    fn an_x11_read_never_shortens_the_settle() {
+        let program = fake_xclip("x11-early-read");
+        let _folder = Folder::of(&program);
+        // A terminal reads PRIMARY as soon as the keys arrive.
+        let unread = x11_paste(&program, || signal(&program, Selection::Primary, "serve"));
+        let started = Instant::now();
+        settle(unread.as_ref());
+        let elapsed = started.elapsed();
+        assert!(
+            elapsed >= PASTE_SETTLE - Duration::from_millis(5),
+            "{elapsed:?}"
+        );
+        assert!(elapsed < Duration::from_millis(250), "{elapsed:?}");
+        release(&program);
+    }
+
+    #[test]
+    fn an_x11_paste_nobody_reads_holds_the_next_copy_for_the_read_timeout() {
+        let program = fake_xclip("x11-unread");
+        let _folder = Folder::of(&program);
+        // A clipboard manager's read before the keys isn't the app's paste.
+        let unread = {
+            let (_, _, helpers) = seen_transaction(
+                program.to_str().unwrap(),
+                "text",
+                || {
+                    served_once(&program);
+                    Ok(())
+                },
+                || Ok(()),
+            )
+            .unwrap();
+            settle_from(Some(PasteRead::Unobserved), Some(helpers))
+        };
+        let (_, keys_started) = unread.as_ref().unwrap().held.as_ref().unwrap();
+        let keys_started = *keys_started;
+        settle(unread.as_ref());
+        let since_keys = keys_started.elapsed();
+        assert!(since_keys >= READ_TIMEOUT, "{since_keys:?}");
+        assert!(
+            since_keys < READ_TIMEOUT + Duration::from_millis(150),
+            "{since_keys:?}"
+        );
+        release(&program);
+    }
+
+    #[test]
+    fn x11_helpers_that_lost_the_selection_hold_back_nothing() {
+        let program = fake_xclip("x11-replaced");
+        let _folder = Folder::of(&program);
+        let unread = x11_paste(&program, || {});
+        // Another program copies: both helpers lose their selection and exit.
+        release(&program);
+        let started = Instant::now();
+        settle(unread.as_ref());
+        let elapsed = started.elapsed();
+        assert!(elapsed < Duration::from_millis(250), "{elapsed:?}");
+    }
+
+    #[test]
+    fn an_x11_clipboard_helper_that_never_starts_is_no_mutation() {
+        let error = seen_transaction(
+            "/nonexistent/voco-test-xclip",
+            "text",
+            || panic!("no checks run after a failed copy"),
+            || panic!("no keys are sent after a failed copy"),
+        )
+        .err()
+        .unwrap();
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(!error.clipboard_changed);
     }
 
     /// Application-delivery fixtures run this production paste against real

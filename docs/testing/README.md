@@ -101,7 +101,7 @@ engine, native desktop and delivery suites. `VOCO_NATIVE_DEPS` and
 The full-application, Wayland and browser suites run the release build with the
 [provisioned runtime](../linux-packaging.md#runtime-provisioning), checked
 against `MODEL-IDENTITY.json` and `NATIVE-BUILD.json`. `--full-application` has
-eight cases:
+nine cases:
 - **`delivery`:** one field keeps focus and gets the words exactly once.
 - **`focus-switch`:** focus moves mid-recording, and each field keeps only what
   was pasted while it had focus.
@@ -118,6 +118,9 @@ eight cases:
 - **`modifier-hold`:** Alt is held from the start of speech until VOCO has
   requested a paste, and 0.3 s more. That paste must wait for the release, then
   deliver as in `delivery`.
+- **`slow-reader`:** the field starts each paste 250 ms after its keys, as a
+  busy app reads the clipboard late. Each paste must still bring its own text,
+  so the next copy waits for that read; otherwise it delivers as in `delivery`.
 - **`launcher`:** VOCO starts as GIO launches its desktop entry, which names
   `VOCO.desktop` and the process it started. VOCO must open the Ready popover by
   itself once it's ready, with no second launch.

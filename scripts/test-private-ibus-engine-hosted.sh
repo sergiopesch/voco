@@ -105,7 +105,7 @@ elif [[ "${1:-}" == --native-pulse-latency ]]; then
     "${VOCO_NATIVE_PULSE_EVIDENCE_DIR}/starved/result.json"
 elif [[ "${1:-}" == --full-application ]]; then
   application_evidence="${VOCO_NATIVE_EVIDENCE_DIR}"
-  for app_case in delivery focus-switch spelling lock web-process modifier-hold launcher autostart; do
+  for app_case in delivery focus-switch spelling lock web-process modifier-hold slow-reader launcher autostart; do
     # The web-process case sometimes loses the Alt+D after the reload (#153):
     # its IBus engine traces each shortcut decision into callbacks.log.
     trace=0

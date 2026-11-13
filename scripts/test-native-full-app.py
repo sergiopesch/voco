@@ -26,6 +26,10 @@ modifier-hold: Alt is held from the start of speech until VOCO has requested a p
 0.3 s more, as when someone starts the shortcut. That paste must wait for the release:
 Shift+Insert sent under a held Alt would turn the shortcut into Alt+Shift+D (#193).
 Otherwise it delivers as in delivery.
+slow-reader: field A starts each paste 250 ms after its keys, as an app busy with
+something else reads the clipboard late. Each paste must still bring its own text: the
+next copy, as when Stop's space follows the last words, must wait for that read (#317).
+Otherwise it delivers as in delivery.
 Every dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -56,7 +60,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'launcher', 'autostart'], 'Unsupported native application case'
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
@@ -295,6 +299,21 @@ other.set_placeholder_text('B: focused for the second utterance' if case == 'foc
 other.set_input_hints(Gtk.InputHints.WORD_COMPLETION)
 box.pack_start(field, False, False, 0)
 box.pack_start(other, False, False, 0)
+if case == 'slow-reader':
+    # Shift+Insert asks the entry to paste. Hold each request back, then let it
+    # through: the entry reads the clipboard only then.
+    late = dict(through=False)
+    def paste_late(entry):
+        if late['through']:
+            return
+        entry.stop_emission_by_name('paste-clipboard')
+        def paste():
+            late['through'] = True
+            entry.emit('paste-clipboard')
+            late['through'] = False
+            return False
+        GLib.timeout_add(250, paste)
+    field.connect('paste-clipboard', paste_late)
 mutations, preedits = [], []
 for entry, label in [(field, 'A'), (other, 'B')]:
     entry.connect('changed', lambda widget, label=label: mutations.append(dict(t=time.monotonic(), field=label, text=widget.get_text())))
@@ -529,7 +548,7 @@ try:
     # xdotool sends one Shift+Insert per dispatched chunk, every space inside one,
     # and one more for the space Stop leaves after a finished sentence.
     assert len(changes) <= c['dictation_desktop_paste_dispatched'] + c['dictation_desktop_stop_space_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
-    if case in ('delivery', 'lock', 'web-process', 'modifier-hold'):
+    if case in ('delivery', 'lock', 'web-process', 'modifier-hold', 'slow-reader'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
     elif case == 'spelling':

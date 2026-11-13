@@ -1,7 +1,8 @@
 //! Clipboard helpers that report what they serve. In the foreground, xclip
 //! prints a line each time it has answered a request for its selection's
 //! contents; TARGETS queries, which list formats, don't count. On GNOME this
-//! tells VOCO when the focused app has read a paste.
+//! tells VOCO when the focused app has read a paste. On X11, where another
+//! program's read can't be told from the app's, the next copy waits for one.
 //!
 //! Each helper keeps its selection until another owner takes it, as a forked
 //! xclip does, and outlives VOCO: it ignores SIGPIPE, so a request after VOCO

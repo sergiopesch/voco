@@ -15,7 +15,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `processor.rs` — Whether the processor has the AVX2, FMA and F16C the speech runtime needs, read once from `/proc/cpuinfo`, and the message that names what's missing.
 - `worker_sandbox.rs` — Confines the speech worker before its Python starts: only the variables it reads, close-on-exec descriptors, no-new-privileges and a seccomp filter that refuses network sockets and io_uring.
 - `insertion.rs` — Desktop paste and copy: helper and `/dev/uinput` checks, the clipboard transaction, Shift+Insert and the three failure outcomes.
-- `selection_owner.rs` — GNOME's paste helpers: foreground xclip owners that keep their selection, report each request they answer, and are reaped when replaced.
+- `selection_owner.rs` — The paste helpers on GNOME Wayland and X11: foreground xclip owners that keep their selection, report each request they answer, and are reaped when replaced.
 - `desktop_session.rs` — Retains the originating graphical login and checks its active seat before Wayland paste, and follows its screen lock through logind's `LockedHint`; bounded logind discovery supports user-manager app launches.
 - `virtual_keyboard.rs` — VOCO's uinput keyboard for Wayland paste keys: one device per process with only Shift and Insert, 12 ms between key events.
 - `config.rs` — Settings file, field-level updates, the My words rules, the copy from the legacy `voice` directory and the update cache.
