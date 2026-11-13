@@ -135,8 +135,7 @@ GNOME's answer in its own settings folder, so `sudo snap remove --purge voco`
 removes it, and a new install asks again. Removing the snap can't reach your
 GNOME settings, so VOCO's shortcut stays in GNOME's **Settings** → **Keyboard**
 → **View and Customize Shortcuts** → **Custom Shortcuts**, where it does
-nothing without VOCO: delete it there, or choose **Reset** on VOCO's **Help**
-page before you remove the snap. A new install takes the entry over.
+nothing without VOCO: delete it there. A new install takes the entry over.
 
 ## Manual install
 
