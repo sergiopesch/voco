@@ -218,7 +218,7 @@ lesson(
     [
         (
             "X11 toggles on release",
-            "While the chord is held, VOCO's grab receives every key. VOCO waits for the release before it toggles, so the paste keys reach the app. The grab sits on the root window and on every top-level window: GNOME's window manager keeps the Super key for the overview and replays the keys pressed under it, and a replayed key skips grabs on the root.",
+            "While the chord is held, VOCO's grab receives every key. VOCO waits for the release before it toggles, so the paste keys reach the app. The grab sits on the root window and on every top-level window: GNOME's window manager keeps the Super key for the overview and hands on the keys pressed with it, and a key handed on that way skips grabs on the root window.",
         ),
         (
             "Why Super+X",
@@ -1504,7 +1504,7 @@ lesson(
         ),
         (
             "Why the X11 actor waits",
-            "The patched global-hotkey waits on the X11 connection and a command signal instead of a timer, so key events never wait for a 50 ms tick and an idle actor never wakes. It grabs each shortcut on the root window and on every child of the root, and follows windows as they become children of the root or leave it for a frame. VOCO and Tauri's shortcut plugin must share this one copy.",
+            "The patched global-hotkey waits on the X11 connection and a command signal instead of a timer, so key events never wait for a 50 ms tick and an idle actor never wakes. It grabs each shortcut on the root window and on every top-level window, and follows the top-level windows as they come and go. VOCO and Tauri's shortcut plugin must share this one copy.",
         ),
         (
             "Why icons stay put",
