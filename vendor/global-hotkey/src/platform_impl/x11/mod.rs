@@ -11,7 +11,10 @@ use crossbeam_channel::Sender;
 use keyboard_types::{Code, Modifiers};
 use x11rb::connection::Connection;
 use x11rb::errors::ReplyError;
-use x11rb::protocol::xproto::{ConnectionExt, GrabMode, KeyButMask, Keycode, ModMask, Window};
+use x11rb::protocol::xproto::{
+    ChangeWindowAttributesAux, ConnectionExt, EventMask, GrabMode, KeyButMask, Keycode, ModMask,
+    Window,
+};
 use x11rb::protocol::{xkb, ErrorKind, Event};
 use x11rb::rust_connection::RustConnection;
 use xkeysym::RawKeysym;
@@ -113,6 +116,66 @@ fn ignored_mods() -> [ModMask; 4] {
     ]
 }
 
+// VOCO: a window manager that grabs a modifier key for itself, as Mutter grabs
+// Super for the overview, replays the keys pressed under it, and the server
+// delivers a replayed key ignoring passive grabs on the window of the grab it
+// released and on that window's ancestors. That window is the root, so a grab
+// on the root alone never sees a Super chord there. Each hotkey is therefore
+// also grabbed on every child of the root, which a replay does reach. A window
+// can vanish at any time and another client may hold the same grab on it, so
+// these requests' errors are ignored; the root grab alone decides whether a
+// registration succeeds.
+fn grab_on(conn: &RustConnection, window: Window, keycode: Keycode, mods: ModMask) {
+    for m in ignored_mods() {
+        if let Ok(cookie) = conn.grab_key(
+            false,
+            window,
+            mods | m,
+            keycode,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC,
+        ) {
+            cookie.ignore_error();
+        }
+    }
+}
+
+fn ungrab_on(conn: &RustConnection, window: Window, keycode: Keycode, mods: ModMask) {
+    for m in ignored_mods() {
+        if let Ok(cookie) = conn.ungrab_key(keycode, window, mods | m) {
+            cookie.ignore_error();
+        }
+    }
+}
+
+/// The root's children now. A query that fails leaves the root grab alone.
+fn top_level_windows(conn: &RustConnection, root: Window) -> Vec<Window> {
+    conn.query_tree(root)
+        .ok()
+        .and_then(|cookie| cookie.reply().ok())
+        .map(|reply| reply.children)
+        .unwrap_or_default()
+}
+
+/// Every registered hotkey, on a window that has just become a child of the
+/// root, or off one that has just left it for a frame, whose own grab covers it.
+fn follow_top_level_window(
+    conn: &RustConnection,
+    hotkeys: &BTreeMap<Keycode, Vec<HotKeyState>>,
+    window: Window,
+    top_level: bool,
+) {
+    for (keycode, states) in hotkeys {
+        for state in states {
+            if top_level {
+                grab_on(conn, window, *keycode, state.mods);
+            } else {
+                ungrab_on(conn, window, *keycode, state.mods);
+            }
+        }
+    }
+}
+
 #[inline]
 fn register_hotkey(
     conn: &RustConnection,
@@ -182,6 +245,9 @@ fn register_hotkey(
                 pressed: false,
             };
             entry.push(state);
+            for window in top_level_windows(conn, root) {
+                grab_on(conn, window, keycode, mods);
+            }
             Ok(())
         }
         Some(_) => Err(Error::AlreadyRegistered(hotkey)),
@@ -223,6 +289,9 @@ fn unregister_hotkey(
     if !removed {
         return Err(Error::FailedToUnRegister(hotkey));
     }
+    for window in top_level_windows(conn, root) {
+        ungrab_on(conn, window, keycode, modifiers);
+    }
 
     let entry = hotkeys.entry(keycode).or_default();
     entry.retain(|k| k.mods != modifiers);
@@ -260,6 +329,16 @@ fn events_processor(thread_rx: wake::WakeReceiver<ThreadMessage>) -> Result<(), 
     .map_err(|err| format!("xkb_per_client_flags request to x11 server has failed: {err}"))?;
 
     let root = conn.setup().roots[screen].root;
+
+    // VOCO: hear of windows that become children of the root or leave it, to
+    // keep each hotkey grabbed on the top-level windows (grab_on). Without
+    // these events the root grab and the windows of each registration remain.
+    if let Ok(cookie) = conn.change_window_attributes(
+        root,
+        &ChangeWindowAttributesAux::new().event_mask(EventMask::SUBSTRUCTURE_NOTIFY),
+    ) {
+        cookie.ignore_error();
+    }
 
     // X11 sends masks for Lock keys as well, and we only care about the 4 below
     let full_mask = KeyButMask::CONTROL | KeyButMask::SHIFT | KeyButMask::MOD4 | KeyButMask::MOD1;
@@ -309,6 +388,12 @@ fn events_processor(thread_rx: wake::WakeReceiver<ThreadMessage>) -> Result<(), 
                             }
                         }
                     }
+                }
+                Event::CreateNotify(event) if event.parent == root => {
+                    follow_top_level_window(&conn, &hotkeys, event.window, true);
+                }
+                Event::ReparentNotify(event) if event.event == root => {
+                    follow_top_level_window(&conn, &hotkeys, event.window, event.parent == root);
                 }
                 _ => {}
             }
