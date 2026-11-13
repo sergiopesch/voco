@@ -315,7 +315,10 @@ it is.
 The companion holds a 2.5-second lease on the exact configured accelerator and
 renews it about once a second. While the lease is fresh, evdev ignores the
 chord. While the IBus engine holds its 1-second lease, evdev ignores the chord
-and VOCO releases its X11 grab so the engine receives it. On Wayland, a shortcut
+and VOCO releases its X11 grab so the engine receives it. The lease ends when
+VOCO closes its channel to the engine, which disarms the engine at once: the
+X11 grab is registered again before the close returns, and evdev takes the
+chord again. On Wayland, a shortcut
 other than the three presets needs a desktop binding that runs `voco --toggle`.
 
 The presets are `Preset` in `lib.rs`: Super+X, the default, then Alt+D and
@@ -376,7 +379,10 @@ WebKit runs the window in a separate web process. If that process crashes,
 VOCO loads the window again. Like any new page, the new renderer gets a new
 epoch, the unfinished entry moves to Review, native capture is cancelled, the
 Chromium exact-field session ends, and shortcuts wait until the renderer says it
-is ready. If a dictation was running, VOCO notifies you. If the window crashes
+is ready. VOCO closes its channel to the IBus engine as soon as it sees the
+crash, so a press while the window loads is taken by VOCO's own grab or evdev
+and waits too, instead of reaching only the focused app. If a dictation was
+running, VOCO notifies you. If the window crashes
 again after three reloads in five minutes, VOCO leaves it closed, ends all of
 that itself, and asks you to quit and open VOCO again.
 

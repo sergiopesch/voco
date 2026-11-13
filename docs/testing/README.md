@@ -111,8 +111,10 @@ eight cases:
   it unlocks. A lock then stops a running dictation, the clip reaches no field,
   and after unlocking a dictation delivers as in `delivery`.
 - **`web-process`:** WebKit's web process dies while a dictation runs. VOCO must
-  load its window again, say once that the dictation was interrupted, and then
-  deliver as in `delivery`.
+  load its window again and say once that the dictation was interrupted. The
+  web process then dies again, and the shortcut is pressed while the window
+  loads: that press must wait for the new renderer and start a dictation, which
+  delivers as in `delivery`.
 - **`modifier-hold`:** Alt is held from the start of speech until VOCO has
   requested a paste, and 0.3 s more. That paste must wait for the release, then
   deliver as in `delivery`.

@@ -18,9 +18,10 @@ lock stops a running dictation, the fixture then reaches no field, and the short
 starts nothing; a dictation after unlocking delivers as in delivery.
 web-process: WebKit's web process, which runs the renderer that drives dictation, dies
 while a dictation runs, as one did on CI. VOCO must load its window again: a new web
-process starts, a second renderer reports ready, the tray returns to Ready, one
-notification says the dictation was interrupted, and a dictation afterwards delivers
-as in delivery.
+process starts, a second renderer reports ready, the tray returns to Ready and one
+notification says the dictation was interrupted. The web process then dies again, and
+the shortcut is pressed while the window loads: that toggle must wait for the third
+renderer and start a dictation, which delivers as in delivery.
 modifier-hold: Alt is held from the start of speech until VOCO has requested a paste, then
 0.3 s more, as when someone starts the shortcut. That paste must wait for the release:
 Shift+Insert sent under a held Alt would turn the shortcut into Alt+Shift+D (#193).
@@ -457,12 +458,34 @@ try:
         assert notifications() == notified + 1, 'VOCO sent more than one notification for the crash'
         assert field.get_text() == other.get_text() == '', 'Text reached a field from the crashed dictation'
         mutations.clear()
-        # The rest is a delivery case.
-    note_focus('before-start')
-    # The lock case already ran one recording: wait for this one's events.
-    before = counts()
-    subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
-    wait_for(lambda: counts()['recording_state_active'] > before['recording_state_active'], 'actual capture')
+        # A press while the window loads again waits for the next renderer. VOCO
+        # closed its channel to the IBus engine when it saw the crash, so the
+        # engine no longer takes the chord and VOCO's own grab must: with that
+        # grab still away, the press reached only the focused field (#318).
+        note_focus('before-start')
+        before = counts()
+        crashed = web_processes()
+        assert len(crashed) == 1, 'VOCO should run one web process again: %r' % crashed
+        os.kill(crashed[0], signal.SIGKILL)
+        wait_for(lambda: counts()['web_process_reloaded'] == 2, 'VOCO to load its window again after a second crash', timeout=30)
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        # Provably while it loaded: no third renderer was ready once the keys had gone.
+        pressed_while_loading = counts()['frontend_hotkey_handler_ready'] == 2
+        wait_for(lambda: counts()['frontend_hotkey_handler_ready'] > 2, 'a new renderer after the second crash', timeout=30)
+        wait_for(lambda: counts()['recording_state_active'] > before['recording_state_active'], 'the press during the reload to start a dictation')
+        c = counts()
+        if pressed_while_loading:
+            assert c['toggle_event_buffered'] == c['pending_toggle_replayed'] == 1, 'The press during the reload did not wait for the new renderer'
+        assert notifications() == notified + 1, 'VOCO notified for a crash that interrupted no dictation'
+        assert field.get_text() == other.get_text() == '', 'Text reached a field from the reloads'
+        mutations.clear()
+        # The rest is a delivery case, its dictation already started.
+    else:
+        note_focus('before-start')
+        # The lock case already ran one recording: wait for this one's events.
+        before = counts()
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        wait_for(lambda: counts()['recording_state_active'] > before['recording_state_active'], 'actual capture')
     note_focus('recording')
     pulse_outputs = subprocess.check_output([os.environ['VOCO_NATIVE_PACTL'], 'list', 'source-outputs'], text=True)
     observable_fields = ('Source Output #', 'Driver:', 'Source:', 'Sample Specification:', 'Corked:', 'Mute:', 'application.name =', 'application.process.binary =')
@@ -570,7 +593,7 @@ finally:
                     'xdotool Shift+Insert into the focused GTK entry', 'one atomic private-X11 Alt+D Stop gesture',
                     'no IBus text mutation', 'private X11 without a window manager']
         if case == 'web-process':
-            boundary.insert(1, 'a WebKit web process killed mid-dictation and loaded again')
+            boundary.insert(1, 'a WebKit web process killed mid-dictation and again while idle, loaded again each time, with the shortcut pressed during the second load')
     report = dict(passed=passed, failure=failure, expectedOutcome=LAUNCH.get(case, 'pasted-into-focused-field'), case=case,
                   buildRole=os.environ.get('VOCO_NATIVE_BUILD_ROLE', 'preflight'),
                   callbackTraceInstrumented=os.environ.get('VOCO_NATIVE_TRACE') == '1', expectedWords=[] if case in LAUNCH else expected,
