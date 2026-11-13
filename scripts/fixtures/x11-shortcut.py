@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Send one valid Alt+D gesture in a private X11 test session.
+"""Send one valid Alt+D gesture, or Super+X when asked, in a private X11 test session.
 
 Two independent XTEST clients using --clearmodifiers can interleave Alt+D
 with a streaming Shift+Insert and manufacture Alt+Shift+D. A server grab
@@ -13,7 +13,11 @@ from pathlib import Path
 import time
 
 
-def send_alt_d():
+# The modifier's and the letter's keysyms.
+CHORDS = {"Alt+D": (0xffe9, 0x64), "Super+X": (0xffeb, 0x78)}
+
+
+def send_chord(chord):
     x11 = C.CDLL("libX11.so.6")
     xtest = C.CDLL("libXtst.so.6")
     display_type, window_type = C.c_void_p, C.c_ulong
@@ -40,9 +44,9 @@ def send_alt_d():
     grabbed, pressed = False, []
     try:
         root = x11.XDefaultRootWindow(display)
-        alt, letter = (x11.XKeysymToKeycode(display, symbol) for symbol in (0xffe9, 0x64))
+        alt, letter = (x11.XKeysymToKeycode(display, symbol) for symbol in CHORDS[chord])
         if not alt or not letter:
-            raise RuntimeError("The private keyboard has no Alt+D mapping")
+            raise RuntimeError("The private keyboard has no %s mapping" % chord)
         deadline = time.monotonic() + 2
         while True:
             x11.XGrabServer(display)
@@ -73,7 +77,7 @@ def send_alt_d():
                 pressed.remove(key)
         # Process all four events before letting the competing paste client run.
         x11.XSync(display, False)
-        return {"method": "atomic-private-x11", "shortcut": "Alt+D", "keyPresses": 1,
+        return {"method": "atomic-private-x11", "shortcut": chord, "keyPresses": 1,
                 "modifierPrecondition": "neutral", "retries": 0}
     finally:
         for key in reversed(pressed):
@@ -91,4 +95,4 @@ if __name__ == "__main__":
     root = Path(os.environ["VOCO_NATIVE_TEST_ROOT"])
     assert os.environ["DISPLAY"] == ":0"
     assert os.environ["XDG_RUNTIME_DIR"] == str(root / "runtime")
-    print(json.dumps(send_alt_d()))
+    print(json.dumps(send_chord(os.environ.get("VOCO_NATIVE_SHORTCUT", "Alt+D"))))

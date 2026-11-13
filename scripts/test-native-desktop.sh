@@ -94,7 +94,10 @@ TRACE
     source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
     voco_stage_test_speech "${TEST_ROOT}"
     mkdir -p "${TEST_ROOT}/config/voco"
-    printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' >"${TEST_ROOT}/config/voco/config.json"
+    hotkey=Alt+D
+    # The super-key case dictates with VOCO's default shortcut.
+    [[ ${VOCO_NATIVE_APP_CASE:-} == super-key ]] && hotkey=Super+X
+    printf '{"onboardingCompleted":true,"hotkey":"%s"}\n' "${hotkey}" >"${TEST_ROOT}/config/voco/config.json"
     export VOCO_NATIVE_AUDIO=1
   fi
   if [[ "${VOCO_NATIVE_AUDIO:-}" == 1 ]]; then

@@ -220,7 +220,7 @@ bar and it takes the pastes that follow. A lone Super opens nothing in an app.
 | GNOME 46, 48, 50 or 51 on Wayland, [companion](../../integrations/gnome/README.md) attached | Shell grabs Super+X, Alt+D or Alt+Shift+D, so the focused app never sees it. |
 | Wayland with Super+X, Alt+D or Alt+Shift+D, no companion | Passive evdev. The focused app also acts on the chord. |
 | Wayland with any other shortcut | A desktop keybinding that runs `voco --toggle`. |
-| X11 | VOCO's root-window grab, for any shortcut it accepts. It toggles on release, so the paste keys reach the app. |
+| X11 | VOCO's key grab, for any shortcut it accepts, on the root window and on each top-level window. It toggles on release, so the paste keys reach the app. |
 | Any session, VOCO Dictation selected | The IBus engine consumes the chord in eligible fields. |
 
 With passive evdev, few apps act on Super+X, but browsers move the cursor to
