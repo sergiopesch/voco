@@ -250,7 +250,7 @@ lesson(
         ),
         (
             "The snap's shortcut on GNOME",
-            "The snap reads no keyboards. On GNOME Wayland its shortcut is an entry named VOCO in GNOME's own custom keyboard shortcuts, with your shortcut in GTK's spelling, such as <Super>x for Super+X. GNOME's keyboard shortcuts ask nobody, so setup adds the entry by itself on its last screen, and Done waits until GNOME holds it. A saved change of shortcut, from Settings or the tray's presets, moves the entry first. If a GNOME window shortcut or another custom shortcut already uses the keys, VOCO names it and changes nothing. GNOME Settings, under Keyboard, can change the entry's keys too: once setup is complete VOCO saves the keys GNOME holds as its own shortcut, so its labels name the keys GNOME listens for. A start adds no entry, except once where an earlier VOCO's setup left none, so one you removed in GNOME Settings stays removed. GNOME's schema for those keys isn't in the snap's runtime, so the snap carries one with the same IDs, paths and types.",
+            "The snap reads no keyboards. On GNOME Wayland its shortcut is an entry named VOCO in GNOME's own custom keyboard shortcuts, with your shortcut in GTK's spelling, such as <Super>x for Super+X. GNOME's keyboard shortcuts ask nobody, so setup adds the entry by itself on its last screen, and Done waits until GNOME holds it. A saved change of shortcut, from Settings or the tray's presets, moves the entry first. If a GNOME window shortcut or another custom shortcut already uses the keys, VOCO names it and changes nothing. GNOME Settings, under Keyboard, can change the entry's keys too: once setup is complete VOCO saves the keys GNOME holds as its own shortcut, so its labels name the keys GNOME listens for. VOCO notes beside its settings that it added the entry. A start adds one only where setup is complete and that note and the entry are both missing, so one you removed in GNOME Settings stays removed. GNOME's schema for those keys isn't in the snap's runtime, so the snap carries one with the same IDs, paths and types.",
         ),
         (
             "A held chord repeats",
@@ -258,7 +258,7 @@ lesson(
         ),
         (
             "GNOME 46",
-            "That timing alone can't tell a second press that comes about one repeat delay after the first. While a dictation's typing session is open, GNOME's keyboard connection says from GNOME 50 whether every modifier was up since the last call, and one that was makes the call a new press whatever its timing, so a dictation stopped half a second after it started still stops. VOCO 2026.0.70 to 2026.0.72 held this shortcut through GNOME's GlobalShortcuts portal on GNOME 48 and later, which shows GNOME's dialog for every new set of keys; VOCO binds nothing through it now. Resetting VOCO's settings removes its entry and only it.",
+            "That timing alone can't tell a second press that comes about one repeat delay after the first. While a dictation's typing session is open, GNOME's keyboard connection says from GNOME 50 whether every modifier was up since the last call, and one that was makes the call a new press whatever its timing, so a dictation stopped half a second after it started still stops. Resetting VOCO's settings removes its entry and only it.",
         ),
         (
             "Plain status",
