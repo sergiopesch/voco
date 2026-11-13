@@ -4,6 +4,7 @@ import {
   ControlPanel,
   saveErrorMessage,
   shouldOpenMicrophonePreview,
+  isSuperKey,
   shortcutFromKeyboardEvent,
 } from "@/components/ControlPanel";
 import recordedShortcuts from "@/components/recordedShortcuts.json";
@@ -304,14 +305,14 @@ describe("guided dictation and settings journeys", () => {
 
 describe("shortcut recording", () => {
   type Press = { key: string; code: string; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean; metaKey?: boolean; altGraph?: boolean };
-  const press = ({ altGraph = false, ...keys }: Press) => {
+  const press = ({ altGraph = false, ...keys }: Press, superHeld = false) => {
     const event = {
       ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...keys, nativeEvent: { altGraph },
       // Like React's synthetic event, this reads the native event through `this`,
       // so calling it apart from its event throws.
       getModifierState(modifier: string) { return modifier === "AltGraph" && this.nativeEvent.altGraph; },
     };
-    return shortcutFromKeyboardEvent(event);
+    return shortcutFromKeyboardEvent(event, superHeld);
   };
   // lib.rs checks that Rust's parser accepts exactly the recordings marked accepted.
   it.each(recordedShortcuts)("records $shortcut", ({ event, shortcut }) => {
@@ -322,6 +323,19 @@ describe("shortcut recording", () => {
     expect(press({ key: "A", code: "KeyA", shiftKey: true })).toBeNull();
     expect(press({ key: "Control", code: "ControlLeft", ctrlKey: true })).toBeNull();
     for (const key of ["Meta", "OS", "Super"]) expect(press({ key, code: "MetaLeft", metaKey: true })).toBeNull();
+  });
+  // WebKitGTK: Super arrives as a key of its own, and the keys pressed with
+  // it carry no modifier at all.
+  it("records a Super chord from the recorder's own count of the Super key", () => {
+    expect(isSuperKey({ key: "Super", code: "OSLeft" })).toBe(true);
+    expect(isSuperKey({ key: "Unidentified", code: "OSRight" })).toBe(true);
+    expect(isSuperKey({ key: "Meta", code: "MetaLeft" })).toBe(true);
+    expect(isSuperKey({ key: "x", code: "KeyX" })).toBe(false);
+    expect(press({ key: "Super", code: "OSLeft" }, true)).toBeNull();
+    expect(press({ key: "x", code: "KeyX" })).toBeNull();
+    expect(press({ key: "x", code: "KeyX" }, true)).toBe("Super+X");
+    expect(press({ key: "X", code: "KeyX", shiftKey: true }, true)).toBe("Shift+Super+X");
+    expect(press({ key: "k", code: "KeyK", altKey: true }, true)).toBe("Alt+Super+K");
   });
 });
 

@@ -258,6 +258,27 @@ try {
       await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
       await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
       assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Ctrl+Shift+1');
+      // WebKitGTK reports Super as a key of its own and never as a modifier of
+      // the keys pressed with it, so the recorder counts that key itself.
+      await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      const bare = { bubbles:true, cancelable:true, ctrlKey:false, altKey:false, shiftKey:false, metaKey:false };
+      await shortcutInput.dispatchEvent('keydown',{...bare,key:'Super',code:'OSLeft'});
+      assert.equal(await shortcutInput.inputValue(),'Press your shortcut…');
+      await shortcutInput.dispatchEvent('keydown',{...bare,key:'j',code:'KeyJ'});
+      assert.equal(await shortcutInput.inputValue(),'Super+J');
+      // Once Super is up again, a letter alone records nothing.
+      await page.getByRole('button',{name:'Record keys',exact:true}).click();
+      await shortcutInput.dispatchEvent('keydown',{...bare,key:'Super',code:'OSLeft'});
+      await shortcutInput.dispatchEvent('keyup',{...bare,key:'Super',code:'OSLeft'});
+      await shortcutInput.dispatchEvent('keydown',{...bare,key:'j',code:'KeyJ'});
+      assert.equal(await shortcutInput.inputValue(),'Press your shortcut…');
+      await shortcutInput.press('Escape');
+      assert.equal(await shortcutInput.inputValue(),'Super+J');
+      await page.getByRole('button',{name:'Apply shortcut',exact:true}).click();
+      await page.getByRole('button',{name:'Change shortcut',exact:true}).waitFor();
+      assert.equal(await page.locator('.voco-preferences__shortcut-summary kbd').innerText(),'Super+J');
       await page.locator('.voco-preferences__content').evaluate(el => el.scrollTop=0);
       await page.getByRole('button',{name:'Change shortcut',exact:true}).click();
       await shortcutInput.fill('Alt+D');

@@ -139,11 +139,22 @@ function shortcutKey(event: ShortcutKeyEvent): string {
   return key.toUpperCase();
 }
 
-export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent): string | null {
-  // Engines name the Super key itself Meta, OS or Super.
-  if (["Alt", "Control", "Shift", "Meta", "OS", "Super", "Hyper"].includes(event.key)) return null;
-  const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"].filter(Boolean);
-  return event.ctrlKey || event.altKey || event.metaKey ? [...modifiers, shortcutKey(event)].join("+") : null;
+/** The Super key itself, which engines name Meta, OS or Super. WebKitGTK
+ * reports it only as this key of its own, never as a modifier of the keys
+ * pressed with it: with Super held, `metaKey` and `getModifierState` stay
+ * false. So a recording counts Super as held from this key's press to its
+ * release. */
+export function isSuperKey(event: Pick<ShortcutKeyEvent, "key" | "code">): boolean {
+  return ["Meta", "OS", "Super"].includes(event.key) || /^(?:OS|Meta)(?:Left|Right)$/.test(event.code);
+}
+
+/** The chord a key press makes. `superHeld` is the recorder's own count of
+ * the Super key, for engines that don't report it with the event. */
+export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent, superHeld = false): string | null {
+  if (isSuperKey(event) || ["Alt", "Control", "Shift", "Hyper"].includes(event.key)) return null;
+  const withSuper = event.metaKey || superHeld;
+  const modifiers = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", withSuper && "Super"].filter(Boolean);
+  return event.ctrlKey || event.altKey || withSuper ? [...modifiers, shortcutKey(event)].join("+") : null;
 }
 
 /** Why a settings save failed. A Tauri command rejects with its error text. */
@@ -220,6 +231,8 @@ export function ControlPanel({
   const [microphoneChecked, setMicrophoneChecked] = useState(false);
   const [editingShortcut, setEditingShortcut] = useState(false);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
+  // Super is down, by the recorder's own count of its key (isSuperKey).
+  const superHeld = useRef(false);
   const shortcutEditButtonRef = useRef<HTMLButtonElement>(null);
   const wasEditingShortcut = useRef(false);
   const headingContainerRef = useRef<HTMLElement>(null);
@@ -617,11 +630,13 @@ export function ControlPanel({
   }
 
   function endShortcutCapture() {
+    superHeld.current = false;
     setRecordingShortcut(false);
     onShortcutCaptureChange?.(false);
   }
 
   function beginShortcutCapture() {
+    superHeld.current = false;
     onShortcutCaptureChange?.(true);
     setRecordingShortcut(true);
     headingContainerRef.current?.querySelector<HTMLInputElement>('input[aria-describedby="voco-hotkey-feedback"]')?.focus();
@@ -642,8 +657,9 @@ export function ControlPanel({
   function captureShortcut(event: KeyboardEvent<HTMLInputElement>) {
     if (!recordingShortcut) return;
     event.preventDefault();
+    if (isSuperKey(event)) { superHeld.current = true; return; }
     if (event.key === "Escape") { endShortcutCapture(); return; }
-    const shortcut = shortcutFromKeyboardEvent(event);
+    const shortcut = shortcutFromKeyboardEvent(event, superHeld.current);
     if (!shortcut) return;
     setHotkeyDraft(shortcut);
     setHotkeyError(null);
@@ -1005,7 +1021,8 @@ export function ControlPanel({
                       {!editingShortcut ? <div className="voco-preferences__shortcut-summary"><span>Start and stop dictation</span><kbd className="voco-glass voco-shortcut">{config.hotkey}</kbd><button className="voco-button voco-button--secondary" ref={shortcutEditButtonRef} onClick={() => setEditingShortcut(true)}>Change shortcut</button></div> : <div className="voco-preferences__shortcut-editor">
                         <label className="voco-field"><span>Start and stop dictation</span><input disabled={saving || askingGnome} value={recordingShortcut ? "Press your shortcut…" : hotkeyDraft} aria-invalid={Boolean(hotkeyError)} aria-describedby="voco-hotkey-feedback"
                           onBlur={() => { if (recordingShortcut) endShortcutCapture(); }} onChange={(event) => setHotkeyDraft(event.target.value)}
-                          onKeyDown={(event) => { if (recordingShortcut) { captureShortcut(event); return; } if (event.key === "Enter") { event.preventDefault(); void saveHotkey(); } }} /></label>
+                          onKeyDown={(event) => { if (recordingShortcut) { captureShortcut(event); return; } if (event.key === "Enter") { event.preventDefault(); void saveHotkey(); } }}
+                          onKeyUp={(event) => { if (recordingShortcut && isSuperKey(event)) superHeld.current = false; }} /></label>
                         <Tooltip text="Press a modifier and key; Escape cancels."><button className="voco-button voco-button--secondary" disabled={saving || askingGnome} onClick={beginShortcutCapture}>Record keys</button></Tooltip>
                         {hotkeyDirty || hotkeyError ? <button className="voco-button voco-button--primary" onClick={() => void saveHotkey()} disabled={saving || askingGnome}>{askingGnome && gnomeConfirmsShortcut ? "Waiting for GNOME…" : "Apply shortcut"}</button> : null}
                         <button className="voco-button voco-button--ghost" disabled={saving || askingGnome} onClick={() => { endShortcutCapture(); setHotkeyDraft(config.hotkey); setHotkeyError(null); setEditingShortcut(false); }}>Cancel</button>
