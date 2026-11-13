@@ -56,7 +56,11 @@ PulseAudio VOCO lists every source as unavailable. Rust pumps the stream every
 renderer stops draining for 5 seconds, and only VOCO's main page may call it.
 On X11 the renderer captures through WebKit with an AudioWorklet. If WebKit
 offers only the ScriptProcessor fallback, VOCO can't confirm it receives every
-sample, so it doesn't type that recording.
+sample, so it doesn't type that recording. With no microphone chosen, the
+renderer asks Rust for the label of the sound server's default source and
+opens the WebKit device with that label; WebKit by itself opens the first
+device it lists. A default that WebKit doesn't list, such as a virtual source,
+leaves the choice to WebKit.
 
 For WebKit capture, `captureHealth.ts` checks every 250 ms. It cancels the
 recording if the track ends, stays muted by the system for 3 seconds, or

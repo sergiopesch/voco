@@ -49,7 +49,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `problem_report.rs` — The address of VOCO's bug form with this installation's version, package and desktop filled in, for Help's Report a problem.
 - `process_runner.rs` — Bounded helper processes: timeouts, output limits and reaping.
 - `digest_hex.rs` — Lowercase hex for SHA-256 digests.
-- `native_capture_commands.rs` — Tauri commands for native capture, callable only from VOCO's main page.
+- `native_capture_commands.rs` — Tauri commands for native capture and for the label of the system's default microphone, callable only from VOCO's main page.
 - `native_capture/mod.rs` — Native capture manager: the capture worker, the 5 ms pump, the 5-second drain lease and retained audio.
 - `native_capture/pulse.rs` — Rust side of the libpulse shim; libpulse types stay in C.
 - `native_capture/protocol.rs` — Packets and acknowledgements between native capture and the renderer.
@@ -136,7 +136,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `captureHealth.test.ts` — Capture liveness.
 - `captureDescriptor.ts` — Capture backend selection and the retained audio format.
 - `captureDescriptor.test.ts` — Retained audio format.
-- `audioInput.ts` — Opens the WebKit microphone stream and picks the device.
+- `audioInput.ts` — Opens the WebKit microphone stream and picks the device: the chosen one, or the system's default by its label.
 - `audioLevel.ts` — Level meter values for every capture path, shown in the window, the tray and the companion.
 - `nativeCapture.ts` — Renderer side of native capture: sources, packets and acknowledgements.
 - `nativeCapture.test.ts` — Native capture protocol and ownership.
