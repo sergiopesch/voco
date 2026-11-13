@@ -101,7 +101,7 @@ engine, native desktop and delivery suites. `VOCO_NATIVE_DEPS` and
 The full-application, Wayland and browser suites run the release build with the
 [provisioned runtime](../linux-packaging.md#runtime-provisioning), checked
 against `MODEL-IDENTITY.json` and `NATIVE-BUILD.json`. `--full-application` has
-nine cases:
+eleven cases:
 - **`delivery`:** one field keeps focus and gets the words exactly once.
 - **`focus-switch`:** focus moves mid-recording, and each field keeps only what
   was pasted while it had focus.
@@ -121,6 +121,15 @@ nine cases:
 - **`slow-reader`:** the field starts each paste 250 ms after its keys, as a
   busy app reads the clipboard late. Each paste must still bring its own text,
   so the next copy waits for that read; otherwise it delivers as in `delivery`.
+- **`super-key`:** the shortcut is Super+X, no VOCO input source is active, and
+  a stand-in (`fixtures/x11-modifier-grab.py`) keeps the Super key as GNOME's
+  window manager does on X11, replaying the keys pressed under it. Super+X
+  must still start and stop the dictation through VOCO's own grab, and no `x`
+  may reach the field; otherwise it delivers as in `delivery`.
+- **`default-microphone`:** the sound server lists a silent microphone before
+  the clip's, the clip's is the system default, and no microphone is chosen in
+  VOCO. The window's capture must record from the system default, found by its
+  label; otherwise it delivers as in `delivery`.
 - **`launcher`:** VOCO starts as GIO launches its desktop entry, which names
   `VOCO.desktop` and the process it started. VOCO must open the Ready popover by
   itself once it's ready, with no second launch.

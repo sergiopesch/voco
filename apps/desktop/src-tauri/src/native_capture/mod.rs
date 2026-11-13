@@ -14,6 +14,11 @@ pub use protocol::{
 };
 use protocol::{Delivery, Health, MAX_FRAMES};
 use pulse::{Pulse, Status};
+
+/// The label of the sound server's default source (pulse.rs).
+pub fn default_source_label() -> Result<Option<String>, String> {
+    pulse::default_source_label()
+}
 use std::sync::{
     mpsc::{self, Receiver, SyncSender},
     Mutex,

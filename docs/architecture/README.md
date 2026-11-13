@@ -56,7 +56,11 @@ PulseAudio VOCO lists every source as unavailable. Rust pumps the stream every
 renderer stops draining for 5 seconds, and only VOCO's main page may call it.
 On X11 the renderer captures through WebKit with an AudioWorklet. If WebKit
 offers only the ScriptProcessor fallback, VOCO can't confirm it receives every
-sample, so it doesn't type that recording.
+sample, so it doesn't type that recording. With no microphone chosen, the
+renderer asks Rust for the label of the sound server's default source and
+opens the WebKit device with that label; WebKit by itself opens the first
+device it lists. A default that WebKit doesn't list, such as a virtual source,
+leaves the choice to WebKit.
 
 For WebKit capture, `captureHealth.ts` checks every 250 ms. It cancels the
 recording if the track ends, stays muted by the system for 3 seconds, or
@@ -314,7 +318,7 @@ it is.
 | --- | --- | --- |
 | GNOME companion | GNOME 46, 48, 50 or 51 on Wayland with the companion attached | Shell grabs Super+X, Alt+D or Alt+Shift+D at every status and calls `Action('shortcut', '')`. The focused app never sees the chord. |
 | Passive evdev | Wayland with Super+X, Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. A keyboard counts for a preset only when it has that chord's modifier, Shift if it names Shift, and letter; the chord matches with exactly its own modifiers held on any keyboard. The focused app also receives the chord. |
-| X11 grab | X11, any valid shortcut | A root-window key grab consumes the chord and toggles on release, so the paste keys reach the app. |
+| X11 grab | X11, any valid shortcut | A key grab on the root window and on each top-level window consumes the chord and toggles on release, so the paste keys reach the app. |
 | IBus engine | The VOCO Dictation input source is selected | Protocol 6. Consumes the chord in IBus-aware fields and changes no text. |
 | `voco --toggle` | Any desktop binding | Connects once to the owner-only socket. The connection itself is the request. |
 

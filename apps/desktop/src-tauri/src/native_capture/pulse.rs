@@ -255,6 +255,39 @@ impl Drop for Pulse {
     }
 }
 
+/// The label of the source named `default_name` among `sources`, each a name,
+/// a label and whether it is a monitor, which no microphone list offers.
+fn default_label(default_name: &str, sources: Vec<(String, String, bool)>) -> Option<String> {
+    sources
+        .into_iter()
+        .find(|(name, _, monitor)| !default_name.is_empty() && name == default_name && !monitor)
+        .map(|(_, label, _)| label)
+}
+
+/// The label of the sound server's default source, through one short-lived
+/// connection of its own. The window's capture opens the device with this
+/// label when no microphone is chosen: left to itself, WebKit opens the first
+/// device it lists, whichever the system's default is. Found by name: a
+/// source needs no PipeWire serial here, as it does to be recorded natively.
+pub(super) fn default_source_label() -> Result<Option<String>, String> {
+    let pulse = Pulse::connect()?;
+    let mut catalog = empty_catalog();
+    if unsafe { vc_enumerate(pulse.ptr.as_ptr(), &mut *catalog) } != 0 {
+        return Err(pulse
+            .status()
+            .error
+            .unwrap_or("Source enumeration unavailable".into()));
+    }
+    if catalog.count > 128 {
+        return Err("Invalid source count".into());
+    }
+    let sources = catalog.sources[..catalog.count as usize]
+        .iter()
+        .map(|raw| Ok((text(&raw.name)?, text(&raw.label)?, raw.monitor != 0)))
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(default_label(&text(&catalog.default_name)?, sources))
+}
+
 #[cfg(test)]
 mod identity_tests {
     use super::*;
@@ -267,6 +300,28 @@ mod identity_tests {
             detail: Some(MICROPHONE_DETAIL),
         });
         assert_eq!(refused.err().as_deref(), Some(MICROPHONE_DETAIL));
+    }
+
+    #[test]
+    fn the_default_label_is_the_default_sources_and_never_a_monitors() {
+        let sources = || {
+            vec![
+                ("built-in".to_string(), "Built-in Audio".to_string(), false),
+                ("headset".to_string(), "Headset".to_string(), false),
+                (
+                    "speakers.monitor".to_string(),
+                    "Monitor of Speakers".to_string(),
+                    true,
+                ),
+            ]
+        };
+        assert_eq!(
+            default_label("headset", sources()).as_deref(),
+            Some("Headset")
+        );
+        assert_eq!(default_label("speakers.monitor", sources()), None);
+        assert_eq!(default_label("gone", sources()), None);
+        assert_eq!(default_label("", sources()), None);
     }
 
     #[test]

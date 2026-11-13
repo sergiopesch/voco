@@ -30,6 +30,15 @@ slow-reader: field A starts each paste 250 ms after its keys, as an app busy wit
 something else reads the clipboard late. Each paste must still bring its own text: the
 next copy, as when Stop's space follows the last words, must wait for that read (#317).
 Otherwise it delivers as in delivery.
+super-key: the shortcut is Super+X, no VOCO input source is active, and a stand-in window
+manager (fixtures/x11-modifier-grab.py) keeps the Super key as Mutter does, replaying the
+keys pressed under it. A replayed key skips grabs on the root window, so VOCO's shortcut
+must also be grabbed on the top-level windows: Super+X must start and stop the dictation,
+and no x may reach the field (#334). Otherwise it delivers as in delivery.
+default-microphone: the sound server lists a silent microphone before the fixture's, the
+fixture's is the system default, no microphone is chosen in VOCO and nothing in VOCO's
+environment names a source. The window's capture must record from the system default, not
+from the first microphone WebKit lists (#335). Otherwise it delivers as in delivery.
 Every dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -60,7 +69,9 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone', 'launcher', 'autostart'], 'Unsupported native application case'
+# What the harness presses, for xdotool and for the stop gesture's fixture.
+SHORTCUT = dict(keys='super+x', name='Super+X') if case == 'super-key' else dict(keys='alt+d', name='Alt+D')
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
 model = root / 'speech/models/nemotron-speech-streaming-en-0.6b.q8_0.gguf'
 sound = repo / 'tests/fixtures/speech' / ('1673-143396-0000.wav' if case == 'spelling' else '84-121123-0000.wav')
@@ -286,7 +297,8 @@ IBus.init()
 bus = IBus.Bus()
 assert bus.is_connected() and bus.preload_engines(['voco'])
 pump(.3)
-assert bus.set_global_engine('voco')
+# Without the VOCO input source, VOCO's own X11 grab holds the shortcut.
+assert case == 'super-key' or bus.set_global_engine('voco')
 window = Gtk.Window(title='VOCO private full application acceptance')
 window.set_default_size(1100, 220)
 box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -346,7 +358,18 @@ Gio.bus_own_name_on_connection(tray_bus, 'org.kde.StatusNotifierWatcher', Gio.Bu
 pump(.1)
 log = (root / 'evidence/full-app.log').open('w')
 app_env = {**os.environ, 'RUST_LOG': 'info', 'VOCO_HOTKEY_TRACE': '1'}
-system_bus = logind = None
+if case == 'default-microphone':
+    # Only the sound server says which microphone is the default.
+    del app_env['PULSE_SOURCE']
+system_bus = logind = modifier_grab = None
+if case == 'super-key':
+    modifier_grab = subprocess.Popen(['/usr/bin/python3', str(repo / 'scripts/fixtures/x11-modifier-grab.py'), str(root / 'modifier-grab.ready')],
+                                     stdout=log, stderr=subprocess.STDOUT)
+    for _ in range(250):
+        if (root / 'modifier-grab.ready').exists():
+            break
+        time.sleep(.02)
+    assert (root / 'modifier-grab.ready').exists(), 'The stand-in for a window manager that keeps Super did not start'
 if case == 'lock':
     # A private system bus whose only service is a fake logind; the sandbox has no real one.
     socket_path = root / 'runtime/system_bus_socket'
@@ -426,6 +449,11 @@ try:
     window.present()
     window_id = subprocess.check_output(['xdotool', 'search', '--name', '^VOCO private full application acceptance$'], text=True).strip().splitlines()[0]
     subprocess.run(['xdotool', 'windowfocus', '--sync', window_id], check=True)
+    if case == 'super-key':
+        # Under a compositing window manager the pointer always rests over some
+        # top-level window. Over the bare root, as here without one, the X server
+        # delivers a replayed key without looking at any passive grab.
+        subprocess.run(['xdotool', 'mousemove', '--window', window_id, '20', '20'], check=True)
     pump(.2)
     other.grab_focus()
     pump(.5)
@@ -503,11 +531,21 @@ try:
         note_focus('before-start')
         # The lock case already ran one recording: wait for this one's events.
         before = counts()
-        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', SHORTCUT['keys']], check=True)
         wait_for(lambda: counts()['recording_state_active'] > before['recording_state_active'], 'actual capture')
     note_focus('recording')
     pulse_outputs = subprocess.check_output([os.environ['VOCO_NATIVE_PACTL'], 'list', 'source-outputs'], text=True)
     observable_fields = ('Source Output #', 'Driver:', 'Source:', 'Sample Specification:', 'Corked:', 'Mute:', 'application.name =', 'application.process.binary =')
+    if case == 'default-microphone':
+        # The window's stream is on the system default, the fixture's source, and
+        # VOCO found it by its label instead of leaving the choice to WebKit.
+        indexes = dict(line.split('\t')[1::-1] for line in subprocess.check_output(
+            [os.environ['VOCO_NATIVE_PACTL'], 'list', 'short', 'sources'], text=True).splitlines())
+        streams = [block for block in pulse_outputs.split('Source Output #') if 'WebKitWebProcess' in block]
+        assert len(streams) == 1, 'Expected one WebKit recording stream: %r' % pulse_outputs
+        assert re.search(r'^\s*Source: (\d+)$', streams[0], re.M).group(1) == indexes['voco_fixture'], 'VOCO did not record from the system default microphone'
+        opened = [x for x in traces() if x.get('event') == 'recording_get_user_media_done']
+        assert opened and opened[-1].get('system_default_resolved') is True, 'VOCO did not open the system default microphone by its label: %r' % opened[-1:]
     (root / 'evidence/pulse-source-outputs.txt').write_text('\n'.join(line for line in pulse_outputs.splitlines() if line.strip().startswith(observable_fields)) + '\n')
     pump(.5)
     if case == 'modifier-hold':
@@ -530,7 +568,7 @@ try:
     note_focus('before-stop')
     stop_gesture = json.loads(subprocess.check_output([
         '/usr/bin/python3', str(repo / 'scripts/fixtures/x11-shortcut.py')
-    ], text=True))
+    ], text=True, env={**os.environ, 'VOCO_NATIVE_SHORTCUT': SHORTCUT['name']}))
     wait_for(lambda: counts()['dictation_stop_to_idle'] > before['dictation_stop_to_idle'], 'successful recording returned to idle', timeout=35)
     wait_for(lambda: quiet(.5), 'the last paste to land', timeout=5)
     note_focus('delivered')
@@ -548,7 +586,9 @@ try:
     # xdotool sends one Shift+Insert per dispatched chunk, every space inside one,
     # and one more for the space Stop leaves after a finished sentence.
     assert len(changes) <= c['dictation_desktop_paste_dispatched'] + c['dictation_desktop_stop_space_dispatched'], 'Fields changed more often than VOCO dispatched pastes'
-    if case in ('delivery', 'lock', 'web-process', 'modifier-hold', 'slow-reader'):
+    if case == 'super-key':
+        assert c['hotkey_event_received_global_shortcut'] >= 2, 'Super+X did not start and stop the dictation through VOCO\'s X11 grab'
+    if case in ('delivery', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone'):
         assert other_text == '' and not any(m['field'] == 'B' for m in changes), 'Unfocused field B received text'
         assert words(text) == expected, 'Focused field A did not receive the dictation exactly once: %r' % text
     elif case == 'spelling':
@@ -609,7 +649,7 @@ finally:
     else:
         boundary = [{'webkit-audio-worklet': 'real WebKit capture', 'native': 'real native capture'}.get(capture, 'capture not established'),
                     'private PulseAudio fixture', 'Tauri binary IPC', 'pinned Nemotron in a seccomp-filtered worker', 'xclip CLIPBOARD+PRIMARY',
-                    'xdotool Shift+Insert into the focused GTK entry', 'one atomic private-X11 Alt+D Stop gesture',
+                    'xdotool Shift+Insert into the focused GTK entry', 'one atomic private-X11 %s Stop gesture' % SHORTCUT['name'],
                     'no IBus text mutation', 'private X11 without a window manager']
         if case == 'web-process':
             boundary.insert(1, 'a WebKit web process killed mid-dictation and again while idle, loaded again each time, with the shortcut pressed during the second load')
@@ -640,7 +680,7 @@ finally:
     except subprocess.TimeoutExpired:
         app.kill()
         app.wait()
-    for helper in (logind, system_bus):
+    for helper in (logind, system_bus, modifier_grab):
         if helper is not None:
             helper.terminate()
             helper.wait(timeout=5)

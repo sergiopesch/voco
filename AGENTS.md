@@ -196,7 +196,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   list without them gives the output it gave before.
 - Select the default microphone automatically only on an explicit Start test,
   Say it or recording when no microphone is chosen. No idle recording, and no silent device
-  switching during capture.
+  switching during capture. Where the window captures, on X11, the default is
+  the sound server's default source: VOCO asks for its label
+  (`default_microphone_label`) and opens the WebKit device of that label, since
+  WebKit left to itself opens the first device it lists, whichever the
+  system's default is. Where WebKit lists no device of that label, as for a
+  virtual source, WebKit chooses. The trace says only whether the default was
+  found, never its label.
 
 ### Delivery
 
@@ -512,6 +518,15 @@ and the update check. [The snap](#the-snap) lists its rules.
   fresh, passive evdev ignores the chord and the action toggles through the
   `gnome_panel` backend; otherwise the action is refused and evdev toggles. Release the grab on rejection, disconnect or
   disable; late replies about an earlier grab never act on a newer one.
+- On X11 the shortcut is grabbed on the root window and on every child of it,
+  and the actor follows windows as they become children of the root or leave
+  it for a frame. A window manager that keeps a modifier key, as Mutter keeps
+  Super for the overview, replays the keys pressed under it, and the X server
+  delivers a replayed key ignoring grabs on the root: with the root grab alone,
+  Super+X did nothing in GNOME's X11 session and its x reached the app. Only
+  the root grab decides whether a registration succeeded; the others' errors
+  are ignored, and unregistering removes them all. The full-app `super-key`
+  case covers it with a stand-in that keeps Super the same way.
 - A completed IBus decision differs from a poll in flight. Consuming X11 callbacks
   go through the debounce; passive evdev keeps its duplicate guard. The listener
   posts fallback arbitration only when the config revision or the decision changes,

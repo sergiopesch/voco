@@ -1,4 +1,4 @@
-import { microphoneAccess } from "@/lib/tauri";
+import { defaultMicrophoneLabel, microphoneAccess } from "@/lib/tauri";
 
 const LABEL_PREFIX = "label:";
 
@@ -10,6 +10,8 @@ export type AudioInputFallbackStage =
 export interface OpenMicrophoneStreamResult {
   fallbackStage: AudioInputFallbackStage;
   selectedDeviceConfigured: boolean;
+  /** No microphone was chosen, and the system's default one was opened by its label. */
+  systemDefaultResolved: boolean;
   stream: MediaStream;
 }
 
@@ -85,6 +87,41 @@ async function resolvePreferredAudioInputDeviceId(
   return resolvedDeviceId;
 }
 
+/** The listed microphone whose label is the system default's, compared
+ * without case. Null when the list has none: WebKit then chooses. */
+export function chooseDefaultAudioInputDeviceId(
+  defaultLabel: string,
+  devices: AudioInputDeviceCandidate[],
+): string | null {
+  const wanted = defaultLabel.trim().toLocaleLowerCase();
+  if (!wanted) {
+    return null;
+  }
+  return devices.find(
+    (device) => device.kind === "audioinput" && device.label.trim().toLocaleLowerCase() === wanted,
+  )?.deviceId ?? null;
+}
+
+/** With no microphone chosen, the system's default one. Left to itself, WebKit
+ * opens the first device it lists, whichever the system's default is. Null
+ * when VOCO can't learn the default or WebKit doesn't list it. */
+async function resolveDefaultAudioInputDeviceId(): Promise<string | null> {
+  const defaultLabel = await defaultMicrophoneLabel().catch(() => null);
+  if (!defaultLabel) {
+    return null;
+  }
+  let devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+  if (!devices.some((device) => device.kind === "audioinput" && device.label)) {
+    // WebKit names its devices only once a microphone has been opened.
+    const permissionStream = await navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .catch(() => null);
+    permissionStream?.getTracks().forEach((track) => track.stop());
+    devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+  }
+  return chooseDefaultAudioInputDeviceId(defaultLabel, devices);
+}
+
 export function buildAudioConstraints(deviceId: string | null): MediaTrackConstraints {
   return {
     deviceId: deviceId ? { exact: deviceId } : undefined,
@@ -124,13 +161,16 @@ export async function openMicrophoneStream(deviceId: string | null): Promise<Med
 export async function openMicrophoneStreamWithDiagnostics(
   deviceId: string | null,
 ): Promise<OpenMicrophoneStreamResult> {
-  const resolvedDeviceId = await resolvePreferredAudioInputDeviceId(deviceId);
+  const resolvedDeviceId = deviceId
+    ? await resolvePreferredAudioInputDeviceId(deviceId)
+    : await resolveDefaultAudioInputDeviceId();
   const selectedDeviceConfigured = Boolean(deviceId);
+  const systemDefaultResolved = !deviceId && resolvedDeviceId !== null;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: buildAudioConstraints(resolvedDeviceId),
     });
-    return { fallbackStage: "none", selectedDeviceConfigured, stream };
+    return { fallbackStage: "none", selectedDeviceConfigured, systemDefaultResolved, stream };
   } catch (error) {
     if (!isConstraintFailure(error)) {
       throw error;
@@ -144,6 +184,7 @@ export async function openMicrophoneStreamWithDiagnostics(
     return {
       fallbackStage: "minimal-constraints",
       selectedDeviceConfigured,
+      systemDefaultResolved,
       stream,
     };
   } catch (error) {
@@ -156,6 +197,7 @@ export async function openMicrophoneStreamWithDiagnostics(
   return {
     fallbackStage: "default-device",
     selectedDeviceConfigured,
+    systemDefaultResolved: false,
     stream,
   };
 }

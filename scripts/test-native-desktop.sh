@@ -94,7 +94,10 @@ TRACE
     source "$(dirname "${BASH_SOURCE[0]}")/lib/test-speech-runtime.sh"
     voco_stage_test_speech "${TEST_ROOT}"
     mkdir -p "${TEST_ROOT}/config/voco"
-    printf '%s\n' '{"onboardingCompleted":true,"hotkey":"Alt+D"}' >"${TEST_ROOT}/config/voco/config.json"
+    hotkey=Alt+D
+    # The super-key case dictates with VOCO's default shortcut.
+    [[ ${VOCO_NATIVE_APP_CASE:-} == super-key ]] && hotkey=Super+X
+    printf '{"onboardingCompleted":true,"hotkey":"%s"}\n' "${hotkey}" >"${TEST_ROOT}/config/voco/config.json"
     export VOCO_NATIVE_AUDIO=1
   fi
   if [[ "${VOCO_NATIVE_AUDIO:-}" == 1 ]]; then
@@ -127,15 +130,30 @@ exec dbus-run-session -- bash -c '
   if [[ "${VOCO_NATIVE_AUDIO:-}" == 1 ]]; then
     export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse.sock"
     export PULSE_SOURCE=voco_fixture PULSE_SINK=fixture
+    first_microphone=()
+    if [[ "${VOCO_NATIVE_APP_CASE:-}" == default-microphone ]]; then
+      # A silent microphone listed before the fixture, which stays the default,
+      # and the per-user socket VOCO asks for the default source.
+      mkdir -p "/run/user/$(id -u)/pulse"
+      first_microphone=(
+        -L "module-null-sink sink_name=decoy rate=48000"
+        -L "module-remap-source master=decoy.monitor source_name=decoy_microphone source_properties=device.description=Decoy-microphone"
+        -L "module-native-protocol-unix socket=/run/user/$(id -u)/pulse/native auth-anonymous=1"
+      )
+    fi
     "$VOCO_NATIVE_PULSEAUDIO" --daemonize=no --use-pid-file=no --exit-idle-time=-1 --disable-shm=true -n \
       --log-target="file:$VOCO_NATIVE_TEST_ROOT/evidence/pulse.log" \
       -L "module-native-protocol-unix socket=$XDG_RUNTIME_DIR/pulse.sock auth-anonymous=1" \
+      "${first_microphone[@]}" \
       -L "module-null-sink sink_name=fixture rate=48000" \
-      -L "module-remap-source master=fixture.monitor source_name=voco_fixture" &
+      -L "module-remap-source master=fixture.monitor source_name=voco_fixture source_properties=device.description=Fixture-microphone" &
     for _ in $(seq 1 100); do [[ -S "$XDG_RUNTIME_DIR/pulse.sock" ]] && break; sleep .02; done
     [[ -S "$XDG_RUNTIME_DIR/pulse.sock" ]] || { cat "$VOCO_NATIVE_TEST_ROOT/evidence/pulse.log" >&2; exit 1; }
     "$VOCO_NATIVE_PACTL" set-default-source voco_fixture
     "$VOCO_NATIVE_PACTL" list short sources >"$VOCO_NATIVE_TEST_ROOT/evidence/pulse-sources.txt"
+    "$VOCO_NATIVE_PACTL" get-default-source >>"$VOCO_NATIVE_TEST_ROOT/evidence/pulse-sources.txt"
+    "$VOCO_NATIVE_PACTL" list sources | grep -E "^\s*(Name|Description):" >>"$VOCO_NATIVE_TEST_ROOT/evidence/pulse-sources.txt"
+    ls -la "/run/user/$(id -u)/pulse" >>"$VOCO_NATIVE_TEST_ROOT/evidence/pulse-sources.txt" 2>&1 || true
   fi
   if [[ -n "${VOCO_NATIVE_APP_BINARY:-}" ]]; then
     /usr/bin/python3 "$1/scripts/test-native-full-app.py"

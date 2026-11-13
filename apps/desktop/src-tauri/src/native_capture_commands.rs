@@ -184,6 +184,24 @@ async fn perform(window: WebviewWindow, operation: Operation) -> Result<Response
     }
 }
 
+/// The label of the system's default microphone, for the window's own capture,
+/// which X11 uses: with no microphone chosen it opens the device with this
+/// label. None where the sound server names no default, or it can't be asked.
+#[tauri::command]
+pub async fn default_microphone_label(window: WebviewWindow) -> Result<Option<String>, String> {
+    require_main(&window)?;
+    #[cfg(all(target_os = "linux", feature = "native-capture"))]
+    {
+        tauri::async_runtime::spawn_blocking(crate::native_capture::default_source_label)
+            .await
+            .map_err(|error| error.to_string())?
+    }
+    #[cfg(not(all(target_os = "linux", feature = "native-capture")))]
+    {
+        Ok(None)
+    }
+}
+
 #[tauri::command]
 pub async fn native_capture_list_sources(window: WebviewWindow) -> Result<Response, String> {
     perform(window, Operation::List).await
