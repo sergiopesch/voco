@@ -245,7 +245,9 @@ shortcut for 1 second at a time, renewed while VOCO keeps asking, in a focused
 field that supports preedit, reports a known and current content type, isn't
 for a password, PIN or terminal, and has no private or hidden-text hint. While
 armed, it consumes the chord and tells VOCO to toggle, passive evdev ignores the
-chord, and VOCO releases its X11 grab. The engine never edits text.
+chord, and VOCO releases its X11 grab. When VOCO closes its connection to the
+engine, as when its window loads again, the engine stops taking the chord and
+VOCO's grab comes back at once. The engine never edits text.
 
 ### Keyboard access for evdev
 

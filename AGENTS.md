@@ -504,6 +504,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   go through the debounce; passive evdev keeps its duplicate guard. The listener
   posts fallback arbitration only when the config revision or the decision changes,
   otherwise once a second, and the main-thread closure re-checks its inputs.
+- The IBus lease never outlives VOCO's channel to the engine. Closing that
+  channel disarms the engine at once, so `close_ibus_channel` ends the lease
+  with it and, on X11, registers VOCO's grab again before it returns; a poll
+  that went out before the close renews nothing. VOCO closes the channel when
+  it sees the web process gone and at each page load, so a press while the
+  window loads waits for the next renderer. Left to run out, the lease kept the
+  grab away for up to a second in which the engine took no chord either.
 - IBus protocol 6 is shortcut-only; older helpers must reconnect after an upgrade. Never
   restore text mutation there.
 - `voco --toggle` connects once to the owner-only socket. Don't add retries or
@@ -642,7 +649,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   in five minutes. `renderer_replaced` runs on every main page load and on a
   refused reload: toggles wait for the next renderer, the active entry moves to
   Review, and native capture and the Chromium exact-field session end. The
-  full-app `web-process` case covers it.
+  full-app `web-process` case covers it, with the shortcut pressed while the
+  window loads.
 - The journal is owner-only, bounded, local and text only, never audio. Keep
   earlier entries until the user discards them: at most five, the oldest evicted
   by a sixth. Without a checkpoint dictation continues and notifies.

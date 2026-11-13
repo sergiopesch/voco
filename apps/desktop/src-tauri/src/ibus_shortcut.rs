@@ -282,9 +282,16 @@ impl IbusShortcutService {
         .map_err(|_| ShortcutPollFailure { may_have_armed })
     }
 
-    pub fn shutdown(&self) {
-        if let Ok(mut guard) = self.bridge.lock() {
-            guard.take();
+    /// Closes the channel, which makes the engine disarm the shortcut and drop
+    /// a pending trigger. `closed` runs before another request can open a new
+    /// channel, so what it records can't be taken for that one's.
+    pub fn shutdown(&self, closed: impl FnOnce()) {
+        match self.bridge.lock() {
+            Ok(mut guard) => {
+                guard.take();
+                closed();
+            }
+            Err(_) => closed(),
         }
     }
 
@@ -648,7 +655,7 @@ mod tests {
         assert_eq!(status.setup_state, "ready");
         assert!(status.detail.contains("takes the dictation shortcut"));
         assert_eq!(status.error, None);
-        service.shutdown();
+        service.shutdown(|| {});
         server.join().unwrap();
         fs::remove_file(&socket_path).unwrap();
         fs::remove_dir(socket_path.parent().unwrap()).unwrap();
@@ -734,7 +741,7 @@ mod tests {
         let service = IbusShortcutService {
             bridge: Mutex::new(Some(bridge)),
         };
-        service.shutdown();
+        service.shutdown(|| {});
 
         server.join().expect("fake server completed");
         fs::remove_file(&socket_path).expect("remove fake socket");
@@ -808,7 +815,7 @@ mod tests {
         assert_eq!(error, "stale or inactive session");
         assert!(service.status().available);
 
-        service.shutdown();
+        service.shutdown(|| {});
         server.join().expect("fake server completed");
         fs::remove_file(&socket_path).expect("remove fake socket");
         fs::remove_dir(socket_path.parent().expect("socket parent"))
@@ -883,7 +890,7 @@ mod tests {
         assert!(!disarmed.expect("the engine replied").armed);
         // An ordered rejection means the engine did not arm the shortcut.
         assert!(!rejected.expect_err("the engine refused").may_have_armed);
-        service.shutdown();
+        service.shutdown(|| {});
         fs::remove_file(&socket_path).unwrap();
         fs::remove_dir(socket_path.parent().unwrap()).unwrap();
     }
@@ -924,7 +931,7 @@ mod tests {
         let poll = service.poll_trigger_from(connect, "Alt+D", || {});
         server.join().expect("the engine saw only the small poll");
         assert!(poll.expect("the same connection still polls").armed);
-        service.shutdown();
+        service.shutdown(|| {});
         fs::remove_file(&socket_path).unwrap();
         fs::remove_dir(socket_path.parent().unwrap()).unwrap();
     }

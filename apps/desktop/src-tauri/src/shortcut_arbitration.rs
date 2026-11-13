@@ -1,7 +1,7 @@
 //! Separate confirmed IBus authority from uncertainty while its poll is in flight.
 //! Passive evdev can observe a chord that IBus consumes, so it keeps both guards.
 //! An X11 grab callback already consumed its chord and uses shared debounce only.
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 
 // The engine arms the shortcut for 1 s from each poll-trigger it handles
 // (voco_ibus_engine.py). The lease starts this bound when the reply or error
@@ -51,6 +51,10 @@ pub enum PollOutcome {
 pub struct ConsumingLease {
     polling: AtomicBool,
     expires_at: AtomicI64,
+    /// How often VOCO closed its channel to the engine, and that count when
+    /// the poll in flight began.
+    closes: AtomicU64,
+    poll_closes: AtomicU64,
 }
 
 impl ConsumingLease {
@@ -58,6 +62,8 @@ impl ConsumingLease {
         Self {
             polling: AtomicBool::new(false),
             expires_at: AtomicI64::new(-1),
+            closes: AtomicU64::new(0),
+            poll_closes: AtomicU64::new(0),
         }
     }
 
@@ -66,7 +72,20 @@ impl ConsumingLease {
     /// so it must not hold back evdev.
     pub fn begin_poll(&self) {
         // The engine can process a chord before its poll reply reaches us.
+        self.poll_closes
+            .store(self.closes.load(Ordering::SeqCst), Ordering::SeqCst);
         self.polling.store(true, Ordering::SeqCst);
+    }
+
+    /// VOCO closed its channel to the engine, which disarms the shortcut there
+    /// at once, so the lease ends with it. Left to run out, it kept the X11
+    /// grab and evdev away for up to a second in which the engine took no
+    /// chord either. A poll that went out on that channel renews nothing when
+    /// its reply is counted afterwards. Returns whether a lease ended, which
+    /// is when the fallback has to come back.
+    pub fn channel_closed(&self, now: i64) -> bool {
+        self.closes.fetch_add(1, Ordering::SeqCst);
+        now < self.expires_at.swap(-1, Ordering::SeqCst)
     }
 
     pub fn finish_poll(&self, now: i64, outcome: PollOutcome) {
@@ -74,6 +93,11 @@ impl ConsumingLease {
             PollOutcome::Armed | PollOutcome::Uncertain => {
                 self.expires_at
                     .store(now.saturating_add(ENGINE_ARM_MS), Ordering::SeqCst);
+                // Compared after the store, so a close on another thread ends
+                // the lease whichever of the two runs last.
+                if self.closes.load(Ordering::SeqCst) != self.poll_closes.load(Ordering::SeqCst) {
+                    self.expires_at.store(-1, Ordering::SeqCst);
+                }
             }
             PollOutcome::Disarmed => self.expires_at.store(-1, Ordering::SeqCst),
             // Connection failures before sending a poll cannot renew a lease.
@@ -282,6 +306,36 @@ mod tests {
         lease.begin_poll();
         lease.finish_poll(1100, PollOutcome::Disarmed);
         assert!(!lease.is_current(1100));
+    }
+
+    #[test]
+    fn closing_the_channel_ends_the_lease_at_once() {
+        let lease = ConsumingLease::new();
+        lease.begin_poll();
+        lease.finish_poll(1000, PollOutcome::Armed);
+        assert!(lease.has_authority(1100));
+        assert!(lease.channel_closed(1100), "a lease ended");
+        assert!(!lease.has_authority(1100), "the engine disarmed with it");
+        assert!(!lease.suppresses_backend("evdev", 1100));
+        assert!(!lease.channel_closed(1150), "none was left to end");
+        // The next channel's poll arms the engine again.
+        lease.begin_poll();
+        lease.finish_poll(1300, PollOutcome::Armed);
+        assert!(lease.has_authority(1400));
+    }
+
+    #[test]
+    fn a_poll_from_before_the_close_cannot_renew_the_lease() {
+        for outcome in [PollOutcome::Armed, PollOutcome::Uncertain] {
+            let lease = ConsumingLease::new();
+            lease.begin_poll();
+            // The channel closes after the engine answered and before the
+            // listener counts the reply.
+            assert!(!lease.channel_closed(990));
+            lease.finish_poll(1000, outcome);
+            assert!(!lease.has_authority(1000));
+            assert!(!lease.is_current(1000));
+        }
     }
 
     #[test]

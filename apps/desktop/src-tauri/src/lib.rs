@@ -1361,6 +1361,10 @@ fn reload_when_web_process_stops(app: &tauri::App) {
                     }
                     let interrupted = tray::dictation_active(&handle);
                     renderer_not_ready();
+                    // Before the reload, whose page load comes only once a new
+                    // web process is up: until then the engine would take a
+                    // press and drop it with the channel.
+                    close_ibus_channel(&handle);
                     if web_process_reload_allowed(&mut reloads.borrow_mut(), Instant::now()) {
                         warn!("VOCO's window stopped ({reason:?}), so it loads again");
                         trace_hotkey_event("web_process_reloaded", None);
@@ -1378,7 +1382,6 @@ fn reload_when_web_process_stops(app: &tauri::App) {
                         );
                         // No page load follows to end what the window held.
                         renderer_replaced(&handle);
-                        handle.state::<ibus_shortcut::IbusShortcutService>().shutdown();
                         if let Err(error) = tray::begin_runtime_status_session(&handle) {
                             warn!("{error}");
                         }
@@ -1545,6 +1548,38 @@ fn schedule_shortcut_arbitration(
             }
         }
     });
+}
+
+/// Closes VOCO's channel to the IBus engine, on the main thread. The engine
+/// disarms the shortcut at once, so the lease ends with the channel and the
+/// fallback follows before anything else runs: with the lease left to run
+/// out, a press while the window loaded again reached only the focused app,
+/// for up to a second. On X11 the grab that comes back takes the chord ahead
+/// of the engine, and the toggle waits for the next renderer like any other.
+fn close_ibus_channel(app: &tauri::AppHandle) {
+    let mut lease_ended = false;
+    app.state::<ibus_shortcut::IbusShortcutService>()
+        .shutdown(|| lease_ended = IBUS_SHORTCUT_LEASE.channel_closed(shortcut_monotonic_ms()));
+    // Without a lease the fallback is already where arbitration put it, as at
+    // the first page load, before the tray holds a shortcut to read.
+    if !lease_ended {
+        return;
+    }
+    // As in schedule_shortcut_arbitration: never wait here for a writer. The
+    // listener's next pass, at most 50 ms away, covers a skipped one.
+    let Ok(_guard) = CONFIG_WRITE_LOCK.try_lock() else {
+        return;
+    };
+    let Ok(hotkey) = tray::current_hotkey(app) else {
+        return;
+    };
+    let enable_plugin = should_register_shortcut_fallback(
+        is_wayland_session(),
+        IBUS_SHORTCUT_LEASE.has_authority(shortcut_monotonic_ms()),
+    );
+    if let Err(error) = sync_global_shortcut_binding(app, &hotkey, enable_plugin) {
+        warn!("Could not bring back the global shortcut after closing the IBus channel: {error}");
+    }
 }
 
 fn start_ibus_shortcut_listener(app_handle: tauri::AppHandle) {
@@ -2556,9 +2591,7 @@ pub fn run() -> Result<(), String> {
                 // Close the private channel first, so the engine drops a
                 // shortcut armed or triggered for the previous renderer
                 // before its replacement can start.
-                webview
-                    .state::<ibus_shortcut::IbusShortcutService>()
-                    .shutdown();
+                close_ibus_channel(webview.app_handle());
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -2779,7 +2812,10 @@ pub fn run() -> Result<(), String> {
                 crash_recovery::clean_exit();
                 performance::shutdown();
                 native_capture_commands::shutdown();
-                app.state::<ibus_shortcut::IbusShortcutService>().shutdown();
+                app.state::<ibus_shortcut::IbusShortcutService>()
+                    .shutdown(|| {
+                        IBUS_SHORTCUT_LEASE.channel_closed(shortcut_monotonic_ms());
+                    });
                 cleanup_socket_files();
                 #[cfg(target_os = "linux")]
                 confinement::end_clipboard_helpers();
