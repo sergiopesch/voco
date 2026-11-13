@@ -2682,10 +2682,7 @@ pub fn run() -> Result<(), String> {
             let hotkey = configured_hotkey.hotkey;
             let app_handle = app.handle().clone();
             #[cfg(target_os = "linux")]
-            {
-                portal_keys::setup(app.handle());
-                gnome_shortcut::setup(app.handle(), &hotkey);
-            }
+            portal_keys::setup(app.handle());
             EVDEV_PRESET.store(Preset::encode(Preset::of(&hotkey)), Ordering::SeqCst);
             let wayland_session = is_wayland_session();
             let use_evdev_hotkey = uses_evdev_hotkey(wayland_session, &hotkey);
@@ -2749,7 +2746,12 @@ pub fn run() -> Result<(), String> {
             // tray state exists, so a VOCO without it stops here.
             tray::setup_tray(app, &hotkey, tray_icons)?;
             #[cfg(target_os = "linux")]
-            panel::setup(app.handle());
+            {
+                panel::setup(app.handle());
+                // After the tray state: keys GNOME Settings changed while
+                // VOCO wasn't running are saved through it.
+                gnome_shortcut::setup(app.handle(), &hotkey);
+            }
             if let Some((title, notice)) = configured_hotkey.notice {
                 warn!("{notice}");
                 send_notification(title, &notice);

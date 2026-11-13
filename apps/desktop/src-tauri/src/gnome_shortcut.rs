@@ -19,6 +19,10 @@ use webkit2gtk::gio::{self, prelude::SettingsExt};
 /// held the shortcut: through its GlobalShortcuts portal on GNOME 48 and
 /// later, under the ID in the second file once Settings had changed its keys.
 const PORTAL_RECORDS: [&str; 2] = ["global-shortcut", "global-shortcut-id"];
+/// Beside the config, once VOCO has added its entry to GNOME's keyboard
+/// shortcuts on this installation. A start adds the entry only where this is
+/// missing, so one the person removed in GNOME Settings stays removed.
+const ADDED_FILE: &str = "gnome-shortcut";
 /// After the last sign of the chord, time for its modifier's own release.
 /// People often let go of Super or Alt a moment after the letter, and keys
 /// sent while it is down make another chord, which pastes nothing.
@@ -246,13 +250,27 @@ pub fn hold(hotkey: &str) -> Result<(), String> {
             format!("GNOME's keyboard shortcuts can't hold {hotkey}. Choose another shortcut.")
         })?
         .gtk_accelerator();
-    custom::add(&chord, hotkey)
+    custom::add(&chord, hotkey)?;
+    note_added();
+    Ok(())
 }
 
 fn config_file(name: &str) -> Option<std::path::PathBuf> {
     crate::config::AppConfig::config_dir_without_migration()
         .ok()
         .map(|dir| dir.join(name))
+}
+
+fn exists(name: &str) -> bool {
+    config_file(name).is_some_and(|path| path.exists())
+}
+
+fn note_added() {
+    if let Some(path) = config_file(ADDED_FILE).filter(|path| !path.exists()) {
+        if let Err(error) = crate::config::atomic_write(&path, "") {
+            log::warn!("Could not record that VOCO added its GNOME shortcut: {error}");
+        }
+    }
 }
 
 fn drop_portal_records() {
@@ -265,55 +283,71 @@ fn drop_portal_records() {
 /// it again.
 pub fn forget() {
     drop_portal_records();
+    if let Some(path) = config_file(ADDED_FILE) {
+        let _ = std::fs::remove_file(path);
+    }
     if applies() {
         custom::remove();
     }
 }
 
-/// What a start does with an earlier VOCO's record that GNOME held the
-/// shortcut.
+/// What a start does about VOCO's entry in GNOME's keyboard shortcuts.
 #[derive(Debug, PartialEq, Eq)]
-enum Handover {
-    /// VOCO's GNOME shortcut already exists, as on GNOME 46, or this GNOME
-    /// never had the portal: only the record goes.
-    DropRecord,
-    /// The portal held the chord and nothing holds it now: VOCO's GNOME
-    /// shortcut takes the same keys.
+enum AtStart {
+    /// Setup isn't complete and will add it, or VOCO added it on this
+    /// installation before: one removed since, in GNOME Settings, stays removed.
+    Nothing,
+    /// It is there, or was and the person removed it, from a VOCO before
+    /// this one kept a note: only the note is due.
+    Note,
+    /// Setup is complete and VOCO never added one here: an earlier VOCO's
+    /// setup could finish without the shortcut, or held it through GNOME's
+    /// portal.
     Add,
 }
 
-fn handover(listed: bool, had_portal: bool) -> Handover {
-    if !listed && had_portal {
-        Handover::Add
+/// `removed_since` says an earlier VOCO recorded adding a custom shortcut, on
+/// a GNOME without the shortcut portal, and GNOME lists none now.
+fn at_start(setup_complete: bool, noted: bool, listed: bool, removed_since: bool) -> AtStart {
+    if !setup_complete || noted {
+        AtStart::Nothing
+    } else if listed || removed_since {
+        AtStart::Note
     } else {
-        Handover::DropRecord
+        AtStart::Add
     }
 }
 
-/// VOCO 2026.0.70 to 2026.0.72 held this shortcut through GNOME's
-/// GlobalShortcuts portal on GNOME 48 and later. The person agreed to those
-/// keys in GNOME's dialog, so a start hands them to VOCO's GNOME shortcut
-/// once, and the record goes. Kept when the keys are taken meanwhile, so the
-/// next start tries again and Settings offers its Add button. GNOME 46 wrote
-/// the same record beside its custom shortcut, and one removed there in
+/// VOCO before 2026.0.73 added the snap's shortcut only from a button its
+/// setup didn't wait for, and from 2026.0.70 held it on GNOME 48 and later
+/// through GNOME's GlobalShortcuts portal, whose dialog the person answered
+/// for those keys. So an installation whose setup is complete and that never
+/// had VOCO's GNOME shortcut gets it at a start, once: with the keys taken
+/// meanwhile the start says so, and the next one tries again. GNOME 46 wrote
+/// the portal's record beside its custom shortcut, and one removed there in
 /// GNOME Settings stays removed.
-fn hand_over_from_portal(hotkey: &str) {
-    if !config_file(PORTAL_RECORDS[0]).is_some_and(|path| path.exists()) {
-        return;
-    }
+fn add_once(hotkey: &str) {
+    let setup_complete =
+        crate::config::AppConfig::load().is_ok_and(|config| config.onboarding_completed);
     let listed = custom::listed();
-    let had_portal = !listed && crate::portal_keys::gnome_has_shortcut_portal();
-    match handover(listed, had_portal) {
-        Handover::DropRecord => drop_portal_records(),
-        Handover::Add => match hold(hotkey) {
+    let removed_since = setup_complete
+        && !listed
+        && exists(PORTAL_RECORDS[0])
+        && !crate::portal_keys::gnome_has_shortcut_portal();
+    match at_start(setup_complete, exists(ADDED_FILE), listed, removed_since) {
+        AtStart::Nothing => {}
+        AtStart::Note => {
+            note_added();
+            drop_portal_records();
+        }
+        AtStart::Add => match hold(hotkey) {
             Ok(()) => {
-                log::info!(
-                    "VOCO's shortcut moved from GNOME's portal to GNOME's keyboard shortcuts"
-                );
+                log::info!("VOCO added {hotkey} to GNOME's keyboard shortcuts");
                 drop_portal_records();
             }
             Err(error) => {
-                log::warn!("VOCO's shortcut didn't move to GNOME's keyboard shortcuts: {error}")
+                log::warn!("VOCO's shortcut isn't in GNOME's keyboard shortcuts: {error}");
+                crate::send_notification("Your shortcut can't reach VOCO yet", &error);
             }
         },
     }
@@ -347,15 +381,17 @@ fn follow(binding: &str) {
     }
 }
 
-/// At startup, on GTK's thread: hand over an earlier VOCO's portal shortcut,
-/// give VOCO's GNOME shortcut this VOCO's command, and follow its keys.
+/// At startup, on GTK's thread and once the tray state exists, which a
+/// followed change of keys is saved through: give VOCO's GNOME shortcut this
+/// VOCO's command, add it where an earlier VOCO's setup left none, and follow
+/// its keys.
 pub fn setup(app: &tauri::AppHandle, hotkey: &str) {
     let _ = APP.set(app.clone());
     if !available() {
         return;
     }
-    hand_over_from_portal(hotkey);
     custom::update_command();
+    add_once(hotkey);
     if let Some(binding) = custom::binding() {
         follow(&binding);
     }
@@ -513,15 +549,21 @@ mod tests {
     }
 
     #[test]
-    fn a_shortcut_the_portal_held_is_handed_over_once() {
-        // GNOME 48 and later with 2026.0.70 to 2026.0.72: the portal held it.
-        assert_eq!(handover(false, true), Handover::Add);
-        // GNOME 46 wrote the same record beside its custom shortcut, and one
-        // removed there in GNOME Settings stays removed.
-        assert_eq!(handover(true, false), Handover::DropRecord);
-        assert_eq!(handover(false, false), Handover::DropRecord);
-        // Already added, as after a handover whose record couldn't be deleted.
-        assert_eq!(handover(true, true), Handover::DropRecord);
+    fn a_start_adds_the_shortcut_once_where_setup_left_none() {
+        // (setup complete, noted, listed, removed since)
+        // Setup still to finish: it adds the shortcut itself.
+        assert_eq!(at_start(false, false, false, false), AtStart::Nothing);
+        assert_eq!(at_start(false, false, true, false), AtStart::Nothing);
+        // An earlier VOCO's setup finished without one, or GNOME's portal
+        // held it: added now.
+        assert_eq!(at_start(true, false, false, false), AtStart::Add);
+        // An earlier VOCO's entry is there, as on GNOME 46: only noted.
+        assert_eq!(at_start(true, false, true, false), AtStart::Note);
+        // That VOCO added one on GNOME 46 and the person removed it since.
+        assert_eq!(at_start(true, false, false, true), AtStart::Note);
+        // Noted: whatever GNOME lists now is the person's choice.
+        assert_eq!(at_start(true, true, false, false), AtStart::Nothing);
+        assert_eq!(at_start(true, true, true, false), AtStart::Nothing);
     }
 
     #[test]

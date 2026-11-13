@@ -437,9 +437,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   the new keys first, adding it where GNOME lists none. It is added or moved
   only when neither GNOME's window shortcuts nor another custom shortcut uses
   the keys: otherwise the change is refused with what uses them, nothing is
-  saved, and no other shortcut is ever changed. A start adds none: one removed
-  in GNOME Settings stays removed until the person chooses Settings' Add
-  button or changes the shortcut. GNOME Settings, under Keyboard, changes its
+  saved, and no other shortcut is ever changed. VOCO notes beside the config
+  that it added its entry, and a start adds none after that: one removed in
+  GNOME Settings stays removed until the person chooses Settings' Add button
+  or changes the shortcut. GNOME Settings, under Keyboard, changes its
   keys too: once setup is complete VOCO saves the keys GNOME holds as its
   shortcut when it can take them, at a start and whenever they change, so its
   labels name the keys GNOME listens for. Reset removes VOCO's entry and only
@@ -468,13 +469,16 @@ and the update check. [The snap](#the-snap) lists its rules.
   keyboard's repeat delay plus 400 ms of the last one is a repeat and toggles
   nothing: each is a snap launch, so repeats arrive late and unevenly. VOCO
   reads GNOME's repeat setting once.
-- VOCO 2026.0.70 to 2026.0.72 held the snap's shortcut through GNOME's
-  GlobalShortcuts portal on GNOME 48 and later, which shows GNOME's dialog for
-  every new set of keys. A start that finds that VOCO's record, this GNOME's
-  portal and no entry of VOCO's in GNOME's keyboard shortcuts adds one for the
-  saved chord, which the person agreed to in that dialog, and deletes the
-  record; with the keys taken meanwhile the record stays for the next start.
-  VOCO binds nothing through that portal.
+- VOCO before 2026.0.73 added the snap's shortcut only from a button its
+  setup didn't wait for, and from 2026.0.70 held it on GNOME 48 and later
+  through GNOME's GlobalShortcuts portal, which shows GNOME's dialog for every
+  new set of keys. So a start whose setup is complete, and that finds neither
+  VOCO's note nor an entry of VOCO's in GNOME's keyboard shortcuts, adds one
+  for the saved chord, once, and deletes that VOCO's records; with the keys
+  taken it notifies with what uses them, and the next start tries again. On
+  GNOME 46 that VOCO recorded the custom shortcut it added: where GNOME lists
+  none now, the person removed it, and the start only notes that. VOCO binds
+  nothing through the portal.
 - Settings' Change shortcut opens the editor already recording, and the keys
   pressed next are saved at once, with no second step. Escape leaves recording
   for the field, where a shortcut can be typed and applied, and Tab leaves the

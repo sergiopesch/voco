@@ -555,9 +555,11 @@ one of its window shortcuts or another custom shortcut, refuses the save.
 `shortcut_chord.rs` spells a shortcut for GTK (`<Control><Alt>d`) by its key's
 X keysym and reads GNOME's keys back into VOCO's spelling; `setup` watches the
 entry's keys and, once setup is complete, saves a change made in GNOME
-Settings as VOCO's shortcut. A start never adds the entry, except once for a
-VOCO from 2026.0.70 to 2026.0.72 that held the chord through GNOME's
-GlobalShortcuts portal (`hand_over_from_portal`).
+Settings as VOCO's shortcut. `hold` notes beside the config, in
+`gnome-shortcut`, that VOCO added its entry, and a start adds none after that.
+Where setup is complete and neither the note nor the entry exists, an earlier
+VOCO's setup finished without the shortcut or held it through GNOME's
+GlobalShortcuts portal, and `add_once` adds it at that start.
 
 The entry's command calls `Toggle` on VOCO's bus name with `dbus-send`, for
 the press and for each repeat GNOME makes while the chord is held, about every

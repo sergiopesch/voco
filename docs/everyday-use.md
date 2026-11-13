@@ -268,7 +268,8 @@ The snap keeps the same files in its own folder, `~/snap/voco`: for example,
 its settings are in `~/snap/voco/current/.config/voco/config.json` and its logs
 in `~/snap/voco/current/.local/state/voco/`. Beside its settings it keeps
 GNOME's answer, `remote-desktop-token`, which lets it type without asking
-GNOME again. Its shortcut is in GNOME's own keyboard shortcuts. It never reads
+GNOME again, and `gnome-shortcut`, which notes that it added its shortcut to
+GNOME's keyboard shortcuts, where the shortcut itself lives. It never reads
 the packages' folders, and they never read its.
 
 Only your account can read VOCO's settings and recovery files. VOCO doesn't
