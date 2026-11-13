@@ -25,9 +25,9 @@ On Ubuntu, VOCO also comes as a strictly confined [snap](../install.md#snap-stor
 It types on GNOME on Wayland through GNOME's Remote Desktop permission, which
 setup asks for once, or through the optional panel, and in X11 sessions with
 `xdotool`; on other Wayland desktops it can't type. It has no `/dev/uinput`
-access, passive evdev or IBus input source, so on Wayland its shortcut is the one
-GNOME holds for it through its shortcut portal (GNOME 48 and later), the panel's,
-or a `voco --toggle` binding.
+access, passive evdev or IBus input source, so on Wayland its shortcut is the
+entry VOCO keeps in GNOME's keyboard shortcuts, the panel's, or a
+`voco --toggle` binding.
 
 The two packages hold the same files and need glibc 2.39 or later: they are
 built on Ubuntu 24.04, whose glibc 2.39 and GCC 13 runtime set their floors.
@@ -211,7 +211,7 @@ group, which lets every program you run read all keyboards, or make
 VOCO's shortcut combines Alt, Control or Super with a key. Super+X is the
 default, and Alt+D and Alt+Shift+D are the other presets; a saved shortcut is
 never changed. A grab that takes only an Alt chord's letter, as the companion's
-and GNOME's shortcut portal do, leaves the focused app seeing Alt pressed and
+and GNOME's keyboard shortcuts do, leaves the focused app seeing Alt pressed and
 released alone, so Firefox, Thunderbird, LibreOffice and VS Code open their menu
 bar and it takes the pastes that follow. A lone Super opens nothing in an app.
 

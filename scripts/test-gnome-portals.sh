@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# CI's portal suite (AGENTS.md, Delivery): VOCO's own portal code, through the
-# lib test binary's portal fixture, against an actual headless GNOME Shell with
-# PipeWire, xdg-desktop-portal and its GNOME backend, in a private D-Bus, XDG
-# and display namespace.
+# CI's portal suite (AGENTS.md, Delivery): VOCO's own typing and shortcut code,
+# through the lib test binary's portal fixture, against an actual headless
+# GNOME Shell with PipeWire, xdg-desktop-portal, its GNOME backend and GNOME's
+# media keys daemon, in a private D-Bus, XDG and display namespace.
 #   VOCO_PORTAL_TEST_BINARY  the lib test binary (cargo test --lib --no-run)
 #   VOCO_PORTAL_EVIDENCE_DIR a fresh directory for logs, screenshots and results
 set -euo pipefail
@@ -12,8 +12,8 @@ if [[ ${1:-} != --inside ]]; then
   : "${VOCO_PORTAL_TEST_BINARY:?Set the lib test binary that cargo test --lib --no-run built}"
   [[ -x $VOCO_PORTAL_TEST_BINARY ]] || { echo "Not an executable: $VOCO_PORTAL_TEST_BINARY" >&2; exit 1; }
   [[ ! -e "$VOCO_PORTAL_EVIDENCE_DIR" ]] || { echo 'Evidence directory exists' >&2; exit 1; }
-  # The suite runs GNOME 50's portals: GlobalShortcuts came in its GNOME
-  # backend's 48, and Shells from 49 on run headless.
+  # The suite runs GNOME 50, whose keyboard connection reports the modifiers;
+  # Shells from 49 on run headless.
   shell_version=$(gnome-shell --version)
   shell_major=${shell_version##* }
   shell_major=${shell_major%%.*}

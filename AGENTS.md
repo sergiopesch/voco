@@ -119,9 +119,9 @@ count is logged. VOCO never overwrites a config it cannot read, nor repairs one
 from the copy: Settings shows a recovery panel, and only Reset renames the file
 to a `config.recovery-backup-*` copy before writing defaults. Reset also deletes
 `config.json.last` and the backups of earlier resets. The snap keeps its portal
-restore token and its record of a bound shortcut, with the shortcut's ID once
-Settings changed its keys, beside the config, owner-only;
-Reset deletes both, and setup then asks GNOME again.
+restore token beside the config, owner-only; Reset deletes it and removes
+VOCO's shortcut from GNOME's keyboard shortcuts, and setup then asks GNOME to
+let VOCO type and adds the shortcut again.
 
 VOCO vendors narrow patches ([vendor/README.md](vendor/README.md)): glib 0.18.5
 with the exact upstream RUSTSEC-2024-0429 fix ([backport](vendor/glib/VOCO-PATCH.md)),
@@ -249,25 +249,19 @@ and the update check. [The snap](#the-snap) lists its rules.
   (below) reports from GNOME 50 which modifiers are down, and the same 1.5 s
   wait sends no keys while Shift, Control, Alt, Super or AltGr is: keys sent
   under Super or Alt make another chord, which pastes nothing. Until GNOME
-  reports them, which GNOME 46 never does, VOCO can't read modifiers there, so
-  a portal shortcut press counts as held until its `Deactivated`, then 400 ms
-  for the modifier's own release, which people often let go of a moment after
-  the letter.
-  GNOME sends `Deactivated` only when the letter comes up under its modifier,
-  and nothing when the modifier comes up first, as it often does. A chord still
-  held repeats, so a press with no `Deactivated` counts as held only until the
-  keyboard's repeat delay plus 100 ms after its last `Activated`, 600 ms by
-  default, or 1 s when the keyboard doesn't repeat; then it reads as unknown
-  and holds back no paste. GNOME 46's custom shortcut reports no release of
-  either key: its press reaches the snap as a `Toggle` call over D-Bus,
-  within a few milliseconds and again at GNOME's own timing for each repeat.
-  With no repeat the letter came up within the repeat delay, and the modifier
-  gets the same 400 ms after that, so a paste waits the repeat delay plus
-  400 ms after the last call, 900 ms by default, or 400 ms when the keyboard
-  doesn't repeat. After a `voco --toggle` in the snap, which
-  that shortcut falls back to and which is a snap launch of about 150 ms, a
-  paste waits 400 ms, or the repeat delay plus 400 ms when it is longer, after
-  the last one, its repeats included. An X11 paste also waits, at most 1.5 s, while the X server's
+  reports them, which GNOME 46 never does, VOCO can't read modifiers there,
+  and the snap's shortcut, a GNOME keyboard shortcut, reports no release of
+  either key: its press reaches the snap as a `Toggle` call over D-Bus, within
+  a few milliseconds and again at GNOME's own timing for each repeat while the
+  chord is held. With no repeat the letter came up within the repeat delay,
+  and the modifier, which people often let go of a moment after the letter,
+  gets 400 ms after that, so a paste waits the repeat delay plus 400 ms after
+  the last call, 900 ms by default, or 400 ms when the keyboard doesn't
+  repeat; then the chord reads as unknown and holds back no paste. After a
+  `voco --toggle` in the snap, which that shortcut falls back to and which is
+  a snap launch of about 150 ms, a paste waits 400 ms, or the repeat delay
+  plus 400 ms when it is longer, after the last one, its repeats included. An
+  X11 paste also waits, at most 1.5 s, while the X server's
   pointer state holds Shift, Control, Alt, Super or AltGr: xdotool's Shift under a
   shortcut being pressed makes it another chord, which neither IBus nor the grab
   takes, and the press is lost.
@@ -298,9 +292,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   paste and space, at a lock, when the renderer is replaced and at quit; it never
   holds one while idle. GNOME shows its orange remote-access icon while a session
   exists, at least 5 s, and its Stop closes the session: VOCO then stops the
-  dictation as Stop does, copying the rest. Where GNOME's portal also holds
-  the shortcut (GNOME 48 and later), the session asks for GNOME's keyboard
-  connection with `ConnectToEIS` (`portal_eis.rs`, libei's protocol through
+  dictation as Stop does, copying the rest. On GNOME 48 and later, which VOCO
+  tells by the GlobalShortcuts portal that came with it and binds nothing
+  through, the session asks for GNOME's keyboard connection with
+  `ConnectToEIS` (`portal_eis.rs`, libei's protocol through
   the `reis` crate), as a sender that binds only the keyboard. The paste keys
   go through it, and it carries back which modifiers are down, never a key.
   VOCO types through it only where GNOME reports them, as GNOME 50 does when
@@ -346,21 +341,27 @@ and the update check. [The snap](#the-snap) lists its rules.
   the protocol relies on: a strict snap with a session `dbus` slot answers an
   unconfined caller's pending call and receives its calls, and its own calls to
   that caller are refused.
-- CI's portal suite proves the snap's portal path in a headless GNOME 50 with the
-  real xdg-desktop-portal and its GNOME backend, which names VOCO by the snap's
-  app ID: the first typing session shows GNOME's dialog and later ones restore
-  without it; every paste lands with its exact text in a GTK field on Wayland and
-  under XWayland; dictation opens a session and its end closes it; the
-  indicator's Stop stops the dictation with no key after it; the shortcut toggles
-  through `Activated`; a paste under the held chord, or under Control alone,
-  waits until GNOME's keyboard connection says the modifier is up, and types
-  nothing when it stays down past 1.5 s; with Super let go first, which GNOME
-  reports no release for, the paste goes out at once; a chord held past the
-  repeat delay keeps its paste waiting and toggles once, and the next press
-  toggles again. With the connection turned off, as on a GNOME that gives
-  none, the same pastes go through the portal's key calls and wait for
-  `Deactivated`, or until no repeat follows; and a connection taken as
-  reporting no modifiers closes its session, and a plain one types. A
+- CI's portal suite proves the snap's path in a headless GNOME 50 with the
+  real xdg-desktop-portal, its GNOME backend, which names VOCO by the snap's
+  app ID, and GNOME's media keys daemon, which runs custom shortcuts: the
+  first typing session shows GNOME's dialog and later ones restore without it;
+  every paste lands with its exact text in a GTK field on Wayland and under
+  XWayland; dictation opens a session and its end closes it; the indicator's
+  Stop stops the dictation with no key after it; VOCO's shortcut joins GNOME's
+  keyboard shortcuts with no dialog, and Super+X then toggles through GNOME's
+  daemon, the shortcut's command and VOCO's `Toggle`, and never reaches the
+  focused app; a paste under the held chord, or under Control alone, waits
+  until GNOME's keyboard connection says the modifier is up, and types nothing
+  when it stays down past 1.5 s; with Super let go first the paste goes out at
+  once; a chord held past the repeat delay runs the command again for each
+  repeat, toggles once and keeps its paste waiting; a press half a second
+  after the last, during a dictation, toggles; a saved change moves the
+  shortcut at once, time after time, and only the new keys toggle; keys
+  another custom shortcut or a GNOME window shortcut uses are refused; and
+  Reset removes VOCO's entry and only it. With the connection turned off, as
+  on a GNOME that gives none, the same pastes go through the portal's key
+  calls and wait by the timing of the shortcut's calls; and a connection taken
+  as reporting no modifiers closes its session, and a plain one types. A
   modifier pressed under VOCO's Shift gets no Insert, and the same text lands
   once it is up.
 - Keys reach seat0's active session. Bind the originating local login at startup
@@ -421,64 +422,70 @@ and the update check. [The snap](#the-snap) lists its rules.
 - The presets (`Preset` in `lib.rs`, in the tray's order) are Super+X, the
   default for a new setup and for a reset or repair, then Alt+D and
   Alt+Shift+D; any other valid chord is custom. Never migrate a saved shortcut.
-  The companion's grab and the GlobalShortcuts portal take only the chord's
+  The companion's grab and GNOME's keyboard shortcuts take only the chord's
   letter, so the focused app sees its modifier pressed and released alone. A
   lone Alt opens the menu bar in Firefox, Thunderbird, LibreOffice and VS Code,
   and the menu swallows the pastes that follow, so the default never pairs Alt
   with a letter. Passive evdev and the IBus engine match the shortcut with
   exactly its own modifiers held, on any keyboard: Super+X never with Alt, Control or
   Shift, Alt+D never with Super or Shift.
-- In the snap on GNOME 48 and later without the companion, the GlobalShortcuts
-  portal holds the shortcut (`portal_shortcut.rs`): one `toggle` shortcut whose
-  preferred trigger is the saved chord, in the shortcuts specification's
-  spelling (`LOGO+x` for Super+X). Only setup's and Settings' explicit
-  button binds it the first time, which shows GNOME's dialog; VOCO records that,
-  and later starts bind it again, which GNOME answers without one. An
-  `Activated` toggles through the debounce, unless it repeats a held chord:
-  GNOME's grab, unlike the companion's, repeats the press about every 30 ms
-  after the keyboard's repeat delay, so one that comes before `Deactivated` at
-  a repeat's time is ignored: the first within 100 ms of one repeat delay after
-  the press, the rest within that delay plus 100 ms of the last. Any other is a
-  press, so one soon after the modifier came up first still toggles.
-  GNOME Settings, under Apps, changes
-  the trigger: VOCO saves each trigger GNOME reports, at a bind or a
-  `ShortcutsChanged`, as its shortcut when it can take it, so its labels name the
-  key GNOME listens for.
-  VOCO's Settings changes the keys too, from its own shortcut editor, as do
-  the tray's presets, and sends nobody to GNOME Settings. GNOME keeps the keys it stored for a shortcut ID
-  whatever an app proposes later, and asks only about an ID it holds no keys
-  for, so Apply shortcut binds the shortcut under its next ID (`toggle-2`,
-  `toggle-3`, recorded beside the config) with the new keys as the preferred
-  trigger. GNOME shows its dialog: when the person adds it, the earlier session
-  closes, GNOME keeps only the new ID and VOCO saves the keys GNOME reports,
-  which that dialog lets the person alter; cancelled, the earlier keys stay
-  and still toggle. Altered there to keys VOCO can't take, such as a key
-  with no Alt, Ctrl or Super, VOCO refuses them and says so: it closes both
-  sessions and drops its records, so it holds no shortcut and the Add button
-  offers its own again, and no start ever shows GNOME's dialog. Any chord whose key has an X keysym VOCO knows
-  (`shortcut_chord.rs`) can be proposed. While the
-  companion's lease is fresh VOCO closes the portal session, so one grab holds the
-  chord, and binds again when the lease lapses. On GNOME 46, which has no
-  GlobalShortcuts portal, setup's button adds a GNOME custom shortcut for the
-  saved chord, only when neither GNOME's window shortcuts nor another custom
-  shortcut uses it, and never changes another. Its command calls the running
-  VOCO's `com.sergiopesch.voco.Panel1.Toggle` with `dbus-send` and waits for
-  the answer, and only where that fails runs `voco --toggle`: a system without
+- In the snap on GNOME Wayland, GNOME's own keyboard shortcuts hold the
+  shortcut (`gnome_shortcut.rs`): one custom shortcut named VOCO with the
+  saved chord (`<Super>x` for Super+X), which GNOME grabs. GNOME's keyboard
+  shortcuts ask nobody. Setup adds VOCO's by itself, and a saved change of
+  shortcut, from Settings' editor, the tray's presets or setup, moves it to
+  the new keys first, adding it where GNOME lists none. It is added or moved
+  only when neither GNOME's window shortcuts nor another custom shortcut uses
+  the keys: otherwise the change is refused with what uses them, nothing is
+  saved, and no other shortcut is ever changed. VOCO notes beside the config
+  that it added its entry, and a start adds none after that: one removed in
+  GNOME Settings stays removed until the person chooses Settings' Add button
+  or changes the shortcut. GNOME Settings, under Keyboard, changes its
+  keys too: once setup is complete VOCO saves the keys GNOME holds as its
+  shortcut when it can take them, at a start and whenever they change, so its
+  labels name the keys GNOME listens for. Reset removes VOCO's entry and only
+  it. GNOME's schema for those keys isn't in the snap's runtime, so the snap
+  carries one with the same IDs, paths and types (`packaging/snap/schemas`).
+- That shortcut's command calls the running VOCO's
+  `com.sergiopesch.voco.Panel1.Toggle` with `dbus-send` and waits for the
+  answer, and only where that fails runs `voco --toggle`: a system without
   `dbus-send`, or a VOCO from before `Toggle` after a revert. A start gives a
   shortcut an earlier VOCO added, whose command was `voco --toggle` alone,
-  this command, and touches nothing else of it. Settings'
-  Apply shortcut moves that one shortcut to the new keys under the same
-  checks, with no dialog, since GNOME's keyboard shortcuts ask nobody. GNOME's schema
-  for those keys isn't in the snap's runtime, so the snap carries one with the
-  same IDs, paths and types (`packaging/snap/schemas`), and Reset removes VOCO's.
-  GNOME runs that command for each repeat too. A `Toggle` call is told from a
-  press as the portal's `Activated` is, by GNOME's repeat timing, and VOCO
-  answers it whatever it did, so a repeat never falls back. Where the keyboard
-  doesn't repeat, every call is a press: no repeat can come, and this route
-  reports no release that would end a held one. In the snap a
-  `voco --toggle` within the keyboard's repeat delay plus 400 ms of the last
-  one is a repeat and toggles nothing: each is a snap launch, so repeats arrive
-  late and unevenly. VOCO reads GNOME's repeat setting once.
+  this command, and touches nothing else of it. GNOME runs the command for the
+  press and again for each repeat while the chord is held, about every 30 ms
+  after the keyboard's repeat delay, and reports no release of either key. A
+  `Toggle` call is therefore told from a press by GNOME's repeat timing: after
+  a press, a call within 100 ms of one repeat delay later is its first repeat
+  and one at once is the same press; after a repeat, a call sooner than a
+  first repeat could come is the next. Any other is a press, and VOCO answers
+  the call whatever it did, so a repeat never falls back. That timing alone
+  can't tell a second press that comes about one repeat delay after the first.
+  While a dictation's typing session is open, GNOME's keyboard connection says
+  from GNOME 50 whether every modifier was up since the last call, and one
+  that was makes the call a press whatever its timing: a dictation stopped
+  half a second after it started still stops. Where the keyboard doesn't
+  repeat, every call is a press: no repeat can come, and this route reports no
+  release that would end a held one. In the snap a `voco --toggle` within the
+  keyboard's repeat delay plus 400 ms of the last one is a repeat and toggles
+  nothing: each is a snap launch, so repeats arrive late and unevenly. VOCO
+  reads GNOME's repeat setting once.
+- VOCO before 2026.0.73 added the snap's shortcut only from a button its
+  setup didn't wait for, and from 2026.0.70 held it on GNOME 48 and later
+  through GNOME's GlobalShortcuts portal, which shows GNOME's dialog for every
+  new set of keys. So a start whose setup is complete, and that finds neither
+  VOCO's note nor an entry of VOCO's in GNOME's keyboard shortcuts, adds one
+  for the saved chord, once, and deletes that VOCO's records; with the keys
+  taken it notifies with what uses them, and the next start tries again. On
+  GNOME 46 that VOCO recorded the custom shortcut it added: where GNOME lists
+  none now, the person removed it, and the start only notes that. VOCO binds
+  nothing through the portal.
+- Settings' Change shortcut opens the editor already recording, and the keys
+  pressed next are saved at once, with no second step. Escape leaves recording
+  for the field, where a shortcut can be typed and applied, and Tab leaves the
+  field as it always does. WebKitGTK reports the Super key only as a key of
+  its own, never as a modifier of the keys pressed with it, so the recorder
+  counts Super as held from that key's press to its release. A save the
+  shortcut's route refuses says why and keeps the editor open.
 - The GNOME Wayland companion is recommended, not required. Without it the focused
   app also receives the chord (on Alt+D browsers focus the address bar and
   terminals delete a word; few apps act on Super+X), and an evdev toggle while
@@ -600,16 +607,21 @@ and the update check. [The snap](#the-snap) lists its rules.
   leave nothing listed, setup says they can personalise VOCO in Settings later.
 - Say it, in setup and Settings, uses the same queue with local-only output and
   the saved list, as recognized, without spelling. Never paste or copy it.
-- In the snap on GNOME Wayland without the companion, setup's desktop step asks
-  for GNOME's permissions from the user's clicks, one at a time: typing, through
-  the RemoteDesktop dialog, then the shortcut, through GlobalShortcuts' dialog or,
-  on GNOME 46, the custom shortcut. It says before each what GNOME will show and
-  what to choose, and that GNOME shows an orange icon while VOCO types. Nothing
-  outside VOCO and GNOME is needed. With the companion attached, setup skips
-  the typing step, and skips the shortcut step only while the companion's lease
-  holds the saved chord: a companion before version 23 grabs only Alt chords,
-  so with Super+X GNOME's shortcut is still asked for. A refusal keeps the step, says what happened
-  and offers the button again; setup completes only once typing is allowed.
+- In the snap on GNOME Wayland, setup's desktop step asks for GNOME's
+  permission to type from the user's click, through the RemoteDesktop dialog.
+  It says first what GNOME will show and what to choose, and that GNOME shows
+  an orange icon while VOCO types. With the companion attached, setup skips
+  that step. A refusal keeps the step, says what happened and offers the
+  button again; setup completes only once typing is allowed. Nothing outside
+  VOCO and GNOME is needed.
+- The snap's shortcut needs no question. On its last screen setup adds VOCO's
+  shortcut to GNOME's keyboard shortcuts by itself, unless the companion's
+  lease holds the saved chord: a companion before version 23 grabs only Alt
+  chords, so with Super+X GNOME's shortcut is still added. Nothing else there
+  reaches VOCO, so Done waits until GNOME holds the shortcut, and until then
+  the screen names no shortcut to press. When something else in GNOME uses the
+  keys, setup says what, offers the same keys again and VOCO's other presets,
+  and only then lets the person finish without a shortcut.
 - Setup's last step names the shortcut to press and, for a Super chord, says
   Super is the key with the Windows or logo symbol. Where VOCO will start at
   login, it says first that VOCO is running now: "starts when you sign in" on
@@ -721,10 +733,9 @@ and the update check. [The snap](#the-snap) lists its rules.
   and with no VOCO to ask they claim neither. The snap alone also answers
   `Toggle` for any caller, since any program of the session may run
   `voco --toggle`; the portal path is ready
-  when a restore token is saved. Its shortcut is the companion's grab or the
-  GlobalShortcuts portal on GNOME Wayland (a custom shortcut on GNOME 46), VOCO's
-  grab on X11 or a desktop binding of `voco --toggle`; it has no evdev or IBus
-  route.
+  when a restore token is saved. Its shortcut is the companion's grab or VOCO's
+  entry in GNOME's keyboard shortcuts on GNOME Wayland, VOCO's grab on X11 or
+  a desktop binding of `voco --toggle`; it has no evdev or IBus route.
 - logind's session signals don't reach a snap, because `login-session-observe`
   receives only the manager's, and `GetSessionByPID` is out of its reach. So the
   snap binds its origin through a validated session ID or the user's sessions,

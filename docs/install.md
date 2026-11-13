@@ -103,11 +103,11 @@ Install update. It is strictly confined, which decides where it can type:
   on **Allow Remote Interaction** in GNOME's dialog, then choose **Share**. GNOME
   remembers the answer. While you dictate, GNOME shows an orange icon in the top
   bar, for at least five seconds; choosing **Stop** there ends the dictation and
-  copies the rest of your words. Then setup offers **Add Super+X**: choose **Add**
-  in GNOME's dialog, and GNOME keeps the shortcut for VOCO, so the app you're
-  typing in never receives it. Change it in **Settings** → **Apps** → **VOCO**.
-  On Ubuntu 24.04, whose GNOME has no shortcut dialog, add a custom shortcut for
-  `voco --toggle` in **Settings** → **Keyboard**.
+  copies the rest of your words. Setup then adds **Super+X** to GNOME's keyboard
+  shortcuts by itself, with nothing to confirm, so the shortcut works as soon
+  as setup ends and the app you're typing in never receives it. Change it in
+  VOCO's **Settings**, on the **Shortcut** page. If something else in GNOME
+  already uses Super+X, setup says what and offers VOCO's other shortcuts.
 - **X11 sessions:** with `xdotool`.
 
 On GNOME, the [VOCO panel](https://extensions.gnome.org/extension/11710/voco/)
@@ -132,7 +132,11 @@ needs. Turn it back on in Ubuntu's **Settings** → **Apps** → **VOCO**, or ru
 `snap connect voco:audio-record` or `snap connect voco:login-session-observe`.
 GNOME's Settings has no switch for the Remote Desktop permission. VOCO keeps
 GNOME's answer in its own settings folder, so `sudo snap remove --purge voco`
-removes it, and a new install asks again.
+removes it, and a new install asks again. Removing the snap can't reach your
+GNOME settings, so VOCO's shortcut stays in GNOME's **Settings** → **Keyboard**
+→ **View and Customize Shortcuts** → **Custom Shortcuts**, where it does
+nothing without VOCO: delete it there, or choose **Reset** on VOCO's **Help**
+page before you remove the snap. A new install takes the entry over.
 
 ## Manual install
 

@@ -127,10 +127,10 @@ these ways:
 
 - On GNOME 46, 48, 50 or 51 with the `.deb` or RPM, choose **Enable live panel**
   on the **Help** page, or run `voco --setup-panel`. Then sign out and back in.
-- With the snap on GNOME 48 or later, choose **Add** and your shortcut, such as
-  **Add Super+X**, on the **Help** page, then **Add** in GNOME's dialog. On
-  Ubuntu 24.04, add a custom shortcut for `voco --toggle` in **Settings** →
-  **Keyboard** → **View and Customize Shortcuts** → **Custom Shortcuts**.
+- With the snap on GNOME, choose **Add** and your shortcut, such as
+  **Add Super+X**, on the **Shortcut** page. VOCO adds it to GNOME's keyboard
+  shortcuts at once. If it says another shortcut already uses the keys, choose
+  **Change shortcut** and press other keys.
 - Elsewhere, choose another shortcut in VOCO and bind it to `voco --toggle` in
   your desktop's keyboard settings.
 - With the `.deb` or RPM, add the

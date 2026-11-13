@@ -2,7 +2,8 @@ import { StatusMark } from "./StatusMark";
 import { RecordingVoiceSignal } from "./VoiceSignal";
 import { SettingsIcon } from "./SettingsIcon";
 import { PanelSetup } from "./PanelSetup";
-import { PortalSetup } from "./PortalSetup";
+import { PortalSetup, shortcutReady } from "./PortalSetup";
+import type { PortalSetupStatus } from "@/lib/tauri";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { DictationStatus, EnglishSpelling } from "@/types";
@@ -65,6 +66,10 @@ export function Onboarding({ microphone, status, passed,
   // Only this view shows recognition text, so only it re-renders per hypothesis.
   const transcript = useStore((state) => state.dictationPurpose === "onboarding" ? state.transcript : "");
   const [changingMicrophone, setChangingMicrophone] = useState(false);
+  // The snap's GNOME setup on the last screen: undefined until it has
+  // answered, null when it couldn't be read.
+  const [gnome, setGnome] = useState<PortalSetupStatus | null | undefined>(undefined);
+  const [shortcutRefused, setShortcutRefused] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const previousPhase = useRef("");
   const recording = status === "recording";
@@ -75,6 +80,12 @@ export function Onboarding({ microphone, status, passed,
   // last screen checks it before Done hands off.
   const toWords = tested && !wordsDone;
   const handoff = ready && wordsDone;
+  // In the snap on GNOME Wayland nothing but GNOME's own shortcut reaches
+  // VOCO, so Done waits until GNOME holds it. Setup adds it by itself; when
+  // GNOME refuses every choice, the person may still finish without one.
+  const gnomeSetup = storeSetup || Boolean(shortcutNote && shortcutArea === "portal");
+  const awaitingShortcut = handoff && gnomeSetup && (gnome === undefined
+    || Boolean(gnome?.applies && gnome.shortcutAvailable && !shortcutReady(gnome)));
   // The test's own words and controls, until the words step is behind.
   const testing = !wordsDone || !passed;
   const choosing = changingMicrophone && !ready && !toWords;
@@ -113,7 +124,7 @@ export function Onboarding({ microphone, status, passed,
     </div>
     {/* When the panel or GNOME's permissions are the fix, their own step says
         so and offers it; the details and the general guide would only repeat it. */}
-    {desktopSetupError && desktopSetupArea === "portal" ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} onChanged={() => onCheckDesktopSetup?.()} />
+    {desktopSetupError && desktopSetupArea === "portal" ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} typingOnly onChanged={() => onCheckDesktopSetup?.()} />
       : desktopSetupError && desktopSetupArea === "panel" ? <PanelSetup disabled={busy || blocked} /> : desktopSetupError ? <>
       <details className="voco-setup__details"><summary>Details</summary><p>{desktopSetupError}</p></details>
       {onOpenDesktopSetupGuide ? <button className="voco-button voco-button--ghost" onClick={onOpenDesktopSetupGuide}>Open setup instructions</button> : null}
@@ -125,10 +136,11 @@ export function Onboarding({ microphone, status, passed,
       {/* While the focused app also acts on the shortcut, as before a fresh install's panel loads at the next login, the fix comes first. */}
       {/* The snap's GNOME permissions come first, with what the orange icon
           means; its setup never offers the panel. */}
-      {shortcutNote ? shortcutArea === "portal" ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} />
-        : <PanelSetup disabled={busy || blocked} note={shortcutNote} />
-        : storeSetup ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} /> : null}
-      <p>{shortcutNote ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.{superKeyHint(hotkey) ? ` ${superKeyHint(hotkey)}` : null}</p>
+      {gnomeSetup ? <PortalSetup hotkey={hotkey} disabled={busy || blocked} addShortcut
+          onStatus={setGnome} onShortcutRefused={setShortcutRefused} />
+        : shortcutNote ? <PanelSetup disabled={busy || blocked} note={shortcutNote} /> : null}
+      {/* Not while GNOME holds no shortcut for VOCO: the keys would do nothing. */}
+      {awaitingShortcut ? null : <p>{shortcutNote && shortcutArea !== "portal" ? "Then choose" : "Choose"} Done, click where you want the text and press <kbd className="voco-glass voco-shortcut">{hotkey}</kbd>. Press again to finish.{superKeyHint(hotkey) ? ` ${superKeyHint(hotkey)}` : null}</p>}
       <p>{startsAtLogin ? "VOCO is running now, and starts by itself each time you sign in. You can turn that off in Settings."
         : "VOCO keeps running until you quit it or sign out. After you sign in again, open it from your app launcher."}</p>
       {shortcutNote || storeSetup ? null : <PanelSetup disabled={busy || blocked} />}
@@ -139,10 +151,12 @@ export function Onboarding({ microphone, status, passed,
           without it would only repeat the step. */}
       {passed && !recording && desktopSetupError && desktopSetupArea === "portal" && !handoff && !toWords ? null
       : passed && !recording ? <>
-        <button ref={primaryRef} className="voco-button voco-button--primary" disabled={busy || blocked || failed || Boolean(setupError)}
+        <button ref={primaryRef} className="voco-button voco-button--primary" disabled={busy || blocked || failed || Boolean(setupError) || awaitingShortcut}
           onClick={handoff ? () => void onFinish() : toWords ? onContinue : onCheckDesktopSetup}>
           {saving ? "Saving…" : checkingDesktopSetup ? "Checking setup…" : handoff ? "Done" : toWords ? "Continue" : "Check desktop setup"}</button>
         {!wordsDone ? <button className="voco-button voco-button--ghost" disabled={busy || blocked} onClick={onStart}>Test again</button> : null}
+        {awaitingShortcut && shortcutRefused ? <button className="voco-button voco-button--ghost" disabled={busy || blocked || failed || Boolean(setupError)}
+          onClick={() => void onFinish()}>Finish without a shortcut</button> : null}
       </> : <div className="voco-voice-control" data-recording={recording}>
         <button ref={primaryRef} className="voco-button voco-button--primary voco-voice-pill" disabled={recording ? busy : busy || blocked}
           onClick={recording ? onStop : problem && onRetrySetup ? onRetrySetup : onStart}><SettingsIcon name="microphone" /><span>{status === "processing" ? "Finishing…" : busy ? "Preparing…" : recording ? "Finish test" : problem && onRetrySetup ? "Retry microphone setup" : attempted || problem ? "Test again" : "Start test"}</span></button>

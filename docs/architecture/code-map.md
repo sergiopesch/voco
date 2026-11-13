@@ -33,8 +33,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `portal.rs` — The thread and main context that hold every GNOME portal request, session and signal for the snap.
 - `portal_keys.rs` — The snap's paste keys through GNOME's RemoteDesktop portal: the saved permission, a session per desktop dictation and Shift+Insert.
 - `portal_eis.rs` — That session's keyboard connection to GNOME (libei's protocol): the paste keys, and the modifiers GNOME reports down.
-- `portal_shortcut.rs` — The snap's shortcut through GNOME's GlobalShortcuts portal, changing its keys from Settings, its release wait and its yielding to the companion's lease.
-- `shortcut_chord.rs` — A shortcut in GNOME's spellings: the portal's preferred trigger, a GTK accelerator, and back from GNOME's description.
+- `gnome_shortcut.rs` — The snap's shortcut on GNOME Wayland: keeping VOCO's entry in GNOME's keyboard shortcuts in step with the saved chord, telling its presses from a held chord's repeats, and its paste wait.
+- `shortcut_chord.rs` — A shortcut in GNOME's spelling: a GTK accelerator, and back from one.
 - `portal_fixture.rs` — Test-only: the portal suite's VOCO, an ignored test that runs the portal code and production paste one command at a time.
 - `ibus_shortcut.rs` — Client for the optional IBus engine's private socket (protocol 6).
 - `shortcut_arbitration.rs` — Tells confirmed IBus authority apart from an unanswered poll, and guards evdev and X11 toggles.
@@ -342,7 +342,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test-private-ibus-engine.py`, `test-private-ibus-engine.sh` — IBus engine on a headless IBus daemon.
 - `test-gnome-panel.py`, `test-gnome-panel.sh`, `test-panel-model.mjs`, `test-panel-setup.py` — GNOME companion.
 - `test-gnome-panel-container.sh` — The companion suite on a GNOME Shell no hosted runner ships, in a digest-pinned Fedora image under rootless Podman.
-- `test-gnome-portals.py`, `test-gnome-portals.sh` — The snap's typing and shortcut through GNOME 50's portals.
+- `test-gnome-portals.py`, `test-gnome-portals.sh` — The snap's typing through GNOME 50's portal and its shortcut through GNOME's keyboard shortcuts.
 - `test-application-delivery.py`, `test-application-delivery.sh` — Paste into real applications on a private desktop.
 - `test-browser-delivery.mjs`, `test-browser-full-app.mjs`, `test-browser-full-app.sh`, `test-browser-toolbar-app.mjs`, `test-browser-toolbar-app.sh`, `test-browser-toolbar-action.py`, `browser-app-harness.mjs` — Chromium paste, exact field and toolbar.
 - `test-chromium-exact-field.mjs`, `chromium-background.test.cjs`, `chromium-content-lifecycle.test.cjs` — Extension scripts.

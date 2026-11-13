@@ -1,8 +1,6 @@
-//! A VOCO shortcut in the spellings GNOME takes (AGENTS.md, Shortcut): the
-//! GlobalShortcuts portal's preferred trigger ("CTRL+ALT+d"), a GTK
-//! accelerator for a custom shortcut ("<Control><Alt>d"), and back from
-//! GNOME's trigger description ("Press <Control><Alt>d") to VOCO's own
-//! "Ctrl+Alt+D". All three name the key by its X keysym.
+//! A VOCO shortcut in the spelling GNOME's keyboard shortcuts take
+//! (AGENTS.md, Shortcut): a GTK accelerator ("<Control><Alt>d"), and back
+//! from one to VOCO's own "Ctrl+Alt+D". Both name the key by its X keysym.
 
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
 
@@ -90,24 +88,6 @@ impl Chord {
         })
     }
 
-    /// The shortcuts specification's spelling, for the portal's preferred
-    /// trigger: "CTRL+ALT+d".
-    pub(crate) fn portal_trigger(&self) -> String {
-        let mut parts = Vec::new();
-        for (held, name) in [
-            (self.control, "CTRL"),
-            (self.alt, "ALT"),
-            (self.shift, "SHIFT"),
-            (self.logo, "LOGO"),
-        ] {
-            if held {
-                parts.push(name);
-            }
-        }
-        parts.push(&self.keysym);
-        parts.join("+")
-    }
-
     /// GTK's spelling, for a GNOME custom shortcut: "<Control><Alt>d".
     pub(crate) fn gtk_accelerator(&self) -> String {
         let mut accelerator = String::new();
@@ -143,17 +123,12 @@ fn key_label(keysym: &str) -> Option<String> {
         .map(|(_, label, _)| (*label).to_owned())
 }
 
-/// "Ctrl+Alt+D" from GNOME's trigger description, such as "Press
-/// <Control><Alt>d": VOCO's own spelling, for its config and labels. None for
-/// a trigger VOCO can't take: no modifier, or a key it has no name for.
-pub(crate) fn hotkey_from_trigger(description: &str) -> Option<String> {
-    let description = description.trim();
-    let accelerator = description
-        .strip_prefix("Press")
-        .unwrap_or(description)
-        .trim();
+/// "Ctrl+Alt+D" from the keys GNOME holds, such as "<Control><Alt>d":
+/// VOCO's own spelling, for its config and labels. None for keys VOCO can't
+/// take: no modifier, or a key it has no name for.
+pub(crate) fn hotkey_from_accelerator(accelerator: &str) -> Option<String> {
     let (mut control, mut alt, mut shift, mut logo) = (false, false, false, false);
-    let mut rest = accelerator;
+    let mut rest = accelerator.trim();
     while let Some(start) = rest.strip_prefix('<') {
         let end = start.find('>')?;
         match start[..end].to_ascii_lowercase().as_str() {
@@ -191,64 +166,53 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_shortcut_is_spelled_for_the_portal_and_for_gtk() {
-        for (hotkey, trigger, accelerator) in [
-            ("Super+X", "LOGO+x", "<Super>x"),
-            ("Alt+D", "ALT+d", "<Alt>d"),
-            ("Alt+Shift+D", "ALT+SHIFT+d", "<Alt><Shift>d"),
-            ("Ctrl+Alt+D", "CTRL+ALT+d", "<Control><Alt>d"),
-            ("Ctrl+Shift+F8", "CTRL+SHIFT+F8", "<Control><Shift>F8"),
-            ("Super+Space", "LOGO+space", "<Super>space"),
-            ("Ctrl+ArrowUp", "CTRL+Up", "<Control>Up"),
-            ("Ctrl+Alt+1", "CTRL+ALT+1", "<Control><Alt>1"),
-            ("Ctrl+Comma", "CTRL+comma", "<Control>comma"),
-            (
-                "Ctrl+Alt+Shift+Super+K",
-                "CTRL+ALT+SHIFT+LOGO+k",
-                "<Control><Alt><Shift><Super>k",
-            ),
+    fn a_shortcut_is_spelled_for_gtk() {
+        for (hotkey, accelerator) in [
+            ("Super+X", "<Super>x"),
+            ("Alt+D", "<Alt>d"),
+            ("Alt+Shift+D", "<Alt><Shift>d"),
+            ("Ctrl+Alt+D", "<Control><Alt>d"),
+            ("Ctrl+Shift+F8", "<Control><Shift>F8"),
+            ("Super+Space", "<Super>space"),
+            ("Ctrl+ArrowUp", "<Control>Up"),
+            ("Ctrl+Alt+1", "<Control><Alt>1"),
+            ("Ctrl+Comma", "<Control>comma"),
+            ("Ctrl+Alt+Shift+Super+K", "<Control><Alt><Shift><Super>k"),
         ] {
             let chord = Chord::of(hotkey).unwrap_or_else(|| panic!("{hotkey}"));
-            assert_eq!(chord.portal_trigger(), trigger, "{hotkey}");
             assert_eq!(chord.gtk_accelerator(), accelerator, "{hotkey}");
         }
         assert_eq!(Chord::of("not a shortcut"), None);
     }
 
     #[test]
-    fn gnomes_trigger_reads_back_as_vocos_shortcut() {
-        for (description, hotkey) in [
-            ("Press <Super>x", "Super+X"),
-            ("Press <Alt><Shift>d", "Alt+Shift+D"),
-            ("Press <Shift><Control>F8", "Ctrl+Shift+F8"),
-            ("Press <Control><Alt>d", "Ctrl+Alt+D"),
-            ("Press <Primary>space", "Ctrl+Space"),
-            ("<Super>Up", "Super+ArrowUp"),
-            ("Press <Control>1", "Ctrl+1"),
-            ("Press <Control>apostrophe", "Ctrl+Quote"),
+    fn gnomes_keys_read_back_as_vocos_shortcut() {
+        for (accelerator, hotkey) in [
+            ("<Super>x", "Super+X"),
+            ("<Alt><Shift>d", "Alt+Shift+D"),
+            ("<Shift><Control>F8", "Ctrl+Shift+F8"),
+            ("<Control><Alt>d", "Ctrl+Alt+D"),
+            ("<Primary>space", "Ctrl+Space"),
+            (" <Super>Up ", "Super+ArrowUp"),
+            ("<Control>1", "Ctrl+1"),
+            ("<Control>apostrophe", "Ctrl+Quote"),
         ] {
             assert_eq!(
-                hotkey_from_trigger(description).as_deref(),
+                hotkey_from_accelerator(accelerator).as_deref(),
                 Some(hotkey),
-                "{description}"
+                "{accelerator}"
             );
         }
         // No modifier, an unknown modifier, or a key VOCO has no name for.
-        for description in [
-            "Press x",
-            "Press <Shift>x",
-            "Press <Hyper>x",
-            "Press <Super>XF86AudioPlay",
-            "",
-        ] {
-            assert_eq!(hotkey_from_trigger(description), None, "{description}");
+        for accelerator in ["x", "<Shift>x", "<Hyper>x", "<Super>XF86AudioPlay", ""] {
+            assert_eq!(hotkey_from_accelerator(accelerator), None, "{accelerator}");
         }
     }
 
     #[test]
     fn every_spelling_round_trips_through_vocos_parser() {
-        // What GNOME reports for a shortcut VOCO proposed must be one VOCO can
-        // save, and must name the same chord.
+        // The keys GNOME holds for a shortcut VOCO gave it must be ones VOCO
+        // can save, and must name the same chord.
         let mut hotkeys = vec![
             "Super+X".to_owned(),
             "Ctrl+Alt+D".to_owned(),
@@ -262,8 +226,9 @@ mod tests {
         );
         for hotkey in hotkeys {
             let chord = Chord::of(&hotkey).unwrap_or_else(|| panic!("{hotkey}"));
-            let description = format!("Press {}", chord.gtk_accelerator());
-            let back = hotkey_from_trigger(&description).unwrap_or_else(|| panic!("{description}"));
+            let accelerator = chord.gtk_accelerator();
+            let back =
+                hotkey_from_accelerator(&accelerator).unwrap_or_else(|| panic!("{accelerator}"));
             assert_eq!(
                 Chord::of(&back),
                 Some(chord),

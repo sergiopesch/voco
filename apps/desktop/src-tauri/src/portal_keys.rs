@@ -311,11 +311,27 @@ fn keyboard_state(keyboard: &Eis) -> Keyboard {
     }
 }
 
-/// Whether a new session asks GNOME for its keyboard connection: where GNOME
-/// also holds the shortcut through its portal, so GNOME 46 keeps the portal's
-/// own key calls, and not after the connection failed once.
+/// Whether this GNOME has the GlobalShortcuts portal, which came with GNOME
+/// 48. VOCO binds nothing through it: it tells a GNOME new enough to be
+/// asked for its keyboard connection from GNOME 46, and a VOCO from before
+/// 2026.0.73 held its shortcut through it (gnome_shortcut.rs).
+pub fn gnome_has_shortcut_portal() -> bool {
+    // The session's portal can't gain or lose the interface while VOCO runs.
+    static FOUND: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    applies()
+        && *FOUND.get_or_init(|| {
+            portal::run(|connection| {
+                portal::has_interface(connection, "org.freedesktop.portal.GlobalShortcuts", 1)
+            })
+            .unwrap_or(false)
+        })
+}
+
+/// Whether a new session asks GNOME for its keyboard connection: on GNOME 48
+/// and later, so GNOME 46, which reports no modifiers through it, keeps the
+/// portal's own key calls, and not after the connection failed once.
 fn wants_keyboard() -> bool {
-    !NO_KEYBOARD.load(Ordering::SeqCst) && crate::portal_shortcut::available()
+    !NO_KEYBOARD.load(Ordering::SeqCst) && gnome_has_shortcut_portal()
 }
 
 /// A dictation's session with its keyboard connection, where GNOME gives one
@@ -577,13 +593,25 @@ pub fn ready() -> Result<(), PortalPasteError> {
 
 /// Whether Shift, Control, Alt, Super or AltGr is down, as GNOME reports it
 /// through the open session's keyboard connection: from GNOME 50, and only
-/// while a session is open. Unknown otherwise, and the shortcut's own
-/// signals then say what they can (portal_shortcut.rs).
+/// while a session is open. Unknown otherwise, and the timing of the
+/// shortcut's presses then says what it can (gnome_shortcut.rs).
 pub fn modifiers_held() -> Option<bool> {
     typing()
         .keyboard
         .as_ref()
         .and_then(|keyboard| keyboard.modifiers_held())
+}
+
+/// Whether every modifier was up at some moment since `since`, as GNOME
+/// reports through the open session's keyboard connection: a shortcut press
+/// after that is a new one, never a held chord's repeat (gnome_shortcut.rs).
+/// Unknown without a session, on a GNOME that reports no modifiers, or when
+/// its reports began later.
+pub fn modifiers_lifted_since(since: Instant) -> Option<bool> {
+    typing()
+        .keyboard
+        .as_ref()
+        .and_then(|keyboard| keyboard.modifiers_lifted_since(since))
 }
 
 /// Whether the open session types through GNOME's keyboard connection, for

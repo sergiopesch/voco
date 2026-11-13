@@ -41,8 +41,8 @@ pub(crate) struct Snapshot<'a> {
     pub configured_preset: Option<Preset>,
     pub bridge_available: bool,
     pub panel_reserved: bool,
-    /// The snap's GNOME shortcut portal holds the chord (portal_shortcut.rs).
-    pub portal_bound: bool,
+    /// GNOME's keyboard shortcuts hold the snap's chord (gnome_shortcut.rs).
+    pub gnome_bound: bool,
 }
 
 impl Observations {
@@ -129,10 +129,10 @@ impl Observations {
                 "VOCO's GNOME panel handles this shortcut.",
             );
         }
-        // GNOME's shortcut portal consumes the chord and toggles, as the panel does.
-        if snapshot.portal_bound {
+        // GNOME's own shortcut consumes the chord and toggles, as the panel does.
+        if snapshot.gnome_bound {
             return status(
-                Some("gnome-portal"),
+                Some("gnome-shortcut"),
                 "available",
                 "GNOME holds this shortcut for VOCO.",
             );
@@ -198,7 +198,7 @@ mod tests {
             configured_preset: Some(Preset::AltD),
             bridge_available: false,
             panel_reserved: false,
-            portal_bound: false,
+            gnome_bound: false,
         }
     }
     #[test]

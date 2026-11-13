@@ -1,27 +1,41 @@
 //! VOCO's side of CI's portal suite (scripts/test-gnome-portals.py, AGENTS.md,
-//! Delivery): the snap's real portal code against a private GNOME Shell, its
-//! xdg-desktop-portal and GNOME backend. The suite answers GNOME's dialogs,
-//! presses keys inside the Shell and reads the field; this process does what
-//! VOCO does, one command at a time, and reports what each call returned.
+//! Delivery): the snap's real typing and shortcut code against a private
+//! GNOME Shell, its xdg-desktop-portal and GNOME backend. The suite answers
+//! GNOME's dialog, presses keys inside the Shell and reads the field; this
+//! process does what VOCO does, one command at a time, and reports what each
+//! call returned.
 //!
 //! Each stdin line is one JSON command; each answer is one stdout line that
 //! starts with [`REPLY`]. Without a tauri app nothing toggles or stops, so the
-//! answers carry the counts of the toggles and stops the portal code asked for.
+//! answers carry the counts of the toggles and stops the code asked for.
 
 use serde_json::{json, Value};
 use std::io::BufRead;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use webkit2gtk::gio;
 
 const REPLY: &str = "VOCO-PORTAL-FIXTURE ";
+/// The Toggle calls of GNOME's shortcut that were presses, which toggle, and
+/// all of them, a held chord's repeats included.
+static TOGGLES: AtomicUsize = AtomicUsize::new(0);
+static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+/// What VOCO does with a Toggle call of GNOME's shortcut (panel.rs), without
+/// an app to toggle: only a press, never a held chord's repeat, would.
+fn shortcut_called() {
+    CALLS.fetch_add(1, Ordering::SeqCst);
+    if crate::gnome_shortcut::note_bus_press() {
+        TOGGLES.fetch_add(1, Ordering::SeqCst);
+    }
+}
 
 fn counts() -> Value {
     json!({
         "stops": crate::portal_keys::STOPS_REQUESTED.load(Ordering::SeqCst),
-        "toggles": crate::portal_shortcut::TOGGLES_REQUESTED.load(Ordering::SeqCst),
-        "activations": crate::portal_shortcut::ACTIVATIONS.load(Ordering::SeqCst),
-        "keysHeld": crate::portal_shortcut::keys_held(),
+        "toggles": TOGGLES.load(Ordering::SeqCst),
+        "calls": CALLS.load(Ordering::SeqCst),
+        "keysHeld": crate::gnome_shortcut::keys_held(),
         "modifiersHeld": crate::portal_keys::modifiers_held(),
         "keyboard": crate::portal_keys::has_keyboard(),
     })
@@ -35,10 +49,10 @@ fn status() -> Value {
         "busName": bus.unique_name().map(|name| name.to_string()),
         "applies": crate::portal_keys::applies(),
         "typingAllowed": crate::portal_keys::allowed(),
-        "shortcutPortal": crate::portal_shortcut::available(),
-        "shortcutBound": crate::portal_shortcut::bound(),
-        "shortcutHeld": crate::portal_shortcut::holds(),
-        "trigger": crate::portal_shortcut::trigger(),
+        "shortcutPortal": crate::portal_keys::gnome_has_shortcut_portal(),
+        "shortcutAvailable": crate::gnome_shortcut::available(),
+        "binding": crate::gnome_custom_shortcut::binding(),
+        "command": crate::gnome_custom_shortcut::command_of_voco(),
     })
 }
 
@@ -71,9 +85,21 @@ fn run(command: &Value) -> Value {
     match command["do"].as_str().expect("a command") {
         "status" => status(),
         "allow-typing" => outcome(crate::portal_keys::allow()),
-        "allow-shortcut" => outcome(crate::portal_shortcut::allow(&text())),
-        // Settings' Apply shortcut, once GNOME holds the shortcut.
-        "change-shortcut" => outcome(crate::portal_shortcut::change(&text())),
+        // Setup, and a saved change of shortcut: VOCO's GNOME shortcut takes
+        // these keys.
+        "hold-shortcut" => outcome(crate::gnome_shortcut::hold(&text())),
+        "keep-shortcut" => outcome(crate::gnome_shortcut::keep_in_step(&text())),
+        "shortcut-present" => json!({ "present": crate::gnome_shortcut::present(&text()) }),
+        "forget-shortcut" => {
+            crate::gnome_shortcut::forget();
+            json!({ "ok": true })
+        }
+        // The bridge GNOME's shortcut calls, served as the snap serves it:
+        // each Toggle call is counted, and the presses among them.
+        "serve-shortcut" => outcome(crate::panel::serve_shortcut_for_fixture(
+            shortcut_called,
+            Duration::from_secs(10),
+        )),
         // A desktop dictation starts: the renderer asks for the session,
         // then reports the dictation starting.
         "begin" => {
@@ -93,14 +119,6 @@ fn run(command: &Value) -> Value {
             json!({ "ok": true })
         }
         "paste" => outcome(crate::insertion::desktop_paste(&text())),
-        "suspend" => {
-            crate::portal_shortcut::suspend();
-            json!({ "ok": true })
-        }
-        "resume" => {
-            crate::portal_shortcut::resume();
-            json!({ "ok": true })
-        }
         // The next sessions type as on a GNOME without the keyboard
         // connection, or with one that reports no modifiers, or with it again.
         "keyboard" => {

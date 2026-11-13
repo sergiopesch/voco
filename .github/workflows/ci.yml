@@ -701,14 +701,16 @@ jobs:
           restore-keys: apt-${{ github.job }}-
 
       # The portal and its GNOME backend need PipeWire; the suite answers
-      # GNOME's dialogs over AT-SPI. The rest builds the lib test binary.
+      # GNOME's dialog over AT-SPI; GNOME's settings daemon has the media keys
+      # service that runs the snap's shortcut. The rest builds the lib test
+      # binary.
       - name: Install system dependencies
         timeout-minutes: 10
         run: |
           sudo apt-get update
           sudo apt-get install -y -o APT::Keep-Downloaded-Packages=true \
             bubblewrap dbus-bin dbus-daemon libglib2.0-bin python3 python3-gi gir1.2-gtk-3.0 \
-            gir1.2-atspi-2.0 at-spi2-core gnome-shell xwayland xclip jq \
+            gir1.2-atspi-2.0 at-spi2-core gnome-shell gnome-settings-daemon xwayland xclip jq \
             pipewire wireplumber xdg-desktop-portal xdg-desktop-portal-gnome \
             pkg-config libglib2.0-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libpulse-dev

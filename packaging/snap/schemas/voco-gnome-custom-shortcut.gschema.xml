@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The two keys of GNOME's custom keyboard shortcuts that VOCO's snap writes on
-     GNOME 46, which has no GlobalShortcuts portal (AGENTS.md, Shortcut). GNOME's
+<!-- The keys of GNOME's custom keyboard shortcuts that VOCO's snap writes for its
+     shortcut on GNOME Wayland (AGENTS.md, Shortcut). GNOME's
      own descriptions aren't in the snap's runtime; these give the same IDs, paths
      and types, so the values VOCO writes are the ones GNOME Settings reads. -->
 <schemalist>

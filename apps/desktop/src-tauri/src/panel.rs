@@ -85,8 +85,6 @@ fn reserve(key: &str, lease: Duration) {
     if let Ok(mut until) = SHORTCUT_UNTIL.lock() {
         *until = Some((key.to_owned(), Instant::now() + lease));
     }
-    // One grab holds the chord: the snap's portal shortcut yields to the lease.
-    crate::portal_shortcut::suspend();
 }
 
 /// The configured chord Shell grabs whenever attached, idle included.
@@ -498,8 +496,8 @@ impl Lease {
 /// The application behind the bridge; tests substitute a recording double.
 trait Host {
     fn snapshot(&self) -> Option<serde_json::Value>;
-    /// A press of the snap's GNOME custom shortcut, or one of its repeats
-    /// while the chord is held.
+    /// A press of the snap's GNOME shortcut, or one of its repeats while the
+    /// chord is held.
     fn shortcut_press(&self);
     /// The ordinary shortcut toggle, with native debounce and arbitration.
     fn toggle(&self);
@@ -514,7 +512,7 @@ impl Host for tauri::AppHandle {
 
     fn shortcut_press(&self) {
         crate::trace_hotkey_event("bus_toggle_received", Some("gnome_shortcut"));
-        if crate::portal_shortcut::note_bus_press() {
+        if crate::gnome_shortcut::note_bus_press() {
             crate::eval_toggle_with_backend(self, "gnome_shortcut");
         } else {
             crate::trace_hotkey_event("bus_toggle_repeat_ignored", Some("gnome_shortcut"));
@@ -540,7 +538,6 @@ fn release(host: &impl Host, lease: &mut Lease) {
     clear_shortcut();
     set_owner(None);
     host.show_tray(true);
-    crate::portal_shortcut::resume();
 }
 
 type Reply = Result<Option<glib::Variant>, (&'static str, &'static str)>;
@@ -782,6 +779,65 @@ pub(crate) fn serve_for_fixture(timeout: Duration) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(20));
     }
     Ok(())
+}
+
+/// For the portal suite (portal_fixture.rs): serves the bridge for a host
+/// that only counts the calls of GNOME's shortcut, which the snap answers
+/// for any caller. Returns once this process owns the bridge's name.
+#[cfg(test)]
+pub(crate) fn serve_shortcut_for_fixture(pressed: fn(), timeout: Duration) -> Result<(), String> {
+    #[derive(Clone)]
+    struct Shortcut(fn());
+    impl Host for Shortcut {
+        fn snapshot(&self) -> Option<serde_json::Value> {
+            None
+        }
+        fn shortcut_press(&self) {
+            (self.0)();
+        }
+        fn toggle(&self) {}
+        fn action(&self, _action: &str, _token: &str) -> bool {
+            false
+        }
+        fn show_tray(&self, _visible: bool) {}
+    }
+    std::thread::spawn(move || {
+        let context = glib::MainContext::new();
+        let _default = context.acquire().expect("a new main context");
+        context
+            .with_thread_default(|| {
+                serve(Shortcut(pressed));
+                glib::MainLoop::new(Some(&context), false).run();
+            })
+            .expect("a thread-default main context");
+    });
+    let bus = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE)
+        .map_err(|error| error.to_string())?;
+    let started = Instant::now();
+    loop {
+        let owned = bus
+            .call_sync(
+                Some("org.freedesktop.DBus"),
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+                "NameHasOwner",
+                Some(&(NAME,).to_variant()),
+                None,
+                gio::DBusCallFlags::NONE,
+                500,
+                gio::Cancellable::NONE,
+            )
+            .ok()
+            .and_then(|reply| reply.get::<(bool,)>())
+            .is_some_and(|(owned,)| owned);
+        if owned {
+            return Ok(());
+        }
+        if started.elapsed() > timeout {
+            return Err(format!("{NAME} has no owner"));
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
 }
 
 #[cfg(test)]

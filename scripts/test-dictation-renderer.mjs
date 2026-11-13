@@ -43,10 +43,10 @@ export const getDesktopInputStatus = async () => ({available:!window.pasteUnavai
 export const speechProcessorProblem = async () => window.processorProblem ?? null;
 export const getPanelSetupStatus = async () => ({status:'other-desktop',detail:'Use the tray menu.',canEnable:false});
 export const enableGnomePanel = getPanelSetupStatus;
-export const getPortalSetupStatus = async () => ({applies:false,typingAllowed:false,panelAttached:false,panelHoldsShortcut:false,shortcutPortal:false,shortcutCustom:false,shortcutBound:false,shortcutTrigger:null});
+export const getPortalSetupStatus = async () => ({applies:false,typingAllowed:false,panelAttached:false,panelHoldsShortcut:false,shortcutAvailable:false,shortcutBound:false});
 export const allowPortalTyping = getPortalSetupStatus;
-export const allowPortalShortcut = getPortalSetupStatus;
-export const changePortalShortcut = getPortalSetupStatus;
+export const holdGnomeShortcut = getPortalSetupStatus;
+export const chooseGnomeShortcut = getPortalSetupStatus;
 export const openProblemReport = async () => { calls.push(['openProblemReport']); };
 export const beginDesktopTyping = async () => { calls.push(['beginDesktopTyping']); };
 export const openExternalUrl = async (url) => { calls.push(['openExternalUrl', url]); };

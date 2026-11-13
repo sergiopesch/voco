@@ -1,7 +1,7 @@
-//! On GNOME 46, which has no GlobalShortcuts portal, the snap's shortcut is a
-//! GNOME custom keyboard shortcut that runs `voco --toggle` (AGENTS.md,
-//! Shortcut). Setup's button adds it, only when no GNOME window shortcut or
-//! other custom shortcut uses the chord, and never changes another.
+//! VOCO's entry in GNOME's custom keyboard shortcuts, which holds the snap's
+//! shortcut on GNOME Wayland (gnome_shortcut.rs; AGENTS.md, Shortcut). VOCO
+//! adds it only when no GNOME window shortcut or other custom shortcut uses
+//! the chord, and never changes another.
 //!
 //! GNOME's own schema for these keys isn't in the snap's runtime, so the snap
 //! carries the same IDs, paths and types (packaging/snap/schemas).
@@ -145,20 +145,56 @@ fn conflict(accelerator: &str, media_keys: &gio::Settings) -> Option<String> {
     None
 }
 
+/// GNOME lists VOCO's custom shortcut, whatever its keys and command.
+pub fn listed() -> bool {
+    settings(MEDIA_KEYS, None).is_some_and(|media_keys| {
+        custom_paths(&media_keys)
+            .iter()
+            .any(|path| path == VOCO_PATH)
+    })
+}
+
 /// VOCO's custom shortcut exists for `accelerator`.
 pub fn present(accelerator: &str) -> bool {
-    let Some(media_keys) = settings(MEDIA_KEYS, None) else {
-        return false;
-    };
-    if !custom_paths(&media_keys)
-        .iter()
-        .any(|path| path == VOCO_PATH)
-    {
-        return false;
+    listed()
+        && settings(CUSTOM, Some(VOCO_PATH)).is_some_and(|voco| {
+            same_chord(&voco.string("binding"), accelerator) && voco.string("command") == command()
+        })
+}
+
+/// The keys of VOCO's custom shortcut, as GNOME holds them: "<Super>x". None
+/// when GNOME lists none, or it has no keys.
+pub fn binding() -> Option<String> {
+    if !listed() {
+        return None;
     }
-    settings(CUSTOM, Some(VOCO_PATH)).is_some_and(|voco| {
-        same_chord(&voco.string("binding"), accelerator) && voco.string("command") == command()
-    })
+    let binding = settings(CUSTOM, Some(VOCO_PATH))?.string("binding");
+    (!binding.trim().is_empty()).then(|| binding.to_string())
+}
+
+/// The command of VOCO's custom shortcut as GNOME holds it, for the portal
+/// suite (portal_fixture.rs).
+#[cfg(test)]
+pub(crate) fn command_of_voco() -> Option<String> {
+    listed()
+        .then(|| settings(CUSTOM, Some(VOCO_PATH)).map(|voco| voco.string("command").to_string()))
+        .flatten()
+}
+
+/// Calls `changed` with the keys of VOCO's custom shortcut whenever they
+/// change while GNOME lists it, as GNOME Settings does under Keyboard. The
+/// signal arrives on the calling thread's main context for as long as the
+/// returned settings live.
+pub fn watch(changed: impl Fn(&str) + 'static) -> Option<gio::Settings> {
+    let voco = settings(CUSTOM, Some(VOCO_PATH))?;
+    voco.connect_changed(Some("binding"), move |_, _| {
+        if let Some(binding) = binding() {
+            changed(&binding);
+        }
+    });
+    // GSettings reports changes of a key only once it has been read.
+    let _ = voco.string("binding");
+    Some(voco)
 }
 
 /// Adds VOCO's custom shortcut for `accelerator` ("<Super>x"), or says what
@@ -168,7 +204,7 @@ pub fn add(accelerator: &str, label: &str) -> Result<(), String> {
         .ok_or_else(|| "VOCO can't reach GNOME's keyboard shortcuts.".to_string())?;
     if let Some(user) = conflict(accelerator, &media_keys) {
         return Err(format!(
-            "{label} is already {user}. Choose another shortcut in VOCO's Settings, or free {label} in GNOME Settings, under Keyboard."
+            "{label} is already {user}. Choose another shortcut, or free {label} in GNOME Settings, under Keyboard."
         ));
     }
     let voco = settings(CUSTOM, Some(VOCO_PATH))
