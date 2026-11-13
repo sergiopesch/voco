@@ -218,7 +218,7 @@ lesson(
     [
         (
             "X11 toggles on release",
-            "While the chord is held, VOCO's grab receives every key. VOCO waits for the release before it toggles, so the paste keys reach the app.",
+            "While the chord is held, VOCO's grab receives every key. VOCO waits for the release before it toggles, so the paste keys reach the app. The grab sits on the root window and on every top-level window: GNOME's window manager keeps the Super key for the overview and hands on the keys pressed with it, and a key handed on that way skips grabs on the root window.",
         ),
         (
             "Why Super+X",
@@ -306,7 +306,7 @@ lesson(
     "A microphone measures tiny changes in air pressure. VOCO reads those measurements as a long list of numbers called samples.",
     [
         "On Wayland, Rust records through libpulse from PipeWire's Pulse service, which gives each source the identity VOCO needs to select it. It takes 44,100 samples per second on two channels and averages them into one.",
-        "On X11, the window records through WebKit with an AudioWorklet. If WebKit offers only the older ScriptProcessor fallback, VOCO can't confirm that it receives every sample. It shows \"Dictation won't be typed\" and never pastes that recording.",
+        "On X11, the window records through WebKit with an AudioWorklet. With no microphone chosen it asks Rust for the label of the sound server's default source and opens the WebKit device with that label, because WebKit by itself opens the first device it lists. If WebKit offers only the older ScriptProcessor fallback, VOCO can't confirm that it receives every sample. It shows \"Dictation won't be typed\" and never pastes that recording.",
         "Silence is valid audio, so a long pause never ends a recording. VOCO stops on its own only when capture fails or after ten minutes.",
     ],
     [
@@ -357,12 +357,13 @@ lesson(
     [
         (F + "lib/nativeCapture.ts", "The window's side of native capture: start, drain and stop."),
         (B + "native_capture/mod.rs", "Native capture's lease, pump and call timeouts."),
-        (B + "native_capture/pulse.rs", "Rust's side of the C capture layer."),
+        (B + "native_capture/pulse.rs", "Rust's side of the C capture layer, and the label of the default source."),
         (
             "apps/desktop/src-tauri/native/native_capture_pulse.c",
             "Records from libpulse: 16-bit stereo at 44,100 Hz.",
         ),
-        (B + "native_capture_commands.rs", "The commands the window uses for native capture."),
+        (B + "native_capture_commands.rs", "The commands the window uses for native capture and for the default microphone's label."),
+        (F + "lib/audioInput.ts", "Opens the window's microphone on X11: the chosen one, or the system default by its label."),
         ("apps/desktop/public/audio-processor.js", "The X11 AudioWorklet that forwards samples."),
         (F + "hooks/useDictation.ts", "Opens the microphone and wires capture into a recording."),
         (F + "hooks/useNativeCaptureSettings.ts", "Loads the list of native sources for settings."),
@@ -719,7 +720,7 @@ lesson(
         (B + "insertion.rs", "Checks helpers, copies both selections and presses Shift+Insert."),
         (B + "virtual_keyboard.rs", "VOCO's own keyboard for the Wayland paste keys, which reports when Insert went out."),
         (B + "panel.rs", "Hands the GNOME companion each paste through its waiting NextRequest call, once the Shell's loaded copy asks for work."),
-        (B + "selection_owner.rs", "The GNOME copies: xclip helpers that keep both selections and report each read."),
+        (B + "selection_owner.rs", "The copies on GNOME Wayland and X11: xclip helpers that keep both selections and report each read."),
         (B + "portal_keys.rs", "The snap's paste keys through GNOME's RemoteDesktop portal: Allow typing, the restore token and a session only while you dictate."),
         (B + "portal_eis.rs", "That session's keyboard connection to GNOME: the paste keys, and the modifiers GNOME reports down."),
         (B + "portal.rs", "One thread that holds every portal request, session and signal, so waiting for GNOME's dialog never blocks GTK's main thread."),
@@ -1480,12 +1481,12 @@ lesson(
     "VOCO builds on libraries other people wrote. A few need small fixes, so VOCO keeps patched copies and checks them.",
     [
         "Three Rust libraries are patched in vendor: glib, global-hotkey and tray-icon. Cargo.toml tells every part of VOCO to use those copies.",
-        "Each patch is small and has one reason: in glib a security fix, in global-hotkey an X11 shortcut actor that waits for events instead of polling, and in tray-icon icons that stay valid while VOCO runs. The package carries each one's licenses and patch notes.",
+        "Each patch is small and has one reason: in glib a security fix, in global-hotkey an X11 shortcut actor that waits for events instead of polling and grabs each shortcut on the top-level windows as well as the root, and in tray-icon icons that stay valid while VOCO runs. The package carries each one's licenses and patch notes.",
         "Scripts check each patched copy against its recorded origin, so a later update can't quietly bring back the unpatched code.",
     ],
     [
         ("glib", "0.18.5 with the two-line upstream fix for RUSTSEC-2024-0429."),
-        ("global-hotkey", "0.8.0 with an event-driven X11 actor."),
+        ("global-hotkey", "0.8.0 with an event-driven X11 actor that also grabs on top-level windows."),
         ("tray-icon", "0.25.1 with a Linux call that sets icons by file path."),
         (
             "Ship",
@@ -1503,7 +1504,7 @@ lesson(
         ),
         (
             "Why the X11 actor waits",
-            "The patched global-hotkey waits on the X11 connection and a command signal instead of a timer, so key events never wait for a 50 ms tick and an idle actor never wakes. VOCO and Tauri's shortcut plugin must share this one copy.",
+            "The patched global-hotkey waits on the X11 connection and a command signal instead of a timer, so key events never wait for a 50 ms tick and an idle actor never wakes. It grabs each shortcut on the root window and on every top-level window, and follows the top-level windows as they come and go. VOCO and Tauri's shortcut plugin must share this one copy.",
         ),
         (
             "Why icons stay put",
@@ -1521,7 +1522,7 @@ lesson(
     [
         ("vendor/README.md", "What is vendored and why."),
         ("vendor/glib/VOCO-PATCH.md", "The glib fix and why one copy serves everyone."),
-        ("vendor/global-hotkey/VOCO-PATCH.md", "The event-driven X11 actor."),
+        ("vendor/global-hotkey/VOCO-PATCH.md", "The event-driven X11 actor and its grabs on top-level windows."),
         ("vendor/tray-icon/VOCO-PATCH.md", "Icons set by path that stay valid."),
         ("scripts/verify-glib-backport.py", "Checks the glib fix and its single resolution."),
         ("scripts/verify-shortcut-backport.py", "Rejects a second, unpatched shortcut actor."),
