@@ -24,6 +24,29 @@ const Reveal = GObject.registerClass(class VocoReveal extends St.Widget {
     }
 });
 
+// The pill's menu, which gets new items each time it opens. GNOME's menu is
+// written for items that change while it is open: when one turns insensitive
+// the menu moves the keyboard focus on, open or not, and from GNOME 49 an item
+// the pointer was over as the menu closed turns active again, hidden as it is,
+// at its next change of sensitivity. Mutter gives the focused app no key while
+// a Shell actor has the keyboard focus, so a closed menu's items never change.
+class VocoMenu extends PopupMenu.PopupMenu {
+    // fill() adds the items for VOCO's present state.
+    constructor(sourceActor, fill) {
+        super(sourceActor, 0, St.Side.TOP);
+        this._fill = fill;
+    }
+
+    // GNOME 51 gave open() a parameters object and a result.
+    open(...args) {
+        if (!this.isOpen) {
+            this.removeAll();
+            this._fill();
+        }
+        return super.open(...args);
+    }
+}
+
 // The VOCO pill in the top bar: microphone, live meter and menu. It shows the
 // state it's given and hands each chosen action to onAction.
 export const VocoIndicator = GObject.registerClass(class VocoIndicator extends PanelMenu.Button {
@@ -37,7 +60,7 @@ export const VocoIndicator = GObject.registerClass(class VocoIndicator extends P
         this.add_style_class_name('voco-panel');
         this.hide();
         this._buildPill(extensionPath);
-        this._buildMenu();
+        this.setMenu(new VocoMenu(this, () => this._fillMenu()));
         // The Shell's own view of reduced motion: the desktop's setting, and off
         // while the Shell inhibits animations.
         this._settings = St.Settings.get();
@@ -105,7 +128,11 @@ export const VocoIndicator = GObject.registerClass(class VocoIndicator extends P
         this._detail.add_child(this._label);
     }
 
-    _buildMenu() {
+    // The opening menu's items, as the present state allows them. Without a
+    // state the menu stays empty, and an empty menu doesn't open.
+    _fillMenu() {
+        if (!this._state)
+            return;
         const item = (label, action) => {
             const menuItem = new PopupMenu.PopupMenuItem(label);
             menuItem.connect('activate', () => this._onAction(action));
@@ -118,6 +145,16 @@ export const VocoIndicator = GObject.registerClass(class VocoIndicator extends P
         this._quitSeparator = new PopupMenu.PopupSeparatorMenuItem();
         this.menu.addMenuItem(this._quitSeparator);
         this._quitItem = item('Quit VOCO', 'quit');
+        this._renderMenu(this._state);
+    }
+
+    _renderMenu(state) {
+        this._settingsItem.setSensitive(state.canOpen);
+        this._reviewItem.setSensitive(state.canOpen);
+        this._stopItem.visible = state.canStop;
+        this._stopItem.setSensitive(state.canStop);
+        this._quitSeparator.visible = this._quitItem.visible = state.quitOffered;
+        this._quitItem.setSensitive(state.canQuit);
     }
 
     // Shows VOCO's state, as model.js's presentation() returns it.
@@ -156,12 +193,8 @@ export const VocoIndicator = GObject.registerClass(class VocoIndicator extends P
             if (label)
                 this._label.text = state.label;
         }
-        this._settingsItem.setSensitive(state.canOpen);
-        this._reviewItem.setSensitive(state.canOpen);
-        this._stopItem.visible = state.canStop;
-        this._stopItem.setSensitive(state.canStop);
-        this._quitSeparator.visible = this._quitItem.visible = state.quitOffered;
-        this._quitItem.setSensitive(state.canQuit);
+        if (this.menu.isOpen)
+            this._renderMenu(state);
         this._renderBars(state, motion);
         if (state.status !== 'idle')
             this._button.add_style_class_name('voco-panel-active');

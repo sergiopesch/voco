@@ -830,6 +830,28 @@ try:
     assert wait_for(lambda: len(attached) > before_attach, 5), 'the companion must attach again once enabled'
     pump(.4)
     assert measure(field, via_companion, 'enabledx')['landed'], 'Paste must work again once enabled'
+    # The menu, used and closed, leaves the keyboard with the focused app when
+    # VOCO's state next changes (#344). From GNOME 49 an item the pointer was
+    # over as the menu closed turns active again at its next change of
+    # sensitivity, and GNOME's menu passes the Shell's key focus on between its
+    # hidden items: no key reaches the app then, the paste's included.
+    shortcut_state('idle', None)
+    pill = inspect()['indicator']
+    mousemove(round(pill['x'] + pill['width'] / 2), round(pill['y'] + pill['height'] / 2)); pump(.1)
+    click(3); pump(.4)
+    opened = inspect()['menu']
+    assert opened['open'], 'a secondary click must open the menu'
+    chosen = next(item for item in opened['items'] if item['text'] == 'Settings')
+    mousemove(round(chosen['x'] + chosen['width'] / 2), round(chosen['y'] + chosen['height'] / 2)); pump(.2)
+    before = len(actions); click(1); pump(.5)
+    assert actions[before:] == [('settings', state['token'])] and not inspect()['menu']['open'], actions[before:]
+    assert wait_for(lambda: call('FocusedWindow').unpack()[0] == 'VOCO paste fixture', 2), 'the closed menu must hand the focus back'
+    for status in ('recording', 'idle'):
+        shortcut_state(status, None)
+        kept = inspect()['keyFocus']
+        assert kept is None, f'{status}: the Shell kept its key focus on {kept!r} with the menu closed'
+        assert measure(field, via_companion, f'aftermenu{status}x')['landed'], f'{status}: a paste after the menu was used must land'
+    report['paste']['afterMenu'] = {'statuses': ['recording', 'idle'], 'keyFocusLeftWithApp': True}
     field.close()
     report['paste'].update(refusals=['held modifier', 'busy', 'unlock-dialog', 'disabled'], modifierRequests=True,
                            cutGestureReleasedShift=True)

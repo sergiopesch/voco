@@ -354,7 +354,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   every paste of every measurement must land, and one measurement within the
   bound passes. A paste answered with a modifier held, while another is in flight,
   in the `unlock-dialog` session mode or after the companion is disabled sends
-  no key. The application job's GNOME Wayland delivery runs through the
+  no key. A paste lands after the menu was opened, an item chosen and VOCO's
+  state changed, with the Shell's keyboard focus left on the stage. The application job's GNOME Wayland delivery runs through the
   companion as well as through uinput. CI's snap probe proves the confinement
   the protocol relies on: a strict snap with a session `dbus` slot answers an
   unconfined caller's pending call and receives its calls, and its own calls to
@@ -598,6 +599,14 @@ and the update check. [The snap](#the-snap) lists its rules.
   Shell a primary click on the pill stops or opens Settings, and other buttons,
   Menu and Shift+F10 open the menu: from GNOME 50, the panel's click gesture must
   leave primary presses and touches to the pill.
+- The companion never changes its menu's items while the menu is closed: it
+  makes new ones each time the menu opens and changes them only while it is
+  open. GNOME's menu moves the Shell's keyboard focus on when an item turns
+  insensitive, open or not, and from GNOME 49 an item the pointer was over as
+  the menu closed turns active again, hidden, at its next change of
+  sensitivity. Mutter gives the focused app no key while a Shell actor has the
+  keyboard focus, so a dictation started after the menu was used typed
+  nothing, and neither did the keyboard until a click in a window.
 - Support each new GNOME major within four weeks of its release, ahead of other
   feature work. Run the companion suite on it in CI (a job like GNOME 51
   Companion builds a digest-pinned image when no hosted runner ships that

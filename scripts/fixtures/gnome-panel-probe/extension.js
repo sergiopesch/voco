@@ -29,6 +29,9 @@ export default class Probe extends Extension {
         const reveal = indicator?._reveal;
         return JSON.stringify({animations: St.Settings.get().enable_animations, panel: bounds(Main.panel), indicator: indicator ? bounds(indicator) : null,
             indicatorFocus: indicator ? indicator.has_style_pseudo_class('focus') : null,
+            // The actor that takes the Shell's keys in place of the focused window, if any.
+            keyFocus: (focus => focus && focus !== global.stage
+                ? focus.label?.text ?? focus.accessible_name ?? focus.constructor.name : null)(global.stage.key_focus),
             revealing: Boolean(reveal?.get_transition('value')),
             statusIcons: Object.entries(Main.panel.statusArea).filter(([key, value]) => key.startsWith('appindicator-') && value)
                 .map(([key, value]) => ({key, ...bounds(value), mapped: value.mapped,
