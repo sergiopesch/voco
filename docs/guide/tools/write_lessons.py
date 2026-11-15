@@ -1310,7 +1310,7 @@ lesson(
         ),
         (
             "Paste against Mutter",
-            "On each Shell it runs, the companion suite pastes into a GTK field 200 times through the companion and 200 times through Mutter's RemoteDesktop API, taking turns. Every paste must arrive exactly, and from the request to the Insert press the companion's median may be at most 1 ms above Mutter's, and its 99th percentile at most 2 ms. 20 more pastes go to a field under XWayland. Pastes asked for by another connection, with a modifier held, while one is in flight, at the lock screen or after disabling must send no key.",
+            "On each Shell it runs, the companion suite pastes into a GTK field 200 times through the companion and 200 times through Mutter's RemoteDesktop API, taking turns. Every paste must arrive exactly, and from the request to the Insert press the companion's median may be at most 1 ms above Mutter's, and its 99th percentile at most 2 ms. 20 more pastes go to a field under XWayland. Pastes asked for by another connection, with a modifier held, while one is in flight, at the lock screen or after disabling must send no key. After the menu was opened with the pointer, an item chosen and VOCO's state changed, the Shell's keyboard focus must be on the stage and a paste must arrive.",
         ),
         (
             "GNOME 50 and 51, headless",
@@ -1637,7 +1637,7 @@ lesson(
     [
         (
             "The menu",
-            "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review, Stop dictation and Quit VOCO. Quit is greyed out while VOCO dictates, and the companion offers it only to a VOCO that sends canQuit. Stop names the recording it ends, so the companion offers it only once VOCO's state carries that recording's session.",
+            "A primary click stops dictation, or opens VOCO when nothing can be stopped. Other mouse buttons, the Menu key and Shift+F10 open a menu with Settings, Review, Stop dictation and Quit VOCO. Quit is greyed out while VOCO dictates, and the companion offers it only to a VOCO that sends canQuit. Stop names the recording it ends, so the companion offers it only once VOCO's state carries that recording's session. The menu gets new items each time it opens, and they change only while it is open. GNOME's menu moves the Shell's keyboard focus on when an item turns insensitive, whether the menu is open or not, and Mutter gives the focused app no key while a Shell actor has that focus, so the companion never changes a closed menu.",
         ),
         (
             "Motion",
@@ -1715,7 +1715,7 @@ lesson(
         ("integrations/gnome/voco-panel@sergiopesch.com/shortcut.js", "The Wayland grab and its lease renewals."),
         ("integrations/gnome/voco-panel@sergiopesch.com/version.js", "The Shell's major version, where the code differs between them."),
         ("integrations/gnome/voco-panel@sergiopesch.com/model.js", "The bar weights, the height formula, when Stop can be offered and which presets the Shell may grab."),
-        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 23 as its version-name, which extensions.gnome.org keeps."),
+        ("integrations/gnome/voco-panel@sergiopesch.com/metadata.json", "Declares GNOME 46, 48, 50 and 51 and companion version 24 as its version-name, which extensions.gnome.org keeps."),
         (B + "panel.rs", "VOCO's D-Bus service for the companion: Attach, state, the shortcut lease and the work it hands out through NextRequest."),
         (B + "panel_setup.rs", "Checks and enables the companion, and caches the result."),
         (B + "tray.rs", "The tray icon, hidden while the companion is attached."),
