@@ -69,6 +69,7 @@ that vanish at icon sizes.
 | `assets/voco-symbol.png` | 1024 px optical master with three broad channels, for icons up to 64 px, headers and status images |
 | `assets/voco-symbol-ui.png` | 128 px copy of the optical master, which the interface imports |
 | `assets/voco-readme-banner.svg` | The README banner |
+| `assets/voco-demo.gif` | The README's demo: screen recordings of VOCO dictating, joined with plain cuts |
 
 Both masters are square, with real alpha transparency. Keep the square canvas and
 the aspect ratio, and don't add transparent padding. Check the 16, 24, 32, 48 and

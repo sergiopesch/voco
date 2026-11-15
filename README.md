@@ -1,14 +1,29 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center"><img src="assets/voco-readme-banner.svg" alt="VOCO, the voice layer for Linux. Today: private dictation." width="560"></p>
 
-[![CI](https://github.com/sergiopesch/voco/actions/workflows/ci.yml/badge.svg)](https://github.com/sergiopesch/voco/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="#get-started">Install</a> ·
+  <a href="docs/everyday-use.md">Everyday use</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="https://www.youtube.com/watch?v=mw2ACJs5rXg">Watch the film</a> ·
+  <a href="#help-and-feedback">Help and feedback</a>
+</p>
+
+<p align="center">
+  <a href="https://snapcraft.io/voco"><img src="https://snapcraft.io/voco/badge.svg" alt="VOCO in the Snap Store"></a>
+  <a href="https://github.com/sergiopesch/voco/actions/workflows/ci.yml"><img src="https://github.com/sergiopesch/voco/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 Dictation is the first step. We're building the voice layer for Linux: private,
 local, and under your control.
 
 **Today: private dictation for Linux.** Press a shortcut, speak, and your words
 appear where you are typing, while you speak.
+
+<p align="center"><img src="assets/voco-demo.gif" alt="VOCO writing four sentences as they are spoken: in Claude Code, in Codex, in a shell and in GNOME Text Editor. Its microphone in the top bar shows a meter while it listens."></p>
+
+<p align="center"><sub>Screen recordings from an Ubuntu 26.04 test machine, not sped up. A synthetic voice speaks and VOCO writes.<br>VOCO isn't affiliated with the apps shown.</sub></p>
 
 - **Private.** Your speech stays on your computer. There's no account,
   subscription, telemetry or cloud transcription.
@@ -125,6 +140,32 @@ tested.
 See [What VOCO keeps](docs/everyday-use.md#what-voco-keeps) and the
 [security model](docs/security/README.md).
 
+## How VOCO is built
+
+VOCO's code, tests and documentation are written with coding agents, directed
+by its maintainer, who decides what is built and approves every merge and
+release. The work follows these rules:
+
+- **A written contract.** [AGENTS.md](AGENTS.md) says what VOCO may and may not
+  do. A new capability changes that contract first, in its own pull request,
+  before any code.
+- **Every change is tested before it merges.** CI runs the test suites, checks
+  recognition against public recordings, and runs the release build in
+  isolated GNOME sessions, where what it pastes into real text fields must
+  match exactly. [Testing](docs/testing/README.md#ci-jobs) lists the jobs.
+- **Privacy is measured.** [`scripts/check-privacy.sh`](scripts/check-privacy.sh)
+  runs a release build in a container and records what it reaches on the
+  network and when a microphone stream exists. You can run it yourself;
+  [Security](docs/security/README.md#release-check) says what it shows.
+- **A bug is reproduced before it is fixed,** in a throwaway test machine, and
+  its cause is written in the issue first. See
+  [Feedback and issues](docs/issue-process.md).
+- **No personal data in tests.** Fixtures are public or synthetic speech, never
+  anyone's own recordings or dictated text.
+- **Releases are built, verified and signed on the maintainer's own machine,**
+  never in hosted CI. The installer checks that signature before it installs
+  anything.
+
 ## Documentation
 
 - [Documentation index](docs/README.md)
@@ -134,6 +175,17 @@ See [What VOCO keeps](docs/everyday-use.md#what-voco-keeps) and the
 - [Troubleshooting](docs/troubleshooting.md)
 - [Platform support](docs/platform/README.md)
 - [Inside VOCO: a visual tour](docs/guide/README.md)
+
+## Help and feedback
+
+- **Something doesn't work:** [report a problem](https://github.com/sergiopesch/voco/issues/new?template=bug.yml),
+  or choose **Report a problem** in VOCO's Help, which fills in the version and
+  the desktop for you.
+- **A question, or help with setup:** ask in
+  [Discussions](https://github.com/sergiopesch/voco/discussions).
+- **An idea:** [suggest an improvement](https://github.com/sergiopesch/voco/issues/new?template=feature.yml).
+
+VOCO sends nothing by itself, so we only hear what you choose to tell us.
 
 ## Contributing
 
