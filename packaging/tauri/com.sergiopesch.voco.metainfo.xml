@@ -28,6 +28,11 @@
   <url type="vcs-browser">https://github.com/sergiopesch/voco</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2026.0.75" date="2026-11-15">
+      <description>
+        <p>On GNOME 50 and 51, a dictation started after the VOCO panel's menu was used typed nothing, and the keyboard didn't reach your app until a click in a window. Dictation now types there as anywhere else. After updating the .deb or the RPM on GNOME, sign out and back in once so GNOME loads the new panel.</p>
+      </description>
+    </release>
     <release version="2026.0.74" date="2026-11-13">
       <description>
         <p>On X11, Super+X now works in GNOME's session, where it started nothing and typed an x. With no microphone chosen, VOCO records from your system's default microphone, not the first in its list. A slow app no longer loses a dictation's last letters, and a shortcut press just after VOCO's window restarts is kept. Each piece of text also reaches your app sooner on GNOME Wayland.</p>

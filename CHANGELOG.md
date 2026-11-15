@@ -6,6 +6,30 @@ use Semantic Versioning: a version has the form `YYYY.0.N`, the year and then a
 number that grows with each release, and its signed Git tag is `voco.<version>`.
 The [release process](docs/release-process.md) describes how a release is made.
 
+## [2026.0.75] - 2026-11-15
+
+On GNOME 50 and 51, a dictation started after the panel's menu was used types
+again. The [release notes](docs/releases/2026.0.75.md) explain the upgrade.
+
+### Fixed
+
+- On GNOME 49 and later, with the VOCO panel attached, a dictation started
+  after the panel's menu was used typed nothing, and the keyboard didn't reach
+  the focused app until a click in a window. The panel set its menu items'
+  sensitivity on every state, with the menu closed. From GNOME 49 an item the
+  pointer was over as the menu closed turns active again, hidden, at its next
+  change of sensitivity, an active item takes the Shell's keyboard focus, and
+  GNOME's menu passes that focus on between its items. Mutter gives the
+  focused app no key while a Shell actor has that focus. The panel now makes
+  its menu's items as the menu opens and changes them only while it is open.
+  The panel's version is 24.
+
+### Added
+
+- A case in the companion suite: after the menu was opened with the pointer,
+  an item chosen and VOCO's state changed, the Shell's keyboard focus is on
+  the stage and a paste lands.
+
 ## [2026.0.74] - 2026-11-13
 
 On X11, the default shortcut works in GNOME's session, VOCO records from the
@@ -976,6 +1000,7 @@ Review keeps a dictation VOCO couldn't finish. The
 The [GitHub releases](https://github.com/sergiopesch/voco/releases) page lists the
 releases before 2026.0.61, each with its signed tag and assets.
 
+[2026.0.75]: https://github.com/sergiopesch/voco/compare/voco.2026.0.74...voco.2026.0.75
 [2026.0.74]: https://github.com/sergiopesch/voco/compare/voco.2026.0.73...voco.2026.0.74
 [2026.0.73]: https://github.com/sergiopesch/voco/compare/voco.2026.0.72...voco.2026.0.73
 [2026.0.72]: https://github.com/sergiopesch/voco/compare/voco.2026.0.71...voco.2026.0.72
