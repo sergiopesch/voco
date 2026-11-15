@@ -32,6 +32,13 @@ or Shift+F10 open the menu, where **Settings**, **Review** and **Quit VOCO**
 work only while you aren't dictating and **Stop dictation** shows only while
 VOCO is starting or recording. **Quit VOCO** quits VOCO as its tray menu does.
 
+The menu's items are made as it opens and change only while it is open. GNOME's
+menu moves the Shell's keyboard focus when an item turns insensitive, open or
+not, and from GNOME 49 an item the pointer was over as the menu closed turns
+active again at its next change. Keyboard focus on a hidden item takes every
+key from the focused app, VOCO's paste keys included, so a closed menu is never
+touched.
+
 ## Set it up
 
 The package installs the companion in
@@ -180,7 +187,9 @@ writes a reproducible archive of the five files, attached to each release.
   - no key arrives from a paste answered with a modifier held, while another
     is in flight, in the `unlock-dialog` session mode or after disabling, and
     each refusal reports why;
-  - a modifier request reports the compositor's held modifiers.
+  - a modifier request reports the compositor's held modifiers;
+  - after the menu was opened with the pointer, an item chosen and VOCO's state
+    changed, the Shell's keyboard focus is on the stage and a paste lands.
 
   Set `VOCO_PANEL_EVIDENCE_DIR` to a new directory
   and, for the nested mode, `VOCO_NATIVE_DEPS` to a root with `bin/Xvfb`.
