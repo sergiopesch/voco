@@ -5,7 +5,7 @@ import {
 } from "@/lib/audioCaptureBuffer";
 import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
 import { calculateVisualAudioLevelFromSamples } from "@/lib/audioLevel";
-import { DictationStream, endsSentence } from "@/lib/dictationStream";
+import { DictationStream, RecognitionFailure, endsSentence } from "@/lib/dictationStream";
 import {
   createCaptureDescriptor,
   type CaptureDescriptor,
@@ -563,11 +563,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
           if (onboardingTest) setError(`Voice test paused: ${sentence(error.message)} Finish test, then try again.`);
           else if (localTest) setError(`VOCO couldn't check that: ${sentence(error.message)}`);
           else if (sessionRef.current.phase === "recording") {
-            // A delivery failure stops typing; healthy recognition runs through Stop.
-            if (kind === "recognition") interruptionNotifiedSession = startingSessionId;
-            void (kind === "delivery"
-              ? showNotification("VOCO stopped typing", "It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.")
-              : showNotification("Dictation interrupted", "Some words may be missing. Stop dictation and check your text field.")).catch(() => {});
+            if (kind === "delivery") {
+              // A delivery failure stops typing; healthy recognition runs through Stop.
+              void showNotification("VOCO stopped typing", "It's still listening. When you stop, VOCO copies the rest of your words to the clipboard.").catch(() => {});
+            } else {
+              // Nothing more will be recognized, so VOCO never shows that it is
+              // listening: the dictation ends here, as at Stop, which types
+              // what was already recognized and then reports the interruption.
+              void stopRecording();
+            }
           }
         }, (event, durationMs) => {
           if (!isCurrentSession(startingSessionId) || cancelledRef.current || localTest) return;
@@ -699,7 +703,15 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
       const started = performance.now();
       enqueueDesktopPhrase(audioBufferRef.current.sampleCount);
-      const { undelivered, uncertain, complete, text } = await queue.finish();
+      // A recognition failure ends the dictation like a Stop: what was
+      // recognized before it and isn't typed is copied or kept below, and only
+      // then is the interruption reported.
+      const { undelivered, uncertain, complete, text, failure } = await queue.finish().then(
+        (result) => ({ ...result, failure: null as RecognitionFailure | null }),
+        (error: unknown) => {
+          if (!(error instanceof RecognitionFailure)) throw error;
+          return { undelivered: error.undelivered, uncertain: error.uncertain, complete: false, text: "", failure: error as RecognitionFailure | null };
+        });
       assertOutputAllowed(stoppingSessionId);
       const browser = browserDeliveryRef.current;
       browserDeliveryRef.current = null;
@@ -707,8 +719,10 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       // lease, as a desktop paste is never checked again. A field that stopped
       // taking text is handled like a failed paste: the rest is copied below.
       void browser?.cancel();
-      traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
-      if (stopRequestedAtMs !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMs) }).catch(() => {});
+      if (!failure) {
+        traceDictationEvent("dictation_desktop_stream_flush_completed", { durationMs: Math.round(performance.now() - started) }).catch(() => {});
+        if (stopRequestedAtMs !== null) traceDictationEvent("dictation_stop_to_final_transcript", { durationMs: Math.round(performance.now() - stopRequestedAtMs) }).catch(() => {});
+      }
       dictationStreamRef.current = null;
       if (undelivered.trim() && (desktopPasteSessionRef.current || browser)) {
         // Text the app did not take (or may not have taken) is never replayed;
@@ -731,6 +745,12 @@ export function createDictationRecording(env: DictationRecordingEnv) {
         void showNotification("Dictation copied to clipboard", uncertain
           ? "Some words may already be in the app, so check it first. Then press Shift+Insert or Ctrl+V to paste the rest."
           : "VOCO couldn't paste into the focused app. Press Shift+Insert or Ctrl+V to paste it.").catch(() => {});
+      }
+      // A recognition failure is reported only now that the words recognized
+      // before it are typed or copied; one kept in Review returned above.
+      if (failure) {
+        queue.cancel();
+        throw failure;
       }
       // A desktop dictation that typed all of a finished sentence gets one space
       // after it, pasted on its own as the address bar keeps it, so the next

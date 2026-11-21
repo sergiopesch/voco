@@ -797,6 +797,36 @@ try:
     second, _ = hand_out('paste')
     assert report_on(second) == ('PasteRefused', (second, 'Busy')), reports[-3:]
     assert wait_for(lambda: report_on(first, 0) and field.text() == 'busyx', 2) and len(field.seen('insert', started)) == 1, field.text()
+    # A modifier that goes down under the gesture's Shift: Insert under it would
+    # be another chord, which types nothing while VOCO counted the words as
+    # typed (#354). The companion must send no Insert, bring its Shift back up
+    # alone and refuse, so VOCO keeps the words. Alt goes down at a spread of
+    # moments after VOCO's answer. Wherever it lands, a paste reported done has
+    # typed its text, and at least one refusal must come from under the Shift.
+    ALT_KEY = 56
+    under_shift = []
+    for number in range(40):
+        text = f'underx{number}'
+        field.command('clear', 'cleared'); field.command('copy ' + text, 'copied')
+        request_id, started = hand_out('paste')
+        press_at = started + (2 + number % 9) / 1000
+        while time.monotonic() < press_at: pass
+        mutter_keys.key(ALT_KEY, True)
+        outcome = report_on(request_id)
+        try:
+            assert outcome, 'the companion must report every paste'
+            if outcome[0] == 'PasteDone':
+                assert wait_for(lambda: field.text() == text, 1) and len(field.seen('insert', started)) == 1, \
+                    f'a paste reported done typed nothing with Alt down {number % 9 + 2} ms after the answer'
+            else:
+                assert outcome == ('PasteRefused', (request_id, 'ModifiersHeld')), outcome
+                assert silent_since(started) and field.text() == '', 'a refused paste typed'
+                if field.seen('shift', started): under_shift.append(number % 9 + 2)
+                assert not call('Modifiers').unpack()[0] & 1, 'a refused paste must release its Shift'
+        finally:
+            mutter_keys.key(ALT_KEY, False); pump(.05)
+    assert under_shift, 'no modifier went down under a paste\'s Shift in 40 tries'
+    assert measure(field, via_companion, 'afterheldx')['landed'], 'Paste must work again after a refusal under Shift'
     # GNOME disables the companion at the lock screen; ScreenShield.activate()
     # pushes this session mode.
     before_attach = len(attached)
@@ -853,7 +883,8 @@ try:
         assert measure(field, via_companion, f'aftermenu{status}x')['landed'], f'{status}: a paste after the menu was used must land'
     report['paste']['afterMenu'] = {'statuses': ['recording', 'idle'], 'keyFocusLeftWithApp': True}
     field.close()
-    report['paste'].update(refusals=['held modifier', 'busy', 'unlock-dialog', 'disabled'], modifierRequests=True,
+    report['paste'].update(refusals=['held modifier', 'modifier under Shift', 'busy', 'unlock-dialog', 'disabled'], modifierRequests=True,
+                           refusedUnderShiftMs=under_shift,
                            cutGestureReleasedShift=True)
     # The same, under XWayland: X11 apps get the paste too.
     displays = re.findall(r'Using public X11 display (:\d+)', (evidence / 'shell.log').read_text())

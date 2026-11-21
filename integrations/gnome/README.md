@@ -131,6 +131,12 @@ with `idle` after 20 seconds:
   - Otherwise it sends Shift, Insert and their releases, 12 ms apart, and then
     calls `PasteDone(id, t)` with the Insert press's monotonic time in
     microseconds. VOCO waits up to 1 second for it.
+  - From version 25 it reads the modifiers again just before Insert. One that
+    went down under its Shift, as the shortcut's does when it is pressed to
+    stop just as words go out, would make the paste another chord, which types
+    nothing. It then sends no Insert, releases its Shift and calls
+    `PasteRefused(id, "ModifiersHeld")`. VOCO keeps a refused paste's words and
+    types them once the modifier is up.
   - Disabled mid-gesture, it releases the keys it holds and calls
     `PasteRefused(id, "Disabled")`, which VOCO treats as uncertain.
   - Its metadata names no session modes, so GNOME disables it at the lock
@@ -187,6 +193,9 @@ writes a reproducible archive of the five files, attached to each release.
   - no key arrives from a paste answered with a modifier held, while another
     is in flight, in the `unlock-dialog` session mode or after disabling, and
     each refusal reports why;
+  - with Alt pressed at a spread of moments after VOCO's answer, every paste
+    reported done has typed its text, and one refused under the companion's
+    Shift sent no Insert and left no key down;
   - a modifier request reports the compositor's held modifiers;
   - after the menu was opened with the pointer, an item chosen and VOCO's state
     changed, the Shell's keyboard focus is on the stage and a paste lands.
