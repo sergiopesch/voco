@@ -165,8 +165,11 @@ pub fn admit_toggle(last: &AtomicI64, now: i64, debounce_ms: i64) -> bool {
 }
 
 /// A held key's repeats follow each other at the keyboard's repeat interval,
-/// 20 to 50 ms on the desktops VOCO supports. A `voco --toggle` this soon
-/// after another is one of them, and nobody presses twice this fast.
+/// 20 to 50 ms on the desktops VOCO supports, and a busy desktop can run one
+/// late. A `voco --toggle` this soon after another is taken for a repeat.
+/// That also takes a press this soon after a held key's last repeat for one,
+/// which only has to be pressed again; a late repeat taken for a press would
+/// start or stop a dictation by itself.
 pub const COMMAND_TRAIN: Duration = Duration::from_millis(150);
 /// After this long without a `voco --toggle`, the next is a press: a key
 /// still held would have repeated, since keyboards wait far less than this
@@ -329,6 +332,20 @@ mod tests {
         let mut times = held(0, 500, 30, 2_000);
         times.push(2_400);
         assert_eq!(command_toggles(&times), [0, 2_550]);
+    }
+
+    #[test]
+    fn a_press_is_taken_for_a_repeat_only_right_after_a_held_keys_last_one() {
+        // Held with its last repeat at 1490 ms, then pressed again 110 ms on:
+        // as late as a repeat can run, so it is taken for one.
+        let mut times = held(0, 500, 30, 1_500);
+        assert_eq!(times.last(), Some(&1_490));
+        times.push(1_600);
+        assert_eq!(command_toggles(&times), [0]);
+        // From 150 ms after the last repeat it is a press again.
+        let mut times = held(0, 500, 30, 1_500);
+        times.push(1_640);
+        assert_eq!(command_toggles(&times), [0, 1_790]);
     }
 
     #[test]

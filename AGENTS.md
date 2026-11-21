@@ -569,8 +569,11 @@ and the update check. [The snap](#the-snap) lists its rules.
   a call within 150 ms of the last is a repeat; one after 2 s of silence is a
   press and toggles at once; one in between is a press or a held key's first
   repeat, and toggles 150 ms later unless a repeat follows it. So one key
-  toggles once however long it is held, a second press is never taken for a
-  repeat, and only a press within 2 s of the last call waits those 150 ms.
+  toggles once however long it is held, and only a press within 2 s of the
+  last call waits those 150 ms. A press is taken for a repeat only within
+  150 ms of a held key's last one: a repeat can run that late on a busy
+  desktop, and one taken for a press would start or stop a dictation by
+  itself, where a press lost that way is pressed again.
   The full-app `held-command` case covers it.
 
 ### GNOME companion and tray
