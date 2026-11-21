@@ -790,6 +790,20 @@ fn companion_asks_for_voco() -> Option<bool> {
     Some(false)
 }
 
+/// A companion that sent no Insert held the paste back: it refused, before its
+/// gesture or with a modifier down under its Shift, or never took the request.
+/// The text goes again, as after the portal's keyboard holds one back.
+#[cfg(target_os = "linux")]
+fn companion_failure(failure: crate::panel::CompanionPasteError) -> InsertionError {
+    match failure {
+        crate::panel::CompanionPasteError::NoMutation(message) => InsertionError {
+            held_back: true,
+            ..InsertionError::no_mutation(message)
+        },
+        crate::panel::CompanionPasteError::Uncertain(message) => InsertionError::uncertain(message),
+    }
+}
+
 /// Shift+Insert through the companion or VOCO's virtual keyboard on Wayland, or
 /// xdotool on X11. Returns when the Insert press went out, where the keyboard
 /// reports it.
@@ -798,14 +812,7 @@ fn send_paste_keys(keys: PasteKeys) -> Result<Option<Instant>, InsertionError> {
         #[cfg(target_os = "linux")]
         PasteKeys::Companion => crate::panel::companion_paste()
             .map(Some)
-            .map_err(|failure| match failure {
-                crate::panel::CompanionPasteError::NoMutation(message) => {
-                    InsertionError::no_mutation(message)
-                }
-                crate::panel::CompanionPasteError::Uncertain(message) => {
-                    InsertionError::uncertain(message)
-                }
-            }),
+            .map_err(companion_failure),
         #[cfg(target_os = "linux")]
         PasteKeys::Uinput => crate::virtual_keyboard::paste()
             .map(Some)
@@ -1150,9 +1157,9 @@ fn paste_transaction<T>(
     let keys_started = Instant::now();
     let inserted = send_keys().map_err(|mut error| {
         error.clipboard_changed = true;
-        // A keyboard that saw a modifier go down under its Shift sent no
-        // Insert: nothing was typed, and the text goes again once the
-        // modifier is up, as after the wait above.
+        // A keyboard that says it sent no Insert, as one that saw a modifier
+        // go down under its Shift does, typed nothing: the text goes again
+        // once the modifier is up, as after the wait above.
         if error.held_back {
             return error;
         }
@@ -1730,6 +1737,44 @@ mod tests {
         assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
         assert!(error.clipboard_changed);
         assert!(!keyboard_was_dispatched);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_companion_that_sent_no_insert_keeps_the_text_pending() {
+        use crate::panel::CompanionPasteError;
+        // A refusal, or a request the companion never took: no Insert went
+        // out, so the paste after the copy is no-mutation, not uncertain (#354).
+        let error = paste_transaction(
+            || Ok(()),
+            || Ok(()),
+            || {
+                Err(companion_failure(CompanionPasteError::NoMutation(
+                    "Keyboard modifiers are held; no paste keys were sent.".into(),
+                )))
+            },
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::NoMutation);
+        assert!(error.clipboard_changed && error.held_back);
+        assert_eq!(
+            error.message,
+            "Keyboard modifiers are held; no paste keys were sent."
+        );
+        // A gesture that may have typed stays uncertain.
+        let error = paste_transaction(
+            || Ok(()),
+            || Ok(()),
+            || {
+                Err(companion_failure(CompanionPasteError::Uncertain(
+                    "The GNOME panel's paste may not have finished.".into(),
+                )))
+            },
+        )
+        .map(|_| ())
+        .unwrap_err();
+        assert_eq!(error.outcome, DeliveryOutcome::Uncertain);
     }
 
     #[test]

@@ -270,7 +270,10 @@ The companion types with one Clutter virtual keyboard per enable, inside the
 Shell, so there's no device to settle. It refuses while a modifier is held or
 another paste is in flight, and says why with `PasteRefused`. Otherwise it sends
 Shift, Insert and their releases, 12 ms apart, and reports the Insert press's
-monotonic time with `PasteDone`, which VOCO reads as the press for step 7. VOCO
+monotonic time with `PasteDone`, which VOCO reads as the press for step 7. Just
+before Insert it reads the modifiers again: with one down under its Shift it
+sends no Insert, releases Shift and refuses, and VOCO keeps the words for the
+next paste. VOCO
 accepts a report only from the attached Shell and only for its open request, and
 waits up to 1 second for it. GNOME disables the companion at the lock screen,
 and disabling it mid-gesture releases any key it holds and reports the paste

@@ -357,7 +357,7 @@ fn report_for(id: u32, report: Report) -> Reply {
 /// What a failed companion paste leaves behind.
 #[derive(Debug, PartialEq)]
 pub(crate) enum CompanionPasteError {
-    /// No key was sent, so the text can wait for the next paste.
+    /// No Insert was sent, so the text can wait for the next paste.
     NoMutation(String),
     /// Keys may have been sent.
     Uncertain(String),
@@ -387,8 +387,9 @@ pub(crate) fn companion_paste() -> Result<Instant, CompanionPasteError> {
     }
 }
 
-/// A refusal comes before any key; a gesture cut short by disabling may have
-/// typed.
+/// A refusal sent no Insert: it comes before any key, or with a modifier down
+/// under the gesture's Shift, which then came back up alone. A gesture cut
+/// short by disabling may have typed.
 fn refusal(reason: &str) -> CompanionPasteError {
     match reason {
         "Disabled" => CompanionPasteError::Uncertain(

@@ -12,10 +12,12 @@ const MODIFIERS = Clutter.ModifierType.SHIFT_MASK | Clutter.ModifierType.CONTROL
     Clutter.ModifierType.MOD1_MASK | Clutter.ModifierType.SUPER_MASK |
     Clutter.ModifierType.META_MASK | Clutter.ModifierType.HYPER_MASK |
     Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.MOD5_MASK;
+// The same under a paste's own Shift, which the compositor then reports too.
+const MODIFIERS_UNDER_SHIFT = MODIFIERS & ~Clutter.ModifierType.SHIFT_MASK;
 
 // Observes compositor state; never synthesizes releases of the user's keys.
-export function modifiersClear() {
-    return (global.get_pointer()[2] & MODIFIERS) === 0;
+export function modifiersClear(modifiers = MODIFIERS) {
+    return (global.get_pointer()[2] & modifiers) === 0;
 }
 
 // Types VOCO's paste through one Clutter virtual keyboard inside the Shell: no
@@ -31,7 +33,8 @@ export class Paster {
 
     // Shift, Insert and their releases, PASTE_GAP_MS apart, then PasteDone with
     // the Insert press's monotonic time for VOCO's paste-read detection. A
-    // refusal sends no key and says why.
+    // refusal sends no Insert and says why: before the gesture no key at all,
+    // and under its Shift only that Shift, which comes back up alone.
     paste(id) {
         if (this._paste) {
             this._report('PasteRefused', new GLib.Variant('(us)', [id, 'Busy']));
@@ -59,8 +62,16 @@ export class Paster {
         const steps = [
             () => key(KEY_SHIFT, true),
             () => {
+                // A modifier that went down under this Shift, as the shortcut's
+                // does when it is pressed to stop just as words go out, would
+                // make the paste another chord, which types nothing.
+                if (!modifiersClear(MODIFIERS_UNDER_SHIFT)) {
+                    key(KEY_SHIFT, false);
+                    return 'ModifiersHeld';
+                }
                 key(KEY_INSERT, true);
                 paste.insertUs = GLib.get_monotonic_time();
+                return null;
             },
             () => key(KEY_INSERT, false),
             () => key(KEY_SHIFT, false),
@@ -68,7 +79,12 @@ export class Paster {
         let next = 0;
         const run = () => {
             paste.sourceId = 0;
-            steps[next++]();
+            const refusal = steps[next++]();
+            if (refusal) {
+                this._paste = null;
+                this._report('PasteRefused', new GLib.Variant('(us)', [id, refusal]));
+                return GLib.SOURCE_REMOVE;
+            }
             if (next < steps.length) {
                 paste.sourceId = GLib.timeout_add(GLib.PRIORITY_HIGH, PASTE_GAP_MS, run);
                 return GLib.SOURCE_REMOVE;

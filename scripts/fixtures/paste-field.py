@@ -2,8 +2,8 @@
 """A disposable GTK 3 field for the companion suite's Paste checks.
 
 One focused entry, on Wayland or, with GDK_BACKEND=x11, under XWayland. Each
-line on stdout is JSON with CLOCK_MONOTONIC seconds: every Insert press the
-entry receives, every change of its text, and the replies below. It reads one
+line on stdout is JSON with CLOCK_MONOTONIC seconds: every Insert and Shift
+press the entry receives, every change of its text, and the replies below. It reads one
 command per line on stdin: `copy TEXT` puts TEXT on its own CLIPBOARD, which
 Shift+Insert pastes, and `clear` empties the entry. Synthetic text only."""
 import json
@@ -29,6 +29,8 @@ clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
 def on_key(_widget, event):
     if event.keyval == Gdk.KEY_Insert:
         say(what='insert', shift=bool(event.state & Gdk.ModifierType.SHIFT_MASK))
+    elif event.keyval in (Gdk.KEY_Shift_L, Gdk.KEY_Shift_R):
+        say(what='shift')
     return False
 
 
