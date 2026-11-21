@@ -130,6 +130,12 @@ eleven cases:
   the clip's, the clip's is the system default, and no microphone is chosen in
   VOCO. The window's capture must record from the system default, found by its
   label; otherwise it delivers as in `delivery`.
+- **`recognition-failure`:** the speech worker stops answering once the first
+  words are in the field, and recognition falls three seconds behind. VOCO
+  must type the rest of what it had recognized, end the dictation by itself
+  while the worker still doesn't answer, close its recording stream and notify
+  once. The clip, played again, reaches no field, nothing is copied or kept
+  for Review, and a new dictation delivers as in `delivery`.
 - **`launcher`:** VOCO starts as GIO launches its desktop entry, which names
   `VOCO.desktop` and the process it started. VOCO must open the Ready popover by
   itself once it's ready, with no second launch.

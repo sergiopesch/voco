@@ -212,10 +212,13 @@ describe("Stop while the recognizer is behind capture", () => {
       error => { settled = true; return error as Error; },
     );
     await vi.waitFor(() => expect(h.collect).toHaveBeenCalledOnce());
-    expect(settled).toBe(false);
-    expect(h.buffer.sampleCount).toBe(live.length + tail.length);
-    release();
+    // A failed stream doesn't wait for the worker, which may never answer.
     expect(await stopped).toMatchObject({ message: expect.stringContaining("three seconds") });
+    expect(settled).toBe(true);
+    expect(h.buffer.sampleCount).toBe(live.length + tail.length);
+    // Its late answer adds no words: they would go out after the dictation ended.
+    release();
+    await new Promise(resolve => setTimeout(resolve, 0));
     expect(h.paste).not.toHaveBeenCalled();
     expect(packets()).toHaveLength(1);
     expect(transport.mock.calls.some(([command, { request }]) =>

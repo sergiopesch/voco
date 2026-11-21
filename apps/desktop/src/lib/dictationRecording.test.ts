@@ -9,6 +9,7 @@ import {
   createAudioCaptureBuffer,
 } from "@/lib/audioCaptureBuffer";
 import { AudioCaptureFlushError } from "@/lib/audioCaptureFlush";
+import { RecognitionFailure } from "@/lib/dictationStream";
 import * as session from "@/lib/dictationSession";
 import {
   createDictationRecording,
@@ -241,7 +242,7 @@ it("leaves the microphone to the capture when its access check can't answer", as
   expect(h.captureSelection).toHaveBeenCalledOnce();
 });
 
-it("notifies a live recognition failure once, not again at Stop", async () => {
+it("ends the dictation at a live recognition failure and notifies once", async () => {
   const h = harness();
   failing.add("speech_stream");
   h.env.captureSelectionRef.current = () => ({ backend: "native", selectionToken: "fixture-source" });
@@ -250,14 +251,38 @@ it("notifies a live recognition failure once, not again at Stop", async () => {
   } as unknown as NativeCaptureSession);
   const interrupted = () => h.notify.mock.calls.filter(([title]) => title === "Dictation interrupted");
   await h.startRecording();
-  await vi.waitFor(() => expect(interrupted()).toHaveLength(1));
-  expect(interrupted()[0]![1]).toBe("Some words may be missing. Stop dictation and check your text field.");
-  await h.stopRecording();
-  expect(h.current.current.phase).toBe("idle");
+  // Nothing more will be recognized, so VOCO doesn't go on showing that it
+  // listens until someone presses Stop (#353).
+  await vi.waitFor(() => expect(h.current.current.phase).toBe("idle"));
   expect(h.setError).toHaveBeenLastCalledWith("read-only filesystem.");
+  expect(interrupted()).toHaveLength(1);
+  expect(interrupted()[0]![1]).toBe("Nothing was typed. read-only filesystem.");
+  // A Stop pressed after it finds nothing to stop.
+  await h.stopRecording();
   expect(interrupted()).toHaveLength(1);
   // Live failures notify instead of setting a notice the popover cannot show.
   expect(h.state.setCaptureNotice.mock.calls.every(([notice]) => notice === null)).toBe(true);
+});
+
+it("copies the words a recognition failure left untyped, then reports the interruption", async () => {
+  const h = harness();
+  h.recordingWith(() => Promise.reject(new RecognitionFailure(new Error("worker response timed out"), "rest of the words", false)));
+  await h.stopRecording();
+  expect(h.copy).toHaveBeenCalledExactlyOnceWith("rest of the words");
+  expect(h.notify).toHaveBeenCalledWith("Dictation copied to clipboard", expect.stringContaining("Shift+Insert"));
+  expect(h.notify.mock.calls.filter(([title]) => title === "Dictation interrupted")).toHaveLength(1);
+  expect(h.queue.current).toBeNull();
+  expect(h.current.current.phase).toBe("idle");
+  expect(h.setError).toHaveBeenLastCalledWith("worker response timed out.");
+});
+
+it("copies nothing when a recognition failure left every recognized word typed", async () => {
+  const h = harness();
+  h.recordingWith(() => Promise.reject(new RecognitionFailure(new Error("worker response timed out"), " ", false)));
+  await h.stopRecording();
+  expect(h.copy).not.toHaveBeenCalled();
+  expect(h.notify.mock.calls.map(([title]) => title)).toEqual(["Dictation interrupted"]);
+  expect(h.current.current.phase).toBe("idle");
 });
 
 it("notifies an unverified desktop recording once, at start", async () => {

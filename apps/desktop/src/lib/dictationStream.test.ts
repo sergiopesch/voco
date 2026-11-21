@@ -1,7 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const transport=vi.hoisted(()=>vi.fn().mockResolvedValue({}));
 vi.mock('@tauri-apps/api/core',()=>({invoke:transport}));
-import {appendOnlySuffix,DictationStream,endsSentence,textLengths} from './dictationStream';
+import {appendOnlySuffix,DictationStream,endsSentence,RecognitionFailure,textLengths} from './dictationStream';
 const worker=vi.fn();
 const quality=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='quality');
 const requests=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>!['quality','diagnostic'].includes(r.op));
@@ -187,6 +187,69 @@ describe('append-only dictation stream',()=>{
   const {queue,paste,observed,failure}=make();queue.pushAudio(new Float32Array(3200),16000);await expect(queue.finish()).rejects.toThrow('revised');
   expect(paste).toHaveBeenCalledTimes(1);expect(observed).toHaveBeenLastCalledWith('Hallo');expect(failure).toHaveBeenCalledOnce();
   expect(transport).toHaveBeenCalledWith('speech_stream',{request:expect.objectContaining({op:'diagnostic',reason:'prefix_revision'})});
+ });
+ it('types what it recognized before a recognition failure, then rejects with nothing left',async()=>{
+  // The last letter of each live paste waits for the next words (desktopChunk);
+  // a failure must not leave the word cut off (#353).
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>{
+   if(r.op!=='push')return {...r,mode:'append-only',text:null};
+   if(n===2)throw new Error('worker response timed out');
+   return {...r,mode:'append-only',text:['Please send the','Please send the report to Zoe\u0308 tomorrow '][n++]};});
+  const paste=vi.fn(async(_s:string)=>{}),failure=vi.fn();
+  const queue=new DictationStream(paste,vi.fn(),failure,vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(4800),16000);
+  const error=await queue.finish().then(()=>null,e=>e);
+  expect(error).toBeInstanceOf(RecognitionFailure);
+  expect(error).toMatchObject({message:'worker response timed out',undelivered:' ',uncertain:false});
+  // Every paste still ends inside the words; the trailing space stays behind.
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Please send th','e report to Zoe\u0308 tomorro','w']);
+  expect(failure).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({message:'worker response timed out'}),'recognition');
+  // No finish was sent, and nothing goes out afterwards.
+  expect(requests().some(r=>r.op==='finish')).toBe(false);
+  queue.pushAudio(new Float32Array(1600),16000);await new Promise(resolve=>setTimeout(resolve,0));
+  expect(paste).toHaveBeenCalledTimes(3);
+ });
+ it('types what it recognized when recognition fails at Stop',async()=>{
+  worker.mockImplementation(async(_c,{request:r})=>{
+   if(r.op==='finish')throw new Error('worker response timed out');
+   return {...r,mode:'append-only',text:r.op==='push'?'Hello world':null};});
+  const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(1600),16000);queue.enqueue();
+  await expect(queue.finish()).rejects.toMatchObject({name:'RecognitionFailure',message:'worker response timed out',undelivered:''});
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello worl','d']);
+ });
+ it('rejects with the recognized words a failed paste left untyped',async()=>{
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>{
+   if(r.op!=='push')return {...r,mode:'append-only',text:null};
+   if(n===1)throw new Error('worker response timed out');
+   n++;return {...r,mode:'append-only',text:'Synthetic phrase'};});
+  const paste=vi.fn(async(_s:string)=>{throw noMutation;});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(3200),16000);
+  const error=await queue.finish().then(()=>null,e=>e);
+  // Nothing was typed, so the whole text is what remains, for the copy.
+  expect(error).toBeInstanceOf(RecognitionFailure);
+  expect(error).toMatchObject({undelivered:'Synthetic phrase',uncertain:false});
+  expect(paste.mock.calls.every(c=>c[0]==='Synthetic phras'||c[0]==='Synthetic phrase')).toBe(true);
+  expect(paste.mock.calls[paste.mock.calls.length-1]![0]).toBe('Synthetic phrase');
+ });
+ it('appends the recognized rest to a browser field exactly after a failure',async()=>{
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>{
+   if(r.op!=='push')return {...r,mode:'append-only',text:null};
+   if(n===1)throw new Error('worker response timed out');
+   n++;return {...r,mode:'append-only',text:'Hello there '};});
+  const {queue,paste}=make();queue.pushAudio(new Float32Array(3200),16000);
+  await expect(queue.finish()).rejects.toMatchObject({undelivered:' '});
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello there']);
+ });
+ it('leaves revised words untyped and offers none of them for a copy',async()=>{
+  let n=0;worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='start'?null:['Hello there','Hallo'][n++]}));
+  const paste=vi.fn(async(_s:string)=>{});
+  const queue=new DictationStream(paste,vi.fn(),vi.fn(),vi.fn(),undefined,true,false,true);
+  queue.pushAudio(new Float32Array(3200),16000);
+  await expect(queue.finish()).rejects.toMatchObject({message:expect.stringContaining('revised'),undelivered:''});
+  expect(paste.mock.calls.map(c=>c[0])).toEqual(['Hello ther']);
  });
  it('preserves the native insertion rejection message for recovery',async()=>{
   worker.mockImplementation(async(_c,{request:r})=>({...r,mode:'append-only',text:r.op==='push'?'Synthetic phrase':null}));

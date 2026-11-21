@@ -316,7 +316,9 @@ rm -f ~/.config/autostart/voco-login.desktop
   pause, because it would also end sentences where you only pause to think
   ([the measurements](../research/pause-sentence-ends-2026-10/README.md)).
 - If recognition falls more than three seconds behind, or revises words it has
-  already given, VOCO stops transcribing and shows **Dictation interrupted**.
+  already given, VOCO types the words it had already recognised, stops
+  listening and shows **Dictation interrupted**. What you say after that isn't
+  heard, so start again.
 - On Wayland, typing needs access to `/dev/uinput`, which the package gives only
   the user of the active local session. Outside GNOME 46, 48, 50 and 51, the
   shortcut also needs a desktop binding. The snap types on Wayland only on
