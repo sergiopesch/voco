@@ -192,18 +192,21 @@ bracketed paste on. Answer a waiting prompt yourself, then dictate.
 
 ## Dictation interrupted
 
-VOCO stops transcribing and shows **Dictation interrupted** when it can't trust
+VOCO stops listening and shows **Dictation interrupted** when it can't trust
 the rest of the recording:
 
 | Cause | What to do |
 | --- | --- |
 | The microphone disconnected, stopped sending audio or was muted by the system | Check the connection and your sound settings. |
-| Recognition fell more than three seconds behind | Close busy programs. Recognition uses up to four processor threads. |
+| Recognition fell more than three seconds behind | Close busy programs. Recognition uses up to four processor threads, and one on a computer with two processors, where another busy program is enough to slow it. |
 | Recognition revised words it had already given | Start again. |
 | VOCO's window stopped unexpectedly and has restarted | Start again. What VOCO heard is in [Review](everyday-use.md#review). |
 
-The words VOCO already typed stay in your app. Words it hadn't typed yet aren't
-kept, so check the end of your text before you continue.
+The words VOCO already typed stay in your app. When recognition fell behind
+or stopped answering, VOCO first types the words it had already recognised,
+and copies them to the clipboard if it can't. In the other cases, words it
+hadn't typed yet aren't kept. Either way VOCO heard nothing after the
+interruption, so check the end of your text and start again.
 
 On X11, **Dictation won't be typed** means VOCO can't confirm it receives all of
 your audio. Stop and try again. If it happens again, quit and reopen VOCO.

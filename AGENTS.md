@@ -162,7 +162,11 @@ and the update check. [The snap](#the-snap) lists its rules.
 - Audio from the unverified ScriptProcessor fallback never enters automatic
   delivery.
 - VOCO never recognizes audio a second time. A failed recording notifies and
-  returns to idle; the voice test's "Test again" records anew.
+  returns to idle; the voice test's "Test again" records anew. A desktop or
+  browser dictation ends the moment recognition fails, without waiting for a
+  Stop or for the worker, which may never answer: VOCO never shows that it
+  listens while nothing is recognized. The full-app `recognition-failure` case
+  covers it.
 - Spelling never breaks append-only delivery. `speech_stream.rs` adds the saved
   spelling to each session start, and a start without one is as recognized. The
   worker converts the whole hypothesis (`spelling.py`), a push returns only text
@@ -423,6 +427,13 @@ and the update check. [The snap](#the-snap) lists its rules.
   copy fails too, `keep_crash_journal` moves the text into Review; only if the
   journal can't keep it does Stop report an interruption. A Chromium exact-field
   session whose field stopped taking text ends the same way.
+- A recognition failure ends the dictation as a Stop does, and only then is
+  reported. What the pushes had returned before it is final, so the part still
+  untyped, at least the letter each live paste holds back, goes out first as
+  the final text does, without its trailing space; what can't be pasted is
+  copied, or kept in Review, as above. Words recognition revised are the
+  exception: they stay untyped and uncopied. An answer that arrives after the
+  failure adds no words.
 - When a desktop dictation's whole final text went out, with no cancel or
   failed or uncertain paste, and it ends a sentence (`endsSentence`: . ? ! or …,
   perhaps before closing quotes or brackets), Stop pastes one space on its own
@@ -678,9 +689,9 @@ and the update check. [The snap](#the-snap) lists its rules.
 
 - Normal completion and handled failures clear text and audio and delete the
   active checkpoint; they never expose a saved transcript.
-- Only an earlier unexpected exit, a replaced renderer, or a Stop that could neither
-  paste nor copy its remainder, puts text into Review. Review never opens, pastes
-  or retries by itself.
+- Only an earlier unexpected exit, a replaced renderer, or a Stop or a
+  recognition failure that could neither paste nor copy its remainder, puts
+  text into Review. Review never opens, pastes or retries by itself.
 - When WebKit's web process crashes, VOCO reloads the window, at most three times
   in five minutes. `renderer_replaced` runs on every main page load and on a
   refused reload: toggles wait for the next renderer, the active entry moves to

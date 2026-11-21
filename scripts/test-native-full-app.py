@@ -39,7 +39,14 @@ default-microphone: the sound server lists a silent microphone before the fixtur
 fixture's is the system default, no microphone is chosen in VOCO and nothing in VOCO's
 environment names a source. The window's capture must record from the system default, not
 from the first microphone WebKit lists (#335). Otherwise it delivers as in delivery.
-Every dictation case fails on IBus preedit or commit, a non-append field change, paste
+recognition-failure: the speech worker stops answering once the first words have reached
+A, as when a processor can't keep up, and recognition falls three seconds behind. VOCO
+must type the rest of what it had recognized, so no word ends cut off, then end the
+dictation by itself while the worker still doesn't answer: its recording stream closes,
+the tray returns to Ready and one notification says so. The fixture, played again,
+reaches no field; nothing is copied or kept for Review. A new dictation then delivers
+as in delivery (#353).
+Every other dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
 launcher: VOCO starts as GIO launches its desktop entry, naming VOCO.desktop and this
@@ -69,7 +76,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone', 'recognition-failure', 'launcher', 'autostart'], 'Unsupported native application case'
 # What the harness presses, for xdotool and for the stop gesture's fixture.
 SHORTCUT = dict(keys='super+x', name='Super+X') if case == 'super-key' else dict(keys='alt+d', name='Alt+D')
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
@@ -406,6 +413,7 @@ if case in LAUNCH:
 app = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=app_env)
 passed, failure, window_id, before_switch = False, None, None, None
 selections, tray_state, popup, popover, diagnostic_errors, confinement = {}, None, None, None, [], None
+recognition_failure = None
 stop_gesture = None
 try:
     assert shutil.which('xclip') and shutil.which('xdotool'), 'X11 paste needs xclip and xdotool on PATH'
@@ -461,6 +469,103 @@ try:
     field.set_position(-1)
     pump(1)
     assert not mutations and field.get_text() == other.get_text() == '', 'A GTK field changed before dictation'
+    if case == 'recognition-failure':
+        def until(predicate, description, timeout=20):
+            # wait_for stops at the failure this case causes.
+            deadline = time.monotonic() + timeout
+            while not predicate():
+                assert app.poll() is None, 'VOCO exited before ' + description
+                assert time.monotonic() < deadline, 'Timed out waiting for %s; last trace events: %s' % (description, [x.get('event') for x in traces()[-8:]])
+                pump(.05)
+        def speech_workers():
+            found = []
+            for proc in Path('/proc').glob('[0-9]*'):
+                try:
+                    if any(arg.endswith(b'/stream_worker.py') for arg in (proc / 'cmdline').read_bytes().split(b'\0')):
+                        found.append(int(proc.name))
+                except OSError:
+                    pass # gone
+            return found
+        def recording_streams():
+            # The window's own: the fixture's remapped source holds one of its own throughout.
+            outputs = subprocess.check_output([os.environ['VOCO_NATIVE_PACTL'], 'list', 'source-outputs'], text=True)
+            return [block for block in outputs.split('Source Output #') if 'WebKitWebProcess' in block]
+        def ready():
+            return any(label.startswith('VOCO — Ready') for label in tray_menus())
+        def selection(name):
+            return subprocess.run(['xclip', '-o', '-selection', name], capture_output=True, text=True, timeout=3).stdout
+        notifications = lambda: sum(n for event, n in counts().items() if event.startswith('desktop_notification_'))
+        notified = notifications()
+        final = 'Go do you hear?'
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        wait_for(lambda: counts()['recording_state_active'] > 0, 'capture before the failure')
+        assert recording_streams(), 'VOCO opened no recording stream'
+        player = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
+        wait_for(lambda: field.get_text() != '', 'the first words to reach field A', timeout=30)
+        workers = speech_workers()
+        assert len(workers) == 1, 'VOCO should run one speech worker: %r' % workers
+        os.kill(workers[0], signal.SIGSTOP)
+        paused = time.monotonic()
+        # A paste dispatched just before the pause still lands.
+        pump(.3)
+        held = field.get_text()
+        try:
+            # A live paste ends inside the words: its last letter waits for the next ones.
+            assert final.startswith(held) and held != final, 'Field A did not hold a live paste of the fixture: %r' % held
+            until(lambda: counts()['dictation_desktop_stream_failed'] > 0, 'recognition to fall three seconds behind', timeout=10)
+            failed_after = time.monotonic() - paused
+            # VOCO ends the dictation itself, while the worker still doesn't answer.
+            until(lambda: counts()['dictation_interrupted'] > 0 and ready(), 'VOCO to end the dictation by itself', timeout=10)
+            ended_after = time.monotonic() - paused
+            until(lambda: not recording_streams(), 'VOCO to close its recording stream', timeout=5)
+            until(lambda: notifications() > notified, 'VOCO to say the dictation was interrupted', timeout=5)
+        finally:
+            try:
+                os.kill(workers[0], signal.SIGCONT)
+            except ProcessLookupError:
+                pass # VOCO gave up on a worker that never answered
+        assert player.wait(timeout=10) == 0, 'paplay failed'
+        pump(1)
+        typed = field.get_text()
+        assert typed.startswith(held) and len(typed) > len(held) and final.startswith(typed), \
+            'VOCO did not type the rest of what it had recognized: %r, then %r' % (held, typed)
+        c = counts()
+        assert c['dictation_recording_stopped'] == 1 and not c['dictation_stop_to_idle'], 'The failed dictation did not end as an interruption'
+        assert not c['dictation_desktop_remainder_copied'] and not c['dictation_desktop_remainder_kept'], 'VOCO copied or kept words it had typed'
+        assert selection('clipboard') == selection('primary') == typed[len(held):], 'The selections do not hold the last paste'
+        assert notifications() == notified + 1, 'VOCO notified more than once for one failure'
+        assert not list((root / 'state/voco/crash-recovery').glob('*')), 'The interrupted dictation left a checkpoint or a Review entry'
+        # What is said after the failure reaches no field: VOCO no longer listens.
+        play_again = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
+        assert play_again.wait(timeout=10) == 0, 'paplay failed'
+        pump(2)
+        assert field.get_text() == typed and other.get_text() == '', 'Text reached a field after the dictation had ended'
+        assert not recording_streams() and counts()['recording_state_active'] == 1, 'VOCO recorded again by itself'
+        recognition_failure = dict(heldAtPause=held, typedAfterFailure=typed, failedAfterSeconds=round(failed_after, 2),
+                                   endedAfterSeconds=round(ended_after, 2), notifications=notifications() - notified)
+        # The next dictation works: the same worker, awake again, takes a new session.
+        field.set_text('')
+        pump(.3)
+        mutations.clear()
+        before = counts()
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'alt+d'], check=True)
+        until(lambda: counts()['recording_state_active'] > before['recording_state_active'], 'capture after the failure')
+        again = subprocess.Popen([os.environ['VOCO_NATIVE_PAPLAY'], '--device=fixture', str(sound)])
+        assert again.wait(timeout=10) == 0, 'paplay failed'
+        pump(.6)
+        subprocess.check_output(['/usr/bin/python3', str(repo / 'scripts/fixtures/x11-shortcut.py')], env={**os.environ, 'VOCO_NATIVE_SHORTCUT': SHORTCUT['name']})
+        until(lambda: counts()['dictation_stop_to_idle'] > before['dictation_stop_to_idle'], 'the next dictation to return to idle', timeout=35)
+        pump(1)
+        c = counts()
+        assert c['dictation_desktop_stream_failed'] == before['dictation_desktop_stream_failed'], 'The next dictation failed too'
+        assert words(field.get_text()) == expected and other.get_text() == '', 'The next dictation did not deliver exactly once: %r' % field.get_text()
+        history = [''] + [m['text'] for m in mutations if m['field'] == 'A']
+        assert all(after.startswith(earlier) and len(after) > len(earlier) for earlier, after in zip(history, history[1:])), 'Field A changed other than by appended paste'
+        assert speech_workers() == workers, 'The next dictation did not reuse the speech worker'
+        until(ready, 'the tray to report Ready', timeout=5)
+        tray_state = dict(status=[label for label in tray_menus() if label.startswith('VOCO — ')])
+        passed = True
+        raise SystemExit(0)
     if case == 'lock':
         def refused_while_locked(attempt):
             started = counts()['recording_state_active']
@@ -661,7 +766,7 @@ finally:
                   selections=selections, traceCounts=dict(sorted(c.items())), captureRoute=capture, focus=focus_log, harnessWindow=window_id,
                   tray=tray_state, popoverWindow=popup, popover=popover, helpers={name: bool(shutil.which(name)) for name in ['xclip', 'xdotool']},
                   diagnosticErrors=diagnostic_errors, workerConfinement=confinement, windowHistory=window_history,
-                  stopGesture=stop_gesture,
+                  stopGesture=stop_gesture, recognitionFailure=recognition_failure,
                   engineSourceHashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in root.glob('voco_ibus_*.py')},
                   fixtureSha256=None if case in LAUNCH else hashlib.sha256(sound.read_bytes()).hexdigest(),
                   appSha256=app_hash,

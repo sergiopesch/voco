@@ -83,6 +83,15 @@ export function textLengths(text: string, prefix: string): Record<string, number
   };
 }
 
+/** What finish() rejects with after a recognition failure: the failure's own
+ * message, and what was recognized before it and still isn't typed. */
+export class RecognitionFailure extends Error {
+  constructor(cause: Error, readonly undelivered: string, readonly uncertain: boolean) {
+    super(cause.message, { cause });
+    this.name = "RecognitionFailure";
+  }
+}
+
 export class DictationStream {
   private pending: Promise<void> = Promise.resolve();
   private cancelled = false;
@@ -122,6 +131,12 @@ export class DictationStream {
   private qualityDropped = 0;
   private quietSamples = 0;
   private released = false;
+  // After a recognition failure, finish() types what was recognized and not
+  // yet typed. A revision is the one failure whose untyped words are suspect.
+  private salvaging = false;
+  private revised = false;
+  private signalFailure: () => void = () => {};
+  private readonly failed = new Promise<void>((resolve) => { this.signalFailure = resolve; });
 
   private quality(event: string, fields: Record<string, number | boolean | string | null> | (() => Record<string, number | boolean | string | null>) = {}) {
     if (!this.recordDeliveryQuality) return;
@@ -181,7 +196,9 @@ export class DictationStream {
       this.deliveryFailure = failure;
     } else {
       this.failure = failure;
+      this.revised = reason === "prefix_revision";
       this.buffered = [];
+      this.signalFailure();
     }
     void invoke("speech_stream", {
       request: { op: "diagnostic", reason, session: this.session, dictation_session_id: this.dictationSessionId },
@@ -212,7 +229,9 @@ export class DictationStream {
           request: { op, audio, rate, session: this.session, seq, dictation_session_id: this.dictationSessionId, queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd,
             ...(op === "start" && this.wordsCheck ? { words_check: true } : {}) },
         });
-        if (this.cancelled) return;
+        // A stream that failed takes no late answer: finish() doesn't wait for
+        // one, and its words would go out after the dictation had ended.
+        if (this.cancelled || this.failure) return;
         phase = "response_invalid";
         if (response.session !== this.session || response.seq !== seq || response.mode !== "append-only") {
           throw new Error("Unexpected recognizer response");
@@ -256,13 +275,19 @@ export class DictationStream {
     });
   }
 
+  /** Whether pastes have stopped: a cancel, a failed paste, or a recognition
+   * failure until finish() lets the recognized rest go. */
+  private halted() {
+    return this.cancelled || this.deliveryFailure !== null || (this.failure !== null && !this.salvaging);
+  }
+
   private deliver() {
-    if (this.delivering || this.cancelled || this.failure || this.deliveryFailure) return;
+    if (this.delivering || this.halted()) return;
     this.delivering = true;
     this.delivery = (async () => {
       let pendingSince: number | null = null;
       try {
-        while (!this.cancelled && !this.failure && !this.deliveryFailure) {
+        while (!this.halted()) {
           const suffix = appendOnlySuffix(this.committed, this.latest);
           const chunk = this.deliverable(suffix);
           if (!chunk) break;
@@ -331,6 +356,9 @@ export class DictationStream {
     const space = this.spacesInsidePastes ? leadingBlanks.exec(suffix)?.[0] : undefined;
     if (space) return space;
     if (this.finishResponded) return suffix;
+    // Nothing extends a failed stream's text either, but no finish confirmed
+    // it, so its trailing space stays behind, as at a quiet release.
+    if (this.salvaging) return suffix.replace(trailingBlanks, "");
     if (!this.spacesInsidePastes) return suffix.trimEnd();
     return this.released ? suffix.replace(trailingBlanks, "") : desktopChunk(suffix);
   }
@@ -407,24 +435,33 @@ export class DictationStream {
     });
   }
 
-  /** Rejects only for recognition failures. `undelivered` is recognized text
-   * that was not typed; when `uncertain`, its first chunk may have been.
-   * `complete` says the whole final text went out, without a cancel or a
-   * failed paste, and `text` is what went out. */
+  /** Rejects only for recognition failures, with a RecognitionFailure.
+   * `undelivered` is recognized text that was not typed; when `uncertain`,
+   * its first chunk may have been. `complete` says the whole final text went
+   * out, without a cancel or a failed paste, and `text` is what went out.
+   * A recognition failure first lets the words recognized before it go out,
+   * as the final text does: every push returned only words no later one could
+   * change. Words that recognition revised are the exception, and stay
+   * untyped. A failure also ends the wait for the worker, which may never
+   * answer. */
   async finish(): Promise<{ undelivered: string; uncertain: boolean; complete: boolean; text: string }> {
-    await this.pending;
+    await Promise.race([this.pending, this.failed]);
     await this.delivery;
+    if (this.failure && !this.revised && !this.cancelled) {
+      this.salvaging = true;
+      this.deliver();
+      await this.delivery;
+    }
     // Deferred ("no-mutation") text gets a few bounded retries at Stop.
-    for (let attempt = 0; attempt < 3 && this.ready()
-      && !this.cancelled && !this.failure && !this.deliveryFailure; attempt++) {
+    for (let attempt = 0; attempt < 3 && this.ready() && !this.halted(); attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 250));
       this.deliver();
       await this.delivery;
     }
     this.terminal();
-    if (this.failure) throw this.failure;
+    const undelivered = this.cancelled || this.revised ? "" : this.latest.slice(this.committed.length);
+    if (this.failure) throw new RecognitionFailure(this.failure, undelivered, this.deliveryUncertain);
     const complete = !this.cancelled && !this.deliveryFailure && this.finishResponded && this.latest === this.committed;
-    return { undelivered: this.cancelled ? "" : this.latest.slice(this.committed.length), uncertain: this.deliveryUncertain,
-      complete, text: this.committed };
+    return { undelivered, uncertain: this.deliveryUncertain, complete, text: this.committed };
   }
 }

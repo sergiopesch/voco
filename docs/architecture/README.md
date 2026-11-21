@@ -305,8 +305,13 @@ confirm its flush within 80 ms, or VOCO doesn't finish the recording. Then:
   words may already be in the app.
 - If that copy fails too, the text moves to Review ("Dictation saved in
   Review").
-- A recognition failure or a capture interruption copies nothing. VOCO notifies
-  "Dictation interrupted" and asks you to check the text field.
+- A recognition failure ends the dictation at once, without a Stop and
+  without waiting for the worker. The words recognized before it are final, so
+  what isn't typed yet goes out as above: pasted, else copied, else kept in
+  Review. Then VOCO notifies "Dictation interrupted". Words recognition revised
+  stay untyped.
+- A capture interruption copies nothing. VOCO notifies "Dictation interrupted"
+  and asks you to check the text field.
 
 ## Shortcuts
 
