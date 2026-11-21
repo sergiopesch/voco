@@ -233,7 +233,11 @@ shortcut can't reach VOCO yet" once, with the same fix.
 `voco --toggle` connects once to VOCO's owner-only socket,
 `$XDG_RUNTIME_DIR/voco.sock`; the connection is the request. It never launches
 VOCO, doesn't report whether recording started, and exits 1 with "Could not
-reach VOCO's private control socket" when VOCO isn't running. VOCO briefly holds
+reach VOCO's private control socket" when VOCO isn't running. A desktop runs
+the command again for each repeat while the key is held; VOCO takes those
+for what they are, so one press toggles once however long you hold it. A press
+within 2 seconds of the last takes effect 150 ms later, the time VOCO needs to
+tell it from a repeat. VOCO briefly holds
 Shift while it pastes, so bind the key with modifiers ignored, or add a second
 binding with Shift, such as F8 and Shift+F8. [Install VOCO](../install.md) lists
 the settings for common desktops.

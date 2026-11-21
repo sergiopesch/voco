@@ -2036,6 +2036,37 @@ fn install_socket_cleanup_signal_handler() {
     }
 }
 
+/// A `voco --toggle` outside the snap, from a desktop shortcut that runs it
+/// for the press and for each repeat while its key is held. Only a press
+/// toggles. One that could still be a held key's first repeat waits
+/// `COMMAND_TRAIN` for the repeat that would follow it (shortcut_arbitration.rs).
+fn command_toggle(app_handle: &tauri::AppHandle) {
+    use shortcut_arbitration::{CommandCall, CommandCalls, COMMAND_TRAIN};
+    static CALLS: Mutex<CommandCalls> = Mutex::new(CommandCalls::new());
+    fn calls() -> std::sync::MutexGuard<'static, CommandCalls> {
+        CALLS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+    let (earlier, call) = calls().note(Instant::now());
+    if earlier {
+        eval_toggle_with_backend(app_handle, "socket");
+    }
+    match call {
+        CommandCall::Press => eval_toggle_with_backend(app_handle, "socket"),
+        CommandCall::Repeat => trace_hotkey_event("socket_toggle_repeat_ignored", Some("socket")),
+        CommandCall::Unsettled(serial) => {
+            let app = app_handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(COMMAND_TRAIN);
+                if calls().settle(serial) {
+                    eval_toggle_with_backend(&app, "socket");
+                }
+            });
+        }
+    }
+}
+
 fn start_socket_listener(app_handle: tauri::AppHandle) {
     let paths = match trigger_socket::paths() {
         Ok(paths) => paths,
@@ -2072,11 +2103,15 @@ fn start_socket_listener(app_handle: tauri::AppHandle) {
                         // call VOCO, with no release to wait for, and again for
                         // each repeat while the chord is held (gnome_shortcut.rs).
                         #[cfg(target_os = "linux")]
-                        if confinement::is_snap() && !gnome_shortcut::note_command_press() {
-                            trace_hotkey_event("socket_toggle_repeat_ignored", Some("socket"));
+                        if confinement::is_snap() {
+                            if gnome_shortcut::note_command_press() {
+                                eval_toggle_with_backend(&handle, "socket");
+                            } else {
+                                trace_hotkey_event("socket_toggle_repeat_ignored", Some("socket"));
+                            }
                             continue;
                         }
-                        eval_toggle_with_backend(&handle, "socket");
+                        command_toggle(&handle);
                     }
                     Err(error) => {
                         warn!("Socket accept error (will rebind): {error}");

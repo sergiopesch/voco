@@ -328,7 +328,7 @@ it is.
 | Passive evdev | Wayland with Super+X, Alt+D or Alt+Shift+D | Reads keyboards in `/dev/input` and needs read access to them. A keyboard counts for a preset only when it has that chord's modifier, Shift if it names Shift, and letter; the chord matches with exactly its own modifiers held on any keyboard. The focused app also receives the chord. |
 | X11 grab | X11, any valid shortcut | A key grab on the root window and on each top-level window consumes the chord and toggles on release, so the paste keys reach the app. |
 | IBus engine | The VOCO Dictation input source is selected | Protocol 6. Consumes the chord in IBus-aware fields and changes no text. |
-| `voco --toggle` | Any desktop binding | Connects once to the owner-only socket. The connection itself is the request. |
+| `voco --toggle` | Any desktop binding | Connects once to the owner-only socket. The connection itself is the request. A desktop runs it again for each repeat of a held key, so outside the snap `CommandCalls` tells a repeat by what follows: a call within 150 ms of the last is one, and a call within 2 s of the last toggles 150 ms later unless a repeat follows it. |
 
 The companion holds a 2.5-second lease on the exact configured accelerator and
 renews it about once a second. While the lease is fresh, evdev ignores the

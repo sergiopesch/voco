@@ -562,6 +562,16 @@ and the update check. [The snap](#the-snap) lists its rules.
   launch/focus side effects; it doesn't prove a compositor binding exists. Document
   modifier-independent Hyprland bindings, or explicitly checked Ctrl/Shift variants
   on other compositors, and never silently overwrite desktop shortcuts.
+- Outside the snap, a desktop shortcut runs `voco --toggle` for the press and
+  again for each repeat while its key is held, within a few milliseconds each,
+  and reports no release. VOCO can't read every desktop's repeat delay, so it
+  tells a repeat by what follows (`CommandCalls` in `shortcut_arbitration.rs`):
+  a call within 150 ms of the last is a repeat; one after 2 s of silence is a
+  press and toggles at once; one in between is a press or a held key's first
+  repeat, and toggles 150 ms later unless a repeat follows it. So one key
+  toggles once however long it is held, a second press is never taken for a
+  repeat, and only a press within 2 s of the last call waits those 150 ms.
+  The full-app `held-command` case covers it.
 
 ### GNOME companion and tray
 
