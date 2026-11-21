@@ -299,9 +299,14 @@ and the update check. [The snap](#the-snap) lists its rules.
   It refuses while a modifier is held or another paste is in flight. Otherwise
   it sends Shift, Insert and their releases, 12 ms apart and never another key,
   then reports the Insert press's monotonic time with `PasteDone`; a refusal
-  reports its reason with `PasteRefused`. VOCO accepts a report only from the
+  reports its reason with `PasteRefused`. From version 25 it reads the
+  modifiers once more just before Insert, as the portal's keyboard does: one
+  that went down under its Shift would make the paste another chord that types
+  nothing while VOCO counted the words as typed. Shift then comes back up
+  alone and the paste is refused. VOCO accepts a report only from the
   attached Shell and only for its open request. A refusal, a companion that isn't
-  attached, or one without a pending request, typed nothing: `no-mutation`. No
+  attached, or one without a pending request, sent no Insert: `no-mutation`
+  though the clipboard changed, its text pending like any other. No
   report within 1 s, or a gesture cut short when the companion is disabled, is
   uncertain; disabling releases any key it holds. GNOME disables the companion
   at the lock screen, since its metadata names no session modes and
@@ -358,7 +363,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   every paste of every measurement must land, and one measurement within the
   bound passes. A paste answered with a modifier held, while another is in flight,
   in the `unlock-dialog` session mode or after the companion is disabled sends
-  no key. A paste lands after the menu was opened, an item chosen and VOCO's
+  no key. A modifier pressed under the companion's Shift gets no Insert and a
+  refusal, never a paste reported done that typed nothing. A paste lands after the menu was opened, an item chosen and VOCO's
   state changed, with the Shell's keyboard focus left on the stage. The application job's GNOME Wayland delivery runs through the
   companion as well as through uinput. CI's snap probe proves the confinement
   the protocol relies on: a strict snap with a session `dbus` slot answers an
