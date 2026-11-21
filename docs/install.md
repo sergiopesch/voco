@@ -320,6 +320,9 @@ second binding for Shift+F8.
 | KDE Plasma | System Settings → Keyboard → Shortcuts. Add the command `voco --toggle`, then assign F8 and Shift+F8. |
 | Hyprland (Lua configuration) | `hl.bind("F8", hl.dsp.exec_cmd("voco --toggle"), { ignore_mods = true })` |
 
+Holding the key down toggles once, like a tap: your desktop runs the command
+again for each repeat, and VOCO ignores those.
+
 Don't hold Alt or Super when you press the key to stop. They can change the
 final paste or open app menus. Test start and stop in the app you plan to use.
 VOCO can't see which key your desktop assigned, so its Shortcut page keeps

@@ -46,6 +46,12 @@ dictation by itself while the worker still doesn't answer: its recording stream 
 the tray returns to Ready and one notification says so. The fixture, played again,
 reaches no field; nothing is copied or kept for Review. A new dictation then delivers
 as in delivery (#353).
+held-command: no shortcut is pressed. `voco --toggle` runs as a desktop shortcut runs it
+for a key held a second and a half: once, then at GNOME's default repeat, every 30 ms
+from 500 ms on. One held key must start one dictation and, after the fixture, another
+held key must stop it, with the words delivered as in delivery. Two single runs half a
+second apart, where a held key's first repeat would come, must then start and stop a
+dictation: a second press is not taken for a repeat (#356).
 Every other dictation case fails on IBus preedit or commit, a non-append field change, paste
 refusal or failure, a copied remainder, recovery or fallback capture, then checks the real
 tray menu and the Ready popover through AT-SPI.
@@ -63,6 +69,7 @@ import re
 import shutil
 import signal
 import subprocess
+import threading
 import time
 import gi
 
@@ -76,7 +83,7 @@ assert os.environ['XDG_RUNTIME_DIR'] == str(root / 'runtime')
 assert os.environ['PULSE_SERVER'] == 'unix:' + str(root / 'runtime/pulse.sock')
 assert os.environ['DISPLAY'] == ':0'
 case = os.environ.get('VOCO_NATIVE_APP_CASE', 'delivery')
-assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone', 'recognition-failure', 'launcher', 'autostart'], 'Unsupported native application case'
+assert case in ['delivery', 'focus-switch', 'spelling', 'lock', 'web-process', 'modifier-hold', 'slow-reader', 'super-key', 'default-microphone', 'recognition-failure', 'held-command', 'launcher', 'autostart'], 'Unsupported native application case'
 # What the harness presses, for xdotool and for the stop gesture's fixture.
 SHORTCUT = dict(keys='super+x', name='Super+X') if case == 'super-key' else dict(keys='alt+d', name='Alt+D')
 trace_path = root / 'state/voco/hotkey-trace.jsonl'
@@ -563,6 +570,67 @@ try:
         assert all(after.startswith(earlier) and len(after) > len(earlier) for earlier, after in zip(history, history[1:])), 'Field A changed other than by appended paste'
         assert speech_workers() == workers, 'The next dictation did not reuse the speech worker'
         until(ready, 'the tray to report Ready', timeout=5)
+        tray_state = dict(status=[label for label in tray_menus() if label.startswith('VOCO — ')])
+        passed = True
+        raise SystemExit(0)
+    if case == 'held-command':
+        def command():
+            return subprocess.Popen([str(root / 'voco'), '--toggle'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        def hold(delay_ms=500, interval_ms=30, held_ms=1500):
+            """`voco --toggle` for one press and each repeat of a key held this long."""
+            calls = []
+            def run():
+                started = time.monotonic()
+                calls.append(command())
+                due = delay_ms
+                while due <= held_ms:
+                    while (time.monotonic() - started) * 1000 < due:
+                        time.sleep(.001)
+                    calls.append(command())
+                    due += interval_ms
+            # On its own thread: the fields are this process's, and a paste that
+            # lands while the key is held needs them to keep reading.
+            holding = threading.Thread(target=run)
+            holding.start()
+            while holding.is_alive():
+                pump(.02)
+            assert all(call.wait(timeout=5) == 0 for call in calls), 'voco --toggle could not reach VOCO'
+            return len(calls)
+        def toggles():
+            c = counts()
+            return dict(received=c['socket_toggle_received'], ignored=c['socket_toggle_repeat_ignored'], emitted=c['toggle_event_emitted'],
+                        started=c['recording_state_active'], stopped=c['dictation_recording_stopped'], idle=c['dictation_stop_to_idle'])
+        def since(before):
+            now = toggles()
+            return {name: now[name] - before[name] for name in now}
+        before = toggles()
+        calls = hold()
+        wait_for(lambda: counts()['recording_state_active'] > 0, 'the held key to start a dictation')
+        pump(1.5)
+        seen = since(before)
+        assert seen['received'] == calls, 'VOCO missed some of the %d runs: %r' % (calls, seen)
+        assert (seen['emitted'], seen['started'], seen['stopped']) == (1, 1, 0), 'One held key did not toggle once: %r' % seen
+        play('fixture playback')
+        pump(.6)
+        before = toggles()
+        calls = hold()
+        wait_for(lambda: counts()['dictation_stop_to_idle'] > 0, 'the held key to stop the dictation', timeout=35)
+        wait_for(lambda: quiet(.5), 'the last paste to land', timeout=5)
+        pump(1.5)
+        seen = since(before)
+        assert seen['received'] == calls, 'VOCO missed some of the %d runs: %r' % (calls, seen)
+        assert (seen['emitted'], seen['started'], seen['stopped'], seen['idle']) == (1, 0, 1, 1), 'One held key did not toggle once: %r' % seen
+        assert words(field.get_text()) == expected and other.get_text() == '', 'The dictation did not deliver exactly once: %r' % field.get_text()
+        # Two presses half a second apart are two presses, not a press and its repeat.
+        pump(2.5)
+        before = toggles()
+        assert command().wait(timeout=5) == 0
+        time.sleep(.5)
+        assert command().wait(timeout=5) == 0
+        wait_for(lambda: since(before)['idle'] == 1, 'the second press to stop what the first started', timeout=35)
+        seen = since(before)
+        assert (seen['received'], seen['emitted'], seen['started'], seen['stopped']) == (2, 2, 1, 1), 'Two presses did not toggle twice: %r' % seen
+        wait_for(lambda: any(label.startswith('VOCO — Ready') for label in tray_menus()), 'the tray to report Ready', timeout=5)
         tray_state = dict(status=[label for label in tray_menus() if label.startswith('VOCO — ')])
         passed = True
         raise SystemExit(0)

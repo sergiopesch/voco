@@ -2,6 +2,7 @@
 //! Passive evdev can observe a chord that IBus consumes, so it keeps both guards.
 //! An X11 grab callback already consumed its chord and uses shared debounce only.
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 
 // The engine arms the shortcut for 1 s from each poll-trigger it handles
 // (voco_ibus_engine.py). The lease starts this bound when the reply or error
@@ -163,10 +164,201 @@ pub fn admit_toggle(last: &AtomicI64, now: i64, debounce_ms: i64) -> bool {
     }
 }
 
+/// A held key's repeats follow each other at the keyboard's repeat interval,
+/// 20 to 50 ms on the desktops VOCO supports. A `voco --toggle` this soon
+/// after another is one of them, and nobody presses twice this fast.
+pub const COMMAND_TRAIN: Duration = Duration::from_millis(150);
+/// After this long without a `voco --toggle`, the next is a press: a key
+/// still held would have repeated, since keyboards wait far less than this
+/// before the first repeat, 500 to 660 ms by default.
+const COMMAND_QUIET: Duration = Duration::from_secs(2);
+
+/// What one `voco --toggle` is, outside the snap.
+#[derive(Debug, PartialEq)]
+pub enum CommandCall {
+    /// A press: it toggles.
+    Press,
+    /// A held key's repeat: it doesn't.
+    Repeat,
+    /// A press, or the first repeat of the one before: `settle` says which
+    /// once `COMMAND_TRAIN` has passed.
+    Unsettled(u64),
+}
+
+/// The `voco --toggle` calls of a desktop shortcut, outside the snap. The
+/// desktop runs the command for the press and again for each repeat while the
+/// key is held, and reports no release (AGENTS.md, Shortcut). VOCO can't read
+/// every desktop's repeat delay, so a repeat is told by what follows it: a
+/// held key's first repeat is followed by the next within `COMMAND_TRAIN`,
+/// and a second press isn't.
+#[derive(Default)]
+pub struct CommandCalls {
+    last: Option<Instant>,
+    unsettled: Option<u64>,
+    serial: u64,
+}
+
+impl CommandCalls {
+    pub const fn new() -> Self {
+        Self {
+            last: None,
+            unsettled: None,
+            serial: 0,
+        }
+    }
+
+    /// A call at `now`. The first value says that the call before it, left
+    /// unsettled, was a press after all: nothing followed it in time, and
+    /// its own `settle` hasn't run yet.
+    pub fn note(&mut self, now: Instant) -> (bool, CommandCall) {
+        let gap = self.last.map(|last| now.saturating_duration_since(last));
+        self.last = Some(now);
+        match gap {
+            // A repeat, which also shows an unsettled call before it to have
+            // been the first repeat of its train.
+            Some(gap) if gap < COMMAND_TRAIN => {
+                self.unsettled = None;
+                (false, CommandCall::Repeat)
+            }
+            Some(gap) if gap < COMMAND_QUIET => {
+                let earlier = self.unsettled.take().is_some();
+                self.serial += 1;
+                self.unsettled = Some(self.serial);
+                (earlier, CommandCall::Unsettled(self.serial))
+            }
+            _ => (self.unsettled.take().is_some(), CommandCall::Press),
+        }
+    }
+
+    /// `COMMAND_TRAIN` after an unsettled call: true when it was a press,
+    /// false when a repeat followed it or a later call already settled it.
+    pub fn settle(&mut self, serial: u64) -> bool {
+        if self.unsettled == Some(serial) {
+            self.unsettled = None;
+            return true;
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::{Arc, Barrier};
+
+    /// The toggles a train of `voco --toggle` calls makes, at these times in
+    /// milliseconds, each unsettled call settled when its time comes.
+    fn command_toggles(times_ms: &[u64]) -> Vec<u64> {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let train = COMMAND_TRAIN.as_millis() as u64;
+        let mut calls = CommandCalls::new();
+        let mut toggles = Vec::new();
+        let mut waiting: Option<(u64, u64)> = None;
+        for &time in times_ms {
+            // An unsettled call's timer fires before any call after it is due.
+            if let Some((serial, due)) = waiting {
+                if due <= time {
+                    waiting = None;
+                    if calls.settle(serial) {
+                        toggles.push(due);
+                    }
+                }
+            }
+            let (earlier, call) = calls.note(at(time));
+            assert!(
+                !earlier,
+                "a timer that fired in time left nothing to settle"
+            );
+            match call {
+                CommandCall::Press => toggles.push(time),
+                CommandCall::Repeat => waiting = None,
+                CommandCall::Unsettled(serial) => waiting = Some((serial, time + train)),
+            }
+        }
+        if let Some((serial, due)) = waiting {
+            if calls.settle(serial) {
+                toggles.push(due);
+            }
+        }
+        toggles
+    }
+
+    /// One key held from `from` for `hold` ms at a keyboard's repeat timing.
+    fn held(from: u64, delay: u64, interval: u64, hold: u64) -> Vec<u64> {
+        let mut times = vec![from];
+        let mut at = from + delay;
+        while at <= from + hold {
+            times.push(at);
+            at += interval;
+        }
+        times
+    }
+
+    #[test]
+    fn a_held_command_key_toggles_once_at_any_desktop_repeat_timing() {
+        // GNOME's defaults, then KDE's and Sway's, then a slow and a fast keyboard.
+        for (delay, interval) in [(500, 30), (600, 40), (660, 40), (1000, 100), (200, 20)] {
+            assert_eq!(
+                command_toggles(&held(0, delay, interval, 3_000)),
+                [0],
+                "{delay} ms, then every {interval} ms"
+            );
+        }
+    }
+
+    #[test]
+    fn each_tap_of_the_command_key_toggles() {
+        // Start, then stop well after: both at once.
+        assert_eq!(command_toggles(&[0, 5_000]), [0, 5_000]);
+        // Stop half a second after start, where a first repeat would come:
+        // nothing follows it, so it toggles once that is known.
+        assert_eq!(command_toggles(&[0, 500]), [0, 650]);
+        // Three taps a second apart.
+        assert_eq!(command_toggles(&[0, 1_000, 2_000]), [0, 1_150, 2_150]);
+        // A bounce is no second press.
+        assert_eq!(command_toggles(&[0, 40]), [0]);
+    }
+
+    #[test]
+    fn a_tap_then_a_held_command_key_toggle_once_each() {
+        let mut times = vec![0];
+        times.extend(held(600, 500, 30, 2_000));
+        assert_eq!(command_toggles(&times), [0, 750]);
+        // Held, released, then tapped soon after the last repeat.
+        let mut times = held(0, 500, 30, 2_000);
+        times.push(2_400);
+        assert_eq!(command_toggles(&times), [0, 2_550]);
+    }
+
+    #[test]
+    fn a_stall_in_a_held_command_keys_repeats_toggles_nothing() {
+        // The desktop starts one process a repeat, and a busy one can run late.
+        let mut times = held(0, 500, 30, 1_000);
+        times.extend(held(1_300, 30, 30, 600));
+        assert_eq!(command_toggles(&times), [0]);
+    }
+
+    #[test]
+    fn an_unsettled_command_call_is_a_press_when_its_timer_runs_late() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut calls = CommandCalls::new();
+        assert_eq!(calls.note(at(0)), (false, CommandCall::Press));
+        assert_eq!(calls.note(at(500)), (false, CommandCall::Unsettled(1)));
+        // The next call comes before the first one's timer got to run: the
+        // first was a press, said here, and its late timer adds no second.
+        assert_eq!(calls.note(at(900)), (true, CommandCall::Unsettled(2)));
+        assert!(!calls.settle(1));
+        assert!(calls.settle(2));
+        assert!(!calls.settle(2));
+        // A repeat settles the call before it as no press.
+        assert_eq!(calls.note(at(1_400)), (false, CommandCall::Unsettled(3)));
+        assert_eq!(calls.note(at(1_430)), (false, CommandCall::Repeat));
+        assert!(!calls.settle(3));
+        // After a long silence a call is a press at once.
+        assert_eq!(calls.note(at(9_000)), (false, CommandCall::Press));
+    }
 
     #[test]
     fn plugin_x11_waits_for_one_completed_gesture_without_a_timer() {

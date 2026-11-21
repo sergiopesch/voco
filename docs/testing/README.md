@@ -136,6 +136,11 @@ eleven cases:
   while the worker still doesn't answer, close its recording stream and notify
   once. The clip, played again, reaches no field, nothing is copied or kept
   for Review, and a new dictation delivers as in `delivery`.
+- **`held-command`:** no shortcut is pressed. `voco --toggle` runs as a
+  desktop shortcut runs it for a key held a second and a half, at GNOME's
+  default repeat. One held key must start one dictation, another must stop it
+  with the clip delivered as in `delivery`, and two single runs half a second
+  apart must start and stop a dictation.
 - **`launcher`:** VOCO starts as GIO launches its desktop entry, which names
   `VOCO.desktop` and the process it started. VOCO must open the Ready popover by
   itself once it's ready, with no second launch.
