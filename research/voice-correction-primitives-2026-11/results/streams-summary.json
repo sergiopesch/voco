@@ -1,0 +1,42 @@
+{
+ "windows": 238,
+ "completeAtTap": {
+  "0": 135,
+  "0.4": 214,
+  "0.8": 232,
+  "1.2": 233
+ },
+ "passages": 100,
+ "sameText": 100,
+ "sameWords": 100,
+ "sameCorrection": 100,
+ "resumes": 80,
+ "skipped": 2,
+ "capital": {
+  "fresh": [
+   78,
+   80
+  ],
+  "together": [
+   18,
+   68
+  ],
+  "nothing": [
+   18,
+   68
+  ],
+  "silence": [
+   24,
+   78
+  ]
+ },
+ "sameWordsResumed": {
+  "nothing": 80,
+  "silence": 65
+ },
+ "bars": {
+  "windowComplete": false,
+  "sameWords": true,
+  "capital": true
+ }
+}

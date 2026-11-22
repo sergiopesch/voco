@@ -1,0 +1,10 @@
+== test: 238 items ==
+rule1              right 82.4% (392/476)  collateral 0/952  far: 196/35/7/0  near: 196/35/7/0  same: 226/0/12/0  elsewhere: 238/0/0/0
+rule2              right 89.5% (426/476)  collateral 0/952  far: 213/17/8/0  near: 213/17/8/0  same: 224/0/14/0  elsewhere: 238/0/0/0
+rule2-fuzzy-only   right 85.3% (406/476)  collateral 0/952  far: 203/27/8/0  near: 203/27/8/0  same: 225/0/13/0  elsewhere: 238/0/0/0
+rule2-trim-only    right 87.4% (416/476)  collateral 0/952  far: 208/23/7/0  near: 208/23/7/0  same: 225/0/13/0  elsewhere: 238/0/0/0
+== test: 238 items (leaned) ==
+rule1              right 87.6% (417/476)  collateral 0/952  far: 208/26/4/0  near: 209/25/4/0  same: 231/0/7/0  elsewhere: 238/0/0/0
+rule2              right 92.4% (440/476)  collateral 0/952  far: 220/14/4/0  near: 220/14/4/0  same: 231/0/7/0  elsewhere: 238/0/0/0
+rule2-fuzzy-only   right 88.9% (423/476)  collateral 0/952  far: 211/23/4/0  near: 212/22/4/0  same: 231/0/7/0  elsewhere: 238/0/0/0
+rule2-trim-only    right 90.8% (432/476)  collateral 0/952  far: 216/18/4/0  near: 216/18/4/0  same: 231/0/7/0  elsewhere: 238/0/0/0

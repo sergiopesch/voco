@@ -1,0 +1,16 @@
+== typed text at the tap: 238 items ==
+Complete up to the phrase after this much silence: 0 s 56.7% (135/238), 0.4 s 89.9% (214/238), 0.8 s 97.5% (232/238), 1.2 s 97.9% (233/238)
+
+== dictation resumed on the first stream, nothing fed at the tap: 100 items ==
+Same text as in one go                                100.0% (100/100)
+Same words                                            100.0% (100/100)
+Correction on the second stream, as on its own        100.0% (100/100)
+
+== resume items: 80 run, 2 skipped for no previous utterance ==
+Starts with a capital: in a session of its own (first study)   97.5% (78/80)
+  after its previous utterance in one go                       26.5% (18/68)
+  on two streams, nothing fed at the tap                       26.5% (18/68)
+  on two streams, 0.4 s of silence fed at the tap              30.8% (24/78)
+Same words as in one go: nothing fed 100.0% (80/80), 0.4 s of silence 81.2% (65/80)
+
+Bars: windowComplete not met, sameWords met, capital met
