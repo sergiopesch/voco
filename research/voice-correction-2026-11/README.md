@@ -29,6 +29,10 @@ Three more results shape a design:
 - **Recognition is not the slow part.** The final text came a median 236 ms
   after the last packet, 396 ms at the 95th percentile.
 
+A second measurement, [reading and changing the focused
+field](field-access/README.md), asks where such a change could be made safely
+in another application.
+
 This record describes measurements of 21 and 22 November 2026. VOCO's
 documentation describes how it works now. Neither `npm test` nor CI runs this
 harness, and VOCO has no such capability.
@@ -145,8 +149,9 @@ Not pre-registered, so read these as leads.
   designed after the first results.
 - A right outcome compares words without case or punctuation. The form
   results above show that case and punctuation would still need a rule.
-- Nothing here types, deletes or pastes. Whether the change can be made safely
-  in another application is a separate question.
+- Nothing here types, deletes or pastes. [Reading and changing the focused
+  field](field-access/README.md) measures, in an X11 test session, where the
+  change could be checked and made in another application.
 - My words was empty. A list with the speaker's names would change both what
   the passage and what the phrase come out as.
 

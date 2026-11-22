@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fields</title>
+<style>
+  body { margin: 20px; font: 16px sans-serif; }
+  textarea, input, div[contenteditable] { display: block; margin-bottom: 20px; font: 16px monospace; }
+  div[contenteditable] { border: 1px solid #888; width: 800px; height: 100px; }
+</style>
+<!-- Fixed geometry so the harness can click a field: body margin 20 px,
+     textarea 800x100, input 800x30, contenteditable 800x100. -->
+<textarea id="ta" aria-label="ta" style="width:800px;height:100px"></textarea>
+<input id="in" type="text" aria-label="in" style="width:800px;height:30px">
+<div id="ce" contenteditable="true" aria-label="ce"></div>
+<script>
+  // fields.html#ta, #in or #ce focuses that field on load.
+  const id = location.hash.slice(1);
+  if (id) document.getElementById(id).focus();
+</script>

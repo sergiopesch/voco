@@ -1,0 +1,26 @@
+{
+  "Unavailable": [
+    "Firefox: not run. apt's only candidate is `1:1snap1-0ubuntu5`, a stub that pre-depends on snapd, and this container has no snapd. packages.mozilla.org and ppa.launchpadcontent.net were refused by the proxy (CONNECT 403), so no .deb build could be fetched.",
+    "Thunderbird: not run, for the same reason (apt candidate `2:1snap1-0ubuntu3`, pre-depends on snapd).",
+    "Electron apps: not run. None is installed, `apt-cache policy code` has no candidate, and hosts other than Ubuntu's archive are blocked.",
+    "KWrite and Kate: not installed; FeatherPad is the Qt case (Qt 5.15). No Qt 6 app was run."
+  ],
+  "Not measured": [
+    "Any Wayland session, GNOME Wayland included: every run is X11 under Xvfb with openbox.",
+    "A strictly confined snap as the AT-SPI client: whether a confined VOCO can reach the accessibility bus at all was not tried.",
+    "A real desktop session (GNOME Shell, its at-spi autostart, a running screen reader, a clipboard manager).",
+    "Chromium page content without `--force-renderer-accessibility`: it was not exposed under the 12 other configs in the probes table; no other switch was tried.",
+    "Whether an AT-SPI replace is one undo step in the app, and what the app's undo then restores.",
+    "Text with more than one line or paragraph, non-ASCII text, text after the caret, an existing selection, password fields, read-only fields.",
+    "Latency distributions: the timings are a median of 5 on one virtual machine, and a second pass of the same runs was up to about 2x slower (results-first-pass/ against results/)."
+  ],
+  "Limits of this measurement": [
+    "One run per app/field and scenario in results/ (174 runs). An earlier pass of 144 of them, with the harness still changing, is kept in results-first-pass/: 143 gave the same outcome fields, and the one that differs is a run from before a window-matching fix.",
+    "Three first-pass runs found no window (results-first-pass/flakes/): openbox's log says it could not open the display. The likely cause, not proven, is Xvfb resetting as its first client left; xsession.sh now starts Xvfb with -noreset, and none of the 174 runs of the final pass failed to start.",
+    "The three chunks are pasted as the task gives them, so chunk 1 ends and chunk 3 begins with a space. VOCO itself keeps spaces away from a paste's edges; the no-break spaces read back from the two contenteditable fields come from those edges.",
+    "The independent read of GUI fields is Ctrl+Shift+Home, Ctrl+C (the text before the caret) and then Ctrl+A, Ctrl+C, read with xclip after the selections were left without an owner. In terminals it is bash's READLINE_LINE and READLINE_POINT through a bind -x key.",
+    "XDG_RUNTIME_DIR is the run's folder bind-mounted on /run/user in a private mount namespace, so atk-bridge's socket path stays under 108 bytes.",
+    "Here /usr/bin/python3 is Python 3.13 without python3-gi, so the harness and gnome-terminal's launcher run as /usr/bin/python3.12 and /usr/bin/gnome-terminal.real.",
+    "The harness runs as root; Chromium therefore runs with --no-sandbox."
+  ]
+}
