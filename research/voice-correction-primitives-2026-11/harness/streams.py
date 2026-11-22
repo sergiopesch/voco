@@ -27,37 +27,49 @@ def quiet(stream, seconds):
     return texts
 
 
+def window(item):
+    """The typed text at the tap, read after each length of digital silence, on a
+    stream that is then thrown away."""
+    previous, phrase = load(item['previous']['audio']), load(item['audio'])
+    probe = asr.Stream(); feed(probe, np.concatenate([previous, phrase]))
+    at_tap = quiet(probe, QUIET[-1]); probe.finish()
+    return dict(kind='window', id=item['id'], atTap={str(k): v for k, v in at_tap.items()})
+
+
 def passage(item):
+    """The dictation on a first stream with nothing fed at the tap, a correction
+    on a second stream while the first is open, then the dictation goes on."""
     previous, phrase, following = (load(part['audio']) for part in (item['previous'], item, item['next']))
-    first = asr.Stream()
-    feed(first, np.concatenate([previous, phrase]))
-    at_tap = quiet(first, QUIET[-1])
+    first = asr.Stream(); feed(first, np.concatenate([previous, phrase]))
     second = asr.Stream(); feed(second, phrase); correction = second.finish()
     feed(first, following)
-    return dict(kind='passage', id=item['id'], atTap={str(k): v for k, v in at_tap.items()}, correction=correction, final=first.finish())
+    return dict(kind='passage', id=item['id'], correction=correction, final=first.finish())
 
 
 def resume(item, clip):
-    """A resume item after its previous utterance: in one go, and with a tap,
-    0.8 s of silence and a correction on the second stream between them."""
+    """A resume item after its previous utterance: in one go, and on two streams
+    with a tap between them, with nothing and with 0.4 s of silence fed there."""
     speaker, chapter, number = item['id'].split('-')
     before = Path(item['audio']).with_name(f'{speaker}-{chapter}-{int(number) - 1:04d}.flac')
     if not (LAB / 'LibriSpeech' / before).exists():
         return dict(kind='resume', id=item['id'], skipped='no previous utterance')
     previous, own = load(before), load(item['audio'])
     whole = asr.Stream(); feed(whole, np.concatenate([previous, own])); together = whole.finish()
-    first = asr.Stream(); feed(first, previous)
-    at_tap = quiet(first, 0.8)[0.8]
-    second = asr.Stream(); feed(second, clip); second.finish()
-    feed(first, own)
-    return dict(kind='resume', id=item['id'], previous=str(before), together=together, atTap=at_tap, final=first.finish())
+    record = dict(kind='resume', id=item['id'], previous=str(before), together=together)
+    for name, seconds in (('nothing', 0), ('silence', 0.4)):
+        first = asr.Stream(); feed(first, previous)
+        at_tap = feed(first, np.zeros(int(seconds * RATE), np.float32)) if seconds else first.last
+        second = asr.Stream(); feed(second, clip); second.finish()
+        feed(first, own)
+        record[name] = dict(atTap=at_tap, final=first.finish())
+    return record
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('items'); parser.add_argument('own'); parser.add_argument('out')
     parser.add_argument('--splits', default='test'); parser.add_argument('--limit', type=int)
-    parser.add_argument('--only', choices=['passage', 'resume'])
+    parser.add_argument('--passages', type=int, default=100, help='how many items get the whole passage run')
     args = parser.parse_args()
     plan = json.loads(Path(args.items).read_text())
     kept = {trial['id'] for trial in json.loads(Path(args.own).read_text())['trials']}
@@ -69,13 +81,12 @@ def main():
     out = Path(args.out)
     done = {(r['kind'], r['id']) for r in map(json.loads, out.read_text().splitlines())} if out.exists() else set()
     clip = load(plan['items'][0]['audio'])
-    work = ([] if args.only == 'resume' else [('passage', item) for item in items]) + \
-           ([] if args.only == 'passage' else [('resume', item) for item in resumes])
+    work = [('window', item) for item in items] + [('passage', item) for item in items[:args.passages]] + [('resume', item) for item in resumes]
     with out.open('a') as log:
         for index, (kind, item) in enumerate(work):
             if (kind, item['id']) in done:
                 continue
-            record = passage(item) if kind == 'passage' else resume(item, clip)
+            record = window(item) if kind == 'window' else passage(item) if kind == 'passage' else resume(item, clip)
             log.write(json.dumps(record, ensure_ascii=False) + '\n'); log.flush()
             if index % 25 == 0:
                 print(index, len(work), kind, flush=True)

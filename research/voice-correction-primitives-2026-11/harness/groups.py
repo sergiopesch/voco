@@ -6,7 +6,7 @@ more different utterances (PREREGISTRATION.md, Said again).
 
 A clause is the words between two punctuation marks of the LibriSpeech-PC
 reference (, . ; : ? ! or a dash) or an end of the utterance, 3 to 6 words
-after normalization. Speakers of tests/fixtures/speech are left out.
+after normalization, counted as the whole reference's words are counted. Speakers of tests/fixtures/speech are left out.
 """
 import json, os, re, sys
 from pathlib import Path
@@ -15,15 +15,23 @@ from text import words
 LAB = Path(os.environ['VOCO_CORRECTION_LAB'])
 ROOT = Path(__file__).resolve().parents[3]
 SUBSETS = ('test-clean', 'test-other', 'dev-clean', 'dev-other', 'train-clean-100')
-MARK = re.compile(r'[,.;:?!—–]+|--+')
+END = re.compile(r'[,.;:?!]["”’)\]]*$')
+DASH = re.compile(r'[—–]|--')
 
 
 def clauses(text):
-    """(first word index, words) of each clause, counted in normalized words."""
-    at, found = 0, []
-    for part in MARK.split(text):
-        spoken = words(part)
-        found.append((at, spoken)); at += len(spoken)
+    """(first word index, words) of each clause, counted as words(text) counts.
+    A token that holds a dash ends a clause and belongs to none."""
+    at, found, current, start = 0, [], [], 0
+    for token in text.split():
+        spoken = words(token)
+        if DASH.search(token):
+            found.append((start, current)); at += len(spoken); current, start = [], at
+            continue
+        current += spoken; at += len(spoken)
+        if END.search(token):
+            found.append((start, current)); current, start = [], at
+    found.append((start, current))
     return found
 
 
