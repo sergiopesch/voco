@@ -109,6 +109,8 @@ confined snap can reach the accessibility bus was not measured.
   shown.
 - Why FeatherPad as a Wayland client is exposed only sometimes is unknown.
 - The machine was shared with another job, so no timing is reported.
+- One run set by a separate test. Five of its runs repeated afterwards by
+  hand gave the same outcomes.
 
 ## Reproduce
 

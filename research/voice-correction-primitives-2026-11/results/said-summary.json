@@ -1,0 +1,828 @@
+{
+ "held out | other | rule 1, plain": {
+  "pairs": 59,
+  "right": 86,
+  "asked": 118,
+  "share": 0.7288,
+  "collateral": 0,
+  "trials": 236,
+  "outcomes": {
+   "far": {
+    "right": 43,
+    "none": 16,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 43,
+    "none": 16,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 59,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 59,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | other | rule 2, plain": {
+  "pairs": 59,
+  "right": 90,
+  "asked": 118,
+  "share": 0.7627,
+  "collateral": 0,
+  "trials": 236,
+  "outcomes": {
+   "far": {
+    "right": 45,
+    "none": 12,
+    "contained": 2,
+    "collateral": 0
+   },
+   "near": {
+    "right": 45,
+    "none": 12,
+    "contained": 2,
+    "collateral": 0
+   },
+   "same": {
+    "right": 57,
+    "none": 0,
+    "contained": 2,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 59,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | other | rule 1, leaned": {
+  "pairs": 59,
+  "right": 90,
+  "asked": 118,
+  "share": 0.7627,
+  "collateral": 0,
+  "trials": 236,
+  "outcomes": {
+   "far": {
+    "right": 45,
+    "none": 11,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 45,
+    "none": 11,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 59,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 59,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | other | rule 2, leaned": {
+  "pairs": 59,
+  "right": 94,
+  "asked": 118,
+  "share": 0.7966,
+  "collateral": 0,
+  "trials": 236,
+  "outcomes": {
+   "far": {
+    "right": 47,
+    "none": 9,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 47,
+    "none": 9,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 57,
+    "none": 0,
+    "contained": 2,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 59,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | same | rule 1, plain": {
+  "pairs": 58,
+  "right": 98,
+  "asked": 116,
+  "share": 0.8448,
+  "collateral": 0,
+  "trials": 232,
+  "outcomes": {
+   "far": {
+    "right": 49,
+    "none": 9,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 49,
+    "none": 9,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | same | rule 2, plain": {
+  "pairs": 58,
+  "right": 100,
+  "asked": 116,
+  "share": 0.8621,
+  "collateral": 0,
+  "trials": 232,
+  "outcomes": {
+   "far": {
+    "right": 50,
+    "none": 8,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 50,
+    "none": 8,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | same | rule 1, leaned": {
+  "pairs": 58,
+  "right": 100,
+  "asked": 116,
+  "share": 0.8621,
+  "collateral": 0,
+  "trials": 232,
+  "outcomes": {
+   "far": {
+    "right": 50,
+    "none": 8,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 50,
+    "none": 8,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | same | rule 2, leaned": {
+  "pairs": 58,
+  "right": 102,
+  "asked": 116,
+  "share": 0.8793,
+  "collateral": 0,
+  "trials": 232,
+  "outcomes": {
+   "far": {
+    "right": 51,
+    "none": 7,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 51,
+    "none": 7,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 58,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | third | rule 1, plain": {
+  "pairs": 1,
+  "right": 0,
+  "asked": 2,
+  "share": 0.0,
+  "collateral": 0,
+  "trials": 3,
+  "outcomes": {
+   "far": {
+    "right": 0,
+    "none": 1,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 0,
+    "none": 1,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 0,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | third | rule 2, plain": {
+  "pairs": 1,
+  "right": 2,
+  "asked": 2,
+  "share": 1.0,
+  "collateral": 0,
+  "trials": 3,
+  "outcomes": {
+   "far": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 0,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | third | rule 1, leaned": {
+  "pairs": 1,
+  "right": 0,
+  "asked": 2,
+  "share": 0.0,
+  "collateral": 0,
+  "trials": 3,
+  "outcomes": {
+   "far": {
+    "right": 0,
+    "none": 1,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 0,
+    "none": 1,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 0,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "held out | third | rule 2, leaned": {
+  "pairs": 1,
+  "right": 2,
+  "asked": 2,
+  "share": 1.0,
+  "collateral": 0,
+  "trials": 3,
+  "outcomes": {
+   "far": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 1,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 0,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | other | rule 1, plain": {
+  "pairs": 143,
+  "right": 226,
+  "asked": 286,
+  "share": 0.7902,
+  "collateral": 0,
+  "trials": 572,
+  "outcomes": {
+   "far": {
+    "right": 113,
+    "none": 29,
+    "contained": 1,
+    "collateral": 0
+   },
+   "near": {
+    "right": 113,
+    "none": 29,
+    "contained": 1,
+    "collateral": 0
+   },
+   "same": {
+    "right": 142,
+    "none": 0,
+    "contained": 1,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 143,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | other | rule 2, plain": {
+  "pairs": 143,
+  "right": 242,
+  "asked": 286,
+  "share": 0.8462,
+  "collateral": 4,
+  "trials": 572,
+  "outcomes": {
+   "far": {
+    "right": 121,
+    "none": 18,
+    "contained": 2,
+    "collateral": 2
+   },
+   "near": {
+    "right": 121,
+    "none": 17,
+    "contained": 3,
+    "collateral": 2
+   },
+   "same": {
+    "right": 140,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 143,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | other | rule 1, leaned": {
+  "pairs": 143,
+  "right": 230,
+  "asked": 286,
+  "share": 0.8042,
+  "collateral": 0,
+  "trials": 572,
+  "outcomes": {
+   "far": {
+    "right": 115,
+    "none": 26,
+    "contained": 2,
+    "collateral": 0
+   },
+   "near": {
+    "right": 115,
+    "none": 26,
+    "contained": 2,
+    "collateral": 0
+   },
+   "same": {
+    "right": 142,
+    "none": 0,
+    "contained": 1,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 143,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | other | rule 2, leaned": {
+  "pairs": 143,
+  "right": 244,
+  "asked": 286,
+  "share": 0.8531,
+  "collateral": 4,
+  "trials": 572,
+  "outcomes": {
+   "far": {
+    "right": 122,
+    "none": 16,
+    "contained": 3,
+    "collateral": 2
+   },
+   "near": {
+    "right": 122,
+    "none": 16,
+    "contained": 3,
+    "collateral": 2
+   },
+   "same": {
+    "right": 140,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 143,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | same | rule 1, plain": {
+  "pairs": 144,
+  "right": 244,
+  "asked": 288,
+  "share": 0.8472,
+  "collateral": 0,
+  "trials": 576,
+  "outcomes": {
+   "far": {
+    "right": 122,
+    "none": 18,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 122,
+    "none": 18,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 140,
+    "none": 0,
+    "contained": 4,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 144,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | same | rule 2, plain": {
+  "pairs": 144,
+  "right": 260,
+  "asked": 288,
+  "share": 0.9028,
+  "collateral": 0,
+  "trials": 576,
+  "outcomes": {
+   "far": {
+    "right": 130,
+    "none": 10,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 130,
+    "none": 9,
+    "contained": 5,
+    "collateral": 0
+   },
+   "same": {
+    "right": 139,
+    "none": 0,
+    "contained": 5,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 144,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | same | rule 1, leaned": {
+  "pairs": 144,
+  "right": 246,
+  "asked": 288,
+  "share": 0.8542,
+  "collateral": 0,
+  "trials": 576,
+  "outcomes": {
+   "far": {
+    "right": 123,
+    "none": 15,
+    "contained": 6,
+    "collateral": 0
+   },
+   "near": {
+    "right": 123,
+    "none": 15,
+    "contained": 6,
+    "collateral": 0
+   },
+   "same": {
+    "right": 140,
+    "none": 0,
+    "contained": 4,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 144,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | same | rule 2, leaned": {
+  "pairs": 144,
+  "right": 262,
+  "asked": 288,
+  "share": 0.9097,
+  "collateral": 0,
+  "trials": 576,
+  "outcomes": {
+   "far": {
+    "right": 131,
+    "none": 7,
+    "contained": 6,
+    "collateral": 0
+   },
+   "near": {
+    "right": 131,
+    "none": 7,
+    "contained": 6,
+    "collateral": 0
+   },
+   "same": {
+    "right": 139,
+    "none": 0,
+    "contained": 5,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 144,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | third | rule 1, plain": {
+  "pairs": 11,
+  "right": 16,
+  "asked": 22,
+  "share": 0.7273,
+  "collateral": 0,
+  "trials": 44,
+  "outcomes": {
+   "far": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | third | rule 2, plain": {
+  "pairs": 11,
+  "right": 16,
+  "asked": 22,
+  "share": 0.7273,
+  "collateral": 0,
+  "trials": 44,
+  "outcomes": {
+   "far": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | third | rule 1, leaned": {
+  "pairs": 11,
+  "right": 16,
+  "asked": 22,
+  "share": 0.7273,
+  "collateral": 0,
+  "trials": 44,
+  "outcomes": {
+   "far": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | third | rule 2, leaned": {
+  "pairs": 11,
+  "right": 16,
+  "asked": 22,
+  "share": 0.7273,
+  "collateral": 0,
+  "trials": 44,
+  "outcomes": {
+   "far": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "near": {
+    "right": 8,
+    "none": 3,
+    "contained": 0,
+    "collateral": 0
+   },
+   "same": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 11,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "train-clean-100 | two attempts": {
+  "pairs": 7,
+  "first": 6,
+  "withinTwo": 6
+ },
+ "bars": {
+  "safe": true,
+  "useful": false,
+  "magic": false
+ }
+}

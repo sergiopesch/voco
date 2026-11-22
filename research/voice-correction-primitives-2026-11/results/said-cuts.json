@@ -1,0 +1,3417 @@
+{
+ "cuts": {
+  "1580-141084-0018:0": {
+   "id": "1580-141084-0018",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 22640,
+   "seconds": 1.415
+  },
+  "1580-141084-0025:3": {
+   "id": "1580-141084-0025",
+   "first": 3,
+   "reason": null,
+   "startSample": 17920,
+   "endSample": 38000,
+   "seconds": 1.255
+  },
+  "1580-141084-0017:2": {
+   "id": "1580-141084-0017",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 32000,
+   "seconds": 2.0
+  },
+  "1580-141084-0019:1": {
+   "id": "1580-141084-0019",
+   "first": 1,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 50000,
+   "seconds": 3.125
+  },
+  "2830-3980-0038:6": {
+   "id": "2830-3980-0038",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 88640,
+   "seconds": 5.54
+  },
+  "2830-3980-0046:6": {
+   "id": "2830-3980-0046",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 45440,
+   "seconds": 2.84
+  },
+  "3575-170457-0028:4": {
+   "id": "3575-170457-0028",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 88480,
+   "seconds": 5.53
+  },
+  "3575-170457-0031:4": {
+   "id": "3575-170457-0031",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 64000,
+   "seconds": 4.0
+  },
+  "4446-2271-0004:0": {
+   "id": "4446-2271-0004",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 192160,
+   "seconds": 12.01
+  },
+  "4446-2271-0013:0": {
+   "id": "4446-2271-0013",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 12960,
+   "seconds": 0.81
+  },
+  "4507-16021-0004:0": {
+   "id": "4507-16021-0004",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 34160,
+   "seconds": 2.135
+  },
+  "4507-16021-0018:0": {
+   "id": "4507-16021-0018",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 30480,
+   "seconds": 1.905
+  },
+  "5683-32865-0007:11": {
+   "id": "5683-32865-0007",
+   "first": 11,
+   "reason": null,
+   "startSample": 75360,
+   "endSample": 97040,
+   "seconds": 1.355
+  },
+  "5683-32866-0005:12": {
+   "id": "5683-32866-0005",
+   "first": 12,
+   "reason": null,
+   "startSample": 54000,
+   "endSample": 73440,
+   "seconds": 1.215
+  },
+  "672-122797-0051:6": {
+   "id": "672-122797-0051",
+   "first": 6,
+   "reason": null,
+   "startSample": 51200,
+   "endSample": 74640,
+   "seconds": 1.465
+  },
+  "672-122797-0056:0": {
+   "id": "672-122797-0056",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 26800,
+   "seconds": 1.675
+  },
+  "672-122797-0054:5": {
+   "id": "672-122797-0054",
+   "first": 5,
+   "reason": null,
+   "startSample": 46640,
+   "endSample": 68000,
+   "seconds": 1.335
+  },
+  "672-122797-0062:1": {
+   "id": "672-122797-0062",
+   "first": 1,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 42800,
+   "seconds": 2.675
+  },
+  "7127-75947-0026:1": {
+   "id": "7127-75947-0026",
+   "first": 1,
+   "reason": null,
+   "startSample": 14480,
+   "endSample": 48320,
+   "seconds": 2.115
+  },
+  "7127-75947-0033:5": {
+   "id": "7127-75947-0033",
+   "first": 5,
+   "reason": null,
+   "startSample": 33680,
+   "endSample": 68160,
+   "seconds": 2.155
+  },
+  "7176-92135-0020:9": {
+   "id": "7176-92135-0020",
+   "first": 9,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 114640,
+   "seconds": 7.165
+  },
+  "7176-92135-0023:10": {
+   "id": "7176-92135-0023",
+   "first": 10,
+   "reason": "no pause after",
+   "startSample": 65520,
+   "endSample": 99440,
+   "seconds": 2.12
+  },
+  "7176-92135-0022:0": {
+   "id": "7176-92135-0022",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 16000,
+   "seconds": 1.0
+  },
+  "7176-92135-0024:0": {
+   "id": "7176-92135-0024",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 65600,
+   "seconds": 4.1
+  },
+  "8455-210777-0011:4": {
+   "id": "8455-210777-0011",
+   "first": 4,
+   "reason": null,
+   "startSample": 23040,
+   "endSample": 45680,
+   "seconds": 1.415
+  },
+  "8455-210777-0046:7": {
+   "id": "8455-210777-0046",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 149280,
+   "seconds": 9.33
+  },
+  "8455-210777-0006:7": {
+   "id": "8455-210777-0006",
+   "first": 7,
+   "reason": null,
+   "startSample": 49600,
+   "endSample": 72320,
+   "seconds": 1.42
+  },
+  "8455-210777-0014:8": {
+   "id": "8455-210777-0014",
+   "first": 8,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 65920,
+   "seconds": 4.12
+  },
+  "8455-210777-0040:1": {
+   "id": "8455-210777-0040",
+   "first": 1,
+   "reason": null,
+   "startSample": 19440,
+   "endSample": 44880,
+   "seconds": 1.59
+  },
+  "8455-210777-0065:9": {
+   "id": "8455-210777-0065",
+   "first": 9,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 62640,
+   "seconds": 3.915
+  },
+  "1688-142285-0034:22": {
+   "id": "1688-142285-0034",
+   "first": 22,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 242639,
+   "seconds": 15.165
+  },
+  "1688-142285-0092:3": {
+   "id": "1688-142285-0092",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 74720,
+   "seconds": 4.67
+  },
+  "1998-29454-0010:2": {
+   "id": "1998-29454-0010",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 45840,
+   "seconds": 2.865
+  },
+  "1998-29454-0019:9": {
+   "id": "1998-29454-0019",
+   "first": 9,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 49440,
+   "seconds": 3.09
+  },
+  "2033-164914-0019:12": {
+   "id": "2033-164914-0019",
+   "first": 12,
+   "reason": null,
+   "startSample": 75360,
+   "endSample": 97360,
+   "seconds": 1.375
+  },
+  "2033-164914-0020:0": {
+   "id": "2033-164914-0020",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 20880,
+   "seconds": 1.305
+  },
+  "2414-159411-0005:25": {
+   "id": "2414-159411-0005",
+   "first": 25,
+   "reason": null,
+   "startSample": 179680,
+   "endSample": 215680,
+   "seconds": 2.25
+  },
+  "2414-159411-0010:7": {
+   "id": "2414-159411-0010",
+   "first": 7,
+   "reason": null,
+   "startSample": 71920,
+   "endSample": 109040,
+   "seconds": 2.32
+  },
+  "2414-159411-0009:0": {
+   "id": "2414-159411-0009",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 88800,
+   "seconds": 5.55
+  },
+  "2414-159411-0013:0": {
+   "id": "2414-159411-0013",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 37760,
+   "seconds": 2.36
+  },
+  "2414-159411-0006:0": {
+   "id": "2414-159411-0006",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 44800,
+   "seconds": 2.8
+  },
+  "2414-159411-0015:0": {
+   "id": "2414-159411-0015",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 34400,
+   "seconds": 2.15
+  },
+  "2414-159411-0007:2": {
+   "id": "2414-159411-0007",
+   "first": 2,
+   "reason": null,
+   "startSample": 21920,
+   "endSample": 44240,
+   "seconds": 1.395
+  },
+  "2414-159411-0030:3": {
+   "id": "2414-159411-0030",
+   "first": 3,
+   "reason": null,
+   "startSample": 29920,
+   "endSample": 50800,
+   "seconds": 1.305
+  },
+  "2414-159411-0029:2": {
+   "id": "2414-159411-0029",
+   "first": 2,
+   "reason": "no pause after",
+   "startSample": 17920,
+   "endSample": 116480,
+   "seconds": 6.16
+  },
+  "2414-159411-0031:5": {
+   "id": "2414-159411-0031",
+   "first": 5,
+   "reason": null,
+   "startSample": 27920,
+   "endSample": 52800,
+   "seconds": 1.555
+  },
+  "3080-5040-0015:23": {
+   "id": "3080-5040-0015",
+   "first": 23,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 138559,
+   "seconds": 8.66
+  },
+  "3080-5040-0031:8": {
+   "id": "3080-5040-0031",
+   "first": 8,
+   "reason": null,
+   "startSample": 38400,
+   "endSample": 57120,
+   "seconds": 1.17
+  },
+  "3528-168669-0055:0": {
+   "id": "3528-168669-0055",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 62560,
+   "seconds": 3.91
+  },
+  "3528-168669-0068:0": {
+   "id": "3528-168669-0068",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 25200,
+   "seconds": 1.575
+  },
+  "3538-163619-0012:5": {
+   "id": "3538-163619-0012",
+   "first": 5,
+   "reason": null,
+   "startSample": 30560,
+   "endSample": 51520,
+   "seconds": 1.31
+  },
+  "3538-163619-0013:56": {
+   "id": "3538-163619-0013",
+   "first": 56,
+   "reason": null,
+   "startSample": 277520,
+   "endSample": 308800,
+   "seconds": 1.955
+  },
+  "3538-163622-0022:2": {
+   "id": "3538-163622-0022",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 58080,
+   "seconds": 3.63
+  },
+  "3538-163622-0023:4": {
+   "id": "3538-163622-0023",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 56720,
+   "seconds": 3.545
+  },
+  "367-293981-0008:4": {
+   "id": "367-293981-0008",
+   "first": 4,
+   "reason": null,
+   "startSample": 22560,
+   "endSample": 38720,
+   "seconds": 1.01
+  },
+  "367-293981-0016:5": {
+   "id": "367-293981-0016",
+   "first": 5,
+   "reason": null,
+   "startSample": 27040,
+   "endSample": 49760,
+   "seconds": 1.42
+  },
+  "3764-168671-0025:0": {
+   "id": "3764-168671-0025",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 51840,
+   "seconds": 3.24
+  },
+  "3764-168671-0029:4": {
+   "id": "3764-168671-0029",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 90400,
+   "seconds": 5.65
+  },
+  "4350-10919-0007:7": {
+   "id": "4350-10919-0007",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 64080,
+   "seconds": 4.005
+  },
+  "4350-9170-0049:18": {
+   "id": "4350-9170-0049",
+   "first": 18,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 101680,
+   "seconds": 6.355
+  },
+  "4350-9170-0046:0": {
+   "id": "4350-9170-0046",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 98640,
+   "seconds": 6.165
+  },
+  "4350-9170-0049:0": {
+   "id": "4350-9170-0049",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 101680,
+   "seconds": 6.355
+  },
+  "4350-9170-0049:4": {
+   "id": "4350-9170-0049",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 101680,
+   "seconds": 6.355
+  },
+  "4350-9170-0054:2": {
+   "id": "4350-9170-0054",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 87200,
+   "seconds": 5.45
+  },
+  "6070-86744-0024:0": {
+   "id": "6070-86744-0024",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 24560,
+   "seconds": 1.535
+  },
+  "6070-86744-0029:2": {
+   "id": "6070-86744-0029",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 58960,
+   "seconds": 3.685
+  },
+  "6070-86744-0001:7": {
+   "id": "6070-86744-0001",
+   "first": 7,
+   "reason": null,
+   "startSample": 51600,
+   "endSample": 70480,
+   "seconds": 1.18
+  },
+  "6070-86744-0006:4": {
+   "id": "6070-86744-0006",
+   "first": 4,
+   "reason": null,
+   "startSample": 22560,
+   "endSample": 39360,
+   "seconds": 1.05
+  },
+  "6070-86744-0004:4": {
+   "id": "6070-86744-0004",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 170480,
+   "seconds": 10.655
+  },
+  "6070-86744-0008:2": {
+   "id": "6070-86744-0008",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 199680,
+   "seconds": 12.48
+  },
+  "6070-86744-0013:5": {
+   "id": "6070-86744-0013",
+   "first": 5,
+   "reason": null,
+   "startSample": 26080,
+   "endSample": 45520,
+   "seconds": 1.215
+  },
+  "6432-63722-0046:18": {
+   "id": "6432-63722-0046",
+   "first": 18,
+   "reason": null,
+   "startSample": 74800,
+   "endSample": 91440,
+   "seconds": 1.04
+  },
+  "6432-63723-0008:14": {
+   "id": "6432-63723-0008",
+   "first": 14,
+   "reason": null,
+   "startSample": 76560,
+   "endSample": 94800,
+   "seconds": 1.14
+  },
+  "6432-63722-0011:8": {
+   "id": "6432-63722-0011",
+   "first": 8,
+   "reason": "no pause after",
+   "startSample": 35520,
+   "endSample": 61280,
+   "seconds": 1.61
+  },
+  "6432-63723-0026:1": {
+   "id": "6432-63723-0026",
+   "first": 1,
+   "reason": "shorter than 0.3 s",
+   "startSample": 12080,
+   "endSample": 12080,
+   "seconds": 0.0
+  },
+  "7018-75789-0011:2": {
+   "id": "7018-75789-0011",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 375840,
+   "seconds": 23.49
+  },
+  "7018-75789-0024:2": {
+   "id": "7018-75789-0024",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 230880,
+   "seconds": 14.43
+  },
+  "7018-75789-0011:6": {
+   "id": "7018-75789-0011",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 375840,
+   "seconds": 23.49
+  },
+  "7018-75789-0024:6": {
+   "id": "7018-75789-0024",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 230880,
+   "seconds": 14.43
+  },
+  "7018-75789-0007:27": {
+   "id": "7018-75789-0007",
+   "first": 27,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 147440,
+   "seconds": 9.215
+  },
+  "7018-75789-0008:0": {
+   "id": "7018-75789-0008",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 276320,
+   "seconds": 17.27
+  },
+  "7018-75789-0009:5": {
+   "id": "7018-75789-0009",
+   "first": 5,
+   "reason": null,
+   "startSample": 44320,
+   "endSample": 60320,
+   "seconds": 1.0
+  },
+  "7018-75789-0015:2": {
+   "id": "7018-75789-0015",
+   "first": 2,
+   "reason": null,
+   "startSample": 23680,
+   "endSample": 39280,
+   "seconds": 0.975
+  },
+  "7902-96595-0019:13": {
+   "id": "7902-96595-0019",
+   "first": 13,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 72240,
+   "seconds": 4.515
+  },
+  "7902-96595-0021:17": {
+   "id": "7902-96595-0021",
+   "first": 17,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 86160,
+   "seconds": 5.385
+  },
+  "7902-96594-0008:6": {
+   "id": "7902-96594-0008",
+   "first": 6,
+   "reason": null,
+   "startSample": 38720,
+   "endSample": 65520,
+   "seconds": 1.675
+  },
+  "7902-96594-0009:2": {
+   "id": "7902-96594-0009",
+   "first": 2,
+   "reason": "no pause after",
+   "startSample": 21920,
+   "endSample": 52800,
+   "seconds": 1.93
+  },
+  "7902-96592-0042:9": {
+   "id": "7902-96592-0042",
+   "first": 9,
+   "reason": null,
+   "startSample": 39920,
+   "endSample": 54640,
+   "seconds": 0.92
+  },
+  "7902-96592-0047:17": {
+   "id": "7902-96592-0047",
+   "first": 17,
+   "reason": null,
+   "startSample": 55680,
+   "endSample": 74160,
+   "seconds": 1.155
+  },
+  "7902-96595-0014:3": {
+   "id": "7902-96595-0014",
+   "first": 3,
+   "reason": null,
+   "startSample": 21040,
+   "endSample": 36960,
+   "seconds": 0.995
+  },
+  "7902-96595-0015:3": {
+   "id": "7902-96595-0015",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 43520,
+   "seconds": 2.72
+  },
+  "8131-117016-0017:0": {
+   "id": "8131-117016-0017",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 46720,
+   "seconds": 2.92
+  },
+  "8131-117017-0025:0": {
+   "id": "8131-117017-0025",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 69120,
+   "seconds": 4.32
+  },
+  "8461-281231-0015:5": {
+   "id": "8461-281231-0015",
+   "first": 5,
+   "reason": null,
+   "startSample": 35920,
+   "endSample": 55760,
+   "seconds": 1.24
+  },
+  "8461-281231-0030:4": {
+   "id": "8461-281231-0030",
+   "first": 4,
+   "reason": null,
+   "startSample": 34400,
+   "endSample": 55280,
+   "seconds": 1.305
+  },
+  "3081-166546-0059:8": {
+   "id": "3081-166546-0059",
+   "first": 8,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 94720,
+   "seconds": 5.92
+  },
+  "3081-166546-0078:5": {
+   "id": "3081-166546-0078",
+   "first": 5,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 69280,
+   "seconds": 4.33
+  },
+  "6313-66125-0003:6": {
+   "id": "6313-66125-0003",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 73280,
+   "seconds": 4.58
+  },
+  "6313-66125-0011:17": {
+   "id": "6313-66125-0011",
+   "first": 17,
+   "reason": null,
+   "startSample": 66000,
+   "endSample": 81920,
+   "seconds": 0.995
+  },
+  "8842-302203-0008:0": {
+   "id": "8842-302203-0008",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 24960,
+   "seconds": 1.56
+  },
+  "8842-302203-0011:0": {
+   "id": "8842-302203-0011",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 27600,
+   "seconds": 1.725
+  },
+  "1686-142278-0042:20": {
+   "id": "1686-142278-0042",
+   "first": 20,
+   "reason": null,
+   "startSample": 87600,
+   "endSample": 117840,
+   "seconds": 1.89
+  },
+  "1686-142278-0069:0": {
+   "id": "1686-142278-0069",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 77840,
+   "seconds": 4.865
+  },
+  "1701-141760-0031:5": {
+   "id": "1701-141760-0031",
+   "first": 5,
+   "reason": null,
+   "startSample": 24240,
+   "endSample": 43600,
+   "seconds": 1.21
+  },
+  "1701-141760-0032:11": {
+   "id": "1701-141760-0032",
+   "first": 11,
+   "reason": null,
+   "startSample": 43920,
+   "endSample": 64640,
+   "seconds": 1.295
+  },
+  "3660-172182-0008:11": {
+   "id": "3660-172182-0008",
+   "first": 11,
+   "reason": null,
+   "startSample": 59040,
+   "endSample": 83120,
+   "seconds": 1.505
+  },
+  "3660-172182-0024:7": {
+   "id": "3660-172182-0024",
+   "first": 7,
+   "reason": null,
+   "startSample": 59840,
+   "endSample": 79520,
+   "seconds": 1.23
+  },
+  "4323-55228-0042:9": {
+   "id": "4323-55228-0042",
+   "first": 9,
+   "reason": "no pause after",
+   "startSample": 49840,
+   "endSample": 76720,
+   "seconds": 1.68
+  },
+  "4323-55228-0051:8": {
+   "id": "4323-55228-0051",
+   "first": 8,
+   "reason": "no pause after",
+   "startSample": 35280,
+   "endSample": 53040,
+   "seconds": 1.11
+  },
+  "4323-18416-0010:4": {
+   "id": "4323-18416-0010",
+   "first": 4,
+   "reason": null,
+   "startSample": 21280,
+   "endSample": 26560,
+   "seconds": 0.33
+  },
+  "4323-18416-0015:12": {
+   "id": "4323-18416-0015",
+   "first": 12,
+   "reason": null,
+   "startSample": 43040,
+   "endSample": 57920,
+   "seconds": 0.93
+  },
+  "4323-55228-0001:0": {
+   "id": "4323-55228-0001",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 61760,
+   "seconds": 3.86
+  },
+  "4323-55228-0004:22": {
+   "id": "4323-55228-0004",
+   "first": 22,
+   "reason": null,
+   "startSample": 88880,
+   "endSample": 106160,
+   "seconds": 1.08
+  },
+  "4570-56594-0003:2": {
+   "id": "4570-56594-0003",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 50880,
+   "seconds": 3.18
+  },
+  "4570-56594-0007:7": {
+   "id": "4570-56594-0007",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 161920,
+   "seconds": 10.12
+  },
+  "5543-27761-0089:3": {
+   "id": "5543-27761-0089",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 91600,
+   "seconds": 5.725
+  },
+  "5543-27761-0093:1": {
+   "id": "5543-27761-0093",
+   "first": 1,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 50400,
+   "seconds": 3.15
+  },
+  "7697-245715-0001:0": {
+   "id": "7697-245715-0001",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 27200,
+   "seconds": 1.7
+  },
+  "7697-245715-0003:15": {
+   "id": "7697-245715-0003",
+   "first": 15,
+   "reason": null,
+   "startSample": 79600,
+   "endSample": 104880,
+   "seconds": 1.58
+  },
+  "103-1240-0017:23": {
+   "id": "103-1240-0017",
+   "first": 23,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 229040,
+   "seconds": 14.315
+  },
+  "103-1240-0020:42": {
+   "id": "103-1240-0020",
+   "first": 42,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 214640,
+   "seconds": 13.415
+  },
+  "1040-133433-0064:0": {
+   "id": "1040-133433-0064",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 35200,
+   "seconds": 2.2
+  },
+  "1040-133433-0067:32": {
+   "id": "1040-133433-0067",
+   "first": 32,
+   "reason": "no pause after",
+   "startSample": 169680,
+   "endSample": 229599,
+   "seconds": 3.745
+  },
+  "1040-133433-0049:38": {
+   "id": "1040-133433-0049",
+   "first": 38,
+   "reason": null,
+   "startSample": 201680,
+   "endSample": 225760,
+   "seconds": 1.505
+  },
+  "1040-133433-0072:3": {
+   "id": "1040-133433-0072",
+   "first": 3,
+   "reason": null,
+   "startSample": 37360,
+   "endSample": 78960,
+   "seconds": 2.6
+  },
+  "1081-125237-0006:15": {
+   "id": "1081-125237-0006",
+   "first": 15,
+   "reason": null,
+   "startSample": 98480,
+   "endSample": 128160,
+   "seconds": 1.855
+  },
+  "1081-125237-0014:15": {
+   "id": "1081-125237-0014",
+   "first": 15,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 222960,
+   "seconds": 13.935
+  },
+  "1235-135883-0008:6": {
+   "id": "1235-135883-0008",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 233840,
+   "seconds": 14.615
+  },
+  "1235-135883-0027:6": {
+   "id": "1235-135883-0027",
+   "first": 6,
+   "reason": null,
+   "startSample": 33920,
+   "endSample": 50800,
+   "seconds": 1.055
+  },
+  "1235-135883-0029:21": {
+   "id": "1235-135883-0029",
+   "first": 21,
+   "reason": null,
+   "startSample": 114880,
+   "endSample": 132320,
+   "seconds": 1.09
+  },
+  "1235-135883-0026:29": {
+   "id": "1235-135883-0026",
+   "first": 29,
+   "reason": null,
+   "startSample": 150240,
+   "endSample": 166080,
+   "seconds": 0.99
+  },
+  "1235-135883-0029:16": {
+   "id": "1235-135883-0029",
+   "first": 16,
+   "reason": null,
+   "startSample": 84000,
+   "endSample": 97120,
+   "seconds": 0.82
+  },
+  "1235-135884-0041:23": {
+   "id": "1235-135884-0041",
+   "first": 23,
+   "reason": null,
+   "startSample": 137600,
+   "endSample": 153120,
+   "seconds": 0.97
+  },
+  "125-121124-0040:3": {
+   "id": "125-121124-0040",
+   "first": 3,
+   "reason": null,
+   "startSample": 28240,
+   "endSample": 55920,
+   "seconds": 1.73
+  },
+  "125-121124-0049:35": {
+   "id": "125-121124-0049",
+   "first": 35,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 228560,
+   "seconds": 14.285
+  },
+  "125-121124-0056:14": {
+   "id": "125-121124-0056",
+   "first": 14,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 239200,
+   "seconds": 14.95
+  },
+  "1334-135589-0036:26": {
+   "id": "1334-135589-0036",
+   "first": 26,
+   "reason": null,
+   "startSample": 181120,
+   "endSample": 202320,
+   "seconds": 1.325
+  },
+  "1334-135589-0037:25": {
+   "id": "1334-135589-0037",
+   "first": 25,
+   "reason": null,
+   "startSample": 152880,
+   "endSample": 168880,
+   "seconds": 1.0
+  },
+  "1455-138263-0012:8": {
+   "id": "1455-138263-0012",
+   "first": 8,
+   "reason": null,
+   "startSample": 68560,
+   "endSample": 97440,
+   "seconds": 1.805
+  },
+  "1455-138263-0039:2": {
+   "id": "1455-138263-0039",
+   "first": 2,
+   "reason": null,
+   "startSample": 27840,
+   "endSample": 69360,
+   "seconds": 2.595
+  },
+  "150-126107-0019:26": {
+   "id": "150-126107-0019",
+   "first": 26,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 224640,
+   "seconds": 14.04
+  },
+  "150-126107-0021:36": {
+   "id": "150-126107-0021",
+   "first": 36,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 242880,
+   "seconds": 15.18
+  },
+  "150-126107-0019:20": {
+   "id": "150-126107-0019",
+   "first": 20,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 224640,
+   "seconds": 14.04
+  },
+  "150-126107-0021:30": {
+   "id": "150-126107-0021",
+   "first": 30,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 242880,
+   "seconds": 15.18
+  },
+  "150-126107-0022:5": {
+   "id": "150-126107-0022",
+   "first": 5,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 256080,
+   "seconds": 16.005
+  },
+  "150-126107-0027:6": {
+   "id": "150-126107-0027",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 188960,
+   "seconds": 11.81
+  },
+  "150-126107-0028:35": {
+   "id": "150-126107-0028",
+   "first": 35,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 256880,
+   "seconds": 16.055
+  },
+  "150-126107-0026:0": {
+   "id": "150-126107-0026",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 258561,
+   "seconds": 16.16
+  },
+  "150-126107-0030:39": {
+   "id": "150-126107-0030",
+   "first": 39,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 247120,
+   "seconds": 15.445
+  },
+  "150-126112-0004:7": {
+   "id": "150-126112-0004",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 212000,
+   "seconds": 13.25
+  },
+  "150-126107-0029:27": {
+   "id": "150-126107-0029",
+   "first": 27,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 194640,
+   "seconds": 12.165
+  },
+  "150-126112-0015:27": {
+   "id": "150-126112-0015",
+   "first": 27,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 267920,
+   "seconds": 16.745
+  },
+  "1553-140047-0050:20": {
+   "id": "1553-140047-0050",
+   "first": 20,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 123680,
+   "seconds": 7.73
+  },
+  "1553-140048-0004:30": {
+   "id": "1553-140048-0004",
+   "first": 30,
+   "reason": null,
+   "startSample": 207360,
+   "endSample": 231360,
+   "seconds": 1.5
+  },
+  "1553-140048-0009:20": {
+   "id": "1553-140048-0009",
+   "first": 20,
+   "reason": "no pause after",
+   "startSample": 98400,
+   "endSample": 245200,
+   "seconds": 9.175
+  },
+  "1553-140048-0018:13": {
+   "id": "1553-140048-0018",
+   "first": 13,
+   "reason": "no pause after",
+   "startSample": 69760,
+   "endSample": 236000,
+   "seconds": 10.39
+  },
+  "1578-140049-0003:33": {
+   "id": "1578-140049-0003",
+   "first": 33,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 203200,
+   "seconds": 12.7
+  },
+  "1578-140049-0030:28": {
+   "id": "1578-140049-0030",
+   "first": 28,
+   "reason": null,
+   "startSample": 111680,
+   "endSample": 128960,
+   "seconds": 1.08
+  },
+  "1737-146161-0012:0": {
+   "id": "1737-146161-0012",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 48560,
+   "seconds": 3.035
+  },
+  "1737-146161-0015:0": {
+   "id": "1737-146161-0015",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 31040,
+   "seconds": 1.94
+  },
+  "1737-146161-0001:13": {
+   "id": "1737-146161-0001",
+   "first": 13,
+   "reason": null,
+   "startSample": 128000,
+   "endSample": 154560,
+   "seconds": 1.66
+  },
+  "1737-146161-0005:10": {
+   "id": "1737-146161-0005",
+   "first": 10,
+   "reason": "no pause after",
+   "startSample": 103280,
+   "endSample": 242160,
+   "seconds": 8.68
+  },
+  "1737-146161-0012:20": {
+   "id": "1737-146161-0012",
+   "first": 20,
+   "reason": null,
+   "startSample": 201600,
+   "endSample": 225200,
+   "seconds": 1.475
+  },
+  "1737-146161-0007:0": {
+   "id": "1737-146161-0007",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 32480,
+   "seconds": 2.03
+  },
+  "1737-146161-0009:0": {
+   "id": "1737-146161-0009",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 34800,
+   "seconds": 2.175
+  },
+  "1737-146161-0012:14": {
+   "id": "1737-146161-0012",
+   "first": 14,
+   "reason": null,
+   "startSample": 126960,
+   "endSample": 182720,
+   "seconds": 3.485
+  },
+  "1737-146161-0015:14": {
+   "id": "1737-146161-0015",
+   "first": 14,
+   "reason": null,
+   "startSample": 107280,
+   "endSample": 155120,
+   "seconds": 2.99
+  },
+  "1737-146161-0012:6": {
+   "id": "1737-146161-0012",
+   "first": 6,
+   "reason": null,
+   "startSample": 48560,
+   "endSample": 92560,
+   "seconds": 2.75
+  },
+  "1737-146161-0015:6": {
+   "id": "1737-146161-0015",
+   "first": 6,
+   "reason": null,
+   "startSample": 31040,
+   "endSample": 76160,
+   "seconds": 2.82
+  },
+  "1867-154071-0012:33": {
+   "id": "1867-154071-0012",
+   "first": 33,
+   "reason": null,
+   "startSample": 168720,
+   "endSample": 196800,
+   "seconds": 1.755
+  },
+  "1867-154071-0043:33": {
+   "id": "1867-154071-0043",
+   "first": 33,
+   "reason": null,
+   "startSample": 189600,
+   "endSample": 213040,
+   "seconds": 1.465
+  },
+  "1867-154071-0008:8": {
+   "id": "1867-154071-0008",
+   "first": 8,
+   "reason": null,
+   "startSample": 46640,
+   "endSample": 66960,
+   "seconds": 1.27
+  },
+  "1867-154071-0031:0": {
+   "id": "1867-154071-0031",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 22080,
+   "seconds": 1.38
+  },
+  "1867-154075-0038:20": {
+   "id": "1867-154075-0038",
+   "first": 20,
+   "reason": null,
+   "startSample": 97280,
+   "endSample": 119040,
+   "seconds": 1.36
+  },
+  "1867-154075-0043:31": {
+   "id": "1867-154075-0043",
+   "first": 31,
+   "reason": null,
+   "startSample": 187280,
+   "endSample": 207440,
+   "seconds": 1.26
+  },
+  "1867-154075-0045:24": {
+   "id": "1867-154075-0045",
+   "first": 24,
+   "reason": null,
+   "startSample": 123760,
+   "endSample": 149040,
+   "seconds": 1.58
+  },
+  "1963-142776-0010:10": {
+   "id": "1963-142776-0010",
+   "first": 10,
+   "reason": null,
+   "startSample": 50800,
+   "endSample": 75760,
+   "seconds": 1.56
+  },
+  "1963-142776-0019:20": {
+   "id": "1963-142776-0019",
+   "first": 20,
+   "reason": null,
+   "startSample": 104240,
+   "endSample": 129520,
+   "seconds": 1.58
+  },
+  "1963-147036-0008:11": {
+   "id": "1963-147036-0008",
+   "first": 11,
+   "reason": null,
+   "startSample": 54960,
+   "endSample": 74640,
+   "seconds": 1.23
+  },
+  "1963-147036-0014:16": {
+   "id": "1963-147036-0014",
+   "first": 16,
+   "reason": null,
+   "startSample": 77040,
+   "endSample": 92400,
+   "seconds": 0.96
+  },
+  "1970-26100-0012:38": {
+   "id": "1970-26100-0012",
+   "first": 38,
+   "reason": null,
+   "startSample": 214320,
+   "endSample": 239440,
+   "seconds": 1.57
+  },
+  "1970-26100-0018:2": {
+   "id": "1970-26100-0018",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 231280,
+   "seconds": 14.455
+  },
+  "200-124139-0008:2": {
+   "id": "200-124139-0008",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 204160,
+   "seconds": 12.76
+  },
+  "200-124140-0008:22": {
+   "id": "200-124140-0008",
+   "first": 22,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 216240,
+   "seconds": 13.515
+  },
+  "200-124139-0017:3": {
+   "id": "200-124139-0017",
+   "first": 3,
+   "reason": "no pause after",
+   "startSample": 30240,
+   "endSample": 154240,
+   "seconds": 7.75
+  },
+  "200-124139-0019:3": {
+   "id": "200-124139-0019",
+   "first": 3,
+   "reason": null,
+   "startSample": 18960,
+   "endSample": 46480,
+   "seconds": 1.72
+  },
+  "200-124139-0027:26": {
+   "id": "200-124139-0027",
+   "first": 26,
+   "reason": "no pause after",
+   "startSample": 161920,
+   "endSample": 210080,
+   "seconds": 3.01
+  },
+  "201-127786-0064:0": {
+   "id": "201-127786-0064",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 13360,
+   "seconds": 0.835
+  },
+  "201-127786-0070:0": {
+   "id": "201-127786-0070",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 216400,
+   "seconds": 13.525
+  },
+  "2092-145706-0042:4": {
+   "id": "2092-145706-0042",
+   "first": 4,
+   "reason": null,
+   "startSample": 27200,
+   "endSample": 57760,
+   "seconds": 1.91
+  },
+  "2092-145706-0068:34": {
+   "id": "2092-145706-0068",
+   "first": 34,
+   "reason": null,
+   "startSample": 194480,
+   "endSample": 225279,
+   "seconds": 1.925
+  },
+  "211-122425-0003:13": {
+   "id": "211-122425-0003",
+   "first": 13,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 87520,
+   "seconds": 5.47
+  },
+  "211-122425-0008:18": {
+   "id": "211-122425-0008",
+   "first": 18,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 226480,
+   "seconds": 14.155
+  },
+  "211-122425-0011:26": {
+   "id": "211-122425-0011",
+   "first": 26,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 246720,
+   "seconds": 15.42
+  },
+  "211-122425-0014:16": {
+   "id": "211-122425-0014",
+   "first": 16,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 230240,
+   "seconds": 14.39
+  },
+  "211-122425-0022:0": {
+   "id": "211-122425-0022",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 191680,
+   "seconds": 11.98
+  },
+  "211-122425-0027:0": {
+   "id": "211-122425-0027",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 221120,
+   "seconds": 13.82
+  },
+  "229-130880-0085:21": {
+   "id": "229-130880-0085",
+   "first": 21,
+   "reason": null,
+   "startSample": 138480,
+   "endSample": 158720,
+   "seconds": 1.265
+  },
+  "229-130880-0088:10": {
+   "id": "229-130880-0088",
+   "first": 10,
+   "reason": null,
+   "startSample": 47280,
+   "endSample": 66000,
+   "seconds": 1.17
+  },
+  "233-134440-0005:23": {
+   "id": "233-134440-0005",
+   "first": 23,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 246880,
+   "seconds": 15.43
+  },
+  "233-134440-0038:18": {
+   "id": "233-134440-0038",
+   "first": 18,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 243680,
+   "seconds": 15.23
+  },
+  "2384-152900-0055:0": {
+   "id": "2384-152900-0055",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 242240,
+   "seconds": 15.14
+  },
+  "2384-152900-0089:2": {
+   "id": "2384-152900-0089",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 210080,
+   "seconds": 13.13
+  },
+  "2416-152137-0004:34": {
+   "id": "2416-152137-0004",
+   "first": 34,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 211200,
+   "seconds": 13.2
+  },
+  "2416-152139-0049:24": {
+   "id": "2416-152139-0049",
+   "first": 24,
+   "reason": null,
+   "startSample": 145200,
+   "endSample": 161920,
+   "seconds": 1.045
+  },
+  "2416-152139-0013:11": {
+   "id": "2416-152139-0013",
+   "first": 11,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 209040,
+   "seconds": 13.065
+  },
+  "2416-152139-0025:17": {
+   "id": "2416-152139-0025",
+   "first": 17,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 186960,
+   "seconds": 11.685
+  },
+  "254-27760-0017:4": {
+   "id": "254-27760-0017",
+   "first": 4,
+   "reason": null,
+   "startSample": 30800,
+   "endSample": 65040,
+   "seconds": 2.14
+  },
+  "254-27760-0020:19": {
+   "id": "254-27760-0020",
+   "first": 19,
+   "reason": null,
+   "startSample": 132400,
+   "endSample": 165600,
+   "seconds": 2.075
+  },
+  "26-495-0043:7": {
+   "id": "26-495-0043",
+   "first": 7,
+   "reason": null,
+   "startSample": 60800,
+   "endSample": 76000,
+   "seconds": 0.95
+  },
+  "26-496-0001:3": {
+   "id": "26-496-0001",
+   "first": 3,
+   "reason": null,
+   "startSample": 23200,
+   "endSample": 41360,
+   "seconds": 1.135
+  },
+  "26-496-0001:7": {
+   "id": "26-496-0001",
+   "first": 7,
+   "reason": null,
+   "startSample": 41360,
+   "endSample": 65200,
+   "seconds": 1.49
+  },
+  "26-496-0002:25": {
+   "id": "26-496-0002",
+   "first": 25,
+   "reason": null,
+   "startSample": 178560,
+   "endSample": 200960,
+   "seconds": 1.4
+  },
+  "27-124992-0008:9": {
+   "id": "27-124992-0008",
+   "first": 9,
+   "reason": null,
+   "startSample": 61760,
+   "endSample": 87680,
+   "seconds": 1.62
+  },
+  "27-124992-0021:6": {
+   "id": "27-124992-0021",
+   "first": 6,
+   "reason": null,
+   "startSample": 41200,
+   "endSample": 64400,
+   "seconds": 1.45
+  },
+  "2764-36617-0015:18": {
+   "id": "2764-36617-0015",
+   "first": 18,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 250240,
+   "seconds": 15.64
+  },
+  "2764-36619-0040:3": {
+   "id": "2764-36619-0040",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 230560,
+   "seconds": 14.41
+  },
+  "2764-36617-0012:26": {
+   "id": "2764-36617-0012",
+   "first": 26,
+   "reason": "shorter than 0.3 s",
+   "startSample": 152800,
+   "endSample": 156320,
+   "seconds": 0.22
+  },
+  "2764-36619-0040:0": {
+   "id": "2764-36619-0040",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 230560,
+   "seconds": 14.41
+  },
+  "2817-142371-0020:13": {
+   "id": "2817-142371-0020",
+   "first": 13,
+   "reason": null,
+   "startSample": 83600,
+   "endSample": 95600,
+   "seconds": 0.75
+  },
+  "2817-142371-0029:13": {
+   "id": "2817-142371-0029",
+   "first": 13,
+   "reason": "no pause after",
+   "startSample": 69280,
+   "endSample": 227280,
+   "seconds": 9.875
+  },
+  "2817-142371-0023:9": {
+   "id": "2817-142371-0023",
+   "first": 9,
+   "reason": null,
+   "startSample": 43680,
+   "endSample": 60160,
+   "seconds": 1.03
+  },
+  "2817-142371-0037:17": {
+   "id": "2817-142371-0037",
+   "first": 17,
+   "reason": "no pause after",
+   "startSample": 116000,
+   "endSample": 190480,
+   "seconds": 4.655
+  },
+  "2817-142371-0046:8": {
+   "id": "2817-142371-0046",
+   "first": 8,
+   "reason": null,
+   "startSample": 65920,
+   "endSample": 84800,
+   "seconds": 1.18
+  },
+  "2836-5354-0024:41": {
+   "id": "2836-5354-0024",
+   "first": 41,
+   "reason": null,
+   "startSample": 247200,
+   "endSample": 268480,
+   "seconds": 1.33
+  },
+  "2836-5354-0029:13": {
+   "id": "2836-5354-0029",
+   "first": 13,
+   "reason": null,
+   "startSample": 85920,
+   "endSample": 105600,
+   "seconds": 1.23
+  },
+  "289-121665-0019:0": {
+   "id": "289-121665-0019",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 30880,
+   "seconds": 1.93
+  },
+  "289-121665-0042:14": {
+   "id": "289-121665-0042",
+   "first": 14,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 255360,
+   "seconds": 15.96
+  },
+  "2893-139310-0009:15": {
+   "id": "2893-139310-0009",
+   "first": 15,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 156000,
+   "seconds": 9.75
+  },
+  "2893-139310-0010:6": {
+   "id": "2893-139310-0010",
+   "first": 6,
+   "reason": null,
+   "startSample": 61280,
+   "endSample": 84880,
+   "seconds": 1.475
+  },
+  "298-126791-0064:31": {
+   "id": "298-126791-0064",
+   "first": 31,
+   "reason": "no pause after",
+   "startSample": 120560,
+   "endSample": 261440,
+   "seconds": 8.805
+  },
+  "298-126791-0067:2": {
+   "id": "298-126791-0067",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 308720,
+   "seconds": 19.295
+  },
+  "298-126791-0056:36": {
+   "id": "298-126791-0056",
+   "first": 36,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 245440,
+   "seconds": 15.34
+  },
+  "298-126791-0065:1": {
+   "id": "298-126791-0065",
+   "first": 1,
+   "reason": "no pause after",
+   "startSample": 3040,
+   "endSample": 253360,
+   "seconds": 15.645
+  },
+  "298-126790-0019:25": {
+   "id": "298-126790-0019",
+   "first": 25,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 231600,
+   "seconds": 14.475
+  },
+  "298-126790-0033:13": {
+   "id": "298-126790-0033",
+   "first": 13,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 192640,
+   "seconds": 12.04
+  },
+  "302-123516-0012:38": {
+   "id": "302-123516-0012",
+   "first": 38,
+   "reason": null,
+   "startSample": 235200,
+   "endSample": 251680,
+   "seconds": 1.03
+  },
+  "302-123516-0013:4": {
+   "id": "302-123516-0013",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 266640,
+   "seconds": 16.665
+  },
+  "3112-9555-0016:19": {
+   "id": "3112-9555-0016",
+   "first": 19,
+   "reason": "no pause after",
+   "startSample": 123040,
+   "endSample": 196480,
+   "seconds": 4.59
+  },
+  "3112-9555-0073:15": {
+   "id": "3112-9555-0073",
+   "first": 15,
+   "reason": "no pause after",
+   "startSample": 100960,
+   "endSample": 158400,
+   "seconds": 3.59
+  },
+  "3168-173565-0051:23": {
+   "id": "3168-173565-0051",
+   "first": 23,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 210400,
+   "seconds": 13.15
+  },
+  "3168-173565-0053:22": {
+   "id": "3168-173565-0053",
+   "first": 22,
+   "reason": null,
+   "startSample": 189840,
+   "endSample": 216960,
+   "seconds": 1.695
+  },
+  "32-4137-0018:13": {
+   "id": "32-4137-0018",
+   "first": 13,
+   "reason": null,
+   "startSample": 59360,
+   "endSample": 82560,
+   "seconds": 1.45
+  },
+  "32-4137-0037:25": {
+   "id": "32-4137-0037",
+   "first": 25,
+   "reason": null,
+   "startSample": 123360,
+   "endSample": 145680,
+   "seconds": 1.395
+  },
+  "3240-131231-0019:10": {
+   "id": "3240-131231-0019",
+   "first": 10,
+   "reason": null,
+   "startSample": 76000,
+   "endSample": 101520,
+   "seconds": 1.595
+  },
+  "3240-131232-0024:6": {
+   "id": "3240-131232-0024",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 232880,
+   "seconds": 14.555
+  },
+  "3240-131231-0015:0": {
+   "id": "3240-131231-0015",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 24720,
+   "seconds": 1.545
+  },
+  "3240-131232-0028:13": {
+   "id": "3240-131232-0028",
+   "first": 13,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 177280,
+   "seconds": 11.08
+  },
+  "3242-67153-0012:40": {
+   "id": "3242-67153-0012",
+   "first": 40,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 201200,
+   "seconds": 12.575
+  },
+  "3242-8112-0012:17": {
+   "id": "3242-8112-0012",
+   "first": 17,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 224960,
+   "seconds": 14.06
+  },
+  "3242-8112-0001:31": {
+   "id": "3242-8112-0001",
+   "first": 31,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 246720,
+   "seconds": 15.42
+  },
+  "3242-8112-0005:2": {
+   "id": "3242-8112-0005",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 245280,
+   "seconds": 15.33
+  },
+  "3242-8112-0039:35": {
+   "id": "3242-8112-0039",
+   "first": 35,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 226320,
+   "seconds": 14.145
+  },
+  "3242-8112-0028:7": {
+   "id": "3242-8112-0028",
+   "first": 7,
+   "reason": null,
+   "startSample": 38560,
+   "endSample": 58800,
+   "seconds": 1.265
+  },
+  "3242-8112-0042:20": {
+   "id": "3242-8112-0042",
+   "first": 20,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 250080,
+   "seconds": 15.63
+  },
+  "328-129766-0024:30": {
+   "id": "328-129766-0024",
+   "first": 30,
+   "reason": "no pause after",
+   "startSample": 163760,
+   "endSample": 255840,
+   "seconds": 5.755
+  },
+  "328-129766-0086:18": {
+   "id": "328-129766-0086",
+   "first": 18,
+   "reason": null,
+   "startSample": 92320,
+   "endSample": 118320,
+   "seconds": 1.625
+  },
+  "328-129766-0033:26": {
+   "id": "328-129766-0033",
+   "first": 26,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 190240,
+   "seconds": 11.89
+  },
+  "328-129766-0095:14": {
+   "id": "328-129766-0095",
+   "first": 14,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 245440,
+   "seconds": 15.34
+  },
+  "3436-172171-0005:31": {
+   "id": "3436-172171-0005",
+   "first": 31,
+   "reason": null,
+   "startSample": 181760,
+   "endSample": 206240,
+   "seconds": 1.53
+  },
+  "3436-172171-0032:1": {
+   "id": "3436-172171-0032",
+   "first": 1,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 238080,
+   "seconds": 14.88
+  },
+  "3486-166424-0066:2": {
+   "id": "3486-166424-0066",
+   "first": 2,
+   "reason": "no pause after",
+   "startSample": 13120,
+   "endSample": 255360,
+   "seconds": 15.14
+  },
+  "3486-166446-0006:29": {
+   "id": "3486-166446-0006",
+   "first": 29,
+   "reason": null,
+   "startSample": 167680,
+   "endSample": 181600,
+   "seconds": 0.87
+  },
+  "3486-166446-0032:7": {
+   "id": "3486-166446-0032",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 132960,
+   "seconds": 8.31
+  },
+  "3526-176653-0019:35": {
+   "id": "3526-176653-0019",
+   "first": 35,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 207040,
+   "seconds": 12.94
+  },
+  "3526-176653-0022:32": {
+   "id": "3526-176653-0022",
+   "first": 32,
+   "reason": null,
+   "startSample": 169200,
+   "endSample": 195520,
+   "seconds": 1.645
+  },
+  "3664-11714-0020:10": {
+   "id": "3664-11714-0020",
+   "first": 10,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 208640,
+   "seconds": 13.04
+  },
+  "3664-11714-0022:6": {
+   "id": "3664-11714-0022",
+   "first": 6,
+   "reason": null,
+   "startSample": 38640,
+   "endSample": 64560,
+   "seconds": 1.62
+  },
+  "3699-19401-0008:6": {
+   "id": "3699-19401-0008",
+   "first": 6,
+   "reason": null,
+   "startSample": 42320,
+   "endSample": 64080,
+   "seconds": 1.36
+  },
+  "3699-19402-0025:2": {
+   "id": "3699-19402-0025",
+   "first": 2,
+   "reason": "no pause after",
+   "startSample": 24400,
+   "endSample": 172720,
+   "seconds": 9.27
+  },
+  "374-180298-0008:0": {
+   "id": "374-180298-0008",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 18960,
+   "seconds": 1.185
+  },
+  "374-180298-0025:20": {
+   "id": "374-180298-0025",
+   "first": 20,
+   "reason": null,
+   "startSample": 91840,
+   "endSample": 112560,
+   "seconds": 1.295
+  },
+  "374-180298-0002:18": {
+   "id": "374-180298-0002",
+   "first": 18,
+   "reason": null,
+   "startSample": 96240,
+   "endSample": 122240,
+   "seconds": 1.625
+  },
+  "374-180298-0008:25": {
+   "id": "374-180298-0008",
+   "first": 25,
+   "reason": null,
+   "startSample": 155200,
+   "endSample": 177600,
+   "seconds": 1.4
+  },
+  "3857-180923-0008:33": {
+   "id": "3857-180923-0008",
+   "first": 33,
+   "reason": null,
+   "startSample": 193840,
+   "endSample": 217360,
+   "seconds": 1.47
+  },
+  "3857-180923-0013:14": {
+   "id": "3857-180923-0013",
+   "first": 14,
+   "reason": "no pause after",
+   "startSample": 67760,
+   "endSample": 218720,
+   "seconds": 9.435
+  },
+  "4014-186175-0002:17": {
+   "id": "4014-186175-0002",
+   "first": 17,
+   "reason": null,
+   "startSample": 77040,
+   "endSample": 99120,
+   "seconds": 1.38
+  },
+  "4014-186179-0039:36": {
+   "id": "4014-186179-0039",
+   "first": 36,
+   "reason": "no pause after",
+   "startSample": 189920,
+   "endSample": 240640,
+   "seconds": 3.17
+  },
+  "4018-107312-0026:13": {
+   "id": "4018-107312-0026",
+   "first": 13,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 184320,
+   "seconds": 11.52
+  },
+  "4018-107312-0027:3": {
+   "id": "4018-107312-0027",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 221199,
+   "seconds": 13.825
+  },
+  "4018-107312-0028:5": {
+   "id": "4018-107312-0028",
+   "first": 5,
+   "reason": "no pause after",
+   "startSample": 19840,
+   "endSample": 244561,
+   "seconds": 14.045
+  },
+  "405-130894-0066:0": {
+   "id": "405-130894-0066",
+   "first": 0,
+   "reason": "shorter than 0.3 s",
+   "startSample": 0,
+   "endSample": 1120,
+   "seconds": 0.07
+  },
+  "405-130894-0070:26": {
+   "id": "405-130894-0070",
+   "first": 26,
+   "reason": null,
+   "startSample": 175440,
+   "endSample": 196720,
+   "seconds": 1.33
+  },
+  "405-130895-0011:4": {
+   "id": "405-130895-0011",
+   "first": 4,
+   "reason": null,
+   "startSample": 40880,
+   "endSample": 63280,
+   "seconds": 1.4
+  },
+  "405-130895-0012:20": {
+   "id": "405-130895-0012",
+   "first": 20,
+   "reason": null,
+   "startSample": 142480,
+   "endSample": 167280,
+   "seconds": 1.55
+  },
+  "405-130894-0009:18": {
+   "id": "405-130894-0009",
+   "first": 18,
+   "reason": null,
+   "startSample": 140320,
+   "endSample": 164880,
+   "seconds": 1.535
+  },
+  "405-130895-0017:3": {
+   "id": "405-130895-0017",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 158320,
+   "seconds": 9.895
+  },
+  "405-130894-0034:10": {
+   "id": "405-130894-0034",
+   "first": 10,
+   "reason": null,
+   "startSample": 74480,
+   "endSample": 89600,
+   "seconds": 0.945
+  },
+  "405-130895-0018:15": {
+   "id": "405-130895-0018",
+   "first": 15,
+   "reason": null,
+   "startSample": 136400,
+   "endSample": 160480,
+   "seconds": 1.505
+  },
+  "4195-186238-0020:47": {
+   "id": "4195-186238-0020",
+   "first": 47,
+   "reason": "no pause after",
+   "startSample": 220080,
+   "endSample": 247280,
+   "seconds": 1.7
+  },
+  "4195-186238-0021:39": {
+   "id": "4195-186238-0021",
+   "first": 39,
+   "reason": null,
+   "startSample": 162400,
+   "endSample": 182800,
+   "seconds": 1.275
+  },
+  "4195-186236-0019:20": {
+   "id": "4195-186236-0019",
+   "first": 20,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 163200,
+   "seconds": 10.2
+  },
+  "4195-186237-0027:31": {
+   "id": "4195-186237-0027",
+   "first": 31,
+   "reason": null,
+   "startSample": 154960,
+   "endSample": 176560,
+   "seconds": 1.35
+  },
+  "426-122819-0002:20": {
+   "id": "426-122819-0002",
+   "first": 20,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 238400,
+   "seconds": 14.9
+  },
+  "426-122822-0024:0": {
+   "id": "426-122822-0024",
+   "first": 0,
+   "reason": "no pause after",
+   "startSample": 0,
+   "endSample": 235680,
+   "seconds": 14.73
+  },
+  "4267-78186-0011:29": {
+   "id": "4267-78186-0011",
+   "first": 29,
+   "reason": null,
+   "startSample": 198400,
+   "endSample": 220560,
+   "seconds": 1.385
+  },
+  "4267-78186-0012:27": {
+   "id": "4267-78186-0012",
+   "first": 27,
+   "reason": null,
+   "startSample": 198880,
+   "endSample": 219200,
+   "seconds": 1.27
+  },
+  "4406-16882-0028:50": {
+   "id": "4406-16882-0028",
+   "first": 50,
+   "reason": null,
+   "startSample": 250400,
+   "endSample": 267920,
+   "seconds": 1.095
+  },
+  "4406-16883-0052:4": {
+   "id": "4406-16883-0052",
+   "first": 4,
+   "reason": null,
+   "startSample": 23360,
+   "endSample": 40000,
+   "seconds": 1.04
+  },
+  "446-123501-0015:0": {
+   "id": "446-123501-0015",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 26320,
+   "seconds": 1.645
+  },
+  "446-123502-0045:15": {
+   "id": "446-123502-0045",
+   "first": 15,
+   "reason": null,
+   "startSample": 94640,
+   "endSample": 119920,
+   "seconds": 1.58
+  },
+  "458-126294-0011:0": {
+   "id": "458-126294-0011",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 29040,
+   "seconds": 1.815
+  },
+  "458-126294-0015:3": {
+   "id": "458-126294-0015",
+   "first": 3,
+   "reason": null,
+   "startSample": 18000,
+   "endSample": 46400,
+   "seconds": 1.775
+  },
+  "458-126294-0018:13": {
+   "id": "458-126294-0018",
+   "first": 13,
+   "reason": null,
+   "startSample": 94960,
+   "endSample": 123280,
+   "seconds": 1.77
+  },
+  "458-126290-0013:4": {
+   "id": "458-126290-0013",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 251520,
+   "seconds": 15.72
+  },
+  "458-126290-0014:35": {
+   "id": "458-126290-0014",
+   "first": 35,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 247680,
+   "seconds": 15.48
+  },
+  "4640-19188-0005:17": {
+   "id": "4640-19188-0005",
+   "first": 17,
+   "reason": null,
+   "startSample": 104560,
+   "endSample": 134960,
+   "seconds": 1.9
+  },
+  "4640-19188-0024:15": {
+   "id": "4640-19188-0024",
+   "first": 15,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 244080,
+   "seconds": 15.255
+  },
+  "481-123719-0022:20": {
+   "id": "481-123719-0022",
+   "first": 20,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 225120,
+   "seconds": 14.07
+  },
+  "481-123719-0033:7": {
+   "id": "481-123719-0033",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 100720,
+   "seconds": 6.295
+  },
+  "5192-19397-0006:14": {
+   "id": "5192-19397-0006",
+   "first": 14,
+   "reason": "no pause after",
+   "startSample": 85120,
+   "endSample": 240000,
+   "seconds": 9.68
+  },
+  "5192-19397-0008:18": {
+   "id": "5192-19397-0008",
+   "first": 18,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 199520,
+   "seconds": 12.47
+  },
+  "5192-19397-0009:10": {
+   "id": "5192-19397-0009",
+   "first": 10,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 241440,
+   "seconds": 15.09
+  },
+  "5192-19397-0001:47": {
+   "id": "5192-19397-0001",
+   "first": 47,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 244000,
+   "seconds": 15.25
+  },
+  "5192-19397-0075:1": {
+   "id": "5192-19397-0075",
+   "first": 1,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 216800,
+   "seconds": 13.55
+  },
+  "5192-19397-0077:14": {
+   "id": "5192-19397-0077",
+   "first": 14,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 191360,
+   "seconds": 11.96
+  },
+  "5390-30096-0026:27": {
+   "id": "5390-30096-0026",
+   "first": 27,
+   "reason": "no pause after",
+   "startSample": 169600,
+   "endSample": 252960,
+   "seconds": 5.21
+  },
+  "5390-30102-0029:7": {
+   "id": "5390-30102-0029",
+   "first": 7,
+   "reason": null,
+   "startSample": 35040,
+   "endSample": 59200,
+   "seconds": 1.51
+  },
+  "5393-19218-0008:11": {
+   "id": "5393-19218-0008",
+   "first": 11,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 249760,
+   "seconds": 15.61
+  },
+  "5393-19218-0016:6": {
+   "id": "5393-19218-0016",
+   "first": 6,
+   "reason": null,
+   "startSample": 26240,
+   "endSample": 42720,
+   "seconds": 1.03
+  },
+  "5456-58161-0008:16": {
+   "id": "5456-58161-0008",
+   "first": 16,
+   "reason": null,
+   "startSample": 105840,
+   "endSample": 145440,
+   "seconds": 2.475
+  },
+  "5456-58161-0020:27": {
+   "id": "5456-58161-0020",
+   "first": 27,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 241200,
+   "seconds": 15.075
+  },
+  "5463-39174-0003:25": {
+   "id": "5463-39174-0003",
+   "first": 25,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 142880,
+   "seconds": 8.93
+  },
+  "5463-39174-0006:37": {
+   "id": "5463-39174-0006",
+   "first": 37,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 204080,
+   "seconds": 12.755
+  },
+  "5463-39174-0009:26": {
+   "id": "5463-39174-0009",
+   "first": 26,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 172800,
+   "seconds": 10.8
+  },
+  "5514-19192-0018:10": {
+   "id": "5514-19192-0018",
+   "first": 10,
+   "reason": "no pause after",
+   "startSample": 63920,
+   "endSample": 248640,
+   "seconds": 11.545
+  },
+  "5514-19192-0024:40": {
+   "id": "5514-19192-0024",
+   "first": 40,
+   "reason": null,
+   "startSample": 221440,
+   "endSample": 238880,
+   "seconds": 1.09
+  },
+  "5514-19193-0003:4": {
+   "id": "5514-19193-0003",
+   "first": 4,
+   "reason": null,
+   "startSample": 19760,
+   "endSample": 32960,
+   "seconds": 0.825
+  },
+  "5703-47198-0021:5": {
+   "id": "5703-47198-0021",
+   "first": 5,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 226000,
+   "seconds": 14.125
+  },
+  "5703-47198-0023:32": {
+   "id": "5703-47198-0023",
+   "first": 32,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 240720,
+   "seconds": 15.045
+  },
+  "5808-48608-0000:16": {
+   "id": "5808-48608-0000",
+   "first": 16,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 226560,
+   "seconds": 14.16
+  },
+  "5808-48608-0016:4": {
+   "id": "5808-48608-0016",
+   "first": 4,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 238320,
+   "seconds": 14.895
+  },
+  "5808-48608-0031:22": {
+   "id": "5808-48608-0031",
+   "first": 22,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 197360,
+   "seconds": 12.335
+  },
+  "5808-48608-0005:11": {
+   "id": "5808-48608-0005",
+   "first": 11,
+   "reason": null,
+   "startSample": 53920,
+   "endSample": 68320,
+   "seconds": 0.9
+  },
+  "5808-48608-0052:14": {
+   "id": "5808-48608-0052",
+   "first": 14,
+   "reason": null,
+   "startSample": 74800,
+   "endSample": 92400,
+   "seconds": 1.1
+  },
+  "5867-48852-0035:37": {
+   "id": "5867-48852-0035",
+   "first": 37,
+   "reason": null,
+   "startSample": 222960,
+   "endSample": 244720,
+   "seconds": 1.36
+  },
+  "5867-48852-0048:25": {
+   "id": "5867-48852-0048",
+   "first": 25,
+   "reason": null,
+   "startSample": 133120,
+   "endSample": 152080,
+   "seconds": 1.185
+  },
+  "6000-86686-0003:13": {
+   "id": "6000-86686-0003",
+   "first": 13,
+   "reason": null,
+   "startSample": 66240,
+   "endSample": 79120,
+   "seconds": 0.805
+  },
+  "6000-86686-0005:11": {
+   "id": "6000-86686-0005",
+   "first": 11,
+   "reason": null,
+   "startSample": 43040,
+   "endSample": 59440,
+   "seconds": 1.025
+  },
+  "6000-86686-0007:6": {
+   "id": "6000-86686-0007",
+   "first": 6,
+   "reason": null,
+   "startSample": 25360,
+   "endSample": 41760,
+   "seconds": 1.025
+  },
+  "6078-54007-0051:1": {
+   "id": "6078-54007-0051",
+   "first": 1,
+   "reason": null,
+   "startSample": 3120,
+   "endSample": 30640,
+   "seconds": 1.72
+  },
+  "6078-54013-0074:28": {
+   "id": "6078-54013-0074",
+   "first": 28,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 182880,
+   "seconds": 11.43
+  },
+  "6078-54007-0005:13": {
+   "id": "6078-54007-0005",
+   "first": 13,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 154240,
+   "seconds": 9.64
+  },
+  "6078-54007-0011:17": {
+   "id": "6078-54007-0011",
+   "first": 17,
+   "reason": null,
+   "startSample": 121360,
+   "endSample": 137200,
+   "seconds": 0.99
+  },
+  "6081-41997-0005:12": {
+   "id": "6081-41997-0005",
+   "first": 12,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 244560,
+   "seconds": 15.285
+  },
+  "6081-41997-0024:22": {
+   "id": "6081-41997-0024",
+   "first": 22,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 204080,
+   "seconds": 12.755
+  },
+  "6367-65536-0018:16": {
+   "id": "6367-65536-0018",
+   "first": 16,
+   "reason": null,
+   "startSample": 130000,
+   "endSample": 164880,
+   "seconds": 2.18
+  },
+  "6367-65536-0021:35": {
+   "id": "6367-65536-0021",
+   "first": 35,
+   "reason": null,
+   "startSample": 204800,
+   "endSample": 233440,
+   "seconds": 1.79
+  },
+  "6454-120342-0018:10": {
+   "id": "6454-120342-0018",
+   "first": 10,
+   "reason": null,
+   "startSample": 63120,
+   "endSample": 87520,
+   "seconds": 1.525
+  },
+  "6454-120342-0025:34": {
+   "id": "6454-120342-0025",
+   "first": 34,
+   "reason": null,
+   "startSample": 214720,
+   "endSample": 240000,
+   "seconds": 1.58
+  },
+  "6476-57446-0002:38": {
+   "id": "6476-57446-0002",
+   "first": 38,
+   "reason": null,
+   "startSample": 206160,
+   "endSample": 224640,
+   "seconds": 1.155
+  },
+  "6476-57446-0018:1": {
+   "id": "6476-57446-0018",
+   "first": 1,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 259360,
+   "seconds": 16.21
+  },
+  "6529-62556-0037:9": {
+   "id": "6529-62556-0037",
+   "first": 9,
+   "reason": null,
+   "startSample": 61440,
+   "endSample": 78480,
+   "seconds": 1.065
+  },
+  "6529-62556-0039:24": {
+   "id": "6529-62556-0039",
+   "first": 24,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 248400,
+   "seconds": 15.525
+  },
+  "6529-62554-0044:39": {
+   "id": "6529-62554-0044",
+   "first": 39,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 224080,
+   "seconds": 14.005
+  },
+  "6529-62554-0052:25": {
+   "id": "6529-62554-0052",
+   "first": 25,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 209920,
+   "seconds": 13.12
+  },
+  "6529-62554-0055:0": {
+   "id": "6529-62554-0055",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 19200,
+   "seconds": 1.2
+  },
+  "6529-62556-0014:16": {
+   "id": "6529-62556-0014",
+   "first": 16,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 188880,
+   "seconds": 11.805
+  },
+  "6529-62554-0016:5": {
+   "id": "6529-62554-0016",
+   "first": 5,
+   "reason": null,
+   "startSample": 20000,
+   "endSample": 44320,
+   "seconds": 1.52
+  },
+  "6529-62554-0044:12": {
+   "id": "6529-62554-0044",
+   "first": 12,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 224080,
+   "seconds": 14.005
+  },
+  "6529-62556-0016:33": {
+   "id": "6529-62556-0016",
+   "first": 33,
+   "reason": null,
+   "startSample": 164160,
+   "endSample": 192240,
+   "seconds": 1.755
+  },
+  "669-129061-0012:30": {
+   "id": "669-129061-0012",
+   "first": 30,
+   "reason": null,
+   "startSample": 232560,
+   "endSample": 251840,
+   "seconds": 1.205
+  },
+  "669-129061-0054:5": {
+   "id": "669-129061-0054",
+   "first": 5,
+   "reason": null,
+   "startSample": 33280,
+   "endSample": 52960,
+   "seconds": 1.23
+  },
+  "6925-80680-0002:9": {
+   "id": "6925-80680-0002",
+   "first": 9,
+   "reason": null,
+   "startSample": 34480,
+   "endSample": 54240,
+   "seconds": 1.235
+  },
+  "6925-80680-0003:41": {
+   "id": "6925-80680-0003",
+   "first": 41,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 245040,
+   "seconds": 15.315
+  },
+  "7178-34644-0034:0": {
+   "id": "7178-34644-0034",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 22400,
+   "seconds": 1.4
+  },
+  "7178-34644-0036:24": {
+   "id": "7178-34644-0036",
+   "first": 24,
+   "reason": "no pause after",
+   "startSample": 136720,
+   "endSample": 250400,
+   "seconds": 7.105
+  },
+  "7178-34644-0039:12": {
+   "id": "7178-34644-0039",
+   "first": 12,
+   "reason": null,
+   "startSample": 76800,
+   "endSample": 101200,
+   "seconds": 1.525
+  },
+  "7264-92310-0021:14": {
+   "id": "7264-92310-0021",
+   "first": 14,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 170800,
+   "seconds": 10.675
+  },
+  "7264-92314-0024:31": {
+   "id": "7264-92314-0024",
+   "first": 31,
+   "reason": "no pause after",
+   "startSample": 146080,
+   "endSample": 272240,
+   "seconds": 7.885
+  },
+  "7278-104730-0027:0": {
+   "id": "7278-104730-0027",
+   "first": 0,
+   "reason": null,
+   "startSample": 0,
+   "endSample": 23680,
+   "seconds": 1.48
+  },
+  "7278-104730-0034:13": {
+   "id": "7278-104730-0034",
+   "first": 13,
+   "reason": null,
+   "startSample": 112080,
+   "endSample": 133760,
+   "seconds": 1.355
+  },
+  "7278-104730-0036:2": {
+   "id": "7278-104730-0036",
+   "first": 2,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 118880,
+   "seconds": 7.43
+  },
+  "730-359-0002:30": {
+   "id": "730-359-0002",
+   "first": 30,
+   "reason": "no pause after",
+   "startSample": 174480,
+   "endSample": 223760,
+   "seconds": 3.08
+  },
+  "730-359-0040:31": {
+   "id": "730-359-0040",
+   "first": 31,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 240880,
+   "seconds": 15.055
+  },
+  "7312-92432-0002:9": {
+   "id": "7312-92432-0002",
+   "first": 9,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 195920,
+   "seconds": 12.245
+  },
+  "7312-92432-0025:10": {
+   "id": "7312-92432-0025",
+   "first": 10,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 192160,
+   "seconds": 12.01
+  },
+  "7402-90848-0035:6": {
+   "id": "7402-90848-0035",
+   "first": 6,
+   "reason": null,
+   "startSample": 37280,
+   "endSample": 67840,
+   "seconds": 1.91
+  },
+  "7402-90848-0039:3": {
+   "id": "7402-90848-0039",
+   "first": 3,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 204800,
+   "seconds": 12.8
+  },
+  "7505-258964-0003:12": {
+   "id": "7505-258964-0003",
+   "first": 12,
+   "reason": "no pause after",
+   "startSample": 68720,
+   "endSample": 267280,
+   "seconds": 12.41
+  },
+  "7505-258964-0042:9": {
+   "id": "7505-258964-0042",
+   "first": 9,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 196480,
+   "seconds": 12.28
+  },
+  "7794-295955-0000:25": {
+   "id": "7794-295955-0000",
+   "first": 25,
+   "reason": null,
+   "startSample": 127600,
+   "endSample": 151360,
+   "seconds": 1.485
+  },
+  "7794-295955-0002:35": {
+   "id": "7794-295955-0002",
+   "first": 35,
+   "reason": null,
+   "startSample": 176800,
+   "endSample": 200400,
+   "seconds": 1.475
+  },
+  "7794-295947-0019:14": {
+   "id": "7794-295947-0019",
+   "first": 14,
+   "reason": null,
+   "startSample": 58720,
+   "endSample": 80320,
+   "seconds": 1.35
+  },
+  "7794-295947-0024:40": {
+   "id": "7794-295947-0024",
+   "first": 40,
+   "reason": null,
+   "startSample": 165040,
+   "endSample": 192960,
+   "seconds": 1.745
+  },
+  "7800-283478-0027:53": {
+   "id": "7800-283478-0027",
+   "first": 53,
+   "reason": null,
+   "startSample": 223520,
+   "endSample": 235760,
+   "seconds": 0.765
+  },
+  "7800-283492-0003:8": {
+   "id": "7800-283492-0003",
+   "first": 8,
+   "reason": "no pause after",
+   "startSample": 39280,
+   "endSample": 204161,
+   "seconds": 10.305
+  },
+  "7800-283493-0027:42": {
+   "id": "7800-283493-0027",
+   "first": 42,
+   "reason": null,
+   "startSample": 195760,
+   "endSample": 208400,
+   "seconds": 0.79
+  },
+  "7800-283493-0032:35": {
+   "id": "7800-283493-0032",
+   "first": 35,
+   "reason": "shorter than 0.3 s",
+   "startSample": 202240,
+   "endSample": 202240,
+   "seconds": 0.0
+  },
+  "8063-274115-0014:7": {
+   "id": "8063-274115-0014",
+   "first": 7,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 241200,
+   "seconds": 15.075
+  },
+  "8063-274115-0025:2": {
+   "id": "8063-274115-0025",
+   "first": 2,
+   "reason": null,
+   "startSample": 13920,
+   "endSample": 34080,
+   "seconds": 1.26
+  },
+  "8063-274115-0030:21": {
+   "id": "8063-274115-0030",
+   "first": 21,
+   "reason": null,
+   "startSample": 97600,
+   "endSample": 122400,
+   "seconds": 1.55
+  },
+  "8088-284756-0016:36": {
+   "id": "8088-284756-0016",
+   "first": 36,
+   "reason": null,
+   "startSample": 208400,
+   "endSample": 228080,
+   "seconds": 1.23
+  },
+  "8088-284756-0053:20": {
+   "id": "8088-284756-0053",
+   "first": 20,
+   "reason": null,
+   "startSample": 121440,
+   "endSample": 140800,
+   "seconds": 1.21
+  },
+  "8088-284756-0046:44": {
+   "id": "8088-284756-0046",
+   "first": 44,
+   "reason": null,
+   "startSample": 225200,
+   "endSample": 253040,
+   "seconds": 1.74
+  },
+  "8088-284756-0047:1": {
+   "id": "8088-284756-0047",
+   "first": 1,
+   "reason": null,
+   "startSample": 14240,
+   "endSample": 42960,
+   "seconds": 1.795
+  },
+  "8123-275209-0013:18": {
+   "id": "8123-275209-0013",
+   "first": 18,
+   "reason": "no pause after",
+   "startSample": 97200,
+   "endSample": 239760,
+   "seconds": 8.91
+  },
+  "8123-275209-0016:6": {
+   "id": "8123-275209-0016",
+   "first": 6,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 207680,
+   "seconds": 12.98
+  },
+  "83-11691-0006:11": {
+   "id": "83-11691-0006",
+   "first": 11,
+   "reason": null,
+   "startSample": 80000,
+   "endSample": 101760,
+   "seconds": 1.36
+  },
+  "83-11691-0008:20": {
+   "id": "83-11691-0008",
+   "first": 20,
+   "reason": null,
+   "startSample": 173760,
+   "endSample": 189760,
+   "seconds": 1.0
+  },
+  "8312-279790-0050:26": {
+   "id": "8312-279790-0050",
+   "first": 26,
+   "reason": null,
+   "startSample": 177680,
+   "endSample": 197120,
+   "seconds": 1.215
+  },
+  "8312-279791-0046:14": {
+   "id": "8312-279791-0046",
+   "first": 14,
+   "reason": null,
+   "startSample": 97280,
+   "endSample": 113360,
+   "seconds": 1.005
+  },
+  "8324-286682-0021:28": {
+   "id": "8324-286682-0021",
+   "first": 28,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 241040,
+   "seconds": 15.065
+  },
+  "8324-286682-0024:17": {
+   "id": "8324-286682-0024",
+   "first": 17,
+   "reason": null,
+   "startSample": 104640,
+   "endSample": 124000,
+   "seconds": 1.21
+  },
+  "8324-286682-0034:16": {
+   "id": "8324-286682-0034",
+   "first": 16,
+   "reason": null,
+   "startSample": 112720,
+   "endSample": 136080,
+   "seconds": 1.46
+  },
+  "8324-286681-0015:42": {
+   "id": "8324-286681-0015",
+   "first": 42,
+   "reason": null,
+   "startSample": 248400,
+   "endSample": 266320,
+   "seconds": 1.12
+  },
+  "8324-286681-0017:31": {
+   "id": "8324-286681-0017",
+   "first": 31,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 215680,
+   "seconds": 13.48
+  },
+  "8419-293469-0009:8": {
+   "id": "8419-293469-0009",
+   "first": 8,
+   "reason": null,
+   "startSample": 42400,
+   "endSample": 68080,
+   "seconds": 1.605
+  },
+  "8419-293469-0024:44": {
+   "id": "8419-293469-0024",
+   "first": 44,
+   "reason": null,
+   "startSample": 225600,
+   "endSample": 251040,
+   "seconds": 1.59
+  },
+  "8580-287364-0016:41": {
+   "id": "8580-287364-0016",
+   "first": 41,
+   "reason": null,
+   "startSample": 228960,
+   "endSample": 252480,
+   "seconds": 1.47
+  },
+  "8580-287364-0021:7": {
+   "id": "8580-287364-0021",
+   "first": 7,
+   "reason": null,
+   "startSample": 46480,
+   "endSample": 71280,
+   "seconds": 1.55
+  },
+  "8630-305212-0008:32": {
+   "id": "8630-305212-0008",
+   "first": 32,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 256240,
+   "seconds": 16.015
+  },
+  "8630-305213-0001:3": {
+   "id": "8630-305213-0001",
+   "first": 3,
+   "reason": "shorter than 0.3 s",
+   "startSample": 24160,
+   "endSample": 24160,
+   "seconds": 0.0
+  },
+  "8747-293952-0055:23": {
+   "id": "8747-293952-0055",
+   "first": 23,
+   "reason": null,
+   "startSample": 133040,
+   "endSample": 152800,
+   "seconds": 1.235
+  },
+  "8747-293952-0069:12": {
+   "id": "8747-293952-0069",
+   "first": 12,
+   "reason": null,
+   "startSample": 106160,
+   "endSample": 125840,
+   "seconds": 1.23
+  },
+  "8747-293952-0092:29": {
+   "id": "8747-293952-0092",
+   "first": 29,
+   "reason": null,
+   "startSample": 170800,
+   "endSample": 198720,
+   "seconds": 1.745
+  },
+  "8747-293952-0104:19": {
+   "id": "8747-293952-0104",
+   "first": 19,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 250320,
+   "seconds": 15.645
+  },
+  "8770-295462-0037:24": {
+   "id": "8770-295462-0037",
+   "first": 24,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 220080,
+   "seconds": 13.755
+  },
+  "8770-295463-0008:28": {
+   "id": "8770-295463-0008",
+   "first": 28,
+   "reason": null,
+   "startSample": 178640,
+   "endSample": 207520,
+   "seconds": 1.805
+  },
+  "8770-295463-0017:19": {
+   "id": "8770-295463-0017",
+   "first": 19,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 229200,
+   "seconds": 14.325
+  },
+  "8770-295462-0012:22": {
+   "id": "8770-295462-0012",
+   "first": 22,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 221920,
+   "seconds": 13.87
+  },
+  "8770-295463-0020:32": {
+   "id": "8770-295463-0020",
+   "first": 32,
+   "reason": "no pause before",
+   "startSample": 0,
+   "endSample": 237360,
+   "seconds": 14.835
+  },
+  "8838-298545-0038:44": {
+   "id": "8838-298545-0038",
+   "first": 44,
+   "reason": "no pause after",
+   "startSample": 206000,
+   "endSample": 253520,
+   "seconds": 2.97
+  },
+  "8838-298546-0040:20": {
+   "id": "8838-298546-0040",
+   "first": 20,
+   "reason": null,
+   "startSample": 100000,
+   "endSample": 125440,
+   "seconds": 1.59
+  },
+  "8838-298545-0039:10": {
+   "id": "8838-298545-0039",
+   "first": 10,
+   "reason": null,
+   "startSample": 37200,
+   "endSample": 55840,
+   "seconds": 1.165
+  },
+  "8838-298546-0042:9": {
+   "id": "8838-298546-0042",
+   "first": 9,
+   "reason": null,
+   "startSample": 48080,
+   "endSample": 74480,
+   "seconds": 1.65
+  }
+ },
+ "leftOut": {
+  "no pause before": 150,
+  "no pause after": 54,
+  "shorter than 0.3 s": 5
+ }
+}
