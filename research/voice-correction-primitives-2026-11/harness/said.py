@@ -3,7 +3,8 @@
 recordings (PREREGISTRATION.md, Study A).
 
   said.py select GROUPS.json OUT.json          the pre-registered choice of groups
-  said.py dictate CHOSEN.json RUNS.jsonl       each utterance whole, through the real worker
+  said.py dictate CHOSEN.json RUNS.jsonl       each utterance whole, on a lab stream, with word times
+  said.py check CHOSEN.json RUNS.jsonl [N]     the first N of them through the real worker, to compare
   said.py clips CHOSEN.json CUTS.json RUNS.jsonl   each cut clause on its own
   said.py trials CHOSEN.json CUTS.json RUNS.jsonl OUT.json
   said.py lean TRIALS.json CUTS.json RUNS.jsonl    each trial's clause, leaned toward its typed window
@@ -45,9 +46,11 @@ def log_runs(path):
 
 
 def dictate(chosen, runs):
+    """Each utterance whole, on a lab stream opened as the worker opens it, with
+    word times, which the worker's protocol doesn't give."""
+    from lab import asr, feed, load as lab_load
     groups = json.loads(Path(chosen).read_text())['groups']
     out, done = log_runs(runs)
-    worker = Worker()
     with out.open('a') as log:
         seen = set(done)
         for number, group in enumerate(groups):
@@ -55,10 +58,22 @@ def dictate(chosen, runs):
                 if ('U', utterance['id']) in seen:
                     continue
                 seen.add(('U', utterance['id']))
-                text, _, _ = worker.recognize('U-' + utterance['id'], load(utterance['audio']))
-                log.write(json.dumps(dict(arm='U', id=utterance['id'], text=text), ensure_ascii=False) + '\n'); log.flush()
+                stream = asr.Stream(word_times=True); feed(stream, lab_load(utterance['audio'])); text = stream.finish()
+                log.write(json.dumps(dict(arm='U', id=utterance['id'], text=text, words=stream.words), ensure_ascii=False) + '\n'); log.flush()
             if number % 25 == 0: print(number, len(groups), flush=True)
-    worker.child.stdin.close(); worker.child.wait(timeout=60); print('done', flush=True)
+    print('done', flush=True)
+
+
+def check(chosen, runs, count='20'):
+    """The first `count` utterances through the real worker: the same text as the lab stream?"""
+    groups = json.loads(Path(chosen).read_text())['groups']
+    texts = {r['id']: r['text'] for r in map(json.loads, Path(runs).read_text().splitlines()) if r['arm'] == 'U'}
+    worker = Worker(); same = total = 0
+    for utterance in [u for g in groups for u in g['utterances']][:int(count)]:
+        text, _, _ = worker.recognize('W-' + utterance['id'], load(utterance['audio']))
+        total += 1; same += text == texts[utterance['id']]
+    worker.child.stdin.close(); worker.child.wait(timeout=60)
+    print(f'worker text equals lab text: {same}/{total}', flush=True)
 
 
 def clip(utterance_audio, cut):
@@ -149,4 +164,4 @@ def lean(trials_path, cuts_path, runs):
 
 
 if __name__ == '__main__':
-    {'select': select, 'dictate': dictate, 'clips': clips, 'trials': trials, 'lean': lean}[sys.argv[1]](*sys.argv[2:])
+    {'select': select, 'dictate': dictate, 'check': check, 'clips': clips, 'trials': trials, 'lean': lean}[sys.argv[1]](*sys.argv[2:])

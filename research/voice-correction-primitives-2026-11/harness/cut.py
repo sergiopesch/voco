@@ -1,79 +1,92 @@
 #!/usr/bin/env python3
 """Find where each clause starts and ends in its recording (PREREGISTRATION.md,
-Said again): a cut at a quiet point between the clause and its neighbours.
+Study A): a cut in the middle of a pause between the clause and its neighbour.
 
-  VOCO_LAB_CONTEXT=1 cut.py GROUPS.json OUT.json
+  cut.py CHOSEN.json RUNS.jsonl OUT.json
 
-As the pause study cut between two words: the quietest 20 ms frame between the
-recognizer's times for the two words, moved 160 ms earlier and widened by 80 ms
-either way, which must be at least 12 dB below the recording's median frame.
-An end of the recording needs no cut. A clause without such a quiet point on a
-side that needs one, or whose neighbours the timing pass didn't recognize, is
-left out, before any correction is recognized.
+Needs the recordings and the dictation pass's word times (arm U of RUNS.jsonl),
+not the recognizer. A pause is a run of 20 ms frames, 10 ms apart, each at
+least 12 dB below the recording's median frame, at least 60 ms long. The
+recognizer writes a word some time after it is said: on clauses outside the
+study, the pause before a word lay 150 to 800 ms before the word's start time.
+So the cut before a word is the middle of the longest pause whose middle lies
+in that span before the word's start time. An end of the recording needs no
+cut. A clause without such a pause on a side that needs one, whose first word
+or the word after it the dictation pass didn't write, or shorter than 0.3 s,
+is left out, before any correction is recognized.
 """
 import json, os, sys
 from pathlib import Path
-os.environ['VOCO_LAB_CONTEXT'] = '1'
 import numpy as np
-from lab import RATE, asr, feed, load
 from text import align, norm, words
 
-FRAME = 320
+RATE, FRAME, HOP = 16000, 320, 160
+LONGEST, EARLIEST, LATEST = 6, 800, 150   # frames; ms before the next word's start time
 
 
-def levels(audio, hop=160):
+def levels(audio, hop=HOP):
     count = (len(audio) - FRAME) // hop + 1
     index = np.arange(FRAME)[None, :] + hop * np.arange(count)[:, None]
     return 10 * np.log10(np.square(audio[index].astype(np.float64)).mean(1) + 1e-12)
 
 
-def quiet_point(energy, median, after_ms, before_ms):
-    """The sample of the quietest frame between two word times, or None."""
-    low, high = (after_ms - 160 - 80) * 16, (before_ms - 160 + 80) * 16
-    first, last = max(0, low // 160), min(len(energy) - 1, high // 160)
-    if last <= first:
+def pauses(audio):
+    """(first frame, frame after the last) of each run of quiet frames."""
+    energy = levels(audio); floor = float(np.median(levels(audio, FRAME))) - 12
+    found, start = [], None
+    for frame, level in enumerate(energy):
+        if level <= floor:
+            start = frame if start is None else start
+        elif start is not None:
+            found.append((start, frame)); start = None
+    if start is not None:
+        found.append((start, len(energy)))
+    return found
+
+
+def before(word_start_ms, quiet):
+    """The sample in the middle of the longest pause before a word, or None."""
+    fits = [(b - a, a, b) for a, b in quiet if b - a >= LONGEST
+            and word_start_ms - EARLIEST <= (a + b) * 5 <= word_start_ms - LATEST]
+    if not fits:
         return None
-    frame = first + int(np.argmin(energy[first:last]))
-    return int(frame * 160 + 160) if energy[frame] <= median - 12 else None
+    _, a, b = max(fits)
+    return (a + b) * HOP // 2
 
 
 def main():
+    from lab import load
     plan = json.loads(Path(sys.argv[1]).read_text())
+    timed_by = {r['id']: r['words'] for r in map(json.loads, Path(sys.argv[2]).read_text().splitlines()) if r['arm'] == 'U'}
     cuts, reasons = {}, {}
-    for number, group in enumerate(plan['groups']):
+    for group in plan['groups']:
         for utterance in group['utterances']:
             audio = load(utterance['audio'])
-            stream = asr.Stream(word_times=True); feed(stream, audio); stream.finish()
-            timed = [(norm(word), start, end) for word, start, end in stream.words if norm(word)]
+            timed = [(norm(word), start) for word, start, _ in timed_by[utterance['id']] if norm(word)]
             reference = words(utterance['reference'])
-            aligned = align(reference, [word for word, _, _ in timed])
+            aligned = align(reference, [word for word, _ in timed])
             first, last = utterance['first'], utterance['last']
-            energy = levels(audio); median = float(np.median(levels(audio, FRAME)))
-            key = f"{utterance['id']}:{first}"
-            reason = None
-            start, end = 0, len(audio)
-            inside = [aligned[i] for i in (first, last)]
-            if any(place[0] is None for place in inside):
-                reason = 'clause edge not recognized'
-            if not reason and first > 0:
-                before = aligned[first - 1]
-                point = None if before[0] is None else quiet_point(energy, median, timed[before[0]][2], timed[inside[0][0]][1])
-                if point is None: reason = 'no quiet point before'
+            quiet = pauses(audio)
+            reason, start, end = None, 0, len(audio)
+            if first > 0:
+                place = aligned[first][0]
+                point = None if place is None else before(timed[place][1], quiet)
+                if place is None: reason = 'first word not written'
+                elif point is None: reason = 'no pause before'
                 else: start = point
             if not reason and last < len(reference) - 1:
-                after = aligned[last + 1]
-                point = None if after[0] is None else quiet_point(energy, median, timed[inside[1][0]][2], timed[after[0]][1])
-                if point is None: reason = 'no quiet point after'
+                place = aligned[last + 1][0]
+                point = None if place is None else before(timed[place][1], quiet)
+                if place is None: reason = 'word after not written'
+                elif point is None: reason = 'no pause after'
                 else: end = point
             if not reason and end - start < RATE * 0.3:
                 reason = 'shorter than 0.3 s'
             if reason:
                 reasons[reason] = reasons.get(reason, 0) + 1
-            cuts[key] = dict(id=utterance['id'], first=first, reason=reason, startSample=start, endSample=end,
-                             seconds=round((end - start) / RATE, 3))
-        if number % 40 == 0:
-            print(number, len(plan['groups']), flush=True)
-    Path(sys.argv[2]).write_text(json.dumps(dict(cuts=cuts, leftOut=reasons), indent=1) + '\n')
+            cuts[f"{utterance['id']}:{first}"] = dict(id=utterance['id'], first=first, reason=reason, startSample=int(start),
+                                                      endSample=int(end), seconds=round((end - start) / RATE, 3))
+    Path(sys.argv[3]).write_text(json.dumps(dict(cuts=cuts, leftOut=reasons), indent=1) + '\n')
     print(len(cuts), 'clauses;', sum(c['reason'] is None for c in cuts.values()), 'cut;', reasons)
 
 
