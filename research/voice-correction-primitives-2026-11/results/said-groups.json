@@ -1,0 +1,4812 @@
+{
+ "groups": [
+  {
+   "subset": "test-clean",
+   "speaker": "1580",
+   "clause": "i think so",
+   "utterances": [
+    {
+     "id": "1580-141084-0018",
+     "audio": "test-clean/1580/141084/1580-141084-0018.flac",
+     "reference": "I think so. You have formed a conclusion?",
+     "seconds": 3.345,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "1580-141084-0025",
+     "audio": "test-clean/1580/141084/1580-141084-0025.flac",
+     "reference": "You know him? I think so.",
+     "seconds": 2.375,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "1580",
+   "clause": "my dear watson",
+   "utterances": [
+    {
+     "id": "1580-141084-0017",
+     "audio": "test-clean/1580/141084/1580-141084-0017.flac",
+     "reference": "No good, my dear Watson.",
+     "seconds": 2,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "1580-141084-0019",
+     "audio": "test-clean/1580/141084/1580-141084-0019.flac",
+     "reference": "Yes, my dear Watson, I have solved the mystery.",
+     "seconds": 3.125,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "2830",
+   "clause": "from god the father",
+   "utterances": [
+    {
+     "id": "2830-3980-0038",
+     "audio": "test-clean/2830/3980/2830-3980-0038.flac",
+     "reference": "Grace be to you, and peace, from God the Father, and from our Lord Jesus Christ.",
+     "seconds": 5.54,
+     "first": 6,
+     "last": 9
+    },
+    {
+     "id": "2830-3980-0046",
+     "audio": "test-clean/2830/3980/2830-3980-0046.flac",
+     "reference": "Was it not enough to say, from God the Father?",
+     "seconds": 2.84,
+     "first": 6,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "3575",
+   "clause": "eighteen thirty seven",
+   "utterances": [
+    {
+     "id": "3575-170457-0028",
+     "audio": "test-clean/3575/170457/3575-170457-0028.flac",
+     "reference": "Keswick, march twenty second, eighteen thirty seven. Dear Madam,",
+     "seconds": 5.53,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "3575-170457-0031",
+     "audio": "test-clean/3575/170457/3575-170457-0031.flac",
+     "reference": "On august twenty seventh, eighteen thirty seven, she writes",
+     "seconds": 4,
+     "first": 4,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "4446",
+   "clause": "do you know",
+   "utterances": [
+    {
+     "id": "4446-2271-0004",
+     "audio": "test-clean/4446/2271/4446-2271-0004.flac",
+     "reference": "Do you know, Alexander, Mainhall looked with perplexity up into the top of the hansom and rubbed his pink cheek with his gloved finger, do you know, I sometimes think of taking to criticism seriously myself.",
+     "seconds": 12.01,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "4446-2271-0013",
+     "audio": "test-clean/4446/2271/4446-2271-0013.flac",
+     "reference": "Do you know, I thought the dance a bit conscious to night, for the first time.",
+     "seconds": 4.4,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "4507",
+   "clause": "what is slang",
+   "utterances": [
+    {
+     "id": "4507-16021-0004",
+     "audio": "test-clean/4507/16021/4507-16021-0004.flac",
+     "reference": "What is slang?",
+     "seconds": 2.135,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "4507-16021-0018",
+     "audio": "test-clean/4507/16021/4507-16021-0018.flac",
+     "reference": "What is slang, properly speaking?",
+     "seconds": 3.375,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "5683",
+   "clause": "over his shoulder",
+   "utterances": [
+    {
+     "id": "5683-32865-0007",
+     "audio": "test-clean/5683/32865/5683-32865-0007.flac",
+     "reference": "I'm glad you like it, ' says Wylder, chuckling benignantly on it, over his shoulder.",
+     "seconds": 6.065,
+     "first": 11,
+     "last": 13
+    },
+    {
+     "id": "5683-32866-0005",
+     "audio": "test-clean/5683/32866/5683-32866-0005.flac",
+     "reference": "and he made a little dip of his cane towards Brandon Hall, over his shoulder.",
+     "seconds": 4.59,
+     "first": 12,
+     "last": 14
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "672",
+   "clause": "said the fir tree",
+   "utterances": [
+    {
+     "id": "672-122797-0051",
+     "audio": "test-clean/672/122797/672-122797-0051.flac",
+     "reference": "I am by no means old, said the Fir Tree.",
+     "seconds": 4.665,
+     "first": 6,
+     "last": 9
+    },
+    {
+     "id": "672-122797-0056",
+     "audio": "test-clean/672/122797/672-122797-0056.flac",
+     "reference": "said the Fir Tree, thinking over what he had himself related.",
+     "seconds": 5.225,
+     "first": 0,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "672",
+   "clause": "said the tree",
+   "utterances": [
+    {
+     "id": "672-122797-0054",
+     "audio": "test-clean/672/122797/672-122797-0054.flac",
+     "reference": "I know no such place, said the Tree.",
+     "seconds": 4.25,
+     "first": 5,
+     "last": 7
+    },
+    {
+     "id": "672-122797-0062",
+     "audio": "test-clean/672/122797/672-122797-0062.flac",
+     "reference": "No, said the Tree.",
+     "seconds": 2.675,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "7127",
+   "clause": "said mademoiselle de tonnay charente",
+   "utterances": [
+    {
+     "id": "7127-75947-0026",
+     "audio": "test-clean/7127/75947/7127-75947-0026.flac",
+     "reference": "Well, said Mademoiselle de Tonnay Charente, I also think a good deal but I take care",
+     "seconds": 6.555,
+     "first": 1,
+     "last": 5
+    },
+    {
+     "id": "7127-75947-0033",
+     "audio": "test-clean/7127/75947/7127-75947-0033.flac",
+     "reference": "How is it, La Valliere, said Mademoiselle de Tonnay Charente, that the Vicomte de Bragelonne spoke of you as Louise?",
+     "seconds": 8.865,
+     "first": 5,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "7176",
+   "clause": "is that you",
+   "utterances": [
+    {
+     "id": "7176-92135-0020",
+     "audio": "test-clean/7176/92135/7176-92135-0020.flac",
+     "reference": "Double nine two three, Elsinore. Double nine, yes. Hallo, is that you, Horatio? Hamlet speaking.",
+     "seconds": 7.165,
+     "first": 9,
+     "last": 11
+    },
+    {
+     "id": "7176-92135-0023",
+     "audio": "test-clean/7176/92135/7176-92135-0023.flac",
+     "reference": "You gave me double five, I want double nine. Hallo, is that you, Horatio? Hamlet speaking.",
+     "seconds": 6.215,
+     "first": 10,
+     "last": 12
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "7176",
+   "clause": "to be or not to be",
+   "utterances": [
+    {
+     "id": "7176-92135-0022",
+     "audio": "test-clean/7176/92135/7176-92135-0022.flac",
+     "reference": "To be or not to be, that is the question whether 'tis nobler in the mind to suffer the slings and arrows What? No, Hamlet speaking.",
+     "seconds": 8.23,
+     "first": 0,
+     "last": 5
+    },
+    {
+     "id": "7176-92135-0024",
+     "audio": "test-clean/7176/92135/7176-92135-0024.flac",
+     "reference": "To be or not to be, that is the question whether 'tis nobler",
+     "seconds": 4.1,
+     "first": 0,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "8455",
+   "clause": "said captain battleax",
+   "utterances": [
+    {
+     "id": "8455-210777-0011",
+     "audio": "test-clean/8455/210777/8455-210777-0011.flac",
+     "reference": "I did not mean, said Captain Battleax, to touch upon public subjects at such a moment as this.",
+     "seconds": 6.63,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "8455-210777-0046",
+     "audio": "test-clean/8455/210777/8455-210777-0046.flac",
+     "reference": "You may be quite sure it's there, said Captain Battleax, and that I can so use it as to half obliterate your town within two minutes of my return on board.",
+     "seconds": 9.33,
+     "first": 7,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "8455",
+   "clause": "said my wife",
+   "utterances": [
+    {
+     "id": "8455-210777-0006",
+     "audio": "test-clean/8455/210777/8455-210777-0006.flac",
+     "reference": "We are quite satisfied now, Captain Battleax, said my wife.",
+     "seconds": 4.52,
+     "first": 7,
+     "last": 9
+    },
+    {
+     "id": "8455-210777-0014",
+     "audio": "test-clean/8455/210777/8455-210777-0014.flac",
+     "reference": "Sir Kennington Oval is a very fine player, said my wife.",
+     "seconds": 4.12,
+     "first": 8,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "test-clean",
+   "speaker": "8455",
+   "clause": "said sir ferdinando",
+   "utterances": [
+    {
+     "id": "8455-210777-0040",
+     "audio": "test-clean/8455/210777/8455-210777-0040.flac",
+     "reference": "Then, said Sir Ferdinando, there is nothing for it but that he must take you with him.",
+     "seconds": 6.195,
+     "first": 1,
+     "last": 3
+    },
+    {
+     "id": "8455-210777-0065",
+     "audio": "test-clean/8455/210777/8455-210777-0065.flac",
+     "reference": "I shall be happy to take charge of them, said Sir Ferdinando.",
+     "seconds": 3.915,
+     "first": 9,
+     "last": 11
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "1688",
+   "clause": "at any rate",
+   "utterances": [
+    {
+     "id": "1688-142285-0034",
+     "audio": "test-other/1688/142285/1688-142285-0034.flac",
+     "reference": "A servant to give Dixon permanent assistance should be got, if she gave up her whole time to the search and then, at any rate, her mother might have all the personal attention she required, and had been accustomed to her whole life.",
+     "seconds": 15.164938,
+     "first": 22,
+     "last": 24
+    },
+    {
+     "id": "1688-142285-0092",
+     "audio": "test-other/1688/142285/1688-142285-0092.flac",
+     "reference": "I am sure, at any rate, she would not like strangers to know anything about it.",
+     "seconds": 4.67,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "1998",
+   "clause": "said the man",
+   "utterances": [
+    {
+     "id": "1998-29454-0010",
+     "audio": "test-other/1998/29454/1998-29454-0010.flac",
+     "reference": "Not exackly, said the man, but it's all right.",
+     "seconds": 2.865,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "1998-29454-0019",
+     "audio": "test-other/1998/29454/1998-29454-0019.flac",
+     "reference": "I wouldn't go 'ome, not if I was you, said the man.",
+     "seconds": 3.09,
+     "first": 9,
+     "last": 11
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "2033",
+   "clause": "o my lord",
+   "utterances": [
+    {
+     "id": "2033-164914-0019",
+     "audio": "test-other/2033/164914/2033-164914-0019.flac",
+     "reference": "Then said the Eunuch to Zau al Makan, Peace be with thee, O my lord",
+     "seconds": 6.085,
+     "first": 12,
+     "last": 14
+    },
+    {
+     "id": "2033-164914-0020",
+     "audio": "test-other/2033/164914/2033-164914-0020.flac",
+     "reference": "O my lord, continued the Eunuch And Shahrazad perceived the dawn of day and ceased to say her permitted say,",
+     "seconds": 10.05,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "2414",
+   "clause": "hear and give judgment",
+   "utterances": [
+    {
+     "id": "2414-159411-0005",
+     "audio": "test-other/2414/159411/2414-159411-0005.flac",
+     "reference": "So the Brahman and the Tiger walked on till they came to a Banyan tree and the Brahman said to it Banyan Tree, Banyan Tree, hear and give judgment.",
+     "seconds": 13.48,
+     "first": 25,
+     "last": 28
+    },
+    {
+     "id": "2414-159411-0010",
+     "audio": "test-other/2414/159411/2414-159411-0010.flac",
+     "reference": "Sir Camel, Sir Camel, cried the Brahman, hear and give judgment.",
+     "seconds": 6.815,
+     "first": 7,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "2414",
+   "clause": "let the tiger eat the man",
+   "utterances": [
+    {
+     "id": "2414-159411-0009",
+     "audio": "test-other/2414/159411/2414-159411-0009.flac",
+     "reference": "Let the Tiger eat the man, for men are an ungrateful race.",
+     "seconds": 5.55,
+     "first": 0,
+     "last": 5
+    },
+    {
+     "id": "2414-159411-0013",
+     "audio": "test-other/2414/159411/2414-159411-0013.flac",
+     "reference": "Let the Tiger eat the man, for men have no pity.",
+     "seconds": 4.52,
+     "first": 0,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "2414",
+   "clause": "on what must i give judgment",
+   "utterances": [
+    {
+     "id": "2414-159411-0006",
+     "audio": "test-other/2414/159411/2414-159411-0006.flac",
+     "reference": "On what must I give judgment? asked the Banyan Tree.",
+     "seconds": 4.675,
+     "first": 0,
+     "last": 5
+    },
+    {
+     "id": "2414-159411-0015",
+     "audio": "test-other/2414/159411/2414-159411-0015.flac",
+     "reference": "On what must I give judgment? asked the Eagle.",
+     "seconds": 3.685,
+     "first": 0,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "2414",
+   "clause": "said the brahman",
+   "utterances": [
+    {
+     "id": "2414-159411-0007",
+     "audio": "test-other/2414/159411/2414-159411-0007.flac",
+     "reference": "This Tiger, said the Brahman, begged me to let him out of his cage to drink a little water, and he promised not to hurt me if I did so but now, that I have let him out, he wishes to eat me.",
+     "seconds": 15.375,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "2414-159411-0030",
+     "audio": "test-other/2414/159411/2414-159411-0030.flac",
+     "reference": "Shut and bolted, said the Brahman.",
+     "seconds": 3.175,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "2414",
+   "clause": "said the jackal",
+   "utterances": [
+    {
+     "id": "2414-159411-0029",
+     "audio": "test-other/2414/159411/2414-159411-0029.flac",
+     "reference": "Very good, said the Jackal, but I cannot judge without understanding the whole matter exactly.",
+     "seconds": 7.28,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "2414-159411-0031",
+     "audio": "test-other/2414/159411/2414-159411-0031.flac",
+     "reference": "Then shut and bolt it, said the Jackal.",
+     "seconds": 3.3,
+     "first": 5,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "3080",
+   "clause": "i can assure you",
+   "utterances": [
+    {
+     "id": "3080-5040-0015",
+     "audio": "test-other/3080/5040/3080-5040-0015.flac",
+     "reference": "Because you find fault with my other letters, this is like to be shorter than they I did not intend it so though, I can assure you.",
+     "seconds": 8.659937,
+     "first": 23,
+     "last": 26
+    },
+    {
+     "id": "3080-5040-0031",
+     "audio": "test-other/3080/5040/3080-5040-0031.flac",
+     "reference": "Not to know when you would come home, I can assure you, nor for any other occasion of my own but with a cousin of mine that had long designed to make herself sport with him, and did not miss of her aim.",
+     "seconds": 12.77,
+     "first": 8,
+     "last": 11
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "3528",
+   "clause": "the dead must be obeyed",
+   "utterances": [
+    {
+     "id": "3528-168669-0055",
+     "audio": "test-other/3528/168669/3528-168669-0055.flac",
+     "reference": "The dead must be obeyed. So be it.",
+     "seconds": 3.91,
+     "first": 0,
+     "last": 4
+    },
+    {
+     "id": "3528-168669-0068",
+     "audio": "test-other/3528/168669/3528-168669-0068.flac",
+     "reference": "The dead must be obeyed. To be buried in the vault under the altar of the chapel, not to go to profane earth to remain there in death where she prayed while living such was the last wish of Mother Crucifixion.",
+     "seconds": 10.435,
+     "first": 0,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "3538",
+   "clause": "and then never again",
+   "utterances": [
+    {
+     "id": "3538-163619-0012",
+     "audio": "test-other/3538/163619/3538-163619-0012.flac",
+     "reference": "I shall come twice more, and then never again, ' said she.",
+     "seconds": 4.3,
+     "first": 5,
+     "last": 8
+    },
+    {
+     "id": "3538-163619-0013",
+     "audio": "test-other/3538/163619/3538-163619-0013.flac",
+     "reference": "This time also, as before, she borrowed a brush and brushed her hair with it, and the gold dropped down as she did it and again she sent the dog out three times, and when day dawned she departed, but as she was going she said as she had said before, 'I shall come once more, and then never again.",
+     "seconds": 19.3,
+     "first": 56,
+     "last": 59
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "3538",
+   "clause": "said the foal",
+   "utterances": [
+    {
+     "id": "3538-163622-0022",
+     "audio": "test-other/3538/163622/3538-163622-0022.flac",
+     "reference": "Now, then, ' said the Foal, 'dost thou not see anything now?",
+     "seconds": 3.63,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "3538-163622-0023",
+     "audio": "test-other/3538/163622/3538-163622-0023.flac",
+     "reference": "That is a river, ' said the Foal, 'and we have to cross it.",
+     "seconds": 3.545,
+     "first": 4,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "367",
+   "clause": "said don quixote",
+   "utterances": [
+    {
+     "id": "367-293981-0008",
+     "audio": "test-other/367/293981/367-293981-0008.flac",
+     "reference": "Mine could speak too, said Don Quixote, but that is not a sufficient reason for believing that what we see is the enchanted Moor.",
+     "seconds": 6.76,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "367-293981-0016",
+     "audio": "test-other/367/293981/367-293981-0016.flac",
+     "reference": "Then this is an inn? said Don Quixote.",
+     "seconds": 3.11,
+     "first": 5,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "3764",
+   "clause": "father mestienne is the grave digger",
+   "utterances": [
+    {
+     "id": "3764-168671-0025",
+     "audio": "test-other/3764/168671/3764-168671-0025.flac",
+     "reference": "Father Mestienne is the grave digger. He was.",
+     "seconds": 5.115,
+     "first": 0,
+     "last": 5
+    },
+    {
+     "id": "3764-168671-0029",
+     "audio": "test-other/3764/168671/3764-168671-0029.flac",
+     "reference": "But, he persisted feebly, Father Mestienne is the grave digger.",
+     "seconds": 5.65,
+     "first": 4,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "4350",
+   "clause": "and so on",
+   "utterances": [
+    {
+     "id": "4350-10919-0007",
+     "audio": "test-other/4350/10919/4350-10919-0007.flac",
+     "reference": "And there are indications malnutrition, nervous excitability, and so on.",
+     "seconds": 4.005,
+     "first": 7,
+     "last": 9
+    },
+    {
+     "id": "4350-9170-0049",
+     "audio": "test-other/4350/9170/4350-9170-0049.flac",
+     "reference": "Except for the state, they tell us, we should not have any religion, education, culture, means of communication, and so on.",
+     "seconds": 6.355,
+     "first": 18,
+     "last": 20
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "4350",
+   "clause": "except for the state",
+   "utterances": [
+    {
+     "id": "4350-9170-0046",
+     "audio": "test-other/4350/9170/4350-9170-0046.flac",
+     "reference": "Except for the state, they say, we should be exposed to the attacks of evil disposed persons in our own country.",
+     "seconds": 6.165,
+     "first": 0,
+     "last": 3
+    },
+    {
+     "id": "4350-9170-0049",
+     "audio": "test-other/4350/9170/4350-9170-0049.flac",
+     "reference": "Except for the state, they tell us, we should not have any religion, education, culture, means of communication, and so on.",
+     "seconds": 6.355,
+     "first": 0,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "4350",
+   "clause": "they tell us",
+   "utterances": [
+    {
+     "id": "4350-9170-0049",
+     "audio": "test-other/4350/9170/4350-9170-0049.flac",
+     "reference": "Except for the state, they tell us, we should not have any religion, education, culture, means of communication, and so on.",
+     "seconds": 6.355,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "4350-9170-0054",
+     "audio": "test-other/4350/9170/4350-9170-0054.flac",
+     "reference": "The government, they tell us, with its army, is necessary to defend us from neighboring states who might enslave us.",
+     "seconds": 5.45,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "6070",
+   "clause": "my dear franz",
+   "utterances": [
+    {
+     "id": "6070-86744-0024",
+     "audio": "test-other/6070/86744/6070-86744-0024.flac",
+     "reference": "My dear Franz, replied Albert, when, upon receipt of my letter, you found the necessity of asking the count's assistance, you promptly went to him, saying, 'My friend Albert de Morcerf is in danger help me to deliver him.",
+     "seconds": 15.925,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "6070-86744-0029",
+     "audio": "test-other/6070/86744/6070-86744-0029.flac",
+     "reference": "And now, my dear Franz, let us talk of something else.",
+     "seconds": 3.685,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "6070",
+   "clause": "replied the count",
+   "utterances": [
+    {
+     "id": "6070-86744-0001",
+     "audio": "test-other/6070/86744/6070-86744-0001.flac",
+     "reference": "My very good friend and excellent neighbor, replied the count, with a smile, you really exaggerate my trifling exertions.",
+     "seconds": 9.12,
+     "first": 7,
+     "last": 9
+    },
+    {
+     "id": "6070-86744-0006",
+     "audio": "test-other/6070/86744/6070-86744-0006.flac",
+     "reference": "So be it, then, replied the count, and extending his hand towards a calendar, suspended near the chimney piece, he said, today is the twenty first of February and drawing out his watch, added, it is exactly half past ten o'clock. Now promise me to remember this, and expect me the twenty first of May at the same hour in the forenoon.",
+     "seconds": 23.349937,
+     "first": 4,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "6070",
+   "clause": "said the count",
+   "utterances": [
+    {
+     "id": "6070-86744-0004",
+     "audio": "test-other/6070/86744/6070-86744-0004.flac",
+     "reference": "Then it is settled, said the count, and I give you my solemn assurance that I only waited an opportunity like the present to realize plans that I have long meditated.",
+     "seconds": 10.655,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "6070-86744-0008",
+     "audio": "test-other/6070/86744/6070-86744-0008.flac",
+     "reference": "Now then, said the count, returning his tablets to his pocket, make yourself perfectly easy the hand of your time piece will not be more accurate in marking the time than myself.",
+     "seconds": 12.48,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "6070-86744-0013",
+     "audio": "test-other/6070/86744/6070-86744-0013.flac",
+     "reference": "Well, since we must part, said the count, holding out a hand to each of the young men, allow me to wish you both a safe and pleasant journey.",
+     "seconds": 8.68,
+     "first": 5,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "6432",
+   "clause": "asked the colonel",
+   "utterances": [
+    {
+     "id": "6432-63722-0046",
+     "audio": "test-other/6432/63722/6432-63722-0046.flac",
+     "reference": "What are the chances of getting him off legally if we go at it from a negative standpoint? asked the colonel.",
+     "seconds": 5.715,
+     "first": 18,
+     "last": 20
+    },
+    {
+     "id": "6432-63723-0008",
+     "audio": "test-other/6432/63723/6432-63723-0008.flac",
+     "reference": "You don't mean that Larch struck her that there was physical abuse, do you? asked the colonel. That's what he did.",
+     "seconds": 7.42,
+     "first": 14,
+     "last": 16
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "6432",
+   "clause": "in a way",
+   "utterances": [
+    {
+     "id": "6432-63722-0011",
+     "audio": "test-other/6432/63722/6432-63722-0011.flac",
+     "reference": "You're on the Darcy case, they tell me. In a way, yes.",
+     "seconds": 3.83,
+     "first": 8,
+     "last": 10
+    },
+    {
+     "id": "6432-63723-0026",
+     "audio": "test-other/6432/63723/6432-63723-0026.flac",
+     "reference": "And, in a way, it was true.",
+     "seconds": 2.175,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7018",
+   "clause": "it hath reached me",
+   "utterances": [
+    {
+     "id": "7018-75789-0011",
+     "audio": "test-other/7018/75789/7018-75789-0011.flac",
+     "reference": "She said, It hath reached me, O auspicious King, that Sindbad the Seaman continued When I landed and found myself amongst the Indians and Abyssinians and had taken some rest, they consulted among themselves and said to one another, There is no help for it but we carry him with us and present him to our King, that he may acquaint him with his adventures.",
+     "seconds": 23.49,
+     "first": 2,
+     "last": 5
+    },
+    {
+     "id": "7018-75789-0024",
+     "audio": "test-other/7018/75789/7018-75789-0024.flac",
+     "reference": "She said, It hath reached me, O auspicious King, that when Sindbad the Seaman had related the history of what befel him in his sixth voyage, and all the company had dispersed, Sindbad the Landsman went home and slept as of wont.",
+     "seconds": 14.43,
+     "first": 2,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7018",
+   "clause": "o auspicious king",
+   "utterances": [
+    {
+     "id": "7018-75789-0011",
+     "audio": "test-other/7018/75789/7018-75789-0011.flac",
+     "reference": "She said, It hath reached me, O auspicious King, that Sindbad the Seaman continued When I landed and found myself amongst the Indians and Abyssinians and had taken some rest, they consulted among themselves and said to one another, There is no help for it but we carry him with us and present him to our King, that he may acquaint him with his adventures.",
+     "seconds": 23.49,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "7018-75789-0024",
+     "audio": "test-other/7018/75789/7018-75789-0024.flac",
+     "reference": "She said, It hath reached me, O auspicious King, that when Sindbad the Seaman had related the history of what befel him in his sixth voyage, and all the company had dispersed, Sindbad the Landsman went home and slept as of wont.",
+     "seconds": 14.43,
+     "first": 6,
+     "last": 8
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7018",
+   "clause": "o my brother",
+   "utterances": [
+    {
+     "id": "7018-75789-0007",
+     "audio": "test-other/7018/75789/7018-75789-0007.flac",
+     "reference": "When they saw I understood them not and made them no answer, one of them came forward and said to me in Arabic, Peace be with thee, O my brother",
+     "seconds": 9.215,
+     "first": 27,
+     "last": 29
+    },
+    {
+     "id": "7018-75789-0008",
+     "audio": "test-other/7018/75789/7018-75789-0008.flac",
+     "reference": "O my brother, answered he, we are husbandmen and tillers of the soil, who came out to water our fields and plantations and, finding thee asleep on this raft, laid hold of it and made it fast by us, against thou shouldst awake at thy leisure.",
+     "seconds": 17.27,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7018",
+   "clause": "o my lord",
+   "utterances": [
+    {
+     "id": "7018-75789-0009",
+     "audio": "test-other/7018/75789/7018-75789-0009.flac",
+     "reference": "I answered, For Allah's sake, O my lord, ere I speak give me somewhat to eat, for I am starving, and after ask me what thou wilt.",
+     "seconds": 10.75,
+     "first": 5,
+     "last": 7
+    },
+    {
+     "id": "7018-75789-0015",
+     "audio": "test-other/7018/75789/7018-75789-0015.flac",
+     "reference": "By Allah, O my lord, answered I, thou hast indeed overwhelmed me with thy favours and well doings but I weary for a sight of my friends and family and native country.",
+     "seconds": 12.25,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7902",
+   "clause": "said sir risdon",
+   "utterances": [
+    {
+     "id": "7902-96595-0019",
+     "audio": "test-other/7902/96595/7902-96595-0019.flac",
+     "reference": "A lad, looking like a common sailor, and wearing a red cap. No, said Sir Risdon.",
+     "seconds": 4.515,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "7902-96595-0021",
+     "audio": "test-other/7902/96595/7902-96595-0021.flac",
+     "reference": "Beg pardon, sir, but can you, as a gentleman, assure me that he is not here? Certainly, said Sir Risdon.",
+     "seconds": 5.385,
+     "first": 17,
+     "last": 19
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7902",
+   "clause": "smugglers are smugglers",
+   "utterances": [
+    {
+     "id": "7902-96594-0008",
+     "audio": "test-other/7902/96594/7902-96594-0008.flac",
+     "reference": "Well, sir, said the master, hesitating, smugglers are smugglers.",
+     "seconds": 4.095,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "7902-96594-0009",
+     "audio": "test-other/7902/96594/7902-96594-0009.flac",
+     "reference": "Certainly, sir. Smugglers are smugglers, indeed.",
+     "seconds": 3.3,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7902",
+   "clause": "what a game",
+   "utterances": [
+    {
+     "id": "7902-96592-0042",
+     "audio": "test-other/7902/96592/7902-96592-0042.flac",
+     "reference": "It was your turn yesterday, it's mine to day. What a game",
+     "seconds": 3.415,
+     "first": 9,
+     "last": 11
+    },
+    {
+     "id": "7902-96592-0047",
+     "audio": "test-other/7902/96592/7902-96592-0047.flac",
+     "reference": "Why, I could tie you up in a knot, and heave you off the cliff any day. What a game",
+     "seconds": 4.635,
+     "first": 17,
+     "last": 19
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "7902",
+   "clause": "where's your master",
+   "utterances": [
+    {
+     "id": "7902-96595-0014",
+     "audio": "test-other/7902/96595/7902-96595-0014.flac",
+     "reference": "Here, my lad, where's your master?",
+     "seconds": 2.31,
+     "first": 3,
+     "last": 5
+    },
+    {
+     "id": "7902-96595-0015",
+     "audio": "test-other/7902/96595/7902-96595-0015.flac",
+     "reference": "Eh? I say, where's your master?",
+     "seconds": 2.72,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "8131",
+   "clause": "for a second",
+   "utterances": [
+    {
+     "id": "8131-117016-0017",
+     "audio": "test-other/8131/117016/8131-117016-0017.flac",
+     "reference": "For a second, Gordon cursed himself.",
+     "seconds": 2.92,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "8131-117017-0025",
+     "audio": "test-other/8131/117017/8131-117017-0025.flac",
+     "reference": "For a second, Izzy's face went blank then he chuckled.",
+     "seconds": 4.32,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "test-other",
+   "speaker": "8461",
+   "clause": "said de bracy",
+   "utterances": [
+    {
+     "id": "8461-281231-0015",
+     "audio": "test-other/8461/281231/8461-281231-0015.flac",
+     "reference": "Yet first let me say, said De Bracy, what it imports thee to know.",
+     "seconds": 5.765,
+     "first": 5,
+     "last": 7
+    },
+    {
+     "id": "8461-281231-0030",
+     "audio": "test-other/8461/281231/8461-281231-0030.flac",
+     "reference": "The Templar is fled, said De Bracy, in answer to the prince's eager questions Front de Boeuf you will never see more and, he added in a low and emphatic tone, Richard is in England I have seen him and spoken with him.",
+     "seconds": 16.69,
+     "first": 4,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "dev-clean",
+   "speaker": "3081",
+   "clause": "i should say",
+   "utterances": [
+    {
+     "id": "3081-166546-0059",
+     "audio": "dev-clean/3081/166546/3081-166546-0059.flac",
+     "reference": "I suppose she has been carefully questioned? Very, I should say.",
+     "seconds": 5.92,
+     "first": 8,
+     "last": 10
+    },
+    {
+     "id": "3081-166546-0078",
+     "audio": "dev-clean/3081/166546/3081-166546-0078.flac",
+     "reference": "No a very natural one, I should say.",
+     "seconds": 4.33,
+     "first": 5,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "dev-clean",
+   "speaker": "6313",
+   "clause": "warned the guide",
+   "utterances": [
+    {
+     "id": "6313-66125-0003",
+     "audio": "dev-clean/6313/66125/6313-66125-0003.flac",
+     "reference": "Don't move around. Lie perfectly still, warned the guide. Are you hurt?",
+     "seconds": 4.58,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "6313-66125-0011",
+     "audio": "dev-clean/6313/66125/6313-66125-0011.flac",
+     "reference": "Be sure to fasten him securely to the loop before you give the signal to haul up, warned the guide.",
+     "seconds": 5.12,
+     "first": 17,
+     "last": 19
+    }
+   ]
+  },
+  {
+   "subset": "dev-clean",
+   "speaker": "8842",
+   "clause": "the second part begins here",
+   "utterances": [
+    {
+     "id": "8842-302203-0008",
+     "audio": "dev-clean/8842/302203/8842-302203-0008.flac",
+     "reference": "The second part begins here, I was a thinking. The first part divides into two.",
+     "seconds": 4.415,
+     "first": 0,
+     "last": 4
+    },
+    {
+     "id": "8842-302203-0011",
+     "audio": "dev-clean/8842/302203/8842-302203-0011.flac",
+     "reference": "The second part begins here, Saying, 'Be now ' the third here, Then, while it was his pleasure.",
+     "seconds": 6.72,
+     "first": 0,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "1686",
+   "clause": "said mister hale",
+   "utterances": [
+    {
+     "id": "1686-142278-0042",
+     "audio": "dev-other/1686/142278/1686-142278-0042.flac",
+     "reference": "I have written to the bishop I dare say I have told you so, but I forget things just now, said mister Hale, collapsing into his depressed manner as soon as he came to talk of hard matter of fact details, informing him of my intention to resign this vicarage.",
+     "seconds": 16.02,
+     "first": 20,
+     "last": 22
+    },
+    {
+     "id": "1686-142278-0069",
+     "audio": "dev-other/1686/142278/1686-142278-0069.flac",
+     "reference": "said mister Hale. That would not answer. I must do something",
+     "seconds": 4.865,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "1701",
+   "clause": "as the saying is",
+   "utterances": [
+    {
+     "id": "1701-141760-0031",
+     "audio": "dev-other/1701/141760/1701-141760-0031.flac",
+     "reference": "Well, he stormed at me, as the saying is, stormed and stormed and stormed",
+     "seconds": 5.01,
+     "first": 5,
+     "last": 8
+    },
+    {
+     "id": "1701-141760-0032",
+     "audio": "dev-other/1701/141760/1701-141760-0032.flac",
+     "reference": "It was not a matter of life but rather of death, as the saying is.",
+     "seconds": 4.04,
+     "first": 11,
+     "last": 14
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "3660",
+   "clause": "the son of nudd",
+   "utterances": [
+    {
+     "id": "3660-172182-0008",
+     "audio": "dev-other/3660/172182/3660-172182-0008.flac",
+     "reference": "I do, said he he tells me that he is Edeyrn, the son of Nudd.",
+     "seconds": 5.195,
+     "first": 11,
+     "last": 14
+    },
+    {
+     "id": "3660-172182-0024",
+     "audio": "dev-other/3660/172182/3660-172182-0024.flac",
+     "reference": "And inasmuch as thou hast vanquished Edeyrn, the son of Nudd, thou hast had a prosperous career.",
+     "seconds": 7.38,
+     "first": 7,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "4323",
+   "clause": "cut in bertram",
+   "utterances": [
+    {
+     "id": "4323-55228-0042",
+     "audio": "dev-other/4323/55228/4323-55228-0042.flac",
+     "reference": "Besides, I need you to take care of me, cut in Bertram, craftily.",
+     "seconds": 4.795,
+     "first": 9,
+     "last": 11
+    },
+    {
+     "id": "4323-55228-0051",
+     "audio": "dev-other/4323/55228/4323-55228-0051.flac",
+     "reference": "Yes, I know that is a good while, cut in Bertram, airily.",
+     "seconds": 3.315,
+     "first": 8,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "4323",
+   "clause": "said mister king",
+   "utterances": [
+    {
+     "id": "4323-18416-0010",
+     "audio": "dev-other/4323/18416/4323-18416-0010.flac",
+     "reference": "So you did, dear, said mister King, highly gratified, and pushing away his writing table, he held out his hand.",
+     "seconds": 5.2,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "4323-18416-0015",
+     "audio": "dev-other/4323/18416/4323-18416-0015.flac",
+     "reference": "Well, then, Phronsie, if you want it, I suppose it must be, said mister King, quite as a matter of course.",
+     "seconds": 4.935,
+     "first": 12,
+     "last": 14
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "4323",
+   "clause": "where is he",
+   "utterances": [
+    {
+     "id": "4323-55228-0001",
+     "audio": "dev-other/4323/55228/4323-55228-0001.flac",
+     "reference": "Where is he, Pete? Miss Billy gasped the old man.",
+     "seconds": 3.86,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "4323-55228-0004",
+     "audio": "dev-other/4323/55228/4323-55228-0004.flac",
+     "reference": "retorted Aunt Hannah, testily. As if you yourself didn't bring her here with your crazy messages at this time of night Pete, where is he?",
+     "seconds": 6.635,
+     "first": 22,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "4570",
+   "clause": "says the old gentleman",
+   "utterances": [
+    {
+     "id": "4570-56594-0003",
+     "audio": "dev-other/4570/56594/4570-56594-0003.flac",
+     "reference": "No, sir, ' says the old gentleman.",
+     "seconds": 3.18,
+     "first": 2,
+     "last": 5
+    },
+    {
+     "id": "4570-56594-0007",
+     "audio": "dev-other/4570/56594/4570-56594-0007.flac",
+     "reference": "I've read some accounts of the battle, ' says the old gentleman, 'that didn't give a very flattering account of the conduct of some of our troops.",
+     "seconds": 10.12,
+     "first": 7,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "5543",
+   "clause": "don't agitate yourself",
+   "utterances": [
+    {
+     "id": "5543-27761-0089",
+     "audio": "dev-other/5543/27761/5543-27761-0089.flac",
+     "reference": "Sima, my dear, don't agitate yourself, said Sergey Modestovich in a whisper.",
+     "seconds": 5.725,
+     "first": 3,
+     "last": 5
+    },
+    {
+     "id": "5543-27761-0093",
+     "audio": "dev-other/5543/27761/5543-27761-0093.flac",
+     "reference": "Sima, don't agitate yourself, he repeated.",
+     "seconds": 3.15,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "dev-other",
+   "speaker": "7697",
+   "clause": "on the contrary",
+   "utterances": [
+    {
+     "id": "7697-245715-0001",
+     "audio": "dev-other/7697/245715/7697-245715-0001.flac",
+     "reference": "On the contrary, Everything generated is first imperfect. But in the state of innocence children would have been begotten by generation.",
+     "seconds": 9.08,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "7697-245715-0003",
+     "audio": "dev-other/7697/245715/7697-245715-0003.flac",
+     "reference": "Therefore, in the state of innocence, there was no need for women to be born. On the contrary, Nature's process in generation would have been in harmony with the manner in which it was established by God.",
+     "seconds": 11.995,
+     "first": 15,
+     "last": 17
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "103",
+   "clause": "to be sure",
+   "utterances": [
+    {
+     "id": "103-1240-0017",
+     "audio": "train-clean-100/103/1240/103-1240-0017.flac",
+     "reference": "the big, rambling, orchard embowered house where the Cuthberts lived was a scant quarter of a mile up the road from Lynde's Hollow. To be sure, the long lane made it a good deal further. Matthew Cuthbert's father, as shy and silent as his son after him,",
+     "seconds": 14.315,
+     "first": 23,
+     "last": 25
+    },
+    {
+     "id": "103-1240-0020",
+     "audio": "train-clean-100/103/1240/103-1240-0020.flac",
+     "reference": "bordered with wild rose bushes. It's no wonder Matthew and Marilla are both a little odd, living away back here by themselves. Trees aren't much company, though dear knows if they were there'd be enough of them. I'd ruther look at people. To be sure,",
+     "seconds": 13.415,
+     "first": 42,
+     "last": 44
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1040",
+   "clause": "what is it",
+   "utterances": [
+    {
+     "id": "1040-133433-0064",
+     "audio": "train-clean-100/1040/133433/1040-133433-0064.flac",
+     "reference": "What is it? he cried, shrinking.",
+     "seconds": 2.2,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "1040-133433-0067",
+     "audio": "train-clean-100/1040/133433/1040-133433-0067.flac",
+     "reference": "Then she turned up the light, and Peter saw. He gave a cry of pain and when the tall beautiful creature stooped to lift him in her arms he drew back sharply. What is it? he cried again. She had to tell him.",
+     "seconds": 14.349937,
+     "first": 32,
+     "last": 34
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1040",
+   "clause": "why are you crying",
+   "utterances": [
+    {
+     "id": "1040-133433-0049",
+     "audio": "train-clean-100/1040/133433/1040-133433-0049.flac",
+     "reference": "You have missed a bit, interrupts Jane, who now knows the story better than her mother. When you saw him sitting on the floor crying, what did you say? I sat up in bed and I said, 'Boy, why are you crying?",
+     "seconds": 14.11,
+     "first": 38,
+     "last": 41
+    },
+    {
+     "id": "1040-133433-0072",
+     "audio": "train-clean-100/1040/133433/1040-133433-0072.flac",
+     "reference": "Boy, she said, why are you crying? Peter rose and bowed to her, and she bowed to him from the bed. Hullo, he said. Hullo, said Jane. My name is Peter Pan, he told her.",
+     "seconds": 15.305,
+     "first": 3,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1081",
+   "clause": "remembering the fate of doreslaer",
+   "utterances": [
+    {
+     "id": "1081-125237-0006",
+     "audio": "train-clean-100/1081/125237/1081-125237-0006.flac",
+     "reference": "and Saint John and Strickland, greeted with loud cries of regicides and many abusive epithets, remembering the fate of Doreslaer, were in fear of their lives.",
+     "seconds": 9.875,
+     "first": 15,
+     "last": 19
+    },
+    {
+     "id": "1081-125237-0014",
+     "audio": "train-clean-100/1081/125237/1081-125237-0014.flac",
+     "reference": "and Saint John and Strickland, greeted with loud cries of regicides and many abusive epithets, remembering the fate of Doreslaer, were in fear of their lives. On april fourth a conference was opened between the envoys and",
+     "seconds": 13.935,
+     "first": 15,
+     "last": 19
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1235",
+   "clause": "answered the merchant",
+   "utterances": [
+    {
+     "id": "1235-135883-0008",
+     "audio": "train-clean-100/1235/135883/1235-135883-0008.flac",
+     "reference": "I did all that you say, answered the merchant, I cannot deny it. If it be so, resumed the genie, I tell thee that thou hast killed my son and in this manner When thou wert throwing the shells about, my son was passing by,",
+     "seconds": 14.615,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "1235-135883-0027",
+     "audio": "train-clean-100/1235/135883/1235-135883-0027.flac",
+     "reference": "If you will believe my oath, answered the merchant, I swear by all that is sacred, that I will come and meet you here without fail. What time do you require then? demanded the genie.",
+     "seconds": 12.4,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "1235-135883-0029",
+     "audio": "train-clean-100/1235/135883/1235-135883-0029.flac",
+     "reference": "to put myself into your hands. Do you take heaven to be witness to this promise? said the genie. I do, answered the merchant, and you may rely on my oath. Upon this the genie left him near the fountain, and disappeared.",
+     "seconds": 15.75,
+     "first": 21,
+     "last": 23
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1235",
+   "clause": "said the genie",
+   "utterances": [
+    {
+     "id": "1235-135883-0026",
+     "audio": "train-clean-100/1235/135883/1235-135883-0026.flac",
+     "reference": "that they may not go to law after my death. When I have done this, I will come back and submit to whatever you shall please to command. But, said the genie, if I grant you the time you ask, I doubt you will never return?",
+     "seconds": 15.355,
+     "first": 29,
+     "last": 31
+    },
+    {
+     "id": "1235-135883-0029",
+     "audio": "train-clean-100/1235/135883/1235-135883-0029.flac",
+     "reference": "to put myself into your hands. Do you take heaven to be witness to this promise? said the genie. I do, answered the merchant, and you may rely on my oath. Upon this the genie left him near the fountain, and disappeared.",
+     "seconds": 15.75,
+     "first": 16,
+     "last": 18
+    },
+    {
+     "id": "1235-135884-0041",
+     "audio": "train-clean-100/1235/135884/1235-135884-0041.flac",
+     "reference": "This is the history of myself and this hind is it not one of the most wonderful and surprising? I admit it is, said the genie, and on that account forgive the merchant one third of his crime.",
+     "seconds": 13.94,
+     "first": 23,
+     "last": 25
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "125",
+   "clause": "said monte cristo",
+   "utterances": [
+    {
+     "id": "125-121124-0040",
+     "audio": "train-clean-100/125/121124/125-121124-0040.flac",
+     "reference": "or Neapolitan bonds? said Monte Cristo. No, said Danglars, smiling,",
+     "seconds": 5.705,
+     "first": 3,
+     "last": 5
+    },
+    {
+     "id": "125-121124-0049",
+     "audio": "train-clean-100/125/121124/125-121124-0049.flac",
+     "reference": "What, he stammered, do you mean to keep that money? Excuse me, excuse me, but I owe this money to the charity fund, a deposit which I promised to pay this morning. Oh, well, then, said Monte Cristo,",
+     "seconds": 14.285,
+     "first": 35,
+     "last": 37
+    },
+    {
+     "id": "125-121124-0056",
+     "audio": "train-clean-100/125/121124/125-121124-0056.flac",
+     "reference": "there is still a sum of one hundred thousand francs? Oh, a mere nothing, said Monte Cristo. The balance would come to about that sum but keep it, and we shall be quits. Count, said Danglars, are you speaking seriously?",
+     "seconds": 14.95,
+     "first": 14,
+     "last": 16
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1334",
+   "clause": "said the king",
+   "utterances": [
+    {
+     "id": "1334-135589-0036",
+     "audio": "train-clean-100/1334/135589/1334-135589-0036.flac",
+     "reference": "Alice and Edith rose and waved their handkerchiefs, but they were soon obliged to cease, and put them to their eyes. Are those your sisters, Edward? said the king. They are, your majesty.",
+     "seconds": 14.81,
+     "first": 26,
+     "last": 28
+    },
+    {
+     "id": "1334-135589-0037",
+     "audio": "train-clean-100/1334/135589/1334-135589-0037.flac",
+     "reference": "The king rose in his stirrups, and made a low obeisance to the window where they were standing. We shall have some court beauties, Beverley, said the king, looking at him over his shoulder. As soon as the ceremonies were over,",
+     "seconds": 16.015,
+     "first": 25,
+     "last": 27
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1455",
+   "clause": "said michel ardan",
+   "utterances": [
+    {
+     "id": "1455-138263-0012",
+     "audio": "train-clean-100/1455/138263/1455-138263-0012.flac",
+     "reference": "A contraction something like a lunar stomach ache. said Michel Ardan. Besides, added Barbicane, this opinion is that of an English savant,",
+     "seconds": 10.215,
+     "first": 8,
+     "last": 10
+    },
+    {
+     "id": "1455-138263-0039",
+     "audio": "train-clean-100/1455/138263/1455-138263-0039.flac",
+     "reference": "Astonish us? said Michel Ardan. I firmly believe that at the period when the moon was inhabited, the nights and days did not last three hundred fifty four hours And why?",
+     "seconds": 14.705,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "150",
+   "clause": "asked the prince",
+   "utterances": [
+    {
+     "id": "150-126107-0019",
+     "audio": "train-clean-100/150/126107/150-126107-0019.flac",
+     "reference": "that would have sent her aloft again but for the hold she had of his arm, Put me up directly. Put you up where, you beauty? asked the prince. He had fallen in love with her almost, already",
+     "seconds": 14.04,
+     "first": 26,
+     "last": 28
+    },
+    {
+     "id": "150-126107-0021",
+     "audio": "train-clean-100/150/126107/150-126107-0021.flac",
+     "reference": "No prince, however, would judge of a princess by weight. The loveliness of her foot he would hardly estimate by the depth of the impression it could make in mud. Put you up where, you beauty? asked the prince. In the water, you stupid",
+     "seconds": 15.18,
+     "first": 36,
+     "last": 38
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "150",
+   "clause": "put you up where",
+   "utterances": [
+    {
+     "id": "150-126107-0019",
+     "audio": "train-clean-100/150/126107/150-126107-0019.flac",
+     "reference": "that would have sent her aloft again but for the hold she had of his arm, Put me up directly. Put you up where, you beauty? asked the prince. He had fallen in love with her almost, already",
+     "seconds": 14.04,
+     "first": 20,
+     "last": 23
+    },
+    {
+     "id": "150-126107-0021",
+     "audio": "train-clean-100/150/126107/150-126107-0021.flac",
+     "reference": "No prince, however, would judge of a princess by weight. The loveliness of her foot he would hardly estimate by the depth of the impression it could make in mud. Put you up where, you beauty? asked the prince. In the water, you stupid",
+     "seconds": 15.18,
+     "first": 30,
+     "last": 33
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "150",
+   "clause": "said the prince",
+   "utterances": [
+    {
+     "id": "150-126107-0022",
+     "audio": "train-clean-100/150/126107/150-126107-0022.flac",
+     "reference": "answered the princess. Come, then, said the prince. The condition of her dress, increasing her usual difficulty in walking, compelled her to cling to him and he could hardly persuade himself that he was not in a delightful dream,",
+     "seconds": 16.005,
+     "first": 5,
+     "last": 7
+    },
+    {
+     "id": "150-126107-0027",
+     "audio": "train-clean-100/150/126107/150-126107-0027.flac",
+     "reference": "Don't you like falling in then? said the prince. It is the most delightful fun I ever had in my life, answered she. I never fell before. I wish I could learn.",
+     "seconds": 11.81,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "150-126107-0028",
+     "audio": "train-clean-100/150/126107/150-126107-0028.flac",
+     "reference": "To think I am the only person in my father's kingdom that can't fall Here the poor princess looked almost sad. I shall be most happy to fall in with you any time you like, said the prince, devotedly. Thank you.",
+     "seconds": 16.055,
+     "first": 35,
+     "last": 37
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "150",
+   "clause": "said the princess",
+   "utterances": [
+    {
+     "id": "150-126107-0026",
+     "audio": "train-clean-100/150/126107/150-126107-0026.flac",
+     "reference": "said the princess. Beyond everything, answered he for I have fallen in with the only perfect creature I ever saw. No more of that I am tired of it, said the princess. Perhaps she shared her father's aversion to punning.",
+     "seconds": 16.160062,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "150-126107-0030",
+     "audio": "train-clean-100/150/126107/150-126107-0030.flac",
+     "reference": "And away they went, swimming, and diving, and floating, until at last they heard cries along the shore, and saw lights glancing in all directions. It was now quite late, and there was no moon. I must go home, said the princess.",
+     "seconds": 15.445,
+     "first": 39,
+     "last": 41
+    },
+    {
+     "id": "150-126112-0004",
+     "audio": "train-clean-100/150/126112/150-126112-0004.flac",
+     "reference": "They told me it was a shoeblack, said the princess. So I am, said the prince. I blacked your little boots three times a day, because they were all I could get of you. Put me in.",
+     "seconds": 13.25,
+     "first": 7,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "150",
+   "clause": "with all my heart",
+   "utterances": [
+    {
+     "id": "150-126107-0029",
+     "audio": "train-clean-100/150/126107/150-126107-0029.flac",
+     "reference": "I don't know. Perhaps it would not be proper. But I don't care. At all events, as we have fallen in, let us have a swim together. With all my heart, responded the prince.",
+     "seconds": 12.165,
+     "first": 27,
+     "last": 30
+    },
+    {
+     "id": "150-126112-0015",
+     "audio": "train-clean-100/150/126112/150-126112-0015.flac",
+     "reference": "replied the princess. I think I will go to sleep again. Just give me a glass of wine and a biscuit first, said the prince, very humbly. With all my heart, said the princess, and gaped as she said it.",
+     "seconds": 16.745,
+     "first": 27,
+     "last": 30
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1553",
+   "clause": "said emma jane",
+   "utterances": [
+    {
+     "id": "1553-140047-0050",
+     "audio": "train-clean-100/1553/140047/1553-140047-0050.flac",
+     "reference": "to show what my leaves were like before I was a scarlet maple. I think it would be awful homely, said Emma Jane.",
+     "seconds": 7.73,
+     "first": 20,
+     "last": 22
+    },
+    {
+     "id": "1553-140048-0004",
+     "audio": "train-clean-100/1553/140048/1553-140048-0004.flac",
+     "reference": "that lucky Rebecca accomplished, with almost no effort, results that poor little Emma Jane failed to attain by hard and conscientious labor. It's your turn, Rebecca, and I'm glad, too, said Emma Jane,",
+     "seconds": 14.46,
+     "first": 30,
+     "last": 32
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1553",
+   "clause": "said the stranger",
+   "utterances": [
+    {
+     "id": "1553-140048-0009",
+     "audio": "train-clean-100/1553/140048/1553-140048-0009.flac",
+     "reference": "so she asked, Is the lady of the house at home? I am the lady of the house at present, said the stranger, with a whimsical smile. What can I do for you? Have you ever heard of the would you like, or I mean",
+     "seconds": 15.325,
+     "first": 20,
+     "last": 22
+    },
+    {
+     "id": "1553-140048-0018",
+     "audio": "train-clean-100/1553/140048/1553-140048-0018.flac",
+     "reference": "I can remember mine well enough, and a particularly unpleasant one it was, said the stranger. So was mine, sighed Rebecca. What was your worst trouble? Lack of food and clothes principally.",
+     "seconds": 14.75,
+     "first": 13,
+     "last": 15
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1578",
+   "clause": "said miss miranda",
+   "utterances": [
+    {
+     "id": "1578-140049-0003",
+     "audio": "train-clean-100/1578/140049/1578-140049-0003.flac",
+     "reference": "What under the canopy did they want of a lamp, and where did they get the money to pay for it? If Abner was at home, I should think he'd been swappin' again, said Miss Miranda. The children got it as a prize for selling soap, replied Rebecca",
+     "seconds": 12.7,
+     "first": 33,
+     "last": 35
+    },
+    {
+     "id": "1578-140049-0030",
+     "audio": "train-clean-100/1578/140049/1578-140049-0030.flac",
+     "reference": "It was a heavenly party, she cried, taking off her hat and cape. Go back and see if you have shut the door tight, and then lock it, said Miss Miranda, in her usual austere manner.",
+     "seconds": 10.235,
+     "first": 28,
+     "last": 30
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1737",
+   "clause": "knit those left at the end",
+   "utterances": [
+    {
+     "id": "1737-146161-0012",
+     "audio": "train-clean-100/1737/146161/1737-146161-0012.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one, knit three, knit two together, make one,",
+     "seconds": 15.23,
+     "first": 0,
+     "last": 5
+    },
+    {
+     "id": "1737-146161-0015",
+     "audio": "train-clean-100/1737/146161/1737-146161-0015.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one,",
+     "seconds": 9.695,
+     "first": 0,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1737",
+   "clause": "knit two together",
+   "utterances": [
+    {
+     "id": "1737-146161-0001",
+     "audio": "train-clean-100/1737/146161/1737-146161-0001.flac",
+     "reference": "Seamed, making a stitch at the beginning. Third row Make one, knit one, knit two together, knit two, make one, knit three, make one, knit two,",
+     "seconds": 16.305,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "1737-146161-0005",
+     "audio": "train-clean-100/1737/146161/1737-146161-0005.flac",
+     "reference": "Make one, knit three, make one, knit one, slip one, knit two together, pass the slipped stitch over, knit one, and repeat. Fourth row",
+     "seconds": 15.135,
+     "first": 10,
+     "last": 12
+    },
+    {
+     "id": "1737-146161-0012",
+     "audio": "train-clean-100/1737/146161/1737-146161-0012.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one, knit three, knit two together, make one,",
+     "seconds": 15.23,
+     "first": 20,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1737",
+   "clause": "knit two together twice",
+   "utterances": [
+    {
+     "id": "1737-146161-0007",
+     "audio": "train-clean-100/1737/146161/1737-146161-0007.flac",
+     "reference": "knit two together twice,",
+     "seconds": 2.03,
+     "first": 0,
+     "last": 3
+    },
+    {
+     "id": "1737-146161-0009",
+     "audio": "train-clean-100/1737/146161/1737-146161-0009.flac",
+     "reference": "knit two together twice,",
+     "seconds": 2.175,
+     "first": 0,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1737",
+   "clause": "seventeenth row make one",
+   "utterances": [
+    {
+     "id": "1737-146161-0012",
+     "audio": "train-clean-100/1737/146161/1737-146161-0012.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one, knit three, knit two together, make one,",
+     "seconds": 15.23,
+     "first": 14,
+     "last": 17
+    },
+    {
+     "id": "1737-146161-0015",
+     "audio": "train-clean-100/1737/146161/1737-146161-0015.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one,",
+     "seconds": 9.695,
+     "first": 14,
+     "last": 17
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1737",
+   "clause": "sixteenth row seamed",
+   "utterances": [
+    {
+     "id": "1737-146161-0012",
+     "audio": "train-clean-100/1737/146161/1737-146161-0012.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one, knit three, knit two together, make one,",
+     "seconds": 15.23,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "1737-146161-0015",
+     "audio": "train-clean-100/1737/146161/1737-146161-0015.flac",
+     "reference": "knit those left at the end. Sixteenth row Seamed, make one at the beginning. Seventeenth row Make one,",
+     "seconds": 9.695,
+     "first": 6,
+     "last": 8
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1867",
+   "clause": "bill gregg groaned",
+   "utterances": [
+    {
+     "id": "1867-154071-0012",
+     "audio": "train-clean-100/1867/154071/1867-154071-0012.flac",
+     "reference": "There stood Caroline Smith in the door of the house She closed the door behind her and, walking to the top of the steps, paused there and looked up and down the street. Bill Gregg groaned,",
+     "seconds": 12.3,
+     "first": 33,
+     "last": 35
+    },
+    {
+     "id": "1867-154071-0043",
+     "audio": "train-clean-100/1867/154071/1867-154071-0043.flac",
+     "reference": "you got to get that gent I seen grinning from the window. Grinning? asked Bill Gregg, grinding his teeth and starting from his chair. Was the skunk laughing at me? Sure Every minute. Bill Gregg groaned. I'll smash every bone in his ugly head.",
+     "seconds": 16.105,
+     "first": 33,
+     "last": 35
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1867",
+   "clause": "said ronicky doone",
+   "utterances": [
+    {
+     "id": "1867-154071-0008",
+     "audio": "train-clean-100/1867/154071/1867-154071-0008.flac",
+     "reference": "And he grew pale at the thought. Partner, said Ronicky Doone, if they are trying to keep her away from us they sure have the sense to keep her under cover for as long as two days. Ain't that right?",
+     "seconds": 11.92,
+     "first": 8,
+     "last": 10
+    },
+    {
+     "id": "1867-154071-0031",
+     "audio": "train-clean-100/1867/154071/1867-154071-0031.flac",
+     "reference": "said Ronicky Doone. Bill, look me in the eye and tell me, man to man, that you're a liar He added Can you ever be happy without her, man? The cruelty of that speech made Gregg flush",
+     "seconds": 12.345,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "1867-154075-0038",
+     "audio": "train-clean-100/1867/154075/1867-154075-0038.flac",
+     "reference": "do you suppose I'll rest idle and let you walk away with her? Once we're outside of the house, Mark, said Ronicky Doone, I don't ask no favors. Let your men come on.",
+     "seconds": 10.86,
+     "first": 20,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1867",
+   "clause": "we've shaken hands",
+   "utterances": [
+    {
+     "id": "1867-154075-0043",
+     "audio": "train-clean-100/1867/154075/1867-154075-0043.flac",
+     "reference": "A great rage came in the eyes of John Mark a great wonder came in the eyes of the Westerner. Where did John Mark get his sudden strength? Well, said Ronicky, we've shaken hands, and now you can do what you please",
+     "seconds": 14.935,
+     "first": 31,
+     "last": 33
+    },
+    {
+     "id": "1867-154075-0045",
+     "audio": "train-clean-100/1867/154075/1867-154075-0045.flac",
+     "reference": "That brought a start from John Mark and a flash of eagerness, but he repressed the idea, after a single glance at the girl. We've shaken hands, he admitted slowly, as though just realizing the full extent of the meaning of that act.",
+     "seconds": 14.32,
+     "first": 24,
+     "last": 26
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1963",
+   "clause": "bring it to a boil",
+   "utterances": [
+    {
+     "id": "1963-142776-0010",
+     "audio": "train-clean-100/1963/142776/1963-142776-0010.flac",
+     "reference": "mix the flour smoothly to a batter with the cream, bring it to a boil, pour over the eels, and serve. Time.",
+     "seconds": 8.315,
+     "first": 10,
+     "last": 14
+    },
+    {
+     "id": "1963-142776-0019",
+     "audio": "train-clean-100/1963/142776/1963-142776-0019.flac",
+     "reference": "Take it off the fire, strain it again, and add the remainder of the stock with the seasoning and mace. Bring it to a boil,",
+     "seconds": 8.095,
+     "first": 20,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1963",
+   "clause": "tell you what",
+   "utterances": [
+    {
+     "id": "1963-147036-0008",
+     "audio": "train-clean-100/1963/147036/1963-147036-0008.flac",
+     "reference": "laying his hand on her shoulder. Why don't you tell me? Tell you what? she asked, without looking up. Tell me all there is to be told, he said. I could help you. I want to help you. She looked up at him.",
+     "seconds": 13.31,
+     "first": 11,
+     "last": 13
+    },
+    {
+     "id": "1963-147036-0014",
+     "audio": "train-clean-100/1963/147036/1963-147036-0014.flac",
+     "reference": "Her head was still bent and her voice was so low as to be almost inaudible. Tell you what? she asked. What you know of this business, he said. Don't you realise how every new development brings you more and more under suspicion?",
+     "seconds": 14.39,
+     "first": 16,
+     "last": 18
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "1970",
+   "clause": "jim it's going to hit us",
+   "utterances": [
+    {
+     "id": "1970-26100-0012",
+     "audio": "train-clean-100/1970/26100/1970-26100-0012.flac",
+     "reference": "I'm sorry, for when I saw this tree, I thought we'd struck the right track. There's one thing I can't make out, I stated, and that is the strange cry of my sister in her delirium. 'Look out, Jim It's going to hit us, ' she called out,",
+     "seconds": 16.17,
+     "first": 38,
+     "last": 43
+    },
+    {
+     "id": "1970-26100-0018",
+     "audio": "train-clean-100/1970/26100/1970-26100-0018.flac",
+     "reference": "Look out, Jim It's going to hit us. Yes, but how are we going to prove it? I asked. That's up to us now. An aeroplane has such speed that it was easy for Woods to fashion an ingenious alibi",
+     "seconds": 14.455,
+     "first": 2,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "200",
+   "clause": "i am afraid",
+   "utterances": [
+    {
+     "id": "200-124139-0008",
+     "audio": "train-clean-100/200/124139/200-124139-0008.flac",
+     "reference": "said Bingley. I am afraid, mister Darcy, observed Miss Bingley, in a half whisper, that this adventure has rather affected your admiration of her fine eyes.",
+     "seconds": 12.76,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "200-124140-0008",
+     "audio": "train-clean-100/200/124140/200-124140-0008.flac",
+     "reference": "Oh yes I understand you perfectly. I wish I might take this for a compliment but to be so easily seen through, I am afraid, is pitiful. That is as it happens.",
+     "seconds": 13.515,
+     "first": 22,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "200",
+   "clause": "said miss bingley",
+   "utterances": [
+    {
+     "id": "200-124139-0017",
+     "audio": "train-clean-100/200/124139/200-124139-0017.flac",
+     "reference": "Miss Eliza Bennet, said Miss Bingley, despises cards. She is a great reader, and has no pleasure in anything else.",
+     "seconds": 9.64,
+     "first": 3,
+     "last": 5
+    },
+    {
+     "id": "200-124139-0019",
+     "audio": "train-clean-100/200/124139/200-124139-0019.flac",
+     "reference": "I am astonished, said Miss Bingley, that my father should have left so small a collection of books. What a delightful library you have at Pemberley, mister Darcy It ought to be good, he replied",
+     "seconds": 13.775,
+     "first": 3,
+     "last": 5
+    },
+    {
+     "id": "200-124139-0027",
+     "audio": "train-clean-100/200/124139/200-124139-0027.flac",
+     "reference": "I cannot boast of knowing more than half a dozen in the whole range of my acquaintance that are really accomplished. Nor I, I am sure, said Miss Bingley. Then,",
+     "seconds": 13.13,
+     "first": 26,
+     "last": 28
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "201",
+   "clause": "it was said",
+   "utterances": [
+    {
+     "id": "201-127786-0064",
+     "audio": "train-clean-100/201/127786/201-127786-0064.flac",
+     "reference": "it was said, too, that her name was Luscinda, and that at the betrothal some strange things had happened.",
+     "seconds": 6.335,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "201-127786-0070",
+     "audio": "train-clean-100/201/127786/201-127786-0070.flac",
+     "reference": "It was said, moreover, that Don Fernando went away at once, and that Luscinda did not recover from her prostration until the next day, when she told her parents how she was really the bride of that Cardenio I have mentioned. I learned besides that Cardenio,",
+     "seconds": 13.525,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2092",
+   "clause": "my kind benefactor",
+   "utterances": [
+    {
+     "id": "2092-145706-0042",
+     "audio": "train-clean-100/2092/145706/2092-145706-0042.flac",
+     "reference": "What is troubling you, my kind benefactor? Can I be of any help to you? I am the bee whose wing you healed,",
+     "seconds": 8.86,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "2092-145706-0068",
+     "audio": "train-clean-100/2092/145706/2092-145706-0068.flac",
+     "reference": "and sat down on the stump of a tree wondering what he should do next. Suddenly a big wolf ran up to him, and standing still said, 'I'm very glad to see you again, my kind benefactor.",
+     "seconds": 14.079937,
+     "first": 34,
+     "last": 36
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "211",
+   "clause": "my dear captain",
+   "utterances": [
+    {
+     "id": "211-122425-0003",
+     "audio": "train-clean-100/211/122425/211-122425-0003.flac",
+     "reference": "Would not one say he was speaking of a religious community? In truth, my dear Captain,",
+     "seconds": 5.47,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "211-122425-0008",
+     "audio": "train-clean-100/211/122425/211-122425-0008.flac",
+     "reference": "Yes, sire, as they always do. And how did the thing happen? Let us see, for you know, my dear Captain, a judge must hear both sides. Good Lord In the most simple and natural manner possible.",
+     "seconds": 14.155,
+     "first": 18,
+     "last": 20
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "211",
+   "clause": "said the king",
+   "utterances": [
+    {
+     "id": "211-122425-0011",
+     "audio": "train-clean-100/211/122425/211-122425-0011.flac",
+     "reference": "who certainly did not go there in such a numerous company without some ill intention against the edicts. Ah, ah You incline me to think so, said the king. There is no doubt they went thither to fight themselves. I do not accuse them, sire",
+     "seconds": 15.42,
+     "first": 26,
+     "last": 28
+    },
+    {
+     "id": "211-122425-0014",
+     "audio": "train-clean-100/211/122425/211-122425-0014.flac",
+     "reference": "are the natural enemies of the Guardsmen, who belong to the cardinal. Yes, Tr ville, yes, said the king, in a melancholy tone and it is very sad, believe me, to see thus two parties in France, two heads to royalty.",
+     "seconds": 14.39,
+     "first": 16,
+     "last": 18
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "211",
+   "clause": "that is true",
+   "utterances": [
+    {
+     "id": "211-122425-0022",
+     "audio": "train-clean-100/211/122425/211-122425-0022.flac",
+     "reference": "That is true, sire there can be no more doubt on that head. They called upon him then to retire but he answered that he was a Musketeer at heart, entirely devoted to your Majesty,",
+     "seconds": 11.98,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "211-122425-0027",
+     "audio": "train-clean-100/211/122425/211-122425-0027.flac",
+     "reference": "That is true, said the king but never mind, Tr ville, come still by the back staircase. Tr ville smiled but as it was indeed something to have prevailed upon this child to rebel against his master,",
+     "seconds": 13.82,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "229",
+   "clause": "ned land said",
+   "utterances": [
+    {
+     "id": "229-130880-0085",
+     "audio": "train-clean-100/229/130880/229-130880-0085.flac",
+     "reference": "Conseil put in. And why not? What good would a pearl worth millions do us here on the Nautilus? Here, no, Ned Land said. But elsewhere.. Oh Elsewhere Conseil put in,",
+     "seconds": 15.02,
+     "first": 21,
+     "last": 23
+    },
+    {
+     "id": "229-130880-0088",
+     "audio": "train-clean-100/229/130880/229-130880-0088.flac",
+     "reference": "What risks would you run in a job like that? Ned Land said. Swallowing a few gulps of salt water? Whatever you say, Ned. Then, trying to imitate Captain Nemo's carefree tone, I asked,",
+     "seconds": 14.09,
+     "first": 10,
+     "last": 12
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "233",
+   "clause": "the telegraph operator of winesburg",
+   "utterances": [
+    {
+     "id": "233-134440-0005",
+     "audio": "train-clean-100/233/134440/233-134440-0005.flac",
+     "reference": "sitting on the grass in the station yard on a summer evening after he has closed his office for the night. Wash Williams, the telegraph operator of Winesburg, was the ugliest thing in town. His girth was immense,",
+     "seconds": 15.43,
+     "first": 23,
+     "last": 27
+    },
+    {
+     "id": "233-134440-0038",
+     "audio": "train-clean-100/233/134440/233-134440-0038.flac",
+     "reference": "There was something almost beautiful in the voice of Wash Williams, the hideous, telling his story of hate. The telegraph operator of Winesburg, sitting in the darkness on the railroad ties, had become a poet.",
+     "seconds": 15.23,
+     "first": 18,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2384",
+   "clause": "in my opinion",
+   "utterances": [
+    {
+     "id": "2384-152900-0055",
+     "audio": "train-clean-100/2384/152900/2384-152900-0055.flac",
+     "reference": "In my opinion, on a long journey such as that we had before us, the ski must be perfectly steady. I do not know anything that tires me more than a bad fastening that is, one that allows the foot to shift in the binding.",
+     "seconds": 15.14,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "2384-152900-0089",
+     "audio": "train-clean-100/2384/152900/2384-152900-0089.flac",
+     "reference": "and was, in my opinion, excellent it also kept good the whole time. The chocolate came from a world renowned firm, and was beyond all praise. The whole supply was a very acceptable gift.",
+     "seconds": 13.13,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2416",
+   "clause": "as it were",
+   "utterances": [
+    {
+     "id": "2416-152137-0004",
+     "audio": "train-clean-100/2416/152137/2416-152137-0004.flac",
+     "reference": "Indeed, it seemed a great length of time now since he had heard from her even in that way, though it was not so many days ago, after all. Perhaps it was the calm, as it were, that, by contrast,",
+     "seconds": 13.2,
+     "first": 34,
+     "last": 36
+    },
+    {
+     "id": "2416-152139-0049",
+     "audio": "train-clean-100/2416/152139/2416-152139-0049.flac",
+     "reference": "And it was safer, much more circumspect on your part, not to order the flat searched at once, but only as a last resort, as it were, after you had led the police to trail him all evening and still remain without a clew",
+     "seconds": 15.485,
+     "first": 24,
+     "last": 26
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2416",
+   "clause": "said jimmie dale softly",
+   "utterances": [
+    {
+     "id": "2416-152139-0013",
+     "audio": "train-clean-100/2416/152139/2416-152139-0013.flac",
+     "reference": "held a disconcerting bead on Carling's forehead. Please don't do that, said Jimmie Dale softly. It's rather a good make, that safe. I dare say it would take me half an hour to open it.",
+     "seconds": 13.065,
+     "first": 11,
+     "last": 14
+    },
+    {
+     "id": "2416-152139-0025",
+     "audio": "train-clean-100/2416/152139/2416-152139-0025.flac",
+     "reference": "What has a story got to do with this? snapped Carling. The man has got a home, said Jimmie Dale softly. A home, and a wife and a little baby girl.",
+     "seconds": 11.685,
+     "first": 17,
+     "last": 20
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "254",
+   "clause": "i can't bear this any more",
+   "utterances": [
+    {
+     "id": "254-27760-0017",
+     "audio": "train-clean-100/254/27760/254-27760-0017.flac",
+     "reference": "home to our village, I can't bear this any more. I bow to the ground to you, and will pray to God for ever and ever, take me from here or I shall die..",
+     "seconds": 13.9,
+     "first": 4,
+     "last": 9
+    },
+    {
+     "id": "254-27760-0020",
+     "audio": "train-clean-100/254/27760/254-27760-0020.flac",
+     "reference": "for Christ's sake, to let me clean the boots, or I'll go instead of Fedya as underherdsman. Dear Grandpapa, I can't bear this any more, it'll kill me. I wanted to run away to our village,",
+     "seconds": 14.25,
+     "first": 19,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "26",
+   "clause": "that is to say",
+   "utterances": [
+    {
+     "id": "26-495-0043",
+     "audio": "train-clean-100/26/495/26-495-0043.flac",
+     "reference": "This hurry, I say, continued some weeks, that is to say, all the month of May and June, and the more because it was rumoured that an order of the Government was to be issued out",
+     "seconds": 13.43,
+     "first": 7,
+     "last": 10
+    },
+    {
+     "id": "26-496-0001",
+     "audio": "train-clean-100/26/496/26-496-0001.flac",
+     "reference": "for the city, that is to say, within the walls, was indifferently healthy still nor was it got then very much over the water into Southwark",
+     "seconds": 12.875,
+     "first": 3,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "26",
+   "clause": "within the walls",
+   "utterances": [
+    {
+     "id": "26-496-0001",
+     "audio": "train-clean-100/26/496/26-496-0001.flac",
+     "reference": "for the city, that is to say, within the walls, was indifferently healthy still nor was it got then very much over the water into Southwark",
+     "seconds": 12.875,
+     "first": 7,
+     "last": 9
+    },
+    {
+     "id": "26-496-0002",
+     "audio": "train-clean-100/26/496/26-496-0002.flac",
+     "reference": "of all distempers, whereof it might be supposed above six hundred died of the plague, yet there was but twenty eight in the whole city, within the walls, and but nineteen in Southwark,",
+     "seconds": 15.12,
+     "first": 25,
+     "last": 27
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "27",
+   "clause": "and herds of oxen",
+   "utterances": [
+    {
+     "id": "27-124992-0008",
+     "audio": "train-clean-100/27/124992/27-124992-0008.flac",
+     "reference": "with all provisions sufficient for the armies in abundance, and herds of oxen, and flocks of sheep,",
+     "seconds": 6.935,
+     "first": 9,
+     "last": 12
+    },
+    {
+     "id": "27-124992-0021",
+     "audio": "train-clean-100/27/124992/27-124992-0021.flac",
+     "reference": "all mountains and hills, and fields, and herds of oxen, and flocks of sheep, and goats, and horses, and camels,",
+     "seconds": 8.63,
+     "first": 6,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2764",
+   "clause": "conseil replied serenely",
+   "utterances": [
+    {
+     "id": "2764-36617-0015",
+     "audio": "train-clean-100/2764/36617/2764-36617-0015.flac",
+     "reference": "Yes, my boy. Get my things ready, get yours ready. We're departing in two hours. As master wishes, Conseil replied serenely. We haven't a moment to lose. Pack as much into my trunk as you can, my traveling kit, my suits, shirts, and socks,",
+     "seconds": 15.64,
+     "first": 18,
+     "last": 20
+    },
+    {
+     "id": "2764-36619-0040",
+     "audio": "train-clean-100/2764/36619/2764-36619-0040.flac",
+     "reference": "To be sure, Conseil replied serenely, I do think they'll have fun at master's expense. And must it be said.? It must be said, Conseil. Well then, it will serve master right",
+     "seconds": 14.41,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2764",
+   "clause": "to be sure",
+   "utterances": [
+    {
+     "id": "2764-36617-0012",
+     "audio": "train-clean-100/2764/36617/2764-36617-0012.flac",
+     "reference": "and he only addressed me in the third person to the point where it got tiresome. Conseil I repeated, while feverishly beginning my preparations for departure. To be sure, I had confidence in this devoted lad.",
+     "seconds": 12.665,
+     "first": 26,
+     "last": 28
+    },
+    {
+     "id": "2764-36619-0040",
+     "audio": "train-clean-100/2764/36619/2764-36619-0040.flac",
+     "reference": "To be sure, Conseil replied serenely, I do think they'll have fun at master's expense. And must it be said.? It must be said, Conseil. Well then, it will serve master right",
+     "seconds": 14.41,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2817",
+   "clause": "do you know",
+   "utterances": [
+    {
+     "id": "2817-142371-0020",
+     "audio": "train-clean-100/2817/142371/2817-142371-0020.flac",
+     "reference": "And you keep it so exquisitely clean, misses Poyser. I like these premises, do you know, beyond any on the estate. Well, sir, since you're fond of em,",
+     "seconds": 11.285,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "2817-142371-0029",
+     "audio": "train-clean-100/2817/142371/2817-142371-0029.flac",
+     "reference": "said the old gentleman, seating himself on a small chair near the door. Do you know, misses Poyser sit down, pray, both of you I've been far from contented, for some time, with misses Satchell's dairy management.",
+     "seconds": 14.205,
+     "first": 13,
+     "last": 15
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2817",
+   "clause": "said the squire",
+   "utterances": [
+    {
+     "id": "2817-142371-0023",
+     "audio": "train-clean-100/2817/142371/2817-142371-0023.flac",
+     "reference": "on all hands about your fine cheese and butter, said the squire, looking politely unconscious that there could be any question on which he and misses Poyser might happen to disagree. I think I see the door open, there.",
+     "seconds": 13.32,
+     "first": 9,
+     "last": 11
+    },
+    {
+     "id": "2817-142371-0037",
+     "audio": "train-clean-100/2817/142371/2817-142371-0037.flac",
+     "reference": "I think folks have to wait long enough afore it's brought to 'em. The fact is, Poyser, said the squire, ignoring misses Poyser's theory of worldly prosperity,",
+     "seconds": 11.905,
+     "first": 17,
+     "last": 19
+    },
+    {
+     "id": "2817-142371-0046",
+     "audio": "train-clean-100/2817/142371/2817-142371-0046.flac",
+     "reference": "No, no, my dear misses Poyser, certainly not, said the squire, still confident in his own powers of persuasion, you must not overwork yourself",
+     "seconds": 10.645,
+     "first": 8,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2836",
+   "clause": "moss and grab",
+   "utterances": [
+    {
+     "id": "2836-5354-0024",
+     "audio": "train-clean-100/2836/5354/2836-5354-0024.flac",
+     "reference": "We beg to inform you that the suit Carlyle versus Carlyle, is at an end. The divorce was pronounced without opposition. According to your request, we hasten to forward you the earliest intimation of the fact. We are, sir, faithfully yours, MOSS and GRAB.",
+     "seconds": 16.78,
+     "first": 41,
+     "last": 43
+    },
+    {
+     "id": "2836-5354-0029",
+     "audio": "train-clean-100/2836/5354/2836-5354-0029.flac",
+     "reference": "on your favoring us with instructions. And we remain, sir, most faithfully yours, MOSS and GRAB. SIR FRANCIS LEVISON, Bart. The outside of the letter was superscribed as the other, F. Levison, Esquire,",
+     "seconds": 14.564937,
+     "first": 13,
+     "last": 15
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "289",
+   "clause": "said the old woman",
+   "utterances": [
+    {
+     "id": "289-121665-0019",
+     "audio": "train-clean-100/289/121665/289-121665-0019.flac",
+     "reference": "said the old woman, I am going over the hill top myself, and I will send the sheep back to you. So she got upon her feet and began climbing the hill, and the girl heard her saying, as she walked away, Little Bo Peep has lost her sheep,",
+     "seconds": 15.685,
+     "first": 0,
+     "last": 3
+    },
+    {
+     "id": "289-121665-0042",
+     "audio": "train-clean-100/289/121665/289-121665-0042.flac",
+     "reference": "I must hunt until I find those that belong to my sheep. My dear, said the old woman, I have been deceiving you you said you knew all about your sheep, and I wanted to teach you a lesson. For, however wise we may be,",
+     "seconds": 15.96,
+     "first": 14,
+     "last": 17
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "2893",
+   "clause": "said the man in yellow",
+   "utterances": [
+    {
+     "id": "2893-139310-0009",
+     "audio": "train-clean-100/2893/139310/2893-139310-0009.flac",
+     "reference": "Councillors under the Atlas? Why should they try to drug me? To keep you insensible, said the man in yellow. To prevent your interference.",
+     "seconds": 9.75,
+     "first": 15,
+     "last": 19
+    },
+    {
+     "id": "2893-139310-0010",
+     "audio": "train-clean-100/2893/139310/2893-139310-0010.flac",
+     "reference": "Because you are the Atlas, Sire, said the man in yellow. The world is on your shoulders. They rule it in your name. The sounds from the hall had died into a silence",
+     "seconds": 13.95,
+     "first": 6,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "298",
+   "clause": "cried the colonel",
+   "utterances": [
+    {
+     "id": "298-126791-0064",
+     "audio": "train-clean-100/298/126791/298-126791-0064.flac",
+     "reference": "Had we succeeded in getting a few good fires upon them in flank, we should have sent these brave Virginians to the right about. Aye, and that in double quick time, cried the colonel, making the other leg follow its companion. Then it was necessary to rout the guides, you know, and the movement gave them the best possible opportunity to charge.",
+     "seconds": 16.34,
+     "first": 31,
+     "last": 33
+    },
+    {
+     "id": "298-126791-0067",
+     "audio": "train-clean-100/298/126791/298-126791-0067.flac",
+     "reference": "True true, cried the colonel, with animation. Had I been there to have improved that advantage, we might have turned the table on the Yankees saying which he displayed still greater animation in completing his toilet and he was soon prepared to make his appearance, fully restored to his own good opinion, and fairly persuaded that his capture was owing to casualties absolutely beyond the control of man.",
+     "seconds": 19.295,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "298",
+   "clause": "said the other",
+   "utterances": [
+    {
+     "id": "298-126791-0056",
+     "audio": "train-clean-100/298/126791/298-126791-0056.flac",
+     "reference": "A good motherly lady, but as to love, that is a matter of taste. A few years younger, with deference to her prudence and experience, would accord better with my fancy. She must be under twenty, said the other, quickly. It depends on the way you count. If you begin at the heel of life, well",
+     "seconds": 15.34,
+     "first": 36,
+     "last": 38
+    },
+    {
+     "id": "298-126791-0065",
+     "audio": "train-clean-100/298/126791/298-126791-0065.flac",
+     "reference": "Yes, said the other, sending the second slipper after the first, and this Major Dunwoodie never overlooks an advantage. I think if we had the thing to do over again, continued the colonel, raising himself on his feet, we might alter the case very materially, though the chief thing the rebels have now to boast of is my capture",
+     "seconds": 15.835,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "298",
+   "clause": "said the trooper",
+   "utterances": [
+    {
+     "id": "298-126790-0019",
+     "audio": "train-clean-100/298/126790/298-126790-0019.flac",
+     "reference": "piercing eyes lowering at her through his thick brows, in silence, Perhaps this gentleman knows he seems to take an interest in my story. Madam, said the trooper, bowing very low, both you and the tale are extremely interesting Katy smiled involuntarily",
+     "seconds": 14.475,
+     "first": 25,
+     "last": 27
+    },
+    {
+     "id": "298-126790-0033",
+     "audio": "train-clean-100/298/126790/298-126790-0033.flac",
+     "reference": "doctor Sitgreaves does not mean a rig'lar soldier, but a regular physician, madam, said the trooper. Oh cried the maiden, again correcting herself, for the best of all reasons there was none to be had, so I took care of him myself.",
+     "seconds": 12.04,
+     "first": 13,
+     "last": 15
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "302",
+   "clause": "if at all",
+   "utterances": [
+    {
+     "id": "302-123516-0012",
+     "audio": "train-clean-100/302/123516/302-123516-0012.flac",
+     "reference": "I have brought a strange creature wearing the metal of a Thark whom it is my pleasure to have battle with a wild thoat at the great games. He will die as Bar Comas, your jeddak, sees fit, if at all,",
+     "seconds": 15.73,
+     "first": 38,
+     "last": 40
+    },
+    {
+     "id": "302-123516-0013",
+     "audio": "train-clean-100/302/123516/302-123516-0013.flac",
+     "reference": "with emphasis and dignity. If at all? roared Dak Kova. By the dead hands at my throat but he shall die, Bar Comas. No maudlin weakness on your part shall save him.",
+     "seconds": 16.665,
+     "first": 4,
+     "last": 6
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3112",
+   "clause": "as far as i can remember",
+   "utterances": [
+    {
+     "id": "3112-9555-0016",
+     "audio": "train-clean-100/3112/9555/3112-9555-0016.flac",
+     "reference": "Perhaps he did not recognise me by my face. At this time I was three years at Harrow and, as far as I can remember, I was the junior boy in the school when I left it.",
+     "seconds": 12.28,
+     "first": 19,
+     "last": 24
+    },
+    {
+     "id": "3112-9555-0073",
+     "audio": "train-clean-100/3112/9555/3112-9555-0073.flac",
+     "reference": "though I think none ever knew less how to go about the work. Of amusement, as far as I can remember, he never recognised the need.",
+     "seconds": 9.9,
+     "first": 15,
+     "last": 20
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3168",
+   "clause": "said prince andrew",
+   "utterances": [
+    {
+     "id": "3168-173565-0051",
+     "audio": "train-clean-100/3168/173565/3168-173565-0051.flac",
+     "reference": "just touching it lightly with her lips. Forgive me she whispered, raising her head and glancing at him. Forgive me I love you, said Prince Andrew.",
+     "seconds": 13.15,
+     "first": 23,
+     "last": 25
+    },
+    {
+     "id": "3168-173565-0053",
+     "audio": "train-clean-100/3168/173565/3168-173565-0053.flac",
+     "reference": "broken whisper, and began kissing his hand more rapidly, just touching it with her lips. I love you more, better than before, said Prince Andrew, lifting her face with his hand",
+     "seconds": 15.74,
+     "first": 22,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "32",
+   "clause": "replied the chattel",
+   "utterances": [
+    {
+     "id": "32-4137-0018",
+     "audio": "train-clean-100/32/4137/32-4137-0018.flac",
+     "reference": "Well den, I guess I will only be thirty when dey axe me, replied the chattel.",
+     "seconds": 5.16,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "32-4137-0037",
+     "audio": "train-clean-100/32/4137/32-4137-0037.flac",
+     "reference": "You will not forget that you belong to me, said Johnson, as the young slave was stepping from the table to a chair. No, sir, replied the chattel.",
+     "seconds": 9.105,
+     "first": 25,
+     "last": 27
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3240",
+   "clause": "eighteen ninety two",
+   "utterances": [
+    {
+     "id": "3240-131231-0019",
+     "audio": "train-clean-100/3240/131231/3240-131231-0019.flac",
+     "reference": "a fall of small frogs, near Birmingham, England, june thirtieth, eighteen ninety two, is attributed to a specific whirlwind but not a word as to any special pond that had contributed.",
+     "seconds": 13.1,
+     "first": 10,
+     "last": 12
+    },
+    {
+     "id": "3240-131232-0024",
+     "audio": "train-clean-100/3240/131232/3240-131232-0024.flac",
+     "reference": "That, according to Das Wetter, december, eighteen ninety two, upon august ninth, eighteen ninety two, a yellow cloud appeared over Paderborn, Germany. From this cloud, fell a torrential rain, in which were hundreds of mussels.",
+     "seconds": 14.555,
+     "first": 6,
+     "last": 8
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3240",
+   "clause": "monthly weather review",
+   "utterances": [
+    {
+     "id": "3240-131231-0015",
+     "audio": "train-clean-100/3240/131231/3240-131231-0015.flac",
+     "reference": "Monthly Weather Review, july, eighteen eighty one A small pond in the track of the cloud was sucked dry, the water being carried over the adjoining fields together with a large quantity of soft mud, which was scattered over the ground for half a mile around.",
+     "seconds": 16.13,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "3240-131232-0028",
+     "audio": "train-clean-100/3240/131232/3240-131232-0028.flac",
+     "reference": "Our quasi reasoning upon this subject applies to all segregations so far considered. Monthly Weather Review, january fifteenth, eighteen seventy seven That,",
+     "seconds": 11.08,
+     "first": 13,
+     "last": 15
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3242",
+   "clause": "and so on",
+   "utterances": [
+    {
+     "id": "3242-67153-0012",
+     "audio": "train-clean-100/3242/67153/3242-67153-0012.flac",
+     "reference": "he applied for every other position on the premises right down to office boy. I told him I was sorry, but I couldn't do anything for him then that we were letting men go, but I'd keep him in mind, and so on.",
+     "seconds": 12.575,
+     "first": 40,
+     "last": 42
+    },
+    {
+     "id": "3242-8112-0012",
+     "audio": "train-clean-100/3242/8112/3242-8112-0012.flac",
+     "reference": "And the number of planetary confederacies, subplanetary governments, industrial, financial and commercial combines, assorted power groups, etcetera. and so on, is something I'd hate to have to calculate. What are you driving at? she asked.",
+     "seconds": 14.06,
+     "first": 17,
+     "last": 19
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3242",
+   "clause": "said the commissioner",
+   "utterances": [
+    {
+     "id": "3242-8112-0001",
+     "audio": "train-clean-100/3242/8112/3242-8112-0001.flac",
+     "reference": "eight tons of his lab equipment. Plus his special U League guards. Oh? Trigger picked up the Puya glass. She looked into it. It was empty. Moving where? she asked. Manon, said the Commissioner. Tell you about that later.",
+     "seconds": 15.42,
+     "first": 31,
+     "last": 33
+    },
+    {
+     "id": "3242-8112-0005",
+     "audio": "train-clean-100/3242/8112/3242-8112-0005.flac",
+     "reference": "And now, said the Commissioner, we'll talk more freely. We tell Mantelish just as little as we can. To tell you the truth, Trigger, the professor is a terrible handicap on an operation like this. I understand he was a great friend of your father's. Yes, she said.",
+     "seconds": 15.33,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "3242-8112-0039",
+     "audio": "train-clean-100/3242/8112/3242-8112-0039.flac",
+     "reference": "So, Trigger said, they might have two thirds of what everybody wants, and you might have one third. Right here on the table. How many of the later raiders did you catch? All of them, said the Commissioner. Around forty.",
+     "seconds": 14.145,
+     "first": 35,
+     "last": 37
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3242",
+   "clause": "the commissioner said",
+   "utterances": [
+    {
+     "id": "3242-8112-0028",
+     "audio": "train-clean-100/3242/8112/3242-8112-0028.flac",
+     "reference": "Mantelish began to get results with it, the Commissioner said. One experiment was rather startling. He'd been trying that electrical stimulation business. Nothing happened until he had finished. Then he touched the plasmoid, and it fed the whole charge back to him.",
+     "seconds": 15.36,
+     "first": 7,
+     "last": 9
+    },
+    {
+     "id": "3242-8112-0042",
+     "audio": "train-clean-100/3242/8112/3242-8112-0042.flac",
+     "reference": "There was a pause. Then Trigger asked, How did you get involved in this, personally? More or less by accident, the Commissioner said. It was in connection with our second lead. That's me, huh? she said unhappily. Yes.",
+     "seconds": 15.63,
+     "first": 20,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "328",
+   "clause": "as he called it",
+   "utterances": [
+    {
+     "id": "328-129766-0024",
+     "audio": "train-clean-100/328/129766/328-129766-0024.flac",
+     "reference": "for a wicked correspondence, if they had any of them offered it yet there was one gentleman, as above, who always singled me out for the diversion of my company, as he called it, which, as he was pleased to say, was very agreeable to him, but at that time",
+     "seconds": 15.99,
+     "first": 30,
+     "last": 33
+    },
+    {
+     "id": "328-129766-0086",
+     "audio": "train-clean-100/328/129766/328-129766-0086.flac",
+     "reference": "and when he grew quite well, he made me a present of fifty guineas for my care and, as he called it, for hazarding my life to save his. And now he made deep protestations of a sincere inviolable affection for me,",
+     "seconds": 15.14,
+     "first": 18,
+     "last": 21
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "328",
+   "clause": "as i said",
+   "utterances": [
+    {
+     "id": "328-129766-0033",
+     "audio": "train-clean-100/328/129766/328-129766-0033.flac",
+     "reference": "till it was found necessary to do otherwise. She had some persons of character that frequently lodged in her house, and in particular the gentleman who, as I said, singled me out for his companion",
+     "seconds": 11.89,
+     "first": 26,
+     "last": 28
+    },
+    {
+     "id": "328-129766-0095",
+     "audio": "train-clean-100/328/129766/328-129766-0095.flac",
+     "reference": "if he had not made those promises at all so after a little struggle, as I said, I lay still and let him come to bed. When he was there he took me in his arms, and so I lay all night with him, but he had no more to do with me, or offered anything to me,",
+     "seconds": 15.34,
+     "first": 14,
+     "last": 16
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3436",
+   "clause": "said sir owain",
+   "utterances": [
+    {
+     "id": "3436-172171-0005",
+     "audio": "train-clean-100/3436/172171/3436-172171-0005.flac",
+     "reference": "Such an one as I am, said the knight. If thou wilt tell me what I ask thee, I will tell thee what thou askest me. Gladly will I do so, said Sir Owain, for that was the knight's name.",
+     "seconds": 15.07,
+     "first": 31,
+     "last": 33
+    },
+    {
+     "id": "3436-172171-0032",
+     "audio": "train-clean-100/3436/172171/3436-172171-0032.flac",
+     "reference": "Verily, said Sir Owain, the son of Urien, to Kay the Seneschal, thou wast ill advised to send that madman after the knight, for he must either be overthrown or flee, and either way it will be a disgrace to Arthur and his warriors",
+     "seconds": 14.88,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3486",
+   "clause": "it came to me",
+   "utterances": [
+    {
+     "id": "3486-166424-0066",
+     "audio": "train-clean-100/3486/166424/3486-166424-0066.flac",
+     "reference": "viewing it, it came to me, with eyes impersonal, cold, indifferent as the untroubled stars which look down upon hurricane and earthquake in this world of ours. There was a rushing of many feet at our left a wail from Chiu Ming.",
+     "seconds": 15.96,
+     "first": 2,
+     "last": 5
+    },
+    {
+     "id": "3486-166446-0006",
+     "audio": "train-clean-100/3486/166446/3486-166446-0006.flac",
+     "reference": "Yet mother and blossoming maid, youth and oldster, all the pageant of humanity within the great walls were now but lines within the stone. According to their different lights, it came to me, there had been",
+     "seconds": 12.3,
+     "first": 29,
+     "last": 32
+    },
+    {
+     "id": "3486-166446-0032",
+     "audio": "train-clean-100/3486/166446/3486-166446-0032.flac",
+     "reference": "purged not only by suffering but by, it came to me, some strange knowledge. No use, Drake, he said dreamily.",
+     "seconds": 8.31,
+     "first": 7,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3526",
+   "clause": "how are you",
+   "utterances": [
+    {
+     "id": "3526-176653-0019",
+     "audio": "train-clean-100/3526/176653/3526-176653-0019.flac",
+     "reference": "drawled a voice from the bushes, and it had a tone that made the fisherman whirl suddenly. A giant mountaineer stood on the bank above him, with a Winchester in the hollow of his arm. How are you?",
+     "seconds": 12.94,
+     "first": 35,
+     "last": 37
+    },
+    {
+     "id": "3526-176653-0022",
+     "audio": "train-clean-100/3526/176653/3526-176653-0022.flac",
+     "reference": "The little creature vanished and the mountaineer turned to the fisherman, who had just put on a fresh minnow and tossed it into the river. Purty well, thank you, he said shortly. How are you? Fine was the nonchalant answer.",
+     "seconds": 15.485,
+     "first": 32,
+     "last": 34
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3664",
+   "clause": "asked the dying man",
+   "utterances": [
+    {
+     "id": "3664-11714-0020",
+     "audio": "train-clean-100/3664/11714/3664-11714-0020.flac",
+     "reference": "Everything, said Savonarola, but on three conditions. What are they? asked the dying man. The first, said Savonarola, is that you feel a complete faith in the power and the mercy of God.",
+     "seconds": 13.04,
+     "first": 10,
+     "last": 13
+    },
+    {
+     "id": "3664-11714-0022",
+     "audio": "train-clean-100/3664/11714/3664-11714-0022.flac",
+     "reference": "My father, shall I have time? asked the dying man. God will give it to you, replied the monk.",
+     "seconds": 6.8,
+     "first": 6,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3699",
+   "clause": "quoth my uncle toby",
+   "utterances": [
+    {
+     "id": "3699-19401-0008",
+     "audio": "train-clean-100/3699/19401/3699-19401-0008.flac",
+     "reference": "We have taken our measures badly, quoth my uncle Toby, looking up interrogatively in Trim 's face. I would lay my Montero cap, said Trim",
+     "seconds": 11.075,
+     "first": 6,
+     "last": 9
+    },
+    {
+     "id": "3699-19402-0025",
+     "audio": "train-clean-100/3699/19402/3699-19402-0025.flac",
+     "reference": "SHE cannot, quoth my uncle Toby, halting, when they had march'd up to within twenty paces of misses Wadman 's door she cannot, corporal, take it amiss.",
+     "seconds": 10.795,
+     "first": 2,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "374",
+   "clause": "for the rest",
+   "utterances": [
+    {
+     "id": "374-180298-0008",
+     "audio": "train-clean-100/374/180298/374-180298-0008.flac",
+     "reference": "For the rest, not a penny of debt. This, then, was my position when I made the acquaintance of Marguerite. You can well understand that, in spite of myself, my expenses soon increased.",
+     "seconds": 13.72,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "374-180298-0025",
+     "audio": "train-clean-100/374/180298/374-180298-0025.flac",
+     "reference": "I lost only what I was able to pay, and gained only what I should have been able to lose. For the rest, chance was on my side. I made no debts, and I spent three times as much money as when I did not gamble.",
+     "seconds": 14.185,
+     "first": 20,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "374",
+   "clause": "in spite of myself",
+   "utterances": [
+    {
+     "id": "374-180298-0002",
+     "audio": "train-clean-100/374/180298/374-180298-0002.flac",
+     "reference": "I wished above all not to leave myself time to think over the position I had accepted, for, in spite of myself, it was a great distress to me. Thus my life, generally so calm,",
+     "seconds": 13.295,
+     "first": 18,
+     "last": 21
+    },
+    {
+     "id": "374-180298-0008",
+     "audio": "train-clean-100/374/180298/374-180298-0008.flac",
+     "reference": "For the rest, not a penny of debt. This, then, was my position when I made the acquaintance of Marguerite. You can well understand that, in spite of myself, my expenses soon increased.",
+     "seconds": 13.72,
+     "first": 25,
+     "last": 28
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "3857",
+   "clause": "but did not graduate",
+   "utterances": [
+    {
+     "id": "3857-180923-0008",
+     "audio": "train-clean-100/3857/180923/3857-180923-0008.flac",
+     "reference": "and was enlisted as captain of a company which he had been active in recruiting. Lieutenant Colonel Nathaniel Smith of Woodbury entered the Yale Law School in the class of eighteen fifty three, but did not graduate.",
+     "seconds": 13.585,
+     "first": 33,
+     "last": 36
+    },
+    {
+     "id": "3857-180923-0013",
+     "audio": "train-clean-100/3857/180923/3857-180923-0013.flac",
+     "reference": "the historian of the regiment, was a student before the war at Union College, but did not graduate. Captain George S. Williams, of New Milford, was a member of the class of eighteen fifty two at Yale for a time,",
+     "seconds": 13.67,
+     "first": 14,
+     "last": 17
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4014",
+   "clause": "while lieutenant mackinson",
+   "utterances": [
+    {
+     "id": "4014-186175-0002",
+     "audio": "train-clean-100/4014/186175/4014-186175-0002.flac",
+     "reference": "was sufficient to prevent Jerry and Slim from taking a full eight hours of much needed sleep, while Lieutenant Mackinson, Joe and three other officers whom the captain had taken into his confidence in the matter, followed out every possible clue in pursuit of a solution of the baffling mystery.",
+     "seconds": 15.104938,
+     "first": 17,
+     "last": 19
+    },
+    {
+     "id": "4014-186179-0039",
+     "audio": "train-clean-100/4014/186179/4014-186179-0039.flac",
+     "reference": "In this way they went forward, yard by yard, until they reached a thick clump of trees. There, after listening intently for several minutes without hearing a dangerous sound, they spread out their coats, tent like, while Lieutenant Mackinson, with gingerly flashes of his light,",
+     "seconds": 15.04,
+     "first": 36,
+     "last": 38
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4018",
+   "clause": "said the girl",
+   "utterances": [
+    {
+     "id": "4018-107312-0026",
+     "audio": "train-clean-100/4018/107312/4018-107312-0026.flac",
+     "reference": "she added in a lower tone. Well, I have left Mr Trafford's mill, said the girl. That's a bad job, said Mrs Carey for those Traffords are kind to their people.",
+     "seconds": 11.52,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "4018-107312-0027",
+     "audio": "train-clean-100/4018/107312/4018-107312-0027.flac",
+     "reference": "So it is, said the girl, but then it was so dull. I can't stand a country life, Mrs Carey. I must have company. Well, I do love a bit of gossip myself, said Mrs Carey, with great frankness.",
+     "seconds": 13.824938,
+     "first": 3,
+     "last": 5
+    },
+    {
+     "id": "4018-107312-0028",
+     "audio": "train-clean-100/4018/107312/4018-107312-0028.flac",
+     "reference": "And then I'm no scholar, said the girl, and never could take to learning. And those Traffords had so many schools. Learning is better than house and land, said Mrs Carey though I'm no scholar myself but then, in my time, things was different.",
+     "seconds": 15.285063,
+     "first": 5,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "405",
+   "clause": "in other words",
+   "utterances": [
+    {
+     "id": "405-130894-0066",
+     "audio": "train-clean-100/405/130894/405-130894-0066.flac",
+     "reference": "in other words, it was raised from its icy bed by a change in its specific gravity. When it was afloat, the crew towed it, leading it right above the immense trench outlined to match the ship's waterline. Next the ballast tanks filled with water,",
+     "seconds": 15.38,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "405-130894-0070",
+     "audio": "train-clean-100/405/130894/405-130894-0070.flac",
+     "reference": "I squeezed it in an involuntary convulsion. All at once, carried away by its frightful excess load, the Nautilus sank into the waters like a cannonball, in other words, dropping as if in a vacuum",
+     "seconds": 15.18,
+     "first": 26,
+     "last": 28
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "405",
+   "clause": "ned land went on",
+   "utterances": [
+    {
+     "id": "405-130895-0011",
+     "audio": "train-clean-100/405/130895/405-130895-0011.flac",
+     "reference": "Conseil put in. Yes, Ned Land went on. You can repay your debt by coming with me when I leave this infernal Nautilus. By the way, Conseil said, are we going in a favorable direction?",
+     "seconds": 15.68,
+     "first": 4,
+     "last": 7
+    },
+    {
+     "id": "405-130895-0012",
+     "audio": "train-clean-100/405/130895/405-130895-0012.flac",
+     "reference": "Yes, I replied, because we're going in the direction of the sun, and here the sun is due north. Sure, Ned Land went on, but it remains to be seen whether we'll make for the Atlantic or the Pacific,",
+     "seconds": 14.685,
+     "first": 20,
+     "last": 23
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "405",
+   "clause": "the canadian replied",
+   "utterances": [
+    {
+     "id": "405-130894-0009",
+     "audio": "train-clean-100/405/130894/405-130894-0009.flac",
+     "reference": "My friends, I said, we're in a serious predicament, but I'm counting on your courage and energy. Sir, the Canadian replied, this is no time to bore you with my complaints.",
+     "seconds": 13.38,
+     "first": 18,
+     "last": 20
+    },
+    {
+     "id": "405-130895-0017",
+     "audio": "train-clean-100/405/130895/405-130895-0017.flac",
+     "reference": "That's good news, the Canadian replied, but where's the Nautilus going? I'm unable to say, Ned. After the South Pole,",
+     "seconds": 9.895,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "405",
+   "clause": "the next day",
+   "utterances": [
+    {
+     "id": "405-130894-0034",
+     "audio": "train-clean-100/405/130894/405-130894-0034.flac",
+     "reference": "Without this precaution we wouldn't have awakened the following morning. The next day, march twenty sixth, I returned to my miner's trade, working to remove the fifth meter. The Ice Bank's side walls and underbelly had visibly thickened.",
+     "seconds": 14.885,
+     "first": 10,
+     "last": 12
+    },
+    {
+     "id": "405-130895-0018",
+     "audio": "train-clean-100/405/130895/405-130895-0018.flac",
+     "reference": "we'll never regret having known him. Especially once we've left him, Ned Land shot back. The next day,",
+     "seconds": 10.03,
+     "first": 15,
+     "last": 17
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4195",
+   "clause": "asked uncle john",
+   "utterances": [
+    {
+     "id": "4195-186238-0020",
+     "audio": "train-clean-100/4195/186238/4195-186238-0020.flac",
+     "reference": "I've got a raise. Really? said Uncle John, seeing it was expected of him. For a fact. It's Patsy's doing, I've no doubt. She wheedled the firm into giving me a vacation, and now they're to pay me twelve a week instead of ten. Is that enough? asked Uncle John, doubtfully.",
+     "seconds": 15.455,
+     "first": 47,
+     "last": 49
+    },
+    {
+     "id": "4195-186238-0021",
+     "audio": "train-clean-100/4195/186238/4195-186238-0021.flac",
+     "reference": "More than enough, sir. I'm getting old, and can't earn as much as a younger man. But I'm pretty tough, and mean to hold onto that twelve a week as long as possible. What pay do you get, Patsy? asked Uncle John. Almost as much as Daddy.",
+     "seconds": 13.105,
+     "first": 39,
+     "last": 41
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4195",
+   "clause": "remarked uncle john",
+   "utterances": [
+    {
+     "id": "4195-186236-0019",
+     "audio": "train-clean-100/4195/186236/4195-186236-0019.flac",
+     "reference": "I'm going home today, said Beth, angrily drying her eyes. We'll all go home, said Patsy, cheerfully. For my part, remarked Uncle John, in a grave voice, I have no home.",
+     "seconds": 10.2,
+     "first": 20,
+     "last": 22
+    },
+    {
+     "id": "4195-186237-0027",
+     "audio": "train-clean-100/4195/186237/4195-186237-0027.flac",
+     "reference": "But Patsy is fast curing me. And, after all, it's a wicked city to be carrying a fat pocketbook around in, as I've often observed. My pocketbook is not exactly fat, remarked Uncle John. But you've money, sir, for I marked you squandering it on the train, said Patsy, severely.",
+     "seconds": 15.87,
+     "first": 31,
+     "last": 33
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "426",
+   "clause": "the trouble is",
+   "utterances": [
+    {
+     "id": "426-122819-0002",
+     "audio": "train-clean-100/426/122819/426-122819-0002.flac",
+     "reference": "and piping a quaint little melody among the twisted firs below the garden, turned her dreamy face over her shoulder. The trouble is, you and misses Lynde don't understand one another, she explained. That is always what is wrong when people don't like each other.",
+     "seconds": 14.9,
+     "first": 20,
+     "last": 22
+    },
+    {
+     "id": "426-122822-0024",
+     "audio": "train-clean-100/426/122822/426-122822-0024.flac",
+     "reference": "The trouble is, I've got things the matter with my conscience, sobbed Anne. Oh, this has been such a Jonah day, Marilla. I'm so ashamed of myself. I lost my temper and whipped Anthony Pye. I'm glad to hear it, said Marilla with decision.",
+     "seconds": 14.73,
+     "first": 0,
+     "last": 2
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4267",
+   "clause": "said mister slick",
+   "utterances": [
+    {
+     "id": "4267-78186-0011",
+     "audio": "train-clean-100/4267/78186/4267-78186-0011.flac",
+     "reference": "The strong flickering light of the fire, as it fell upon her tall, fine figure and beautiful face, revealed a creature worthy of the Clockmaker's comments. Good evening, marm, said mister Slick. How do",
+     "seconds": 14.995,
+     "first": 29,
+     "last": 31
+    },
+    {
+     "id": "4267-78186-0012",
+     "audio": "train-clean-100/4267/78186/4267-78186-0012.flac",
+     "reference": "and how's mister Pugwash? He said she why, he's been abed this hour. You don't expect to disturb him this time of night, I hope? Oh, no, said mister Slick, certainly not,",
+     "seconds": 14.905,
+     "first": 27,
+     "last": 29
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4406",
+   "clause": "but instead of that",
+   "utterances": [
+    {
+     "id": "4406-16882-0028",
+     "audio": "train-clean-100/4406/16882/4406-16882-0028.flac",
+     "reference": "My wounds stink and are corrupt, I am troubled, I am bowed down greatly, I go mourning all the day long. I sat much alone with a poor wounded child in my lap, which moaned night and day, having nothing to revive the body, or cheer the spirits of her, but instead of that,",
+     "seconds": 16.745,
+     "first": 50,
+     "last": 53
+    },
+    {
+     "id": "4406-16883-0052",
+     "audio": "train-clean-100/4406/16883/4406-16883-0052.flac",
+     "reference": "as my master spake, but instead of that, my master himself was gone, and I left behind, so that my spirit was now quite ready to sink. I asked them to let me go out and pick up some sticks, that I might get alone, and pour out my heart unto the Lord.",
+     "seconds": 15.125,
+     "first": 4,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "446",
+   "clause": "as i afterward learned",
+   "utterances": [
+    {
+     "id": "446-123501-0015",
+     "audio": "train-clean-100/446/123501/446-123501-0015.flac",
+     "reference": "as I afterward learned, two legs and two arms, with an intermediary pair of limbs which could be used at will either as arms or legs. Their eyes were set at the extreme sides of their heads a trifle above the center",
+     "seconds": 14.885,
+     "first": 0,
+     "last": 3
+    },
+    {
+     "id": "446-123502-0045",
+     "audio": "train-clean-100/446/123502/446-123502-0045.flac",
+     "reference": "She was of a light olive green color, with a smooth, glossy hide. Her name, as I afterward learned, was Sola, and she belonged to the retinue of Tars Tarkas. She conducted me to a spacious chamber",
+     "seconds": 15.105,
+     "first": 15,
+     "last": 18
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "458",
+   "clause": "and i will never leave you",
+   "utterances": [
+    {
+     "id": "458-126294-0011",
+     "audio": "train-clean-100/458/126294/458-126294-0011.flac",
+     "reference": "and I will never leave you'. Fundevogel said 'Neither now, nor ever.",
+     "seconds": 4.96,
+     "first": 0,
+     "last": 5
+    },
+    {
+     "id": "458-126294-0015",
+     "audio": "train-clean-100/458/126294/458-126294-0015.flac",
+     "reference": "never leave me, and I will never leave you'. Fundevogel said 'Neither now nor ever'. Said Lina 'Then do you become a church, and I'll be the chandelier in it'. So when the three servants came, nothing was there but a church, with a chandelier in it.",
+     "seconds": 15.87,
+     "first": 3,
+     "last": 8
+    },
+    {
+     "id": "458-126294-0018",
+     "audio": "train-clean-100/458/126294/458-126294-0018.flac",
+     "reference": "and the cook waddling after them. Then said Lina 'Fundevogel, never leave me, and I will never leave you'. Then said Fundevogel 'Neither now, nor ever'. Said Lina 'Be a fishpond, and I will be the duck upon it.",
+     "seconds": 15.475,
+     "first": 13,
+     "last": 18
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "458",
+   "clause": "said the cat",
+   "utterances": [
+    {
+     "id": "458-126290-0013",
+     "audio": "train-clean-100/458/126290/458-126290-0013.flac",
+     "reference": "You sit at home, ' said the cat, 'in your dark grey fur coat and long tail, and are filled with fancies, that's because you do not go out in the daytime'. During the cat's absence the mouse cleaned the house, and put it in order, but the greedy cat entirely emptied the pot of fat.",
+     "seconds": 15.72,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "458-126290-0014",
+     "audio": "train-clean-100/458/126290/458-126290-0014.flac",
+     "reference": "and well filled and fat she did not return home till night. The mouse at once asked what name had been given to the third child. 'It will not please you more than the others, ' said the cat. 'He is called All gone'. 'All gone, ' cried the mouse",
+     "seconds": 15.48,
+     "first": 35,
+     "last": 37
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "4640",
+   "clause": "it is a question of women",
+   "utterances": [
+    {
+     "id": "4640-19188-0005",
+     "audio": "train-clean-100/4640/19188/4640-19188-0005.flac",
+     "reference": "Come, said he, you must have a little pity. Do you know what the question is here? It is a question of women. See here. Are there women or are there not? Are there children or are there not?",
+     "seconds": 15.495,
+     "first": 17,
+     "last": 22
+    },
+    {
+     "id": "4640-19188-0024",
+     "audio": "train-clean-100/4640/19188/4640-19188-0024.flac",
+     "reference": "Statistics show that the mortality among abandoned children is fifty five per cent. I repeat, it is a question of women, it concerns mothers, it concerns young girls, it concerns little children.",
+     "seconds": 15.255,
+     "first": 15,
+     "last": 20
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "481",
+   "clause": "and so on",
+   "utterances": [
+    {
+     "id": "481-123719-0022",
+     "audio": "train-clean-100/481/123719/481-123719-0022.flac",
+     "reference": "Lake Como being for that purpose transferred to the neighbourhood of Rome then would come a scene in the bushes, and so on, and so on as though you did not know all about it? You will say that it is vulgar and contemptible to drag all this into public",
+     "seconds": 14.07,
+     "first": 20,
+     "last": 22
+    },
+    {
+     "id": "481-123719-0033",
+     "audio": "train-clean-100/481/123719/481-123719-0033.flac",
+     "reference": "and the best means of pleasing him, and so on. I had the patience to sit like a fool beside these people",
+     "seconds": 6.295,
+     "first": 7,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5192",
+   "clause": "said my uncle toby",
+   "utterances": [
+    {
+     "id": "5192-19397-0006",
+     "audio": "train-clean-100/5192/19397/5192-19397-0006.flac",
+     "reference": "or told your honour one story good or bad Thou hast many excellencies, Trim, said my uncle Toby, and I hold it not the least of them, as thou happenest to be a story teller, that of the number thou hast told me, either to amuse me in my painful hours,",
+     "seconds": 15,
+     "first": 14,
+     "last": 17
+    },
+    {
+     "id": "5192-19397-0008",
+     "audio": "train-clean-100/5192/19397/5192-19397-0008.flac",
+     "reference": "they are all true for they are about myself I do not like the subject the worse, Trim, said my uncle Toby, on that score But prithee what is this story? thou hast excited my curiosity.",
+     "seconds": 12.47,
+     "first": 18,
+     "last": 21
+    },
+    {
+     "id": "5192-19397-0009",
+     "audio": "train-clean-100/5192/19397/5192-19397-0009.flac",
+     "reference": "I'll tell it your honour, quoth the corporal, directly Provided, said my uncle Toby, looking earnestly towards Dunkirk and the mole again provided it is not a merry one to such, Trim, a man should ever bring one half of the entertainment along with him",
+     "seconds": 15.09,
+     "first": 10,
+     "last": 13
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5192",
+   "clause": "said the corporal",
+   "utterances": [
+    {
+     "id": "5192-19397-0001",
+     "audio": "train-clean-100/5192/19397/5192-19397-0001.flac",
+     "reference": "A soldier, cried my uncle Toby, interrupting the corporal, is no more exempt from saying a foolish thing, Trim, than a man of letters But not so often, an' please your honour, replied the corporal my uncle Toby gave a nod. It was a thousand pities then, said the corporal,",
+     "seconds": 15.25,
+     "first": 47,
+     "last": 49
+    },
+    {
+     "id": "5192-19397-0075",
+     "audio": "train-clean-100/5192/19397/5192-19397-0075.flac",
+     "reference": "Besides, said the corporal, resuming the discourse but in a gayer accent if it had not been for that single shot, I had never, 'an please your honour, been in love So, thou wast once in love, Trim said my uncle Toby, smiling",
+     "seconds": 13.55,
+     "first": 1,
+     "last": 3
+    },
+    {
+     "id": "5192-19397-0077",
+     "audio": "train-clean-100/5192/19397/5192-19397-0077.flac",
+     "reference": "It's high time I should said my uncle Toby. Your honour remembers with concern, said the corporal, the total rout and confusion of our camp and army at the affair of Landen every one was left to shift for himself",
+     "seconds": 11.96,
+     "first": 14,
+     "last": 16
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5390",
+   "clause": "inquired uncle john",
+   "utterances": [
+    {
+     "id": "5390-30096-0026",
+     "audio": "train-clean-100/5390/30096/5390-30096-0026.flac",
+     "reference": "he replied. What became of the young man? asked the girl. He's a competent chauffeur, and so he went to work driving an automobile. Where is Millville? inquired Uncle John, thoughtfully. Somewhere at the north of the State, I believe.",
+     "seconds": 15.81,
+     "first": 27,
+     "last": 29
+    },
+    {
+     "id": "5390-30102-0029",
+     "audio": "train-clean-100/5390/30102/5390-30102-0029.flac",
+     "reference": "Do you know where the Thompsons live? inquired Uncle John. No. Whoa, Dan That was the best thing the nag did. He knew how to whoa. Thomas called Uncle John, turning in his seat",
+     "seconds": 14.015,
+     "first": 7,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5393",
+   "clause": "at that epoch",
+   "utterances": [
+    {
+     "id": "5393-19218-0008",
+     "audio": "train-clean-100/5393/19218/5393-19218-0008.flac",
+     "reference": "marriage was not conducted at a full trot. Strange to say, at that epoch, people still imagined that a wedding was a private and social festival, that a patriarchal banquet does not spoil a domestic solemnity, that gayety, even in excess,",
+     "seconds": 15.61,
+     "first": 11,
+     "last": 13
+    },
+    {
+     "id": "5393-19218-0016",
+     "audio": "train-clean-100/5393/19218/5393-19218-0016.flac",
+     "reference": "to the church of Saint Paul. At that epoch,",
+     "seconds": 2.67,
+     "first": 6,
+     "last": 8
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5456",
+   "clause": "se or grandissimo bastinado",
+   "utterances": [
+    {
+     "id": "5456-58161-0008",
+     "audio": "train-clean-100/5456/58161/5456-58161-0008.flac",
+     "reference": "Full of gasconade and bravado But a regular, rich Don Rataplan, Santa Claus de la Muscovado, Se or Grandissimo Bastinado.",
+     "seconds": 9.09,
+     "first": 16,
+     "last": 19
+    },
+    {
+     "id": "5456-58161-0020",
+     "audio": "train-clean-100/5456/58161/5456-58161-0020.flac",
+     "reference": "That told as plainly as words could speak, She was more antique than the other, Leaned on the arm of Don Rataplan, Santa Claus de la Muscovado, Se or Grandissimo Bastinado. Happy mortal fortunate man And Marquis of El Dorado",
+     "seconds": 15.075,
+     "first": 27,
+     "last": 30
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5463",
+   "clause": "said mister crawley",
+   "utterances": [
+    {
+     "id": "5463-39174-0003",
+     "audio": "train-clean-100/5463/39174/5463-39174-0003.flac",
+     "reference": "It galled him, however, to think that he and his were so poorly dressed. I am afraid you can hardly find a chair, Miss Robarts, said mister Crawley.",
+     "seconds": 8.93,
+     "first": 25,
+     "last": 27
+    },
+    {
+     "id": "5463-39174-0006",
+     "audio": "train-clean-100/5463/39174/5463-39174-0006.flac",
+     "reference": "And she knows an ode of Horace all by heart, said Bob. An ode of Horace said Lucy, still holding the young shamefaced female prodigy close to her knees. It is all that I can give them, said mister Crawley, apologetically.",
+     "seconds": 12.755,
+     "first": 37,
+     "last": 39
+    },
+    {
+     "id": "5463-39174-0009",
+     "audio": "train-clean-100/5463/39174/5463-39174-0009.flac",
+     "reference": "So that Lucy anxiously wished that mister Crawley could be got rid of and the presents produced. I hope you have left mister Robarts quite well, said mister Crawley, with a stiff, ceremonial voice,",
+     "seconds": 10.8,
+     "first": 26,
+     "last": 28
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5514",
+   "clause": "that is to say",
+   "utterances": [
+    {
+     "id": "5514-19192-0018",
+     "audio": "train-clean-100/5514/19192/5514-19192-0018.flac",
+     "reference": "and the ambition of capturing the barricade alone and unaided, that is to say, with his company. Exasperated by the successive apparition of the red flag and the old coat which he took for the black flag, he loudly blamed the generals and chiefs of the corps,",
+     "seconds": 15.54,
+     "first": 10,
+     "last": 13
+    },
+    {
+     "id": "5514-19192-0024",
+     "audio": "train-clean-100/5514/19192/5514-19192-0024.flac",
+     "reference": "and it received the volley from the battery piece which, not having received the order, had not discontinued its firing. The intrepid and imprudent Fannicot was one of the dead from this grape shot. He was killed by the cannon, that is to say, by order.",
+     "seconds": 15.965,
+     "first": 40,
+     "last": 43
+    },
+    {
+     "id": "5514-19193-0003",
+     "audio": "train-clean-100/5514/19193/5514-19193-0003.flac",
+     "reference": "who make us crazy, that is to say, brave. When a man is as much in love as a tiger,",
+     "seconds": 5.52,
+     "first": 4,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5703",
+   "clause": "said sir arthur",
+   "utterances": [
+    {
+     "id": "5703-47198-0021",
+     "audio": "train-clean-100/5703/47198/5703-47198-0021.flac",
+     "reference": "I think you might ask, said Sir Arthur. It is absurd that you should be bound by a promise that I made. And you may be sure of one thing. Your asking, or your not asking, won't make any odds to Findlay and Ince.",
+     "seconds": 14.125,
+     "first": 5,
+     "last": 7
+    },
+    {
+     "id": "5703-47198-0023",
+     "audio": "train-clean-100/5703/47198/5703-47198-0023.flac",
+     "reference": "In a few days. You will hardly be ready to start to morrow, will you? I could be ready, easily, said Juliet. You're in a great hurry to get away from us, said Sir Arthur, with a rather uneasy laugh. Not from you.",
+     "seconds": 15.045,
+     "first": 32,
+     "last": 34
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5808",
+   "clause": "o auspicious king",
+   "utterances": [
+    {
+     "id": "5808-48608-0000",
+     "audio": "train-clean-100/5808/48608/5808-48608-0000.flac",
+     "reference": "When it was the Three Hundred and Forty seventh Night, She said, It hath reached me, O auspicious King, that Ibrahim son of Al Mahdi continued Now when the housemaster heard my name he sprang to his feet and said,",
+     "seconds": 14.16,
+     "first": 16,
+     "last": 18
+    },
+    {
+     "id": "5808-48608-0016",
+     "audio": "train-clean-100/5808/48608/5808-48608-0016.flac",
+     "reference": "It hath reached me, O auspicious King, that, quoth the beggar to the woman, Give me an alms however small. But she answered him, How can I give thee aught, when the King cutteth off the hands of all who give alms?",
+     "seconds": 14.895,
+     "first": 4,
+     "last": 6
+    },
+    {
+     "id": "5808-48608-0031",
+     "audio": "train-clean-100/5808/48608/5808-48608-0031.flac",
+     "reference": "and ceased saying her permitted say. When it was the Three Hundred and Forty ninth Night, She said, It hath reached me, O auspicious King,",
+     "seconds": 12.335,
+     "first": 22,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5808",
+   "clause": "o my lord",
+   "utterances": [
+    {
+     "id": "5808-48608-0005",
+     "audio": "train-clean-100/5808/48608/5808-48608-0005.flac",
+     "reference": "but I saw not my mistress among them, and he said, 'O my lord, there is none left save my mother and sister but, by Allah, I must needs have them also down and show them to thee'. So I marvelled at his courtesy and large heartedness and said,",
+     "seconds": 15.88,
+     "first": 11,
+     "last": 13
+    },
+    {
+     "id": "5808-48608-0052",
+     "audio": "train-clean-100/5808/48608/5808-48608-0052.flac",
+     "reference": "so I rose and bade the boy saddle me the she mule. Answered he, 'O my lord, it is yet but the first third of the night and indeed we have hardly had time to rest'. I returned to my bed,",
+     "seconds": 12.84,
+     "first": 14,
+     "last": 16
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "5867",
+   "clause": "said misses dale",
+   "utterances": [
+    {
+     "id": "5867-48852-0035",
+     "audio": "train-clean-100/5867/48852/5867-48852-0035.flac",
+     "reference": "but neither knew how to throw any tenderness into this first greeting. So you're staying at the Manor House, said Lily. Yes I'm staying there. Your uncle and Bell came yesterday afternoon. Have you heard about Bell? said misses Dale.",
+     "seconds": 15.295,
+     "first": 37,
+     "last": 39
+    },
+    {
+     "id": "5867-48852-0048",
+     "audio": "train-clean-100/5867/48852/5867-48852-0048.flac",
+     "reference": "He has just been talking to me, too, said John, as I came through the squire's garden. And what has he been saying to you? said misses Dale. Oh, I don't know not much.",
+     "seconds": 12.03,
+     "first": 25,
+     "last": 27
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6000",
+   "clause": "says the king",
+   "utterances": [
+    {
+     "id": "6000-86686-0003",
+     "audio": "train-clean-100/6000/86686/6000-86686-0003.flac",
+     "reference": "God save you kindly, King O'Toole, says the young man. True for you, says the king. I am King O'Toole, says he, prince and plennypennytinchery of these parts, says he but how came ye to know that? says he. Oh, never mind, says St. Kavin.",
+     "seconds": 15.24,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "6000-86686-0005",
+     "audio": "train-clean-100/6000/86686/6000-86686-0005.flac",
+     "reference": "Blur an agers, how came ye to know about my goose? says the king. Oh, no matter I was given to understand it, says Saint Kavin. After some more talk the king says, What are you? I'm an honest man, says Saint Kavin. Well, honest man, says the king,",
+     "seconds": 15.28,
+     "first": 11,
+     "last": 13
+    },
+    {
+     "id": "6000-86686-0007",
+     "audio": "train-clean-100/6000/86686/6000-86686-0007.flac",
+     "reference": "Is it a tinker you are? says the king. No, says the saint I'm no tinker by trade, King O'Toole",
+     "seconds": 5.765,
+     "first": 6,
+     "last": 8
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6078",
+   "clause": "said saint george",
+   "utterances": [
+    {
+     "id": "6078-54007-0051",
+     "audio": "train-clean-100/6078/54007/6078-54007-0051.flac",
+     "reference": "Nay, said Saint George, everything must have a name. It hath no name, said doctor Faustus. But I shall give it a name, and it shall be",
+     "seconds": 9.535,
+     "first": 1,
+     "last": 3
+    },
+    {
+     "id": "6078-54013-0074",
+     "audio": "train-clean-100/6078/54013/6078-54013-0074.flac",
+     "reference": "No offence, said the Blacksmith I meant not to speak ill of your story. Come, come, sir, will you not take a pot of ale with me? Why, said Saint George, somewhat mollified,",
+     "seconds": 11.43,
+     "first": 28,
+     "last": 30
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6078",
+   "clause": "says ill luck",
+   "utterances": [
+    {
+     "id": "6078-54007-0005",
+     "audio": "train-clean-100/6078/54007/6078-54007-0005.flac",
+     "reference": "even if it be through a key hole now, is that so? Yes, says Ill Luck, it is. Well, look now, friend, says Saint Nicholas,",
+     "seconds": 9.64,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "6078-54007-0011",
+     "audio": "train-clean-100/6078/54007/6078-54007-0011.flac",
+     "reference": "and phst pop out came Ill Luck along with it. Plague take the Fiddler say I. Listen, says Ill Luck. It has been many a long day that I have been in that hazel nut, and you are the man that has let me out",
+     "seconds": 14.75,
+     "first": 17,
+     "last": 19
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6081",
+   "clause": "my good fellow",
+   "utterances": [
+    {
+     "id": "6081-41997-0005",
+     "audio": "train-clean-100/6081/41997/6081-41997-0005.flac",
+     "reference": "was speedily reached. Then it was that Lecoq resumed his inquiries. Well, my good fellow, he began, you have told me the principal facts, now I should like the details.",
+     "seconds": 15.285,
+     "first": 12,
+     "last": 14
+    },
+    {
+     "id": "6081-41997-0024",
+     "audio": "train-clean-100/6081/41997/6081-41997-0024.flac",
+     "reference": "Contrary to Lecoq's original idea, it now seemed evident that she was the mistress, and her companion the servant. Is that all, my good fellow? he asked the driver,",
+     "seconds": 12.755,
+     "first": 22,
+     "last": 24
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6367",
+   "clause": "he would not go down",
+   "utterances": [
+    {
+     "id": "6367-65536-0018",
+     "audio": "train-clean-100/6367/65536/6367-65536-0018.flac",
+     "reference": "and friends whom the varying years must certainly have changed as he had changed himself? No, he would not go down. It had been a foolish whim to come at all",
+     "seconds": 13.205,
+     "first": 16,
+     "last": 20
+    },
+    {
+     "id": "6367-65536-0021",
+     "audio": "train-clean-100/6367/65536/6367-65536-0021.flac",
+     "reference": "and he realized at last how much poorer he was than when he had left that home valley. His was a name that stood for millions, but he was beggared of hope and purpose. No, he would not go down.",
+     "seconds": 14.59,
+     "first": 35,
+     "last": 39
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6454",
+   "clause": "hail to the day",
+   "utterances": [
+    {
+     "id": "6454-120342-0018",
+     "audio": "train-clean-100/6454/120342/6454-120342-0018.flac",
+     "reference": "And the children broke out with Hail to the night, Hail to the day, rather a favorite, quicker and more to the childish taste perhaps than the other, and with another Merry Christmas we were off again.",
+     "seconds": 15.35,
+     "first": 10,
+     "last": 13
+    },
+    {
+     "id": "6454-120342-0025",
+     "audio": "train-clean-100/6454/120342/6454-120342-0025.flac",
+     "reference": "Jesus in his babes abiding. And then we came up Hanover Street and stopped under mister Gerry's chapel, where they were dressing the walls with their evergreens, and gave them Hail to the night, Hail to the day",
+     "seconds": 15,
+     "first": 34,
+     "last": 37
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6476",
+   "clause": "at any rate",
+   "utterances": [
+    {
+     "id": "6476-57446-0002",
+     "audio": "train-clean-100/6476/57446/6476-57446-0002.flac",
+     "reference": "looking at the man attentively, recognized him as a retainer whom he had had in his employ the year before, and said This is a curious meeting pray, what have you been about since you left my service? At any rate,",
+     "seconds": 14.04,
+     "first": 38,
+     "last": 40
+    },
+    {
+     "id": "6476-57446-0018",
+     "audio": "train-clean-100/6476/57446/6476-57446-0018.flac",
+     "reference": "Well, at any rate, I have some news for you that will make you happy. A messenger has come from my lord Genzabur, for whom your heart yearns. At this O Koyo, who had been crouching down like a drooping flower, gave a great start, and cried out, Is that really true?",
+     "seconds": 16.21,
+     "first": 1,
+     "last": 3
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6529",
+   "clause": "answered the reporter",
+   "utterances": [
+    {
+     "id": "6529-62556-0037",
+     "audio": "train-clean-100/6529/62556/6529-62556-0037.flac",
+     "reference": "That would have spared us all these misfortunes Yes, answered the reporter, but now we have the right to be merciless At any rate, said the engineer, we are obliged to wait some time, and to remain at the corral until we can carry Herbert without danger to Granite House.",
+     "seconds": 15.24,
+     "first": 9,
+     "last": 11
+    },
+    {
+     "id": "6529-62556-0039",
+     "audio": "train-clean-100/6529/62556/6529-62556-0039.flac",
+     "reference": "As to leaving Pencroft and Herbert here alone, we could not do it Well, I will go alone to Granite House. No, no Cyrus, answered the reporter, you must not expose yourself Your courage would be of no avail. The villains are evidently watching the corral,",
+     "seconds": 15.525,
+     "first": 24,
+     "last": 26
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6529",
+   "clause": "answered the sailor",
+   "utterances": [
+    {
+     "id": "6529-62554-0044",
+     "audio": "train-clean-100/6529/62554/6529-62554-0044.flac",
+     "reference": "He has as much right to speak here as any one Yes, said Gideon Spilett, but his reserve does him honor, and it is right to respect the feeling which he has about his sad past. Certainly, mister Spilett, answered the sailor,",
+     "seconds": 14.005,
+     "first": 39,
+     "last": 41
+    },
+    {
+     "id": "6529-62554-0052",
+     "audio": "train-clean-100/6529/62554/6529-62554-0052.flac",
+     "reference": "you have always shown much deference to my advice will you, in this matter, yield to me? I will do as you please, Captain Harding, answered the sailor, who was not at all convinced. Very well, wait,",
+     "seconds": 13.12,
+     "first": 25,
+     "last": 27
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6529",
+   "clause": "at any rate",
+   "utterances": [
+    {
+     "id": "6529-62554-0055",
+     "audio": "train-clean-100/6529/62554/6529-62554-0055.flac",
+     "reference": "At any rate, for humanity's sake alone, it would be right to wait. The colonists would no longer as before, be able to go and come without fear. Hitherto they had only wild beasts to guard against,",
+     "seconds": 13.55,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "6529-62556-0014",
+     "audio": "train-clean-100/6529/62556/6529-62556-0014.flac",
+     "reference": "Now, what styptics, what antiphlogistics ought to be employed? By what means could inflammation be prevented? At any rate, the most important thing was that the two wounds should be dressed without delay.",
+     "seconds": 11.805,
+     "first": 16,
+     "last": 18
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6529",
+   "clause": "said gideon spilett",
+   "utterances": [
+    {
+     "id": "6529-62554-0016",
+     "audio": "train-clean-100/6529/62554/6529-62554-0016.flac",
+     "reference": "I am of Neb's opinion, said Gideon Spilett, but that is no reason for not attempting the adventure. Whether we find this mysterious being or not, we shall at least have fulfilled our duty towards him.",
+     "seconds": 12.025,
+     "first": 5,
+     "last": 7
+    },
+    {
+     "id": "6529-62554-0044",
+     "audio": "train-clean-100/6529/62554/6529-62554-0044.flac",
+     "reference": "He has as much right to speak here as any one Yes, said Gideon Spilett, but his reserve does him honor, and it is right to respect the feeling which he has about his sad past. Certainly, mister Spilett, answered the sailor,",
+     "seconds": 14.005,
+     "first": 12,
+     "last": 14
+    },
+    {
+     "id": "6529-62556-0016",
+     "audio": "train-clean-100/6529/62556/6529-62556-0016.flac",
+     "reference": "The reporter, therefore, thought it best to simply bathe the two wounds with cold water. Herbert was placed on his left side, and was maintained in that position. He must not be moved. said Gideon Spilett.",
+     "seconds": 12.015,
+     "first": 33,
+     "last": 35
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "669",
+   "clause": "in a word",
+   "utterances": [
+    {
+     "id": "669-129061-0012",
+     "audio": "train-clean-100/669/129061/669-129061-0012.flac",
+     "reference": "his scanty hair combed and oiled, trimming his nails as he descended the stairs majestically, in a starched cravat and a grey flannel dressing gown a real old English gentleman, in a word",
+     "seconds": 15.74,
+     "first": 30,
+     "last": 32
+    },
+    {
+     "id": "669-129061-0054",
+     "audio": "train-clean-100/669/129061/669-129061-0054.flac",
+     "reference": "and every kind of person, in a word, was resting himself after the night's labours, and, not being on duty, was in bed. His room was hung round with boxing, sporting, and dancing pictures,",
+     "seconds": 15.98,
+     "first": 5,
+     "last": 7
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "6925",
+   "clause": "answered the queen",
+   "utterances": [
+    {
+     "id": "6925-80680-0002",
+     "audio": "train-clean-100/6925/80680/6925-80680-0002.flac",
+     "reference": "if you thought it was anything but a jackal, ' answered the queen. 'I say it was a tiger, ' cried the king 'don't contradict me'. 'Nonsense' snapped the queen. 'It was a jackal'. And the dispute waxed so warm that the king said at last 'Very well,",
+     "seconds": 15.515,
+     "first": 9,
+     "last": 11
+    },
+    {
+     "id": "6925-80680-0003",
+     "audio": "train-clean-100/6925/80680/6925-80680-0003.flac",
+     "reference": "we'll call the guard and ask and if it was a jackal I'll leave this kingdom to you and go away and if it was a tiger then you shall go, and I will marry a new wife'. 'As you like, ' answered the queen, 'there isn't any doubt which it was.",
+     "seconds": 15.315,
+     "first": 41,
+     "last": 43
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7178",
+   "clause": "said the sheriff",
+   "utterances": [
+    {
+     "id": "7178-34644-0034",
+     "audio": "train-clean-100/7178/34644/7178-34644-0034.flac",
+     "reference": "said the sheriff, passing from a grave voice to a clear one. Gwynplaine was as a man on whose head a tile falls from the palace of dreams. He began to speak, like one who speaks unconsciously.",
+     "seconds": 16.08,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "7178-34644-0036",
+     "audio": "train-clean-100/7178/34644/7178-34644-0036.flac",
+     "reference": "His name was Capgaroupe. He used to drink out of a flat bottle on which there was a name written in red. Behold it, said the sheriff. He placed on the table something which the secretary had just taken out of the bag.",
+     "seconds": 15.65,
+     "first": 24,
+     "last": 26
+    },
+    {
+     "id": "7178-34644-0039",
+     "audio": "train-clean-100/7178/34644/7178-34644-0039.flac",
+     "reference": "which had been used to cork it. It was in this bottle, said the sheriff, that the men about to perish placed the declaration which I have just read.",
+     "seconds": 11.3,
+     "first": 12,
+     "last": 14
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7264",
+   "clause": "as i have said",
+   "utterances": [
+    {
+     "id": "7264-92310-0021",
+     "audio": "train-clean-100/7264/92310/7264-92310-0021.flac",
+     "reference": "often quite conscious and direct, of advertising power over the Press and this was, as I have said, not only negative, that was long obvious, but, at last, positive.",
+     "seconds": 10.675,
+     "first": 14,
+     "last": 17
+    },
+    {
+     "id": "7264-92314-0024",
+     "audio": "train-clean-100/7264/92314/7264-92314-0024.flac",
+     "reference": "no shred of responsibility to any organ of the State, they are a deadly peril. The chief of these men are more powerful to day than any Minister. Nay, they do, as I have said, and it is now notorious, make and unmake Ministers, and they may yet in our worst hour decide the national fate.",
+     "seconds": 17.015,
+     "first": 31,
+     "last": 34
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7278",
+   "clause": "eighteen thirty seven",
+   "utterances": [
+    {
+     "id": "7278-104730-0027",
+     "audio": "train-clean-100/7278/104730/7278-104730-0027.flac",
+     "reference": "eighteen thirty seven, would be my irredeemable ruin in this world and both the ruling political parties are watching with intense anxiety for some overt act by me to set the whole pack of their hireling presses upon me.",
+     "seconds": 14.115,
+     "first": 0,
+     "last": 2
+    },
+    {
+     "id": "7278-104730-0034",
+     "audio": "train-clean-100/7278/104730/7278-104730-0034.flac",
+     "reference": "totally disqualify me. There is no such man in the House. september fifteenth, eighteen thirty seven, he says I have been for some time occupied day and night,",
+     "seconds": 12.655,
+     "first": 13,
+     "last": 15
+    },
+    {
+     "id": "7278-104730-0036",
+     "audio": "train-clean-100/7278/104730/7278-104730-0036.flac",
+     "reference": "In december, eighteen thirty seven, still at this same work, he made a hard but fruitless effort",
+     "seconds": 7.43,
+     "first": 2,
+     "last": 4
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "730",
+   "clause": "the old man",
+   "utterances": [
+    {
+     "id": "730-359-0002",
+     "audio": "train-clean-100/730/359/730-359-0002.flac",
+     "reference": "This day was passed in the same routine as that which preceded it. The young man was constantly employed out of doors, and the girl in various laborious occupations within. The old man, whom I soon perceived to be blind,",
+     "seconds": 13.985,
+     "first": 30,
+     "last": 32
+    },
+    {
+     "id": "730-359-0040",
+     "audio": "train-clean-100/730/359/730-359-0040.flac",
+     "reference": "and they procured a sufficiency of it. Several new kinds of plants sprang up in the garden, which they dressed and these signs of comfort increased daily as the season advanced. The old man, leaning on his son,",
+     "seconds": 15.055,
+     "first": 31,
+     "last": 33
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7312",
+   "clause": "as you are no doubt aware",
+   "utterances": [
+    {
+     "id": "7312-92432-0002",
+     "audio": "train-clean-100/7312/92432/7312-92432-0002.flac",
+     "reference": "In the month of april, eighteen forty nine, Rome, as you are no doubt aware, was placed in a state of siege by the approach of the French army. It was filled at that time with exiles and fugitives",
+     "seconds": 12.245,
+     "first": 9,
+     "last": 14
+    },
+    {
+     "id": "7312-92432-0025",
+     "audio": "train-clean-100/7312/92432/7312-92432-0025.flac",
+     "reference": "formerly in the service of the Ossoli family. She remained, as you are no doubt aware, some months at Rieti, whence she removed to Florence, where she resided until her ill fated departure for the United States.",
+     "seconds": 12.01,
+     "first": 10,
+     "last": 15
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7402",
+   "clause": "said father time",
+   "utterances": [
+    {
+     "id": "7402-90848-0035",
+     "audio": "train-clean-100/7402/90848/7402-90848-0035.flac",
+     "reference": "You have served faithfully and well, said Father Time. Here is your reward. And, with these words, he placed in Bobo's hands a small square casket made of ebony. The half hour lies inside.",
+     "seconds": 14.705,
+     "first": 6,
+     "last": 8
+    },
+    {
+     "id": "7402-90848-0039",
+     "audio": "train-clean-100/7402/90848/7402-90848-0039.flac",
+     "reference": "Tell the first, said Father Time, that his reputation has been broken into a thousand pieces which have been picked up by his neighbors and carried home. If he can persuade his neighbors to give them up,",
+     "seconds": 12.8,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7505",
+   "clause": "in some cases",
+   "utterances": [
+    {
+     "id": "7505-258964-0003",
+     "audio": "train-clean-100/7505/258964/7505-258964-0003.flac",
+     "reference": "and thus is brought about an increase of the stock of wealth. In some cases, however, improvements such as the dredging of harbors or as the protecting of forests, are made by men collectively through the agency of governments.",
+     "seconds": 16.705,
+     "first": 12,
+     "last": 14
+    },
+    {
+     "id": "7505-258964-0042",
+     "audio": "train-clean-100/7505/258964/7505-258964-0042.flac",
+     "reference": "and favorably located building sites illustrate the same principle. In some cases, it is true, the demand may be due to some temporary cause,",
+     "seconds": 12.28,
+     "first": 9,
+     "last": 11
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7794",
+   "clause": "and hither and thither",
+   "utterances": [
+    {
+     "id": "7794-295955-0000",
+     "audio": "train-clean-100/7794/295955/7794-295955-0000.flac",
+     "reference": "Then the middle son went hunting, and as he issued from the town, a hare sprang out of a bush, and the prince after it, and hither and thither, till the hare fled into the water mill and the prince after it",
+     "seconds": 13.17,
+     "first": 25,
+     "last": 28
+    },
+    {
+     "id": "7794-295955-0002",
+     "audio": "train-clean-100/7794/295955/7794-295955-0002.flac",
+     "reference": "Then the third son went hunting, to see whether he could not find his brothers. When he issued from the town, again up sprang a hare out of a bush, and the prince after it, and hither and thither, till the hare fled into the water mill.",
+     "seconds": 14.965,
+     "first": 35,
+     "last": 38
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7794",
+   "clause": "and went away",
+   "utterances": [
+    {
+     "id": "7794-295947-0019",
+     "audio": "train-clean-100/7794/295947/7794-295947-0019.flac",
+     "reference": "and I will pass the night with him and so he took his leave, and went away. The parents lost no time in sending to let the physician know that they had procured the fox's liver. The next day the doctor came and compounded a medicine for the patient,",
+     "seconds": 15.71,
+     "first": 14,
+     "last": 16
+    },
+    {
+     "id": "7794-295947-0024",
+     "audio": "train-clean-100/7794/295947/7794-295947-0024.flac",
+     "reference": "which you had just procured, and said that he would come and tell us the price another day. When we asked him to spend the night here, he answered that he would lodge with a relation in the next village, and went away. The visitor was more and more lost in amazement, and,",
+     "seconds": 16.07,
+     "first": 40,
+     "last": 42
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7800",
+   "clause": "frank told him",
+   "utterances": [
+    {
+     "id": "7800-283478-0027",
+     "audio": "train-clean-100/7800/283478/7800-283478-0027.flac",
+     "reference": "You see, he's got a bad attack of rheumatism yet he says he must try to get away Down East on some very important business. Between you and me, he never will be able to do it for days or weeks, he's that doubled up. Run in, if you feel like it, Will, Frank told him. We'll wait out here for you.",
+     "seconds": 15.995,
+     "first": 53,
+     "last": 55
+    },
+    {
+     "id": "7800-283492-0003",
+     "audio": "train-clean-100/7800/283492/7800-283492-0003.flac",
+     "reference": "We can only give a guess at that, Frank told him. Whew exclaimed Bluff, as he grasped the meaning back of those few words. After all, I wouldn't put it past him, Frank.",
+     "seconds": 12.760063,
+     "first": 8,
+     "last": 10
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "7800",
+   "clause": "he told them",
+   "utterances": [
+    {
+     "id": "7800-283493-0027",
+     "audio": "train-clean-100/7800/283493/7800-283493-0027.flac",
+     "reference": "The three soon reached the cabin. It chanced that just then the call to the midday meal came. Will was too busy working at his developing tank to sit down with the rest. Plenty of time when I get through with this, he told them.",
+     "seconds": 13.025,
+     "first": 42,
+     "last": 44
+    },
+    {
+     "id": "7800-283493-0032",
+     "audio": "train-clean-100/7800/283493/7800-283493-0032.flac",
+     "reference": "Wear your sweaters, and be sure your woolen gloves are in your pockets, cautioned weather wise Frank. He hovered about the pair, and constantly warned them against carelessness. I hope you get that big moose, he told them, as they all pushed outdoors,",
+     "seconds": 14.945,
+     "first": 35,
+     "last": 37
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8063",
+   "clause": "monsieur le baron",
+   "utterances": [
+    {
+     "id": "8063-274115-0014",
+     "audio": "train-clean-100/8063/274115/8063-274115-0014.flac",
+     "reference": "so much the better. You overwhelm me, monsieur le baron. The monsieur le baron had a great effect upon the men, who detected a personage of the highest quality in an appetite of that kind. This title, too, reassured them.",
+     "seconds": 15.075,
+     "first": 7,
+     "last": 9
+    },
+    {
+     "id": "8063-274115-0025",
+     "audio": "train-clean-100/8063/274115/8063-274115-0025.flac",
+     "reference": "So that, monsieur le baron, continued the grocer,",
+     "seconds": 3.34,
+     "first": 2,
+     "last": 4
+    },
+    {
+     "id": "8063-274115-0030",
+     "audio": "train-clean-100/8063/274115/8063-274115-0030.flac",
+     "reference": "and I was only saying, this very morning, to D'Artagnan, how much I regretted him. But tell me, Planchet? Thank you, monsieur le baron, thank you. Good lad, good lad How many acres of park have you got? Of park?",
+     "seconds": 12.83,
+     "first": 21,
+     "last": 23
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8088",
+   "clause": "i don't blame you",
+   "utterances": [
+    {
+     "id": "8088-284756-0016",
+     "audio": "train-clean-100/8088/284756/8088-284756-0016.flac",
+     "reference": "He was wearing a bathrobe, hastily flung on over a damp bathing suit, his bare legs terminating in a pair of disreputable slippers. Fine, Taylor he greeted me. I suppose you're wondering what it's all about. I don't blame you. But come in, come in",
+     "seconds": 15.5,
+     "first": 36,
+     "last": 39
+    },
+    {
+     "id": "8088-284756-0053",
+     "audio": "train-clean-100/8088/284756/8088-284756-0053.flac",
+     "reference": "Look And he held out a thin, aristocratic brown hand before my eyes, a hand that shook with nervous excitement. I don't blame you, I said quickly.",
+     "seconds": 10.01,
+     "first": 20,
+     "last": 23
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8088",
+   "clause": "some may have gone back",
+   "utterances": [
+    {
+     "id": "8088-284756-0046",
+     "audio": "train-clean-100/8088/284756/8088-284756-0046.flac",
+     "reference": "We moved out of the room. Nothing human can live under water and breathe water, as she does Mercer paused a moment, staring at me oddly. The human race, he said gravely, came up out of sea. The human race as we know it. Some may have gone back.",
+     "seconds": 15.815,
+     "first": 44,
+     "last": 48
+    },
+    {
+     "id": "8088-284756-0047",
+     "audio": "train-clean-100/8088/284756/8088-284756-0047.flac",
+     "reference": "Mercer? 'Some may have gone back'? I don't get it. Mercer shook his head, but made no other reply until we stood again on the edge of the pool. The girl was standing where we had left her, and as she looked up into my face, she smiled again,",
+     "seconds": 14.1,
+     "first": 1,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8123",
+   "clause": "observed the caterpillar",
+   "utterances": [
+    {
+     "id": "8123-275209-0013",
+     "audio": "train-clean-100/8123/275209/8123-275209-0013.flac",
+     "reference": "Perhaps you will be able to inquire and hear something about it next time you go up high, observed the Caterpillar, timidly. The Lark said, Perhaps he should but he did not satisfy her curiosity any further.",
+     "seconds": 14.985,
+     "first": 18,
+     "last": 20
+    },
+    {
+     "id": "8123-275209-0016",
+     "audio": "train-clean-100/8123/275209/8123-275209-0016.flac",
+     "reference": "I believe everything I am told, observed the Caterpillar, hastily. Well, then, first of all, I will tell you what these little creatures are to eat. What do you think it is to be? Guess",
+     "seconds": 12.98,
+     "first": 6,
+     "last": 8
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "83",
+   "clause": "said the voice",
+   "utterances": [
+    {
+     "id": "83-11691-0006",
+     "audio": "train-clean-100/83/11691/83-11691-0006.flac",
+     "reference": "he said. Isn't it time we were starting? We aren't starting, said the voice. What's the matter? What are you hiding in the bushes for? Whatever's the matter, Udo?",
+     "seconds": 11.62,
+     "first": 11,
+     "last": 13
+    },
+    {
+     "id": "83-11691-0008",
+     "audio": "train-clean-100/83/11691/83-11691-0008.flac",
+     "reference": "I think I'm coming out. Wondering what it all meant, Coronel waited in silence. Yes, I am coming out, Coronel, said the voice. But you mustn't be surprised if I don't look very well.",
+     "seconds": 15.875,
+     "first": 20,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8312",
+   "clause": "said the queen",
+   "utterances": [
+    {
+     "id": "8312-279790-0050",
+     "audio": "train-clean-100/8312/279790/8312-279790-0050.flac",
+     "reference": "If it were Florina, now, said the kings, or the kings' ambassadors, we should be most happy to sign the contract. That girl thwarts us still, said the queen.",
+     "seconds": 12.32,
+     "first": 26,
+     "last": 28
+    },
+    {
+     "id": "8312-279791-0046",
+     "audio": "train-clean-100/8312/279791/8312-279791-0046.flac",
+     "reference": "or you would disturb him by that terrible sobbing of yours. Does he so? said the queen, now comprehending all. Then if you will promise to night to keep the opium cup out of his way, these pearls and diamonds,",
+     "seconds": 15.44,
+     "first": 14,
+     "last": 16
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8324",
+   "clause": "said the bachelor",
+   "utterances": [
+    {
+     "id": "8324-286682-0021",
+     "audio": "train-clean-100/8324/286682/8324-286682-0021.flac",
+     "reference": "Then he heard the Bachelor groan, and he knew that it was so. He hurried up to where the trap was. Can't you get out? said he. No, said the Bachelor. I can't. The best way to get",
+     "seconds": 15.065,
+     "first": 28,
+     "last": 30
+    },
+    {
+     "id": "8324-286682-0024",
+     "audio": "train-clean-100/8324/286682/8324-286682-0024.flac",
+     "reference": "I have good teeth, said he, Tell me what to do. If you will help me out, said the Bachelor, I will give you my luck. And what shall I do with the tail I have? asked the young Mink,",
+     "seconds": 14.73,
+     "first": 17,
+     "last": 19
+    },
+    {
+     "id": "8324-286682-0034",
+     "audio": "train-clean-100/8324/286682/8324-286682-0034.flac",
+     "reference": "has the bushiest tail, or the longest fur, or the thickest pads on his feet. Now, said the Bachelor, we will talk about luck. We will go to a place where nobody can hear what we say.",
+     "seconds": 15.5,
+     "first": 16,
+     "last": 18
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8324",
+   "clause": "said their teacher",
+   "utterances": [
+    {
+     "id": "8324-286681-0015",
+     "audio": "train-clean-100/8324/286681/8324-286681-0015.flac",
+     "reference": "one mischievous little fellow called out, I want to know about the Eels. My mother would never let me go near them, and now they've moved away, and I won't ever see them, and I think it's just horrid. Eels, my children, said their teacher,",
+     "seconds": 16.645,
+     "first": 42,
+     "last": 44
+    },
+    {
+     "id": "8324-286681-0017",
+     "audio": "train-clean-100/8324/286681/8324-286681-0017.flac",
+     "reference": "They have large mouths, and teeth in their mouths, and they are always sticking out their lower jaws. And how do began the Biggest Little Crayfish. Ask me that to morrow, said their teacher,",
+     "seconds": 13.48,
+     "first": 31,
+     "last": 33
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8419",
+   "clause": "said the tree frog",
+   "utterances": [
+    {
+     "id": "8419-293469-0009",
+     "audio": "train-clean-100/8419/293469/8419-293469-0009.flac",
+     "reference": "I did have when I was a Tadpole, said the Tree Frog. I had a beautiful, wiggly little tail with which to swim through the waters of the pond but as my legs grew larger and stronger, my tail grew littler and weaker, until there wasn't any tail left.",
+     "seconds": 16.755,
+     "first": 8,
+     "last": 11
+    },
+    {
+     "id": "8419-293469-0024",
+     "audio": "train-clean-100/8419/293469/8419-293469-0024.flac",
+     "reference": "but for a long time I could not sleep without dreaming that I was back in prison, and I would croak in my sleep at the thought of it. I heard you, cried the Katydid, and I wondered what was the matter. Matter enough, said the Tree Frog.",
+     "seconds": 15.69,
+     "first": 44,
+     "last": 47
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8580",
+   "clause": "asked mister parker",
+   "utterances": [
+    {
+     "id": "8580-287364-0016",
+     "audio": "train-clean-100/8580/287364/8580-287364-0016.flac",
+     "reference": "Probably he wants to wait until the ship is farther out west, suggested mister Jenks. Then he will be nearer his friends, and can get help, if he needs it. And do you really believe he would destroy the Red Cloud? asked mister Parker.",
+     "seconds": 15.78,
+     "first": 41,
+     "last": 43
+    },
+    {
+     "id": "8580-287364-0021",
+     "audio": "train-clean-100/8580/287364/8580-287364-0021.flac",
+     "reference": "How are you going to capture him? asked mister Parker. If he has a gun it won't be any too easy to go in the storeroom, and drag him out. We'll have to use a little strategy, decided Tom, and then they discussed several plans.",
+     "seconds": 16.53,
+     "first": 7,
+     "last": 9
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8630",
+   "clause": "it is true",
+   "utterances": [
+    {
+     "id": "8630-305212-0008",
+     "audio": "train-clean-100/8630/305212/8630-305212-0008.flac",
+     "reference": "the old pagan ways seemed only natural. He was scarcely likely to be astonished at the fact that his son's boyhood was rather like what his own had been. He was standing, it is true, on the threshold of the Church,",
+     "seconds": 16.015,
+     "first": 32,
+     "last": 34
+    },
+    {
+     "id": "8630-305213-0001",
+     "audio": "train-clean-100/8630/305213/8630-305213-0001.flac",
+     "reference": "She needed little, it is true, for herself, but there was Augustine. Would it be possible for her, even if she practised the strictest economy, to keep him at Carthage, where he was doing so well?",
+     "seconds": 14.01,
+     "first": 3,
+     "last": 5
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8747",
+   "clause": "said miss randolph",
+   "utterances": [
+    {
+     "id": "8747-293952-0055",
+     "audio": "train-clean-100/8747/293952/8747-293952-0055.flac",
+     "reference": "Ah You would make him pay money to save himself. I have a right to a portion of the estate. You have not, said Miss Randolph, clenching her fists and all her languor gone. Bernard is the owner of Gore Hall",
+     "seconds": 14.94,
+     "first": 23,
+     "last": 25
+    },
+    {
+     "id": "8747-293952-0069",
+     "audio": "train-clean-100/8747/293952/8747-293952-0069.flac",
+     "reference": "which ever it is, joy of a spitfire. And an honest woman, said Miss Randolph, wrathfully, for the reference to Conniston touched her nearly",
+     "seconds": 12.58,
+     "first": 12,
+     "last": 14
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8747",
+   "clause": "said the old dame",
+   "utterances": [
+    {
+     "id": "8747-293952-0092",
+     "audio": "train-clean-100/8747/293952/8747-293952-0092.flac",
+     "reference": "He is a lad I wish you to help, said Beryl, blandly. Last time we met, Miss Plantagenet, you mentioned that you wanted a page. Not exactly a page, said the old dame, rubbing her nose,",
+     "seconds": 13.67,
+     "first": 29,
+     "last": 32
+    },
+    {
+     "id": "8747-293952-0104",
+     "audio": "train-clean-100/8747/293952/8747-293952-0104.flac",
+     "reference": "I can vouch for his honesty, he said. But he talks too much. He must hold his tongue here, said the old dame, severely, and shaking her trowel at the boy. Where are his clothes? I have none but what's on, cried Jerry.",
+     "seconds": 15.645,
+     "first": 19,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8770",
+   "clause": "eighteen sixty three",
+   "utterances": [
+    {
+     "id": "8770-295462-0037",
+     "audio": "train-clean-100/8770/295462/8770-295462-0037.flac",
+     "reference": "That Declaration young Abe Lincoln first read in the Gentryville constable's copy of the Statutes of Indiana. At noon on the first of january, eighteen sixty three,",
+     "seconds": 13.755,
+     "first": 24,
+     "last": 26
+    },
+    {
+     "id": "8770-295463-0008",
+     "audio": "train-clean-100/8770/295463/8770-295463-0008.flac",
+     "reference": "Believing he was on God's side, he felt that the cause of Right could not lose, for the Lord would save His own. The next day, july fourth, eighteen sixty three, came the surrender of Vicksburg,",
+     "seconds": 15.035,
+     "first": 28,
+     "last": 30
+    },
+    {
+     "id": "8770-295463-0017",
+     "audio": "train-clean-100/8770/295463/8770-295463-0017.flac",
+     "reference": "but mister Everett was to be the chief speaker of the occasion. The Sunday before the nineteenth of november, eighteen sixty three, the date of the dedication, the President went with his friend Noah Brooks",
+     "seconds": 14.325,
+     "first": 19,
+     "last": 21
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8770",
+   "clause": "said mister lincoln",
+   "utterances": [
+    {
+     "id": "8770-295462-0012",
+     "audio": "train-clean-100/8770/295462/8770-295462-0012.flac",
+     "reference": "the more they needed his sympathetic help, the more certain they were to receive it. My sympathies are with the under dog, said mister Lincoln, one day, though it is often that dog that starts the fuss.",
+     "seconds": 13.87,
+     "first": 22,
+     "last": 24
+    },
+    {
+     "id": "8770-295463-0020",
+     "audio": "train-clean-100/8770/295463/8770-295463-0020.flac",
+     "reference": "During the forenoon of the eighteenth, Secretary John Hay was anxious lest the President be late for the special Presidential train, which was to leave at noon for Gettysburg. Don't worry, John, said mister Lincoln.",
+     "seconds": 14.835,
+     "first": 32,
+     "last": 34
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8838",
+   "clause": "said the assistant",
+   "utterances": [
+    {
+     "id": "8838-298545-0038",
+     "audio": "train-clean-100/8838/298545/8838-298545-0038.flac",
+     "reference": "a deal more trouble than that before he put Barton to sleep. You've done a fine performance, sir, and happen you'll do a finer, if you give yourself the chance. I never heard of Ted Barton, beyond seeing the name on a medicine label, said the assistant. Well,",
+     "seconds": 15.845,
+     "first": 44,
+     "last": 46
+    },
+    {
+     "id": "8838-298546-0040",
+     "audio": "train-clean-100/8838/298546/8838-298546-0040.flac",
+     "reference": "You may find yourself molested by the blackguards whom it will attract. I will take my chance of that, sir, said the assistant. On the Friday night, which was the last night before the fight,",
+     "seconds": 11.605,
+     "first": 20,
+     "last": 22
+    }
+   ]
+  },
+  {
+   "subset": "train-clean-100",
+   "speaker": "8838",
+   "clause": "said the horse breaker",
+   "utterances": [
+    {
+     "id": "8838-298545-0039",
+     "audio": "train-clean-100/8838/298545/8838-298545-0039.flac",
+     "reference": "you may take it from me that he's a slaughterer, said the horse breaker. You've taught him a lesson that he needed, for it was always a word and a blow with him, and the word alone was worth five shillin' in a public court. He won't be so ready now to shake his nief in the face of everyone he meets.",
+     "seconds": 15,
+     "first": 10,
+     "last": 13
+    },
+    {
+     "id": "8838-298546-0042",
+     "audio": "train-clean-100/8838/298546/8838-298546-0042.flac",
+     "reference": "That's only three pund off in a week's trainin', said the horse breaker. He said right when he said that he was in condition. Well, it's fine stuff all there is of it, but I'm none so sure as there is enough.",
+     "seconds": 12.89,
+     "first": 9,
+     "last": 12
+    }
+   ]
+  }
+ ]
+}

@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[3]
 os.environ.setdefault('VOCO_LAB_RUNTIME', str(ROOT / 'runtime/speech'))
 os.environ.setdefault('VOCO_LAB_CONTEXT', '6')
 os.environ.setdefault('NEMO_SPEECH_CPU_THREADS', '4')
-sys.path.insert(0, str(ROOT / 'research/pause-sentence-ends-2026-10/harness'))
+sys.path.append(str(ROOT / 'research/pause-sentence-ends-2026-10/harness'))  # after this folder, whose text.py must win
 import asr  # noqa: E402
 
 RATE, PACKET = 16000, 1600

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score rules on own-text trials: devscore.py OWN.json RUNS.jsonl [RUNS2.jsonl ...] --splits dev
+"""Score rules on own-text trials: ownscore.py OWN.json RUNS.jsonl [RUNS2.jsonl ...] --splits dev
 
 Heard words come from arm S of the first runs file; a later runs file may give
 arms 'far' and 'near' (sessions leaned toward that trial's typed window), which
