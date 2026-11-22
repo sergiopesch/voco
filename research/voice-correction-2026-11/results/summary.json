@@ -1,0 +1,358 @@
+{
+ "dev": {
+  "items": 270,
+  "sRight": {
+   "count": 191,
+   "of": 270,
+   "share": 0.7074
+  },
+  "passageBySelf": {
+   "P right": {
+    "S right": 186,
+    "S wrong": 18
+   },
+   "P wrong": {
+    "S right": 5,
+    "S wrong": 61
+   }
+  },
+  "sRightAmongPWrong": {
+   "count": 5,
+   "of": 66,
+   "share": 0.0758
+  },
+  "sRightAmongPRight": {
+   "count": 186,
+   "of": 204,
+   "share": 0.9118
+  },
+  "sRightByWords": {
+   "3": {
+    "count": 10,
+    "of": 24,
+    "share": 0.4167
+   },
+   "4": {
+    "count": 42,
+    "of": 57,
+    "share": 0.7368
+   },
+   "5": {
+    "count": 61,
+    "of": 85,
+    "share": 0.7176
+   },
+   "6": {
+    "count": 78,
+    "of": 104,
+    "share": 0.75
+   }
+  },
+  "sWrong": {
+   "anchorWrong": 49,
+   "onlyInteriorWrong": 30
+  },
+  "capitalWhereReferenceIsLower": {
+   "count": 12,
+   "of": 12,
+   "share": 1.0
+  },
+  "sentenceEndWhereReferenceHasNone": {
+   "count": 44,
+   "of": 44,
+   "share": 1.0
+  },
+  "interiorFormSameAmongSRight": {
+   "count": 137,
+   "of": 191,
+   "share": 0.7173
+  },
+  "resumedStartsWithCapital": {
+   "count": 60,
+   "of": 61,
+   "share": 0.9836
+  },
+  "tailMs": {
+   "median": 233.1,
+   "p95": 371.3
+  },
+  "rule": {
+   "tolerance": 1,
+   "outcomes": {
+    "far": {
+     "right": 190,
+     "none": 58,
+     "contained": 22,
+     "collateral": 0
+    },
+    "near": {
+     "right": 190,
+     "none": 58,
+     "contained": 22,
+     "collateral": 0
+    },
+    "same": {
+     "right": 243,
+     "none": 0,
+     "contained": 27,
+     "collateral": 0
+    },
+    "elsewhere": {
+     "right": 270,
+     "none": 0,
+     "contained": 0,
+     "collateral": 0
+    }
+   },
+   "rightOfFarAndNear": {
+    "count": 380,
+    "of": 540,
+    "share": 0.7037
+   },
+   "collateralOfAll": {
+    "count": 0,
+    "of": 1080,
+    "share": 0.0
+   }
+  }
+ },
+ "test": {
+  "items": 244,
+  "sRight": {
+   "count": 179,
+   "of": 244,
+   "share": 0.7336
+  },
+  "passageBySelf": {
+   "P right": {
+    "S right": 171,
+    "S wrong": 11
+   },
+   "P wrong": {
+    "S right": 8,
+    "S wrong": 54
+   }
+  },
+  "sRightAmongPWrong": {
+   "count": 8,
+   "of": 62,
+   "share": 0.129
+  },
+  "sRightAmongPRight": {
+   "count": 171,
+   "of": 182,
+   "share": 0.9396
+  },
+  "sRightByWords": {
+   "3": {
+    "count": 18,
+    "of": 24,
+    "share": 0.75
+   },
+   "4": {
+    "count": 34,
+    "of": 43,
+    "share": 0.7907
+   },
+   "5": {
+    "count": 47,
+    "of": 74,
+    "share": 0.6351
+   },
+   "6": {
+    "count": 80,
+    "of": 103,
+    "share": 0.7767
+   }
+  },
+  "sWrong": {
+   "anchorWrong": 39,
+   "onlyInteriorWrong": 26
+  },
+  "capitalWhereReferenceIsLower": {
+   "count": 15,
+   "of": 15,
+   "share": 1.0
+  },
+  "sentenceEndWhereReferenceHasNone": {
+   "count": 37,
+   "of": 38,
+   "share": 0.9737
+  },
+  "interiorFormSameAmongSRight": {
+   "count": 121,
+   "of": 179,
+   "share": 0.676
+  },
+  "resumedStartsWithCapital": {
+   "count": 80,
+   "of": 82,
+   "share": 0.9756
+  },
+  "tailMs": {
+   "median": 235.7,
+   "p95": 396.2
+  },
+  "rule": {
+   "tolerance": 1,
+   "outcomes": {
+    "far": {
+     "right": 178,
+     "none": 47,
+     "contained": 19,
+     "collateral": 0
+    },
+    "near": {
+     "right": 177,
+     "none": 48,
+     "contained": 19,
+     "collateral": 0
+    },
+    "same": {
+     "right": 218,
+     "none": 0,
+     "contained": 26,
+     "collateral": 0
+    },
+    "elsewhere": {
+     "right": 244,
+     "none": 0,
+     "contained": 0,
+     "collateral": 0
+    }
+   },
+   "rightOfFarAndNear": {
+    "count": 355,
+    "of": 488,
+    "share": 0.7275
+   },
+   "collateralOfAll": {
+    "count": 0,
+    "of": 976,
+    "share": 0.0
+   }
+  }
+ },
+ "all": {
+  "items": 514,
+  "sRight": {
+   "count": 370,
+   "of": 514,
+   "share": 0.7198
+  },
+  "passageBySelf": {
+   "P right": {
+    "S right": 357,
+    "S wrong": 29
+   },
+   "P wrong": {
+    "S right": 13,
+    "S wrong": 115
+   }
+  },
+  "sRightAmongPWrong": {
+   "count": 13,
+   "of": 128,
+   "share": 0.1016
+  },
+  "sRightAmongPRight": {
+   "count": 357,
+   "of": 386,
+   "share": 0.9249
+  },
+  "sRightByWords": {
+   "3": {
+    "count": 28,
+    "of": 48,
+    "share": 0.5833
+   },
+   "4": {
+    "count": 76,
+    "of": 100,
+    "share": 0.76
+   },
+   "5": {
+    "count": 108,
+    "of": 159,
+    "share": 0.6792
+   },
+   "6": {
+    "count": 158,
+    "of": 207,
+    "share": 0.7633
+   }
+  },
+  "sWrong": {
+   "anchorWrong": 88,
+   "onlyInteriorWrong": 56
+  },
+  "capitalWhereReferenceIsLower": {
+   "count": 27,
+   "of": 27,
+   "share": 1.0
+  },
+  "sentenceEndWhereReferenceHasNone": {
+   "count": 81,
+   "of": 82,
+   "share": 0.9878
+  },
+  "interiorFormSameAmongSRight": {
+   "count": 258,
+   "of": 370,
+   "share": 0.6973
+  },
+  "resumedStartsWithCapital": {
+   "count": 140,
+   "of": 143,
+   "share": 0.979
+  },
+  "tailMs": {
+   "median": 235.2,
+   "p95": 388.2
+  },
+  "rule": {
+   "tolerance": 1,
+   "outcomes": {
+    "far": {
+     "right": 368,
+     "none": 105,
+     "contained": 41,
+     "collateral": 0
+    },
+    "near": {
+     "right": 367,
+     "none": 106,
+     "contained": 41,
+     "collateral": 0
+    },
+    "same": {
+     "right": 461,
+     "none": 0,
+     "contained": 53,
+     "collateral": 0
+    },
+    "elsewhere": {
+     "right": 514,
+     "none": 0,
+     "contained": 0,
+     "collateral": 0
+    }
+   },
+   "rightOfFarAndNear": {
+    "count": 735,
+    "of": 1028,
+    "share": 0.715
+   },
+   "collateralOfAll": {
+    "count": 0,
+    "of": 2056,
+    "share": 0.0
+   }
+  }
+ },
+ "bars": {
+  "safe": true,
+  "useful": false,
+  "magic": false
+ }
+}
