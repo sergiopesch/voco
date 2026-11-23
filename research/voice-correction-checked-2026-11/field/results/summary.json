@@ -1,0 +1,6508 @@
+{
+ "result_files": 882,
+ "cells": [
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "unreadable": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-text-editor",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "unreadable": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-textview",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "unreadable": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 3,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {},
+   "rungs": {},
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk4-entry",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gedit",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-textview",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 3,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {},
+   "rungs": {},
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gtk3-entry",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "unreadable": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "featherpad",
+   "config": "xwayland-root-property",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "unreadable": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "libreoffice-writer",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "2": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "4": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "4": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text after caret": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "4": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 3,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {},
+   "rungs": {},
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "4": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "4": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-textarea",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 3,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {},
+   "rungs": {},
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-input",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "offsets unsure": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "epiphany-contenteditable",
+   "config": "plain",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "selection did not read back": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "selection did not read back": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-textarea",
+   "config": "status-a11y-api",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 3,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {},
+   "rungs": {},
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "selection did not read back": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-input",
+   "config": "status-force-renderer",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 1,
+    "window not ACTIVE": 2
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": false
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 3,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {},
+   "rungs": {},
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "selection did not read back": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-input",
+   "config": "status-a11y-api",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 2,
+    "moved or changed": 1
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": false
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "selection did not read back": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "chromium-contenteditable",
+   "config": "status-force-renderer",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "plain",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "home",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "typed-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "cleared",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "other-field",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "prefilled",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "text-after",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "other-unreadable",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "window not ACTIVE": 2,
+    "moved or changed": 1
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": false
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "twice",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "two-lines",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "moved or changed": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "selected-all",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "text selected": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 3,
+   "ended_as_wanted": 3,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "emoji-before",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 0,
+   "untouched": 3,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 3
+   },
+   "rungs": {},
+   "refusal_reasons": {
+    "selection did not read back": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  },
+  {
+   "case": "electron-contenteditable",
+   "config": "status-a11y-api",
+   "scenario": "non-ascii",
+   "runs": 3,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 3,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 3
+   },
+   "rungs": {
+    "3": 3
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 0,
+   "ended_as_wanted": 0,
+   "all_reps_agree": true
+  }
+ ],
+ "trials": [
+  {
+   "case": "gedit",
+   "config": "plain",
+   "runs": 60,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 60,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 60
+   },
+   "rungs": {
+    "2": 60
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 60,
+   "ended_as_wanted": 60,
+   "by_report": [
+    {
+     "outcome": "CHANGED-VERIFIED",
+     "rung": 2,
+     "runs": 60,
+     "correct": 60,
+     "untouched": 0,
+     "damaged": 0,
+     "unverified": 0
+    }
+   ],
+   "trial_files": [
+    [
+     "1255-90413-0003-far",
+     "ddea625daf34ff0901552c19ca0794f74ded75d89667b5d6df7d629f908e78ec"
+    ],
+    [
+     "1272-135031-0014-far",
+     "58ec8b7d7452728fe2ccfad9541364dfb8d8258b1edbceeac7fa60724232d824"
+    ],
+    [
+     "1272-135031-0019-far",
+     "794bbf2641ff2b6e602f11adbee090663bb4deb97060e3cabdf70033fb943b5b"
+    ],
+    [
+     "1272-135031-0021-near",
+     "a33aecca7977ee3a540892cd2a84c752c0610ce6ca615d089f248a7c8de39220"
+    ],
+    [
+     "1272-141231-0024-far",
+     "6d87995c8f6ac1c253b02ef3bd0c96a770597ce0e012f766ec02e69dfe351bfa"
+    ],
+    [
+     "1585-131718-0041-far",
+     "faa2b957b0df12e13210819b1668d32ea1542ef80415c0cb79a0ed84a5fd6b86"
+    ],
+    [
+     "1630-73710-0005-far",
+     "44993cbbfaf6118513e7288c67f7bab133599b5fd4bb6689f4bc13aafe8c2237"
+    ],
+    [
+     "1630-96099-0016-near",
+     "7ba62a981d839fda27be0ef44c2c0ddc6e3f7d59fd9050d0b657640d50dd6b0c"
+    ],
+    [
+     "1650-167613-0031-far",
+     "6a45556589eac001ec5b6daacebd59b82137f7f2cedcf520bbdebdb13a38a7e9"
+    ],
+    [
+     "1686-142278-0038-near",
+     "69f7e5a4c65ef2fd2d78403aa6cf4d5a03d433a9e407db7b1536970327293fd3"
+    ],
+    [
+     "1686-142278-0072-near",
+     "27614d4a28b2f0526ed5885d4dc853cf37094f684b9637e3b6b281fc20889bae"
+    ],
+    [
+     "1686-142278-0084-far",
+     "9b0f65ce4023502777af265253aea537b1d2a51fdd5e8aafa4f765ccfc35ba9c"
+    ],
+    [
+     "1701-141760-0015-near",
+     "aa1635a6f682a69b06c29ebe62c885e2239cafab23c11cdce3730814fd10cb06"
+    ],
+    [
+     "2078-142845-0048-near",
+     "27042cc2304594494fc630392dd42174b9bdb9c9133c8becd29d4dc553b584f6"
+    ],
+    [
+     "2428-83705-0003-near",
+     "cc9c597102d05fdddfe6650ba4fd26add32697fc457ae14d398f511fbb75f68f"
+    ],
+    [
+     "2506-13150-0004-far",
+     "3ddef7e45e68064c07a3ef97e88a8f8f95e3e1a5387e05515877def341329352"
+    ],
+    [
+     "2803-154328-0016-far",
+     "196f98e16a4863f098e80e2bedf513ab7986b19fe1876cb659425153dc59726b"
+    ],
+    [
+     "3170-137482-0013-far",
+     "882d598cb8c720c62c0733bcfa0736bc74d46cfa818bfa63caae75d874e98890"
+    ],
+    [
+     "3752-4943-0017-near",
+     "5186127d6fee020ed18d87a7fa248598ca1833bd5ca2b6c719f478eb868479a6"
+    ],
+    [
+     "3752-4944-0014-far",
+     "7049b7879e13e5b8b7934015f14ece5206d99b3576eb82df80f403f05405ac37"
+    ],
+    [
+     "3752-4944-0037-far",
+     "f85d0c6a4a0d27df71c1e82c654cc5178f975d44e1857d20d1535b91ad7dc165"
+    ],
+    [
+     "3853-163249-0034-far",
+     "553d15c4f712f59162611f64bb89e9a6d72440efd2d92de9fe305d63b9656e66"
+    ],
+    [
+     "4153-186222-0021-far",
+     "5839576e4d428feaa7c0ff80167dc38b474d101cdc9946cd131b700b990dabc9"
+    ],
+    [
+     "4153-186223-0014-near",
+     "0e09291d11fe48c897389ee35ee9133b5eb76d9a2cfb231599a21fc437ce71fb"
+    ],
+    [
+     "4323-18416-0012-far",
+     "c6d78d972988da59d7edde8471a7267b3a5ffc4e45232be61233dc151da7dbf3"
+    ],
+    [
+     "4323-18416-0017-near",
+     "67578042d840b5cba74062b1eb63e9132c8f16b5bc7cbc2c1ee807678409cdd0"
+    ],
+    [
+     "4323-55228-0048-far",
+     "a66747f9d0ce980dcfd93ff6c778a8e7c84c0a17bce9a7bdec0a7b237acbb59d"
+    ],
+    [
+     "4515-11057-0077-far",
+     "55e97307d8c6a99df071b23c0f243cc5af94d740e5d46edd82d4030751fc5dd4"
+    ],
+    [
+     "4570-24733-0003-far",
+     "14715d6903526b3dfa70e4e08809f9591ddb41cf25256df0ccba913667f67eba"
+    ],
+    [
+     "5338-284437-0023-near",
+     "4c5deb82c2c7285368cb9b18215db97e9af65e56d701450cfabe87cc661ff85a"
+    ],
+    [
+     "5543-27761-0005-far",
+     "b153b3f3aa23528305b9be71b7979726be6720f835bcf12216565130086b7e1b"
+    ],
+    [
+     "5543-27761-0019-far",
+     "b2418a3e74db9bce0f1d62581e14cedd9352c923d4a987087aceaa41cc54ad9c"
+    ],
+    [
+     "5543-27761-0046-far",
+     "2a1dd22ff43b328170b4e6626a83ea4ca5b6252adccf523bad51d5ae6ac74780"
+    ],
+    [
+     "5543-27761-0076-near",
+     "dbdbdae919ba5b11523c4c63e337b9a077f2c4c89b5596ab6b58d823422fb6a2"
+    ],
+    [
+     "5694-64029-0002-near",
+     "2ea901331eb0a6076df8814deef56a85e64de24fc8940394b0046c8df1d683aa"
+    ],
+    [
+     "5849-50873-0030-far",
+     "cc8913b2940e6fff4b51c68234af7e1d347aab27ae95552c5e3d8bf539e37b38"
+    ],
+    [
+     "6267-53049-0021-near",
+     "5acf63aab6b4f239a723ee323f5daa0d90ff0c4e336d52d0a21a948dc2b17eb5"
+    ],
+    [
+     "6267-65525-0032-far",
+     "50fd0f1b5c7a0cfd9b0234aa01ba367ff219fb673033f6486a092aa60d7463e4"
+    ],
+    [
+     "6267-65525-0043-far",
+     "58ab3fb6942422c7426fe9646c0ac6698f7373990e9d0aea7ae6aeef20e08a68"
+    ],
+    [
+     "6313-66125-0026-near",
+     "ae519f82aec88a0a2c62e5fd265c5a0d9921bf37cb3abdcd6e17defd14abfdf7"
+    ],
+    [
+     "6313-66129-0019-far",
+     "704ae8567d5b0abb2638d71fba1fe3aec82b785556ff03fd8cc577b4f3e53d9a"
+    ],
+    [
+     "6319-64726-0014-far",
+     "046d3f855e84caee40b41aef037cdbed8c2edf12ebb6bf00bb3747425e92e013"
+    ],
+    [
+     "6455-67803-0012-far",
+     "4411f5984dfd82f2313e9738bc176a8a76f4ada4d32019fdac3afce8ef7cbc24"
+    ],
+    [
+     "6455-67803-0012-near",
+     "05d997f5911954b19f1344d69266293497c75e2bf9a5cabb37a7c5c2adeb1854"
+    ],
+    [
+     "6467-94831-0039-far",
+     "8cf8f6f667541586165600b60a7120eeb0e8b7d20d81e2c9cb738beba300aa0f"
+    ],
+    [
+     "6467-94831-0041-far",
+     "3f3dce519f02203c0c10e4a2bc560de134ecae92049ba9ec7b3f3760da072dbb"
+    ],
+    [
+     "6841-88294-0028-near",
+     "d4a00009060c7b445f251a452beea253927dda1f3e1daa953f5b08252bda7262"
+    ],
+    [
+     "700-122866-0016-far",
+     "ee8f149a1632860cbea5bab78119b49753d603d1779b616250549923743af581"
+    ],
+    [
+     "700-122867-0029-near",
+     "fa171eb9fa6201e79f48d2335244958cc48aa6c56787a1c16bbc28942ee2a5fd"
+    ],
+    [
+     "700-122868-0014-far",
+     "d06c74c5da8a98487e2cda0ad794f68acb07eda99eff32410364dadddd2a299d"
+    ],
+    [
+     "700-122868-0027-near",
+     "9c3927c0da08c6ea75d68bfda24352f575b6c128e62d7190ca18eeada10b39bc"
+    ],
+    [
+     "7976-105575-0017-far",
+     "c94d73c3cb26982676cd63a31bff0945c47e0c86fbc3ed7ac8e547404f0b6ac1"
+    ],
+    [
+     "7976-105575-0020-far",
+     "382a5e437c31aa189a4511dbc1a48ce5c61a4a96871c287d71582c8666f652a0"
+    ],
+    [
+     "8173-294714-0037-near",
+     "590d80286300cacabdc2be9f3a8dffa07d973aa1d98c16c068ccfcb71c71bcf3"
+    ],
+    [
+     "8173-294714-0048-far",
+     "50e4893ba17973091126ecb964ce93c4141d034741c9c44a68f9393939b28af7"
+    ],
+    [
+     "8173-294714-0056-far",
+     "cdfa13a6236942567189333d1a69511b29d4f68ba7a849e22f5ce35eaad05d81"
+    ],
+    [
+     "8254-84205-0015-far",
+     "71c5b4cdc928af09ca5f5fdbfdc25a12717d85558cc85bf0fb21ff7993fc544d"
+    ],
+    [
+     "8254-84205-0064-far",
+     "f36d1a2d5b665686f1ac91e9a1db9040a937b571f23392bfdbabc2aeafcd05d5"
+    ],
+    [
+     "8288-274150-0005-far",
+     "fece945879274760349f0f249320a8b6935b7729f89fbdc1059da992c8310aeb"
+    ],
+    [
+     "8288-274162-0063-near",
+     "22e8e2c4ae0583f3e6d133b3fc0a5b2d74d081e2bced9498caac3e681cfe6319"
+    ]
+   ]
+  },
+  {
+   "case": "gnome-terminal",
+   "config": "plain",
+   "runs": 60,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 60,
+   "untouched": 0,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 58,
+    "FAILED-DETECTED": 2
+   },
+   "rungs": {
+    "4": 60
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 60,
+   "ended_as_wanted": 60,
+   "by_report": [
+    {
+     "outcome": "CHANGED-VERIFIED",
+     "rung": 4,
+     "runs": 58,
+     "correct": 58,
+     "untouched": 0,
+     "damaged": 0,
+     "unverified": 0
+    },
+    {
+     "outcome": "FAILED-DETECTED",
+     "rung": 4,
+     "runs": 2,
+     "correct": 2,
+     "untouched": 0,
+     "damaged": 0,
+     "unverified": 0
+    }
+   ],
+   "trial_files": [
+    [
+     "1255-90413-0003-far",
+     "ddea625daf34ff0901552c19ca0794f74ded75d89667b5d6df7d629f908e78ec"
+    ],
+    [
+     "1272-135031-0014-far",
+     "58ec8b7d7452728fe2ccfad9541364dfb8d8258b1edbceeac7fa60724232d824"
+    ],
+    [
+     "1272-135031-0019-far",
+     "794bbf2641ff2b6e602f11adbee090663bb4deb97060e3cabdf70033fb943b5b"
+    ],
+    [
+     "1272-135031-0021-near",
+     "a33aecca7977ee3a540892cd2a84c752c0610ce6ca615d089f248a7c8de39220"
+    ],
+    [
+     "1272-141231-0024-far",
+     "6d87995c8f6ac1c253b02ef3bd0c96a770597ce0e012f766ec02e69dfe351bfa"
+    ],
+    [
+     "1585-131718-0041-far",
+     "faa2b957b0df12e13210819b1668d32ea1542ef80415c0cb79a0ed84a5fd6b86"
+    ],
+    [
+     "1630-73710-0005-far",
+     "44993cbbfaf6118513e7288c67f7bab133599b5fd4bb6689f4bc13aafe8c2237"
+    ],
+    [
+     "1630-96099-0016-near",
+     "7ba62a981d839fda27be0ef44c2c0ddc6e3f7d59fd9050d0b657640d50dd6b0c"
+    ],
+    [
+     "1650-167613-0031-far",
+     "6a45556589eac001ec5b6daacebd59b82137f7f2cedcf520bbdebdb13a38a7e9"
+    ],
+    [
+     "1686-142278-0038-near",
+     "69f7e5a4c65ef2fd2d78403aa6cf4d5a03d433a9e407db7b1536970327293fd3"
+    ],
+    [
+     "1686-142278-0072-near",
+     "27614d4a28b2f0526ed5885d4dc853cf37094f684b9637e3b6b281fc20889bae"
+    ],
+    [
+     "1686-142278-0084-far",
+     "9b0f65ce4023502777af265253aea537b1d2a51fdd5e8aafa4f765ccfc35ba9c"
+    ],
+    [
+     "1701-141760-0015-near",
+     "aa1635a6f682a69b06c29ebe62c885e2239cafab23c11cdce3730814fd10cb06"
+    ],
+    [
+     "2078-142845-0048-near",
+     "27042cc2304594494fc630392dd42174b9bdb9c9133c8becd29d4dc553b584f6"
+    ],
+    [
+     "2428-83705-0003-near",
+     "cc9c597102d05fdddfe6650ba4fd26add32697fc457ae14d398f511fbb75f68f"
+    ],
+    [
+     "2506-13150-0004-far",
+     "3ddef7e45e68064c07a3ef97e88a8f8f95e3e1a5387e05515877def341329352"
+    ],
+    [
+     "2803-154328-0016-far",
+     "196f98e16a4863f098e80e2bedf513ab7986b19fe1876cb659425153dc59726b"
+    ],
+    [
+     "3170-137482-0013-far",
+     "882d598cb8c720c62c0733bcfa0736bc74d46cfa818bfa63caae75d874e98890"
+    ],
+    [
+     "3752-4943-0017-near",
+     "5186127d6fee020ed18d87a7fa248598ca1833bd5ca2b6c719f478eb868479a6"
+    ],
+    [
+     "3752-4944-0014-far",
+     "7049b7879e13e5b8b7934015f14ece5206d99b3576eb82df80f403f05405ac37"
+    ],
+    [
+     "3752-4944-0037-far",
+     "f85d0c6a4a0d27df71c1e82c654cc5178f975d44e1857d20d1535b91ad7dc165"
+    ],
+    [
+     "3853-163249-0034-far",
+     "553d15c4f712f59162611f64bb89e9a6d72440efd2d92de9fe305d63b9656e66"
+    ],
+    [
+     "4153-186222-0021-far",
+     "5839576e4d428feaa7c0ff80167dc38b474d101cdc9946cd131b700b990dabc9"
+    ],
+    [
+     "4153-186223-0014-near",
+     "0e09291d11fe48c897389ee35ee9133b5eb76d9a2cfb231599a21fc437ce71fb"
+    ],
+    [
+     "4323-18416-0012-far",
+     "c6d78d972988da59d7edde8471a7267b3a5ffc4e45232be61233dc151da7dbf3"
+    ],
+    [
+     "4323-18416-0017-near",
+     "67578042d840b5cba74062b1eb63e9132c8f16b5bc7cbc2c1ee807678409cdd0"
+    ],
+    [
+     "4323-55228-0048-far",
+     "a66747f9d0ce980dcfd93ff6c778a8e7c84c0a17bce9a7bdec0a7b237acbb59d"
+    ],
+    [
+     "4515-11057-0077-far",
+     "55e97307d8c6a99df071b23c0f243cc5af94d740e5d46edd82d4030751fc5dd4"
+    ],
+    [
+     "4570-24733-0003-far",
+     "14715d6903526b3dfa70e4e08809f9591ddb41cf25256df0ccba913667f67eba"
+    ],
+    [
+     "5338-284437-0023-near",
+     "4c5deb82c2c7285368cb9b18215db97e9af65e56d701450cfabe87cc661ff85a"
+    ],
+    [
+     "5543-27761-0005-far",
+     "b153b3f3aa23528305b9be71b7979726be6720f835bcf12216565130086b7e1b"
+    ],
+    [
+     "5543-27761-0019-far",
+     "b2418a3e74db9bce0f1d62581e14cedd9352c923d4a987087aceaa41cc54ad9c"
+    ],
+    [
+     "5543-27761-0046-far",
+     "2a1dd22ff43b328170b4e6626a83ea4ca5b6252adccf523bad51d5ae6ac74780"
+    ],
+    [
+     "5543-27761-0076-near",
+     "dbdbdae919ba5b11523c4c63e337b9a077f2c4c89b5596ab6b58d823422fb6a2"
+    ],
+    [
+     "5694-64029-0002-near",
+     "2ea901331eb0a6076df8814deef56a85e64de24fc8940394b0046c8df1d683aa"
+    ],
+    [
+     "5849-50873-0030-far",
+     "cc8913b2940e6fff4b51c68234af7e1d347aab27ae95552c5e3d8bf539e37b38"
+    ],
+    [
+     "6267-53049-0021-near",
+     "5acf63aab6b4f239a723ee323f5daa0d90ff0c4e336d52d0a21a948dc2b17eb5"
+    ],
+    [
+     "6267-65525-0032-far",
+     "50fd0f1b5c7a0cfd9b0234aa01ba367ff219fb673033f6486a092aa60d7463e4"
+    ],
+    [
+     "6267-65525-0043-far",
+     "58ab3fb6942422c7426fe9646c0ac6698f7373990e9d0aea7ae6aeef20e08a68"
+    ],
+    [
+     "6313-66125-0026-near",
+     "ae519f82aec88a0a2c62e5fd265c5a0d9921bf37cb3abdcd6e17defd14abfdf7"
+    ],
+    [
+     "6313-66129-0019-far",
+     "704ae8567d5b0abb2638d71fba1fe3aec82b785556ff03fd8cc577b4f3e53d9a"
+    ],
+    [
+     "6319-64726-0014-far",
+     "046d3f855e84caee40b41aef037cdbed8c2edf12ebb6bf00bb3747425e92e013"
+    ],
+    [
+     "6455-67803-0012-far",
+     "4411f5984dfd82f2313e9738bc176a8a76f4ada4d32019fdac3afce8ef7cbc24"
+    ],
+    [
+     "6455-67803-0012-near",
+     "05d997f5911954b19f1344d69266293497c75e2bf9a5cabb37a7c5c2adeb1854"
+    ],
+    [
+     "6467-94831-0039-far",
+     "8cf8f6f667541586165600b60a7120eeb0e8b7d20d81e2c9cb738beba300aa0f"
+    ],
+    [
+     "6467-94831-0041-far",
+     "3f3dce519f02203c0c10e4a2bc560de134ecae92049ba9ec7b3f3760da072dbb"
+    ],
+    [
+     "6841-88294-0028-near",
+     "d4a00009060c7b445f251a452beea253927dda1f3e1daa953f5b08252bda7262"
+    ],
+    [
+     "700-122866-0016-far",
+     "ee8f149a1632860cbea5bab78119b49753d603d1779b616250549923743af581"
+    ],
+    [
+     "700-122867-0029-near",
+     "fa171eb9fa6201e79f48d2335244958cc48aa6c56787a1c16bbc28942ee2a5fd"
+    ],
+    [
+     "700-122868-0014-far",
+     "d06c74c5da8a98487e2cda0ad794f68acb07eda99eff32410364dadddd2a299d"
+    ],
+    [
+     "700-122868-0027-near",
+     "9c3927c0da08c6ea75d68bfda24352f575b6c128e62d7190ca18eeada10b39bc"
+    ],
+    [
+     "7976-105575-0017-far",
+     "c94d73c3cb26982676cd63a31bff0945c47e0c86fbc3ed7ac8e547404f0b6ac1"
+    ],
+    [
+     "7976-105575-0020-far",
+     "382a5e437c31aa189a4511dbc1a48ce5c61a4a96871c287d71582c8666f652a0"
+    ],
+    [
+     "8173-294714-0037-near",
+     "590d80286300cacabdc2be9f3a8dffa07d973aa1d98c16c068ccfcb71c71bcf3"
+    ],
+    [
+     "8173-294714-0048-far",
+     "50e4893ba17973091126ecb964ce93c4141d034741c9c44a68f9393939b28af7"
+    ],
+    [
+     "8173-294714-0056-far",
+     "cdfa13a6236942567189333d1a69511b29d4f68ba7a849e22f5ce35eaad05d81"
+    ],
+    [
+     "8254-84205-0015-far",
+     "71c5b4cdc928af09ca5f5fdbfdc25a12717d85558cc85bf0fb21ff7993fc544d"
+    ],
+    [
+     "8254-84205-0064-far",
+     "f36d1a2d5b665686f1ac91e9a1db9040a937b571f23392bfdbabc2aeafcd05d5"
+    ],
+    [
+     "8288-274150-0005-far",
+     "fece945879274760349f0f249320a8b6935b7729f89fbdc1059da992c8310aeb"
+    ],
+    [
+     "8288-274162-0063-near",
+     "22e8e2c4ae0583f3e6d133b3fc0a5b2d74d081e2bced9498caac3e681cfe6319"
+    ]
+   ]
+  },
+  {
+   "case": "chromium-textarea",
+   "config": "status-force-renderer",
+   "runs": 60,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 59,
+   "untouched": 1,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 59,
+    "FAILED-DETECTED": 1
+   },
+   "rungs": {
+    "3": 60
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 60,
+   "ended_as_wanted": 59,
+   "by_report": [
+    {
+     "outcome": "CHANGED-VERIFIED",
+     "rung": 3,
+     "runs": 59,
+     "correct": 59,
+     "untouched": 0,
+     "damaged": 0,
+     "unverified": 0
+    },
+    {
+     "outcome": "FAILED-DETECTED",
+     "rung": 3,
+     "runs": 1,
+     "correct": 0,
+     "untouched": 1,
+     "damaged": 0,
+     "unverified": 0
+    }
+   ],
+   "trial_files": [
+    [
+     "1255-90413-0003-far",
+     "ddea625daf34ff0901552c19ca0794f74ded75d89667b5d6df7d629f908e78ec"
+    ],
+    [
+     "1272-135031-0014-far",
+     "58ec8b7d7452728fe2ccfad9541364dfb8d8258b1edbceeac7fa60724232d824"
+    ],
+    [
+     "1272-135031-0019-far",
+     "794bbf2641ff2b6e602f11adbee090663bb4deb97060e3cabdf70033fb943b5b"
+    ],
+    [
+     "1272-135031-0021-near",
+     "a33aecca7977ee3a540892cd2a84c752c0610ce6ca615d089f248a7c8de39220"
+    ],
+    [
+     "1272-141231-0024-far",
+     "6d87995c8f6ac1c253b02ef3bd0c96a770597ce0e012f766ec02e69dfe351bfa"
+    ],
+    [
+     "1585-131718-0041-far",
+     "faa2b957b0df12e13210819b1668d32ea1542ef80415c0cb79a0ed84a5fd6b86"
+    ],
+    [
+     "1630-73710-0005-far",
+     "44993cbbfaf6118513e7288c67f7bab133599b5fd4bb6689f4bc13aafe8c2237"
+    ],
+    [
+     "1630-96099-0016-near",
+     "7ba62a981d839fda27be0ef44c2c0ddc6e3f7d59fd9050d0b657640d50dd6b0c"
+    ],
+    [
+     "1650-167613-0031-far",
+     "6a45556589eac001ec5b6daacebd59b82137f7f2cedcf520bbdebdb13a38a7e9"
+    ],
+    [
+     "1686-142278-0038-near",
+     "69f7e5a4c65ef2fd2d78403aa6cf4d5a03d433a9e407db7b1536970327293fd3"
+    ],
+    [
+     "1686-142278-0072-near",
+     "27614d4a28b2f0526ed5885d4dc853cf37094f684b9637e3b6b281fc20889bae"
+    ],
+    [
+     "1686-142278-0084-far",
+     "9b0f65ce4023502777af265253aea537b1d2a51fdd5e8aafa4f765ccfc35ba9c"
+    ],
+    [
+     "1701-141760-0015-near",
+     "aa1635a6f682a69b06c29ebe62c885e2239cafab23c11cdce3730814fd10cb06"
+    ],
+    [
+     "2078-142845-0048-near",
+     "27042cc2304594494fc630392dd42174b9bdb9c9133c8becd29d4dc553b584f6"
+    ],
+    [
+     "2428-83705-0003-near",
+     "cc9c597102d05fdddfe6650ba4fd26add32697fc457ae14d398f511fbb75f68f"
+    ],
+    [
+     "2506-13150-0004-far",
+     "3ddef7e45e68064c07a3ef97e88a8f8f95e3e1a5387e05515877def341329352"
+    ],
+    [
+     "2803-154328-0016-far",
+     "196f98e16a4863f098e80e2bedf513ab7986b19fe1876cb659425153dc59726b"
+    ],
+    [
+     "3170-137482-0013-far",
+     "882d598cb8c720c62c0733bcfa0736bc74d46cfa818bfa63caae75d874e98890"
+    ],
+    [
+     "3752-4943-0017-near",
+     "5186127d6fee020ed18d87a7fa248598ca1833bd5ca2b6c719f478eb868479a6"
+    ],
+    [
+     "3752-4944-0014-far",
+     "7049b7879e13e5b8b7934015f14ece5206d99b3576eb82df80f403f05405ac37"
+    ],
+    [
+     "3752-4944-0037-far",
+     "f85d0c6a4a0d27df71c1e82c654cc5178f975d44e1857d20d1535b91ad7dc165"
+    ],
+    [
+     "3853-163249-0034-far",
+     "553d15c4f712f59162611f64bb89e9a6d72440efd2d92de9fe305d63b9656e66"
+    ],
+    [
+     "4153-186222-0021-far",
+     "5839576e4d428feaa7c0ff80167dc38b474d101cdc9946cd131b700b990dabc9"
+    ],
+    [
+     "4153-186223-0014-near",
+     "0e09291d11fe48c897389ee35ee9133b5eb76d9a2cfb231599a21fc437ce71fb"
+    ],
+    [
+     "4323-18416-0012-far",
+     "c6d78d972988da59d7edde8471a7267b3a5ffc4e45232be61233dc151da7dbf3"
+    ],
+    [
+     "4323-18416-0017-near",
+     "67578042d840b5cba74062b1eb63e9132c8f16b5bc7cbc2c1ee807678409cdd0"
+    ],
+    [
+     "4323-55228-0048-far",
+     "a66747f9d0ce980dcfd93ff6c778a8e7c84c0a17bce9a7bdec0a7b237acbb59d"
+    ],
+    [
+     "4515-11057-0077-far",
+     "55e97307d8c6a99df071b23c0f243cc5af94d740e5d46edd82d4030751fc5dd4"
+    ],
+    [
+     "4570-24733-0003-far",
+     "14715d6903526b3dfa70e4e08809f9591ddb41cf25256df0ccba913667f67eba"
+    ],
+    [
+     "5338-284437-0023-near",
+     "4c5deb82c2c7285368cb9b18215db97e9af65e56d701450cfabe87cc661ff85a"
+    ],
+    [
+     "5543-27761-0005-far",
+     "b153b3f3aa23528305b9be71b7979726be6720f835bcf12216565130086b7e1b"
+    ],
+    [
+     "5543-27761-0019-far",
+     "b2418a3e74db9bce0f1d62581e14cedd9352c923d4a987087aceaa41cc54ad9c"
+    ],
+    [
+     "5543-27761-0046-far",
+     "2a1dd22ff43b328170b4e6626a83ea4ca5b6252adccf523bad51d5ae6ac74780"
+    ],
+    [
+     "5543-27761-0076-near",
+     "dbdbdae919ba5b11523c4c63e337b9a077f2c4c89b5596ab6b58d823422fb6a2"
+    ],
+    [
+     "5694-64029-0002-near",
+     "2ea901331eb0a6076df8814deef56a85e64de24fc8940394b0046c8df1d683aa"
+    ],
+    [
+     "5849-50873-0030-far",
+     "cc8913b2940e6fff4b51c68234af7e1d347aab27ae95552c5e3d8bf539e37b38"
+    ],
+    [
+     "6267-53049-0021-near",
+     "5acf63aab6b4f239a723ee323f5daa0d90ff0c4e336d52d0a21a948dc2b17eb5"
+    ],
+    [
+     "6267-65525-0032-far",
+     "50fd0f1b5c7a0cfd9b0234aa01ba367ff219fb673033f6486a092aa60d7463e4"
+    ],
+    [
+     "6267-65525-0043-far",
+     "58ab3fb6942422c7426fe9646c0ac6698f7373990e9d0aea7ae6aeef20e08a68"
+    ],
+    [
+     "6313-66125-0026-near",
+     "ae519f82aec88a0a2c62e5fd265c5a0d9921bf37cb3abdcd6e17defd14abfdf7"
+    ],
+    [
+     "6313-66129-0019-far",
+     "704ae8567d5b0abb2638d71fba1fe3aec82b785556ff03fd8cc577b4f3e53d9a"
+    ],
+    [
+     "6319-64726-0014-far",
+     "046d3f855e84caee40b41aef037cdbed8c2edf12ebb6bf00bb3747425e92e013"
+    ],
+    [
+     "6455-67803-0012-far",
+     "4411f5984dfd82f2313e9738bc176a8a76f4ada4d32019fdac3afce8ef7cbc24"
+    ],
+    [
+     "6455-67803-0012-near",
+     "05d997f5911954b19f1344d69266293497c75e2bf9a5cabb37a7c5c2adeb1854"
+    ],
+    [
+     "6467-94831-0039-far",
+     "8cf8f6f667541586165600b60a7120eeb0e8b7d20d81e2c9cb738beba300aa0f"
+    ],
+    [
+     "6467-94831-0041-far",
+     "3f3dce519f02203c0c10e4a2bc560de134ecae92049ba9ec7b3f3760da072dbb"
+    ],
+    [
+     "6841-88294-0028-near",
+     "d4a00009060c7b445f251a452beea253927dda1f3e1daa953f5b08252bda7262"
+    ],
+    [
+     "700-122866-0016-far",
+     "ee8f149a1632860cbea5bab78119b49753d603d1779b616250549923743af581"
+    ],
+    [
+     "700-122867-0029-near",
+     "fa171eb9fa6201e79f48d2335244958cc48aa6c56787a1c16bbc28942ee2a5fd"
+    ],
+    [
+     "700-122868-0014-far",
+     "d06c74c5da8a98487e2cda0ad794f68acb07eda99eff32410364dadddd2a299d"
+    ],
+    [
+     "700-122868-0027-near",
+     "9c3927c0da08c6ea75d68bfda24352f575b6c128e62d7190ca18eeada10b39bc"
+    ],
+    [
+     "7976-105575-0017-far",
+     "c94d73c3cb26982676cd63a31bff0945c47e0c86fbc3ed7ac8e547404f0b6ac1"
+    ],
+    [
+     "7976-105575-0020-far",
+     "382a5e437c31aa189a4511dbc1a48ce5c61a4a96871c287d71582c8666f652a0"
+    ],
+    [
+     "8173-294714-0037-near",
+     "590d80286300cacabdc2be9f3a8dffa07d973aa1d98c16c068ccfcb71c71bcf3"
+    ],
+    [
+     "8173-294714-0048-far",
+     "50e4893ba17973091126ecb964ce93c4141d034741c9c44a68f9393939b28af7"
+    ],
+    [
+     "8173-294714-0056-far",
+     "cdfa13a6236942567189333d1a69511b29d4f68ba7a849e22f5ce35eaad05d81"
+    ],
+    [
+     "8254-84205-0015-far",
+     "71c5b4cdc928af09ca5f5fdbfdc25a12717d85558cc85bf0fb21ff7993fc544d"
+    ],
+    [
+     "8254-84205-0064-far",
+     "f36d1a2d5b665686f1ac91e9a1db9040a937b571f23392bfdbabc2aeafcd05d5"
+    ],
+    [
+     "8288-274150-0005-far",
+     "fece945879274760349f0f249320a8b6935b7729f89fbdc1059da992c8310aeb"
+    ],
+    [
+     "8288-274162-0063-near",
+     "22e8e2c4ae0583f3e6d133b3fc0a5b2d74d081e2bced9498caac3e681cfe6319"
+    ]
+   ]
+  }
+ ],
+ "totals": {
+  "matrix": {
+   "runs": 702,
+   "not_applicable": 18,
+   "no_result": 0,
+   "correct": 333,
+   "untouched": 351,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "REFUSED": 351,
+    "CHANGED-VERIFIED": 333
+   },
+   "rungs": {
+    "3": 156,
+    "2": 162,
+    "4": 15
+   },
+   "refusal_reasons": {
+    "moved or changed": 225,
+    "selection did not read back": 18,
+    "window not ACTIVE": 36,
+    "text selected": 51,
+    "offsets unsure": 3,
+    "unreadable": 15,
+    "text after caret": 3
+   },
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 324,
+   "ended_as_wanted": 324
+  },
+  "trials": {
+   "runs": 180,
+   "not_applicable": 0,
+   "no_result": 0,
+   "correct": 179,
+   "untouched": 1,
+   "damaged": 0,
+   "unverified": 0,
+   "outcomes": {
+    "CHANGED-VERIFIED": 177,
+    "FAILED-DETECTED": 3
+   },
+   "rungs": {
+    "3": 60,
+    "2": 60,
+    "4": 60
+   },
+   "refusal_reasons": {},
+   "honesty_violations": 0,
+   "damaged_where_the_ladder_sent_nothing": 0,
+   "runs_with_a_wanted_end": 180,
+   "ended_as_wanted": 179
+  }
+ },
+ "cells_whose_reps_disagree": [
+  "electron-input × other-unreadable",
+  "chromium-contenteditable × other-unreadable",
+  "electron-contenteditable × other-unreadable"
+ ]
+}

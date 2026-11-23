@@ -1,0 +1,24 @@
+60 trials drawn; the rule made a change in 60, the right one in 58, and with the passage's exact text in 58
+
+== gedit: 60 runs ==
+  the ladder reported: CHANGED-VERIFIED, rung 2 60
+  the field read back: correct 60, untouched 0, damaged 0, unverified 0
+  reported changed and verified on a field that was not the text asked for: 0
+  right end to end, the field's words the passage as recognized: 96.7% (58/60)
+  the passage's exact text: 96.7% (58/60)
+
+== chromium-textarea: 60 runs ==
+  the ladder reported: CHANGED-VERIFIED, rung 3 59, FAILED-DETECTED, rung 3 1
+  the field read back: correct 59, untouched 1, damaged 0, unverified 0
+  reported changed and verified on a field that was not the text asked for: 0
+  right end to end, the field's words the passage as recognized: 95.0% (57/60)
+  the passage's exact text: 95.0% (57/60)
+
+== gnome-terminal: 60 runs ==
+  the ladder reported: CHANGED-VERIFIED, rung 4 58, FAILED-DETECTED, rung 4 2
+  the field read back: correct 60, untouched 0, damaged 0, unverified 0
+  reported changed and verified on a field that was not the text asked for: 0
+  right end to end, the field's words the passage as recognized: 96.7% (58/60)
+  the passage's exact text: 96.7% (58/60)
+
+Bars on the chain: safe met, honest met, faithful met, rightEndToEnd met

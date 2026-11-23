@@ -1,0 +1,70 @@
+{
+ "drawn": 60,
+ "ruleMadeAChange": 60,
+ "ruleRightInWords": 58,
+ "ruleExact": 58,
+ "cases": {
+  "gedit": {
+   "runs": 60,
+   "missing": 0,
+   "reports": {
+    "CHANGED-VERIFIED, rung 2": 60
+   },
+   "classes": {
+    "correct": 60,
+    "untouched": 0,
+    "damaged": 0,
+    "unverified": 0
+   },
+   "dishonest": 0,
+   "unfaithful": 0,
+   "right": 58,
+   "exact": 58,
+   "of": 60
+  },
+  "chromium-textarea": {
+   "runs": 60,
+   "missing": 0,
+   "reports": {
+    "CHANGED-VERIFIED, rung 3": 59,
+    "FAILED-DETECTED, rung 3": 1
+   },
+   "classes": {
+    "correct": 59,
+    "untouched": 1,
+    "damaged": 0,
+    "unverified": 0
+   },
+   "dishonest": 0,
+   "unfaithful": 0,
+   "right": 57,
+   "exact": 57,
+   "of": 60
+  },
+  "gnome-terminal": {
+   "runs": 60,
+   "missing": 0,
+   "reports": {
+    "CHANGED-VERIFIED, rung 4": 58,
+    "FAILED-DETECTED, rung 4": 2
+   },
+   "classes": {
+    "correct": 60,
+    "untouched": 0,
+    "damaged": 0,
+    "unverified": 0
+   },
+   "dishonest": 0,
+   "unfaithful": 0,
+   "right": 58,
+   "exact": 58,
+   "of": 60
+  }
+ },
+ "bars": {
+  "safe": true,
+  "honest": true,
+  "faithful": true,
+  "rightEndToEnd": true
+ }
+}
