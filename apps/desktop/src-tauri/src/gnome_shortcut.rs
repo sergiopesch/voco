@@ -30,18 +30,104 @@ const MODIFIER_GRACE: Duration = Duration::from_millis(400);
 /// How far a repeat may trail the time GNOME's keyboard repeat gives it.
 const REPEAT_MARGIN: Duration = Duration::from_millis(100);
 
-/// The `Toggle` calls of GNOME's shortcut, a held chord's repeats included.
-#[derive(Default)]
-struct Presses {
-    last: Option<Instant>,
-    /// That call was a repeat: the chord was still held then.
-    repeating: bool,
+/// Where the `Toggle` calls of GNOME's shortcut stand, a held chord's
+/// repeats included. `specs/tla/ShortcutPresses.tla` models these states and
+/// checks that a held chord toggles once, however its press was delivered.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+enum Presses {
+    /// No call yet.
+    #[default]
+    Idle,
+    /// The last call was a press, first heard at `at`. `seen` is when it was
+    /// last heard: GNOME can deliver one press twice, at once.
+    Pressed { at: Instant, seen: Instant },
+    /// The last call, at `last`, was a held chord's repeat.
+    Repeating { last: Instant },
 }
 
-static PRESSES: Mutex<Presses> = Mutex::new(Presses {
-    last: None,
-    repeating: false,
-});
+/// What a `Toggle` call is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Call {
+    /// A press: it toggles.
+    Press,
+    /// The press before it, delivered again at once.
+    SamePress,
+    /// A held chord's repeat.
+    Repeat,
+}
+
+impl Presses {
+    /// The last call, a repeat or a press delivered again included.
+    fn last(self) -> Option<Instant> {
+        match self {
+            Self::Idle => None,
+            Self::Pressed { seen, .. } => Some(seen),
+            Self::Repeating { last } => Some(last),
+        }
+    }
+
+    /// What a call at `now` is, by the time since the last press or repeat.
+    /// After a press the first repeat comes one repeat delay later, give or
+    /// take the margin; the rest follow each other at the repeat interval,
+    /// and a gap as long as a first repeat's is no such train. A call at once
+    /// after a press is the same press, and leaves the wait for its first
+    /// repeat counted from the press itself. Anything else is a new press:
+    /// one soon after the last, well before a repeat could come, and one
+    /// after the chord went silent past the repeat delay, when a chord still
+    /// held would have repeated.
+    ///
+    /// One press this can't tell: a second one that comes about a repeat
+    /// delay after the first reads as its repeat. GNOME's own report of the
+    /// modifiers, where there is one, settles it first (`call`).
+    fn classify(self, now: Instant, repeat: Repeat) -> Call {
+        let train = repeat.interval + REPEAT_MARGIN;
+        match self {
+            Self::Idle => Call::Press,
+            Self::Pressed { at, .. } => {
+                let gap = now.saturating_duration_since(at);
+                if gap + REPEAT_MARGIN >= repeat.delay
+                    && gap < repeat.delay.max(repeat.interval) + REPEAT_MARGIN
+                {
+                    Call::Repeat
+                } else if gap < train {
+                    Call::SamePress
+                } else {
+                    Call::Press
+                }
+            }
+            Self::Repeating { last } => {
+                let gap = now.saturating_duration_since(last);
+                if gap < repeat.delay.saturating_sub(REPEAT_MARGIN).max(train) {
+                    Call::Repeat
+                } else {
+                    Call::Press
+                }
+            }
+        }
+    }
+
+    /// The one transition: a `Toggle` call at `now`. `lifted` is GNOME's word
+    /// on whether every modifier was up since the last call: a chord whose
+    /// modifier came up in between is a new press whatever the timing says,
+    /// as when the shortcut is pressed to stop half a second after it started
+    /// the dictation. A keyboard that doesn't repeat sends no repeat to tell
+    /// apart, and this route reports no release that would end a held press,
+    /// so every call is then a press.
+    fn call(self, now: Instant, repeat: Option<Repeat>, lifted: Option<bool>) -> (Self, Call) {
+        let call = match repeat {
+            Some(repeat) if lifted != Some(true) => self.classify(now, repeat),
+            _ => Call::Press,
+        };
+        let next = match (call, self) {
+            (Call::SamePress, Self::Pressed { at, .. }) => Self::Pressed { at, seen: now },
+            (Call::Repeat, _) => Self::Repeating { last: now },
+            _ => Self::Pressed { at: now, seen: now },
+        };
+        (next, call)
+    }
+}
+
+static PRESSES: Mutex<Presses> = Mutex::new(Presses::Idle);
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
 fn presses() -> MutexGuard<'static, Presses> {
@@ -91,31 +177,6 @@ fn repeat_delay() -> Option<Duration> {
     repeat().map(|repeat| repeat.delay)
 }
 
-/// A held chord's repeated call, by the time since the last one. After a
-/// press the first repeat comes one repeat delay later, give or take the
-/// margin; the rest follow each other at the repeat interval, and a gap as
-/// long as a first repeat's is no such train. A call at once after a press is
-/// the same press. Anything else is a new press: one soon after the last,
-/// well before a repeat could come, and one after the chord went silent past
-/// the repeat delay, when a chord still held would have repeated.
-///
-/// One press this can't tell: a second one that comes about a repeat delay
-/// after the first reads as its repeat. GNOME's own report of the modifiers,
-/// where there is one, settles it first (`bus_press`).
-fn is_repeat(state: &Presses, now: Instant, repeat: Repeat) -> bool {
-    let Some(last) = state.last else {
-        return false;
-    };
-    let gap = now.saturating_duration_since(last);
-    let train = repeat.interval + REPEAT_MARGIN;
-    if state.repeating {
-        return gap < repeat.delay.saturating_sub(REPEAT_MARGIN).max(train);
-    }
-    gap < train
-        || (gap + REPEAT_MARGIN >= repeat.delay
-            && gap < repeat.delay.max(repeat.interval) + REPEAT_MARGIN)
-}
-
 /// The snap holds its shortcut this way on GNOME Wayland.
 pub fn applies() -> bool {
     crate::portal_keys::applies()
@@ -133,29 +194,22 @@ pub fn available() -> bool {
 pub fn note_bus_press() -> bool {
     // While a dictation's typing session is open, GNOME 50 and later say
     // whether the chord's modifier came up since the last call.
-    let last = presses().last;
+    let last = presses().last();
     let lifted = last.and_then(crate::portal_keys::modifiers_lifted_since);
     bus_press(&mut presses(), Instant::now(), repeat(), lifted)
 }
 
-/// A Toggle call: a press, or a held chord's repeat of one. `lifted` is
-/// GNOME's word on whether every modifier was up since the last call: a
-/// chord whose modifier came up in between is a new press whatever the
-/// timing says, as when the shortcut is pressed to stop half a second after
-/// it started the dictation. A keyboard that doesn't repeat sends no repeat
-/// to tell apart, and this route reports no release that would end a held
-/// press, so every call is then a press.
+/// A Toggle call: true for a press, which toggles; false for a held chord's
+/// repeat, or for the same press delivered again.
 fn bus_press(
     state: &mut Presses,
     now: Instant,
     repeat: Option<Repeat>,
     lifted: Option<bool>,
 ) -> bool {
-    let repeated =
-        lifted != Some(true) && repeat.is_some_and(|repeat| is_repeat(state, now, repeat));
-    state.last = Some(now);
-    state.repeating = repeated;
-    !repeated
+    let (next, call) = state.call(now, repeat, lifted);
+    *state = next;
+    call == Call::Press
 }
 
 /// How long after the last Toggle call, a repeat included, a paste waits
@@ -228,7 +282,7 @@ pub fn keys_held() -> Option<bool> {
     if command.is_some_and(|at| at.elapsed() < command_grace(repeat_delay())) {
         return Some(true);
     }
-    bus_held(presses().last, Instant::now(), repeat_delay())
+    bus_held(presses().last(), Instant::now(), repeat_delay())
 }
 
 /// VOCO's GNOME shortcut exists for `hotkey`, with VOCO's command.
@@ -465,18 +519,15 @@ mod tests {
         for ms in (504..2_000).step_by(30) {
             // GNOME reports the modifier down throughout, where it reports.
             for lifted in [None, Some(false)] {
-                let mut copy = Presses {
-                    last: state.last,
-                    repeating: state.repeating,
-                };
+                let mut copy = state;
                 assert!(!bus_press(&mut copy, at(ms), repeat, lifted), "{ms} ms");
             }
             toggles += usize::from(bus_press(&mut state, at(ms), repeat, Some(false)));
             last = ms;
         }
         assert_eq!(toggles, 1);
-        assert_eq!(bus_held(state.last, at(last + 899), delay), Some(true));
-        assert_eq!(bus_held(state.last, at(last + 900), delay), None);
+        assert_eq!(bus_held(state.last(), at(last + 899), delay), Some(true));
+        assert_eq!(bus_held(state.last(), at(last + 900), delay), None);
         // A stall between two repeats, short of a first repeat's wait, is
         // still the train.
         assert!(!bus_press(&mut state, at(last + 300), repeat, None));
@@ -531,6 +582,129 @@ mod tests {
         assert!(!bus_press(&mut state, at(500), repeat, Some(false)));
     }
 
+    /// Every state against every kind of call, as
+    /// `specs/tla/ShortcutPresses.tla` lists them, at GNOME's default repeat
+    /// of 500 ms and 30 ms: the windows are [0, 130) for the same press or a
+    /// train, [400, 600) for a first repeat and [0, 400) for the next.
+    #[test]
+    fn the_presses_decide_every_call_in_every_state() {
+        use Call::{Press, Repeat as Held, SamePress};
+        let repeat = repeat_after(500);
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let pressed = |ms| Presses::Pressed {
+            at: at(ms),
+            seen: at(ms),
+        };
+        let repeating = |ms| Presses::Repeating { last: at(ms) };
+
+        // No call yet: a press, whatever GNOME says of the modifiers.
+        for lifted in [None, Some(false), Some(true)] {
+            assert_eq!(
+                Presses::Idle.call(at(0), repeat, lifted),
+                (pressed(0), Press)
+            );
+        }
+
+        // After a press at 1000 ms.
+        for (ms, call, next) in [
+            // At once: the same press, its first repeat still due from 1000.
+            (
+                1_000,
+                SamePress,
+                Presses::Pressed {
+                    at: at(1_000),
+                    seen: at(1_000),
+                },
+            ),
+            (
+                1_129,
+                SamePress,
+                Presses::Pressed {
+                    at: at(1_000),
+                    seen: at(1_129),
+                },
+            ),
+            // Too late for that and too early for a repeat: another press.
+            (1_130, Press, pressed(1_130)),
+            (1_399, Press, pressed(1_399)),
+            // Where the first repeat comes.
+            (1_400, Held, repeating(1_400)),
+            (1_599, Held, repeating(1_599)),
+            // The chord went silent: a press.
+            (1_600, Press, pressed(1_600)),
+        ] {
+            assert_eq!(
+                pressed(1_000).call(at(ms), repeat, None),
+                (next, call),
+                "{ms} ms"
+            );
+        }
+        // The same press heard again keeps counting from the press.
+        let again = Presses::Pressed {
+            at: at(1_000),
+            seen: at(1_100),
+        };
+        assert_eq!(again.call(at(1_230), repeat, None), (pressed(1_230), Press));
+        assert_eq!(
+            again.call(at(1_500), repeat, None),
+            (repeating(1_500), Held)
+        );
+        assert_eq!(again.last(), Some(at(1_100)));
+
+        // After a repeat at 1000 ms: the train, a stall short of a first
+        // repeat's wait included, then a press.
+        for (ms, call, next) in [
+            (1_000, Held, repeating(1_000)),
+            (1_030, Held, repeating(1_030)),
+            (1_399, Held, repeating(1_399)),
+            (1_400, Press, pressed(1_400)),
+            (9_000, Press, pressed(9_000)),
+        ] {
+            assert_eq!(
+                repeating(1_000).call(at(ms), repeat, None),
+                (next, call),
+                "{ms} ms"
+            );
+        }
+
+        // GNOME saw every modifier up since the last call, or the keyboard
+        // doesn't repeat: a press from any state, at any time.
+        for state in [pressed(1_000), again, repeating(1_000)] {
+            for ms in [1_000, 1_030, 1_500] {
+                assert_eq!(state.call(at(ms), repeat, Some(true)), (pressed(ms), Press));
+                assert_eq!(state.call(at(ms), None, None), (pressed(ms), Press));
+                // The modifier held, by GNOME's word: the timing decides.
+                assert_eq!(
+                    state.call(at(ms), repeat, Some(false)),
+                    state.call(at(ms), repeat, None)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_press_delivered_twice_and_then_held_still_toggles_once() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        // GNOME's default delay, a fast one, and the fastest GNOME Settings offers.
+        for delay in [500, 200, 100] {
+            let repeat = repeat_after(delay);
+            let mut state = Presses::default();
+            let mut toggles = vec![bus_press(&mut state, at(0), repeat, None)];
+            // The same press again at once, then the held chord's repeats.
+            toggles.push(bus_press(&mut state, at(50), repeat, None));
+            for ms in (delay..delay + 600).step_by(30) {
+                toggles.push(bus_press(&mut state, at(ms), repeat, None));
+            }
+            assert_eq!(
+                toggles.iter().filter(|toggled| **toggled).count(),
+                1,
+                "{delay} ms: {toggles:?}"
+            );
+        }
+    }
+
     #[test]
     fn without_keyboard_repeat_every_call_over_the_bus_is_a_press() {
         // No repeat can arrive, and no release ever does.
@@ -544,8 +718,8 @@ mod tests {
             );
         }
         // The paste after the last one still waits out the modifier's grace.
-        assert_eq!(bus_held(state.last, at(4100), None), Some(true));
-        assert_eq!(bus_held(state.last, at(4500), None), None);
+        assert_eq!(bus_held(state.last(), at(4100), None), Some(true));
+        assert_eq!(bus_held(state.last(), at(4500), None), None);
     }
 
     #[test]
