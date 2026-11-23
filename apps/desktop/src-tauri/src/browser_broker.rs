@@ -80,6 +80,11 @@ struct State {
     trigger: Option<Trigger>,
     session: Option<Session>,
     pending: Option<Pending>,
+    /// The request VOCO stopped waiting for, sent and still unanswered: its
+    /// field was revoked, or its receipt was two seconds late. The browser
+    /// may still answer it, and that one late receipt is expected, where any
+    /// other receipt without a request ends the connection.
+    abandoned: Option<Pending>,
     used_tokens: HashSet<String>,
     last_trigger: Option<(String, String, bool)>,
 }
@@ -384,7 +389,8 @@ impl BrowserBroker {
                 || Instant::now() >= deadline
             {
                 invalidate(&mut state, true);
-                state.pending = None;
+                // VOCO has decided without the receipt, which may still come.
+                state.abandoned = state.pending.take();
                 return Err("Browser delivery is uncertain; automatic retry is disabled.".into());
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -693,7 +699,21 @@ fn receive(
             committed_characters,
             reason,
         } => {
-            let p = state.pending.as_mut().ok_or(())?;
+            // The answer to the request VOCO stopped waiting for arrives
+            // once, late. Its outcome changes nothing: that delivery was
+            // already reported uncertain and its session revoked.
+            // Request IDs are never reused, so it can't be taken for the
+            // answer to a request that is pending now.
+            let late = state
+                .abandoned
+                .as_ref()
+                .is_some_and(|p| p.connection == connection && p.request_id == request_id);
+            let p = if late {
+                state.abandoned.as_mut()
+            } else {
+                state.pending.as_mut()
+            }
+            .ok_or(())?;
             if p.receipt.is_some()
                 || p.connection != connection
                 || p.request_id != request_id
@@ -713,7 +733,11 @@ fn receive(
             if !valid_count {
                 return Err(());
             }
-            p.receipt = Some(outcome);
+            if late {
+                state.abandoned = None;
+            } else {
+                p.receipt = Some(outcome);
+            }
             Ok(None)
         }
         _ => Err(()),
@@ -1119,6 +1143,40 @@ mod tests {
         assert_eq!(result.committed_character_count, 4);
         assert_eq!(result.finalization_outcome, None);
         assert!(!result.ownership_intact);
+    }
+    #[test]
+    fn a_receipt_that_arrives_after_voco_stopped_waiting_keeps_the_connection() {
+        // content.js revokes a field that changed and then answers the append
+        // it refused, so the receipt follows the invalidation.
+        for outcome in ["rejected", "uncertain", "applied"] {
+            let (broker, mut browser, rx) = fixture();
+            let id = trigger(&mut browser, &rx);
+            claim(&broker, &mut browser, id);
+            let worker = broker.clone();
+            let t = std::thread::spawn(move || worker.append(1, "", "done"));
+            let request = read(&mut browser);
+            send(&mut browser, &json!({"protocol":protocol::PROTOCOL,"type":"invalidate","token":"a".repeat(48),"documentId":"b".repeat(48),"reason":"field-changed"})).unwrap();
+            // The waiter gives up as soon as the field is revoked.
+            assert!(t.join().unwrap().is_err());
+            let count = if outcome == "applied" { 4 } else { 0 };
+            send(&mut browser, &receipt(&request, outcome, count)).unwrap();
+            // The connection still serves the tab: its Stop arrives, and the
+            // receipt changed nothing VOCO had already decided.
+            send(&mut browser, &json!({"protocol":protocol::PROTOCOL,"type":"stop","token":"a".repeat(48),"documentId":"b".repeat(48)})).unwrap();
+            assert_eq!(
+                rx.recv_timeout(Duration::from_secs(1)).unwrap().action,
+                "stop",
+                "{outcome}"
+            );
+            let status = broker.get_status();
+            assert!(status.available, "{outcome}");
+            assert_eq!(status.committed_character_count, 0, "{outcome}");
+            assert!(!status.ownership_intact, "{outcome}");
+            // The same receipt a second time answers nothing, as before.
+            send(&mut browser, &receipt(&request, outcome, count)).unwrap();
+            assert!(protocol::read_frame(&mut browser).is_err(), "{outcome}");
+            assert!(!broker.get_status().available, "{outcome}");
+        }
     }
     #[test]
     fn stale_trigger_rejected_and_competing_live_connection_does_not_replace_owner() {
