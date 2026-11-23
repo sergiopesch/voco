@@ -175,9 +175,62 @@ describe("UpdateCheckCoordinator", () => {
     result.resolve(updateState("2026.0.22"));
     await check;
 
-    expect(currentState.status).toBe("checking");
+    // Nothing else would replace "checking", so the state from before it is back.
+    expect(currentState).toEqual({
+      status: "idle",
+      currentVersion: "2026.0.21",
+      latestRelease: null,
+      lastCheckedAt: null,
+      error: null,
+    });
     expect(writeCachedState).not.toHaveBeenCalled();
     expect(showNotification).not.toHaveBeenCalled();
     expect(coordinator.lastCheckedChannel).toBeNull();
+  });
+
+  it("never leaves checking on screen once every run has ended, whatever order they end in", async () => {
+    const before = updateState("2026.0.21");
+    // Each case: the channel selected after each of two runs starts, which
+    // run's check answers first, and whether the first fails.
+    for (const selected of [["stable", "beta"], ["beta", "beta"], ["beta", "stable"], ["stable", "stable"]] as const) {
+      for (const firstAnswersFirst of [true, false]) {
+        for (const firstFails of [true, false]) {
+          let currentChannel: UpdateChannel = "stable";
+          let currentState: UpdateCheckState = before;
+          const answers = [deferred<UpdateCheckState>(), deferred<UpdateCheckState>()];
+          const checkForUpdates = vi.fn()
+            .mockReturnValueOnce(answers[0]!.promise).mockReturnValueOnce(answers[1]!.promise);
+          const coordinator = new UpdateCheckCoordinator({
+            getCurrentChannel: () => currentChannel,
+            getUpdateState: () => currentState,
+            setUpdateState: (state) => { currentState = state; },
+            readCachedState: vi.fn().mockResolvedValue(null),
+            checkForUpdates,
+            writeCachedState: vi.fn().mockResolvedValue(undefined),
+            showNotification: vi.fn().mockResolvedValue(undefined),
+          });
+          const first = coordinator.run("stable", undefined, true);
+          await vi.waitFor(() => expect(checkForUpdates).toHaveBeenCalledTimes(1));
+          currentChannel = selected[0];
+          const second = coordinator.run("beta", undefined, true);
+          await Promise.resolve();
+          currentChannel = selected[1];
+          const settleFirst = () => firstFails ? answers[0]!.reject(new Error("offline")) : answers[0]!.resolve(updateState("2026.0.22"));
+          if (firstAnswersFirst) settleFirst();
+          // The second run checks only while its channel is still selected.
+          if (checkForUpdates.mock.calls.length < 2) await Promise.resolve();
+          answers[1]!.resolve(updateState("2026.0.23"));
+          if (!firstAnswersFirst) settleFirst();
+          await Promise.all([first, second]);
+          const label = `${selected.join(",")} ${firstAnswersFirst} ${firstFails}`;
+          expect(currentState.status, label).not.toBe("checking");
+          // The second run shows its result when its channel was selected
+          // throughout; a run for a channel that wasn't shows nothing of its
+          // own, and what was there before the checks is back.
+          if (selected[0] === "beta" && selected[1] === "beta") expect(currentState.latestRelease?.version, label).toBe("2026.0.23");
+          else expect(currentState, label).toEqual(before);
+        }
+      }
+    }
   });
 });
