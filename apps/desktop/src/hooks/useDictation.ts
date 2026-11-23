@@ -36,6 +36,7 @@ import {
   speechProcessorProblem,
   traceHotkeyEvent
 } from "@/lib/tauri";
+import { expirePrimedStream } from "@/lib/primedStream";
 import { useStore } from "@/store/useStore";
 import type { CursorDeliveryState } from "@/types";
 import { useCallback,useEffect,useRef,useState } from "react";
@@ -184,6 +185,7 @@ export function useDictation(options: { getCaptureSelection?: () => CaptureSelec
         }
         primedStreamRef.current = stream;
         setMicrophoneReadyState(true);
+        expirePrimedStream(stream, primedStreamRef, () => sessionRef.current.phase);
         return stream;
       })
       .finally(() => {

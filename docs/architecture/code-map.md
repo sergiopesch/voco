@@ -157,6 +157,8 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `dictationPresentation.test.ts` — Status labels.
 - `activityMode.ts` — Whether dictation is active and whether a toggle is allowed.
 - `activityMode.test.ts` — Activity rules.
+- `primedStream.ts` — Closes a microphone stream opened ahead of a start that no start took.
+- `primedStream.test.ts` — The stream closes when idle, and is left to a start in flight.
 - `shortcutPresentation.ts` — Shortcut and microphone labels, and time limits for diagnostics requests.
 - `shortcutPresentation.test.ts` — Presentation helpers.
 - `microphoneRefresh.ts` — Orders device list refreshes against explicit access requests.

@@ -182,6 +182,18 @@ it("reaches source selection from input readiness alone, with no destination bin
   expect(h.setError).toHaveBeenLastCalledWith("Choose a microphone in Microphone settings.");
 });
 
+it("closes a microphone stream opened ahead of a start that the start never took", async () => {
+  // The start is refused before it reaches the microphone.
+  const h = harness();
+  const stop = vi.fn();
+  h.env.primedStreamRef.current = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+  Object.assign(h.microphone, { allowed: false, detail: "Microphone access is blocked." });
+  await h.startRecording();
+  expect(h.env.openTracedMicrophoneStream).not.toHaveBeenCalled();
+  expect(stop).toHaveBeenCalledOnce();
+  expect(h.env.primedStreamRef.current).toBeNull();
+});
+
 it.each(["cursor", "onboarding:test"])("names the snap's microphone connection before opening a microphone (%s)", async (trigger) => {
   const h = harness();
   const detail = "The VOCO snap can't use the microphone yet. Run snap connect voco:audio-record, then try again.";

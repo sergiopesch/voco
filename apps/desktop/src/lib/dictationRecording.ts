@@ -209,8 +209,17 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     void releaseBrowserRecording(triggerId).catch(() => {});
   }
 
+  /** A stream opened ahead of a start is for that start alone: when a
+   * recording ends, one that no start took is closed, so no microphone
+   * stream stays open while VOCO is idle. */
+  function releasePrimedStream() {
+    primedStreamRef.current?.getTracks().forEach((track) => track.stop());
+    primedStreamRef.current = null;
+  }
+
   function interruptRecording(reason: string) {
     if (disposedRef.current) return;
+    releasePrimedStream();
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
     // Whatever the recording was for, an interruption ends its native capture:
@@ -269,6 +278,7 @@ export function createDictationRecording(env: DictationRecordingEnv) {
 
   function finalizeIdleState() {
     if (disposedRef.current) return;
+    releasePrimedStream();
     void browserDeliveryRef.current?.cancel();
     const completed = useStore.getState();
     if (completed.dictationPurpose === "onboarding") {
@@ -600,6 +610,8 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       }
     } catch (err) {
       if (!isCurrentSession(startingSessionId)) return;
+      // A start that failed before its capture took the stream opened for it.
+      releasePrimedStream();
       if (!cancelledRef.current) invalidateNativeSelection();
       await teardownAudioGraph().catch(() => {});
       void browserDeliveryRef.current?.cancel();
