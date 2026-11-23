@@ -126,3 +126,10 @@ cd research/voice-correction-primitives-2026-11/field-ladder/harness
 ```
 
 The harness writes its results and a `work/` folder beside itself.
+
+**Note, 23 November 2026.** The harness can't run as committed. `ladder.py`
+loads a Shell extension from `harness/probe/`, which lists and activates
+windows, reads the pointer and takes screenshots, and that folder was never
+committed. The results above are unaffected: they were made with it. The
+[later study](../../voice-correction-checked-2026-11/README.md)'s field
+harness carries a rewritten extension, and runs.
