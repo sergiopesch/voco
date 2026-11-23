@@ -228,6 +228,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `test_spelling.py` — The table and its notices, conversion rules, append-only streaming and the benchmark replay.
 - `test_streaming.py` — Silence gate accounting and log privacy.
 - `test_timing.py` — Timing instrumentation keeps sample order and transcripts.
+- `test_worker_audio.py` — A push's samples from base64 float32 and from a JSON list, bit for bit, and malformed audio rejected.
 - `test_worker_protocol.py` — Protocol and lifecycle checks against the real model.
 - `test_worker_mywords.py` — Each session's My words in the protocol loop: the boosted phrases, listed spellings and content-free diagnostics.
 - `test_worker_spelling.py` — Each session's spelling in the protocol loop, and a missing table failing startup.
@@ -303,6 +304,7 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 
 - `test-unit.sh` — `npm test`: fast checks that need no microphone, speech model or desktop session.
 - `check-devops.sh`, `check-shell-syntax.sh`, `check-version-consistency.mjs` — Repository, shell and version checks.
+- `check-specs.sh` — Model-checks the TLA+ specifications in `specs/tla` with TLC, given `VOCO_TLA_TOOLS`.
 - `verify-deb-package.sh`, `verify-speech-payload.py` — Package contents.
 - `verify-rpm-package.sh` — The RPM's contents and policy; given the Debian package, it also proves that both carry the same files and dependencies.
 - `verify-snap-package.sh` — The snap's metadata, wrappers, libraries and speech payload, and that it carries the Debian package's files except those strict confinement can't use.
@@ -386,6 +388,17 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `voco-symbol-ui.png` — 128 px symbol that the window and the GNOME companion show.
 - `voco-readme-banner.svg` — README banner, written by `scripts/generate-brand-banner.py`.
 - `brand-sources/*` — Source images for the logo, the symbol and the two window textures, with notes on the textures. [Branding](../branding.md) covers their use.
+
+## Specifications: `specs/`
+
+- `tla/README.md` — What each TLA+ model covers, what it assumes, and how to check it.
+- `tla/DictationSession.tla` — One recording at a time: start, queued Stop, cancel and their completions.
+- `tla/NativeCapture.tla` — The renderer's native capture session: polling, Stop, cancel and interruptions.
+- `tla/UpdateCheck.tla` — Update checks that overlap or outlive their channel.
+- `tla/UpdateInstall.tla` — Install update's stages and the recognition sessions they exclude.
+- `tla/CommandCalls.tla` — The `voco --toggle` calls of a held or tapped desktop shortcut.
+- `tla/ShortcutPresses.tla` — The `Toggle` calls of the snap's GNOME shortcut, at GNOME's repeat timing.
+- `tla/*.cfg` — The bounded model TLC checks for the module each is named after.
 
 ## Repository root
 

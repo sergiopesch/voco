@@ -75,9 +75,14 @@ On GNOME with the companion attached, the companion presses VOCO's paste keys
 instead, from inside GNOME Shell. It asks the application attached as
 `com.sergiopesch.voco.Panel` for its work (`NextRequest`) and takes it from no
 one else, sends only Shift+Insert, never while a modifier is held, and GNOME
-disables it at the lock screen. A program of yours that owned
-`com.sergiopesch.voco.Panel` before VOCO started could hand it a Shift+Insert; your access to `/dev/uinput` already lets
-any of your programs do that.
+disables it at the lock screen. A program of yours that owns
+`com.sergiopesch.voco.Panel` while VOCO isn't running, before it started or
+after you quit or removed it, could hand the companion a Shift+Insert. Where
+the package's udev rule is installed, your access to `/dev/uinput` already lets
+any of your programs do that. With the snap, or with the companion left enabled
+after VOCO is removed, nothing else does: the companion is then what lets such
+a program paste the clipboard into the focused app, so disable it in GNOME's
+Extensions when you remove VOCO.
 
 The package's udev rule tags `/dev/uinput` with `uaccess`, so logind gives the
 user of the active local session read and write access through an ACL, and
@@ -156,7 +161,9 @@ global shortcut itself. VOCO grants microphone requests that ask for audio
 only, and denies any request that includes a camera.
 
 The window opens two kinds of link through `xdg-open`: release pages under
-`https://github.com/sergiopesch/voco/releases/tag/`, and the
+`https://github.com/sergiopesch/voco/releases/tag/`, whose tag must be `voco.`
+and a version of digits, letters, dots and hyphens, so nothing in an address
+from GitHub's answer can lead to another page, and the
 [Wayland paste keys section](../platform/README.md#wayland-paste-keys) of the
 platform guide, on GitHub. It refuses every other address.
 

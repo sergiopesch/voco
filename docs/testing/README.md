@@ -336,6 +336,11 @@ results. Neither
 These need programs or permissions that CI doesn't have. A run is evidence only
 for the host it ran on. Where you don't run them, record them as unavailable.
 
+`scripts/check-specs.sh` model-checks the TLA+ specifications in
+[specs/tla](../../specs/tla/README.md) with TLC. It needs Java and
+`VOCO_TLA_TOOLS`, the path of a `tla2tools.jar` from the TLA+ project's
+releases, and takes module names to check only those.
+
 | Script | What runs | Needs |
 | --- | --- | --- |
 | `test-native-gnome.sh` | GNOME Shell with Ubuntu's AppIndicator extension on a private Xvfb seat. `VOCO_GNOME_APP_BINARY` adds the app and its tray, and `VOCO_GNOME_CRASH_REVIEW=1`, `VOCO_GNOME_ONBOARDING=1` or `VOCO_GNOME_CURSOR=1` adds Review, the voice test or dictation into a field | `VOCO_NATIVE_DEPS` and a new `VOCO_GNOME_EVIDENCE_DIR`. The voice test and dictation also need `VOCO_DEV_NATIVE_CAPTURE`, `VOCO_DEBUG_CAPTURE_AUDIO` and `VOCO_DEBUG_NATIVE_CAPTURE` set to 1, and dictation the [uinput bridge](#the-uinput-bridge) |

@@ -89,6 +89,9 @@ recognizer; browser field ownership is a delivery concern.
 Rust owns OS integration, files, processes, the tray, packaging and validation.
 React owns presentation and recording orchestration. Keep both typed and
 state-driven. Comment invariants and non-obvious decisions; don't narrate lines.
+A lifecycle is one enum or union with one transition function, never a set of
+flags, and the ones in [specs/tla](specs/tla/README.md) have a TLA+ model:
+change the code, its model and its tests together.
 
 Capture is native Pulse/PipeWire on Wayland and a WebKit AudioWorklet on X11
 (`VOCO_DEV_NATIVE_CAPTURE=1` selects native capture for development). A hidden
@@ -154,7 +157,11 @@ and the update check. [The snap](#the-snap) lists its rules.
   replay a whole recording. Recreate a dead worker only at a session boundary.
 - Keep bounded queues, deadlines and sequence/sample accounting. Worker IPC groups
   100 ms of audio and Stop flushes the partial packet. Keep the three-second
-  backlog bound and account for every sample.
+  backlog bound and account for every sample. A packet's samples travel as
+  little-endian float32 in base64 (`audio_f32`), the same samples bit for bit
+  as a JSON list of numbers in a quarter of the bytes; the worker still takes
+  that list (`audio`) from fixtures and research tools, and a push names
+  exactly one of the two.
 - Native Pulse ticks drain ready transport events within bounded work and time.
   Pulse's playback overflow callback doesn't report recording drops, so keep the
   bounded duration-deficit guard and the complete-reference waveform tests;
@@ -406,7 +413,10 @@ and the update check. [The snap](#the-snap) lists its rules.
 - A locked origin rejects too. Read logind's `LockedHint` with `Active` and
   follow its changes: while it is set, both checks reject (`no-mutation`) and no
   shortcut route starts dictation, a toggle that waited for the renderer is
-  dropped, and the change to locked stops a running one. Subscribe, then read
+  dropped, and the change to locked stops a running one, or one still
+  starting: a Stop asked of a start in flight is queued and runs the moment
+  the microphone is live, even before the renderer shows "starting".
+  Subscribe, then read
   the first value on the same main context, so the read can't undo a newer
   change. While logind doesn't answer, or the origin isn't bound yet, keep
   trying, up to every 30 s. A logind that answers without the property reads as
@@ -450,7 +460,11 @@ and the update check. [The snap](#the-snap) lists its rules.
   space loses no words, so Stop says nothing and copies nothing.
 - Closing or navigating an enabled browser tab, or losing its native connection,
   stops that tab's recording. Field focus loss revokes delivery but keeps the
-  session's explicit Stop; stale tokens can't stop a newer session.
+  session's explicit Stop; stale tokens can't stop a newer session. VOCO stops
+  waiting for an append's receipt when its field is revoked or after 2 s, and
+  reports that delivery uncertain. The browser may still answer it: that one
+  late receipt is expected and changes nothing, where any other receipt
+  without a request ends the connection.
 
 ### Shortcut
 
@@ -492,7 +506,8 @@ and the update check. [The snap](#the-snap) lists its rules.
   after the keyboard's repeat delay, and reports no release of either key. A
   `Toggle` call is therefore told from a press by GNOME's repeat timing: after
   a press, a call within 100 ms of one repeat delay later is its first repeat
-  and one at once is the same press; after a repeat, a call sooner than a
+  and one at once is the same press, which leaves that first repeat due from
+  the press itself; after a repeat, a call sooner than a
   first repeat could come is the next. Any other is a press, and VOCO answers
   the call whatever it did, so a repeat never falls back. That timing alone
   can't tell a second press that comes about one repeat delay after the first.
@@ -758,7 +773,10 @@ and the update check. [The snap](#the-snap) lists its rules.
   signature and checksum again, refuses a release not newer than the installed
   one, and runs exactly `apt-get install` or `dnf install` on that copy, with
   no other argument from VOCO. The package
-  manager must then report exactly that release. Never install while
+  manager must then report exactly that release. Cancel counts until the
+  password prompt, the checks after the download included, and is refused
+  from then on. After an install that succeeded, this VOCO starts no
+  recognition and no other install, even when its restart fails. Never install while
   dictating, a recording is finishing or a Stop's text is still being pasted or
   copied; Review's journal survives the restart. Restart
   only after the install succeeds, through the same detached launch as the
@@ -922,6 +940,11 @@ reached and the speech worker reaches nothing. In both, a microphone stream exis
 only while dictation runs. Run it after a change that could touch the network, the
 update check, the worker sandbox or capture, and keep its evidence folder out of
 the repository.
+
+`scripts/check-specs.sh` model-checks the TLA+ specifications in `specs/tla`
+with TLC, given `VOCO_TLA_TOOLS`, the path of a `tla2tools.jar`, and Java. Run
+it after a change to a state machine that has a model, and to the model itself.
+CI doesn't run it.
 
 `scripts/check-speech.sh` measures recognition through the real worker after
 `scripts/provision-ci-speech.sh`: the accuracy gate, word error rate and latency on

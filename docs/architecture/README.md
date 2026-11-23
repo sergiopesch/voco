@@ -109,8 +109,12 @@ digital-silence gate skips long runs of exact zeros but keeps 640 ms before
 sound and 1.5 seconds after it.
 
 `DictationStream` groups audio into packets of `round(rate × 0.1)` samples and
-sends one request at a time. It accepts only results that extend the previous
-one. If the recognizer revises earlier words, or falls more than three seconds
+sends one request at a time. A packet's samples travel as little-endian
+float32 in base64 (`audio_f32`): the same samples bit for bit as a JSON list of
+numbers, in a quarter of the bytes, with nothing to print or parse per sample
+in the renderer, in Rust or in the worker. The worker still takes that list
+(`audio`), which fixtures and the evaluation tools send. It accepts only
+results that extend the previous one. If the recognizer revises earlier words, or falls more than three seconds
 behind, recognition stops for that recording.
 
 Each start carries `spelling`: `british`, `american` or `as-recognised`.
@@ -490,7 +494,8 @@ install runs at a time, on its own thread, and reports each stage through
 WebKit already links, following redirects by hand (`allowed_redirect`), with a
 30-second idle timeout and size limits, into `$XDG_STATE_HOME/voco/update/`.
 `cancel_update_install` cancels the `gio::Cancellable` under a waiting read,
-and only until the download ends. `update_verify.rs` holds the checks shared
+and counts until the password prompt: a Cancel chosen while the release is
+checked stops the install too, and from the prompt on it is refused. `update_verify.rs` holds the checks shared
 with the root helper: the `gpgv` signature by the release key's fingerprint,
 the signed manifest, the SHA-256 and the package's identity.
 
@@ -499,7 +504,10 @@ the signed manifest, the SHA-256 and the package's identity.
 `cancel`. After verifying, VOCO closes the gate unless the tray reports
 dictation or a session started in the last 5 seconds (the renderer's report can
 lag its start), so from the password prompt until VOCO exits no recognition
-starts; a failure opens it again. Rust also keeps the last stage it reported,
+starts; a failure opens it again. The install's stages are one `Install` enum
+behind that gate: idle, fetching, installing and installed. Once installed,
+this VOCO starts no recognition and no other install, also when its restart
+fails. Rust also keeps the last stage it reported,
 which `update_install_status` returns, so the Updates page shows a running or
 ended install when it opens again, until **Close** calls
 `dismiss_update_install`. Then VOCO runs
@@ -661,6 +669,26 @@ dictated text, audio or window titles:
 
 With both off, the renderer sends no dictation traces or delivery quality
 records.
+
+## State machines and their models
+
+A lifecycle in VOCO is one enum or union with one transition function, tested
+beside it. [specs/tla](../../specs/tla/README.md)
+holds TLA+ models of the ones whose cases are easy to miss, each checked with
+TLC by `scripts/check-specs.sh`:
+
+| Model | Code | What TLC checks |
+| --- | --- | --- |
+| `DictationSession` | `dictationSession.ts`, driven by `dictationRecording.ts`, `useDictation.ts` and `App.tsx` | A Stop or a cancel asked of a session, also while it starts, never leaves it recording, and the session ends |
+| `NativeCapture` | `nativeCapture.ts` | Polling only between activation and Stop, one report of an interruption, and a stopped capture is a complete one |
+| `UpdateCheck` | `updateCheckCoordinator.ts` | "Checking" is never left on screen once every check has ended, whatever order they end in |
+| `UpdateInstall` | `Install` and `Gate` in `update_install.rs` | An accepted Cancel stops the install, no recognition starts at the prompt or after, and installed is final |
+| `CommandCalls` | `CommandTrain` in `shortcut_arbitration.rs` | A held key bound to `voco --toggle` toggles once, every tap toggles, and no call toggles twice |
+| `ShortcutPresses` | `Presses` in `gnome_shortcut.rs` | A held chord of the snap's GNOME shortcut toggles once, also when GNOME delivers its press twice |
+
+A model covers the decisions of its state machine, not the code around it:
+timers, IPC and the desktop are its environment, written down as assumptions in
+the model.
 
 ## Design decisions
 
