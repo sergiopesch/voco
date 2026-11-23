@@ -393,7 +393,10 @@ export function App() {
       return true;
     }
 
-    const dictationActive = isDictationActive(currentState.status);
+    // Start publishes "starting" only after its checks, so a dictation the
+    // session has begun counts here too: a Stop that comes in that moment, as
+    // the screen lock's does, is queued for it and never dropped.
+    const dictationActive = isDictationActive(currentState.status) || dictationInProgress();
     if (!dictationActive && action === "stop") return true;
     const captureState = useStore.getState();
     if (!dictationActive && captureState.captureBackendMode !== "webkit") {
@@ -413,7 +416,7 @@ export function App() {
       if (request.cancelled || useStore.getState().surface !== "hidden") { rejectBrowserStart(); return true; }
     }
     if (
-      captureState.captureBackendMode === "webkit" &&
+      captureState.captureBackendMode === "webkit" && !dictationActive &&
       !canToggleDictationWithPermission(
         currentState.status,
         useStore.getState().microphonePermission,
@@ -431,7 +434,7 @@ export function App() {
       await showNotification("Dictation stopped", "VOCO stopped listening when the screen locked.").catch(() => {});
     }
     return true;
-  }, [dictationSessionId, dismissInteractiveSurface, nativeMicrophone.ensureDefault, runtimeStatusEpoch, setError, toggle]);
+  }, [dictationInProgress, dictationSessionId, dismissInteractiveSurface, nativeMicrophone.ensureDefault, runtimeStatusEpoch, setError, toggle]);
   const handleStartTest = useCallback(async () => {
     const state = useStore.getState();
     if (startRequestRef.current || isDictationActive(state.status) || state.surface !== "onboarding") return;

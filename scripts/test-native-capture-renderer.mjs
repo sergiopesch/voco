@@ -646,6 +646,30 @@ try {
       await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
       await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_drain'&&x.args.request.ackThroughSequence===4));
     };
+    // A Stop that comes after Start began and before it shows "starting", as
+    // the screen lock's can, is queued: the recording ends as soon as it is live.
+    await load('enabled');await chooseNative('token-1');
+    await page.waitForFunction(()=>window.store.getState().nativeCaptureSource!==null);
+    await page.waitForFunction(()=>window.listeners['voco:toggle-dictation']);
+    await page.evaluate(()=>{window.allowBegin=true;
+      const answer=window.nativeHandlers.getDesktopPasteStatus,held=new Promise(resolve=>{window.releasePasteStatus=resolve;});
+      window.nativeHandlers.getDesktopPasteStatus=async()=>{window.pasteStatusAsked=true;await held;return answer();};
+      window.store.getState().setSurface('hidden');window.listeners['voco:toggle-dictation']({payload:null});});
+    await page.waitForFunction(()=>window.pasteStatusAsked===true);
+    assert.equal(await page.evaluate(()=>window.store.getState().status),'idle');
+    await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:{triggerId:'session:locked',action:'stop'}}));
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal((await state()).commands.filter(x=>x.name==='native_capture_begin').length,0);
+    await page.evaluate(()=>window.releasePasteStatus());
+    await page.waitForFunction(()=>window.nativeCommands.some(x=>x.name==='native_capture_stop'));
+    // Stopped at once, before any audio went to recognition: the fixture's
+    // capture also ends by itself, much later.
+    assert.deepEqual(await page.evaluate(()=>{
+      const steps=window.nativeCommands.map(x=>x.name==='speech_stream'?x.args.request.op:x.name);
+      return steps.slice(steps.indexOf('native_capture_begin'),steps.indexOf('native_capture_stop')).filter(step=>step==='push');
+    }),[]);
+    await page.waitForFunction(()=>window.store.getState().status==='idle');
+    expected.push('stop-before-starting-is-shown-is-queued');record(expected.at(-1));
     await activate();
     const panelSession = await page.evaluate(()=>window.captureIdentity.sessionId);
     for (const stopSession of [`2:${panelSession}`, `1:${panelSession+1}`, '', 'malformed']) {
