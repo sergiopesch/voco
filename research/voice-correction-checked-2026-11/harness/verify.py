@@ -48,6 +48,15 @@ def tables(scratch):
         check(f'{name} computed again from the runs', same(scratch / name, RESULTS / name))
 
 
+def field_runs(scratch):
+    """The field's result files, out of their archive."""
+    folder = scratch / 'field-runs'
+    if not folder.exists():
+        folder.mkdir()
+        subprocess.run(['tar', 'xJf', str(FIELD / 'results' / 'runs.tar.xz'), '-C', str(folder)], check=True)
+    return folder
+
+
 def chain(scratch):
     """The chain's trial files built again, and each field run tied to its file."""
     script('chain.py', RESULTS / 'trials.json', RESULTS / 'runs.jsonl', RESULTS / 'lean.jsonl', scratch / 'chain')
@@ -58,22 +67,30 @@ def chain(scratch):
           all(same(scratch / 'chain' / entry['file'], RESULTS / 'chain' / entry['file']) for entry in files))
     check('each trial file has the SHA-256 chain.json names',
           all(hashlib.sha256((RESULTS / 'chain' / entry['file']).read_bytes()).hexdigest() == entry['sha256'] for entry in files))
-    script('score_chain.py', RESULTS / 'chain' / 'chain.json', FIELD / 'results' / 'runs', scratch)
+    script('score_chain.py', RESULTS / 'chain' / 'chain.json', field_runs(scratch), scratch)
     for name in ('chain-summary.json', 'chain-tables.txt'):
         check(f'{name} computed again from the field runs', same(scratch / name, RESULTS / name))
     by_hash = {entry['sha256']: entry for entry in files}
-    runs = [json.loads(path.read_text()) for path in sorted((FIELD / 'results' / 'runs').glob('*.trial-*.json'))]
+    runs = [json.loads(path.read_text()) for path in sorted(field_runs(scratch).glob('*.trial-*.json'))]
     check(f'{len(runs)} chain runs in the field each name a trial file of chain.json by its SHA-256',
-          bool(runs) and all(run.get('trial_sha256') in by_hash for run in runs))
+          bool(runs) and all(run.get('trial', {}).get('sha256') in by_hash for run in runs))
+    check('each chain run pasted, asked for and expected what its trial file holds',
+          all(run['request']['parts'] == trial['parts'] and run['request']['start'] == trial['start'] and run['request']['end'] == trial['end']
+              and run['request']['replacement'] == trial['replacement'] and run['request']['rest'] == trial['rest']
+              and run['trial']['expected'] == trial['expected']
+              for run in runs for trial in [json.loads((RESULTS / 'chain' / by_hash[run['trial']['sha256']]['file']).read_text())]))
 
 
 def field(scratch):
     """Every field run classified again from its raw reads."""
     work = scratch / 'field'
-    subprocess.run(['cp', '-a', str(FIELD / 'harness'), str(work)], check=True)
-    (work / 'results').mkdir(exist_ok=True)
-    for path in (FIELD / 'results' / 'runs').glob('*.json'):
+    work.mkdir()
+    for path in (FIELD / 'harness').glob('*.py'):
+        (work / path.name).write_bytes(path.read_bytes())
+    (work / 'results').mkdir()
+    for path in field_runs(scratch).glob('*.json'):
         (work / 'results' / path.name).write_bytes(path.read_bytes())
+    (work / 'results' / 'versions.txt').write_bytes((FIELD / 'results' / 'versions.txt').read_bytes())
     subprocess.run(['/usr/bin/python3.12', 'summarize.py'], check=True, cwd=work, stdout=subprocess.DEVNULL)
     for name in ('summary.json', 'summary.md'):
         check(f'field {name} computed again from the runs', same(work / 'results' / name, FIELD / 'results' / name))
