@@ -188,24 +188,87 @@ pub enum CommandCall {
     Unsettled(u64),
 }
 
-/// The `voco --toggle` calls of a desktop shortcut, outside the snap. The
-/// desktop runs the command for the press and again for each repeat while the
-/// key is held, and reports no release (AGENTS.md, Shortcut). VOCO can't read
-/// every desktop's repeat delay, so a repeat is told by what follows it: a
-/// held key's first repeat is followed by the next within `COMMAND_TRAIN`,
-/// and a second press isn't.
+/// Where a desktop shortcut's `voco --toggle` calls stand, outside the snap.
+/// The desktop runs the command for the press and again for each repeat while
+/// the key is held, and reports no release (AGENTS.md, Shortcut). VOCO can't
+/// read every desktop's repeat delay, so a repeat is told by what follows it:
+/// a held key's first repeat is followed by the next within `COMMAND_TRAIN`,
+/// and a second press isn't. `specs/tla/CommandCalls.tla` models these states
+/// and checks that a held key toggles once and no call toggles twice.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum CommandTrain {
+    /// No call yet.
+    #[default]
+    Idle,
+    /// The last call, at `last`, is decided: a press that toggled, or a repeat.
+    Settled { last: Instant },
+    /// The last call, at `last`, is a press or the first repeat of the one
+    /// before. Its timer, `serial`, or the next call says which.
+    Unsettled { last: Instant, serial: u64 },
+}
+
+/// What `CommandTrain::call` decided about a call.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CallKind {
+    Press,
+    Repeat,
+    Unsettled,
+}
+
+impl CommandTrain {
+    fn last(self) -> Option<Instant> {
+        match self {
+            Self::Idle => None,
+            Self::Settled { last } | Self::Unsettled { last, .. } => Some(last),
+        }
+    }
+
+    /// The one transition for a call at `now`, whose timer would be `serial`:
+    /// the next state, whether the call before it, left unsettled, was a
+    /// press after all, and what this call is.
+    fn call(self, now: Instant, serial: u64) -> (Self, bool, CallKind) {
+        let gap = self.last().map(|last| now.saturating_duration_since(last));
+        let unsettled = matches!(self, Self::Unsettled { .. });
+        match gap {
+            // A repeat, which also shows an unsettled call before it to have
+            // been the first repeat of its train.
+            Some(gap) if gap < COMMAND_TRAIN => {
+                (Self::Settled { last: now }, false, CallKind::Repeat)
+            }
+            Some(gap) if gap < COMMAND_QUIET => (
+                Self::Unsettled { last: now, serial },
+                unsettled,
+                CallKind::Unsettled,
+            ),
+            _ => (Self::Settled { last: now }, unsettled, CallKind::Press),
+        }
+    }
+
+    /// The one transition for the timer `serial`: the next state, and whether
+    /// its call was a press. A timer whose call a later call already settled
+    /// changes nothing.
+    fn timer(self, serial: u64) -> (Self, bool) {
+        match self {
+            Self::Unsettled { last, serial: open } if open == serial => {
+                (Self::Settled { last }, true)
+            }
+            _ => (self, false),
+        }
+    }
+}
+
+/// The `voco --toggle` calls of a desktop shortcut, outside the snap: the
+/// `CommandTrain` and the serial numbers of its timers.
 #[derive(Default)]
 pub struct CommandCalls {
-    last: Option<Instant>,
-    unsettled: Option<u64>,
+    train: CommandTrain,
     serial: u64,
 }
 
 impl CommandCalls {
     pub const fn new() -> Self {
         Self {
-            last: None,
-            unsettled: None,
+            train: CommandTrain::Idle,
             serial: 0,
         }
     }
@@ -214,33 +277,25 @@ impl CommandCalls {
     /// unsettled, was a press after all: nothing followed it in time, and
     /// its own `settle` hasn't run yet.
     pub fn note(&mut self, now: Instant) -> (bool, CommandCall) {
-        let gap = self.last.map(|last| now.saturating_duration_since(last));
-        self.last = Some(now);
-        match gap {
-            // A repeat, which also shows an unsettled call before it to have
-            // been the first repeat of its train.
-            Some(gap) if gap < COMMAND_TRAIN => {
-                self.unsettled = None;
-                (false, CommandCall::Repeat)
-            }
-            Some(gap) if gap < COMMAND_QUIET => {
-                let earlier = self.unsettled.take().is_some();
+        let (train, earlier, kind) = self.train.call(now, self.serial + 1);
+        self.train = train;
+        let call = match kind {
+            CallKind::Press => CommandCall::Press,
+            CallKind::Repeat => CommandCall::Repeat,
+            CallKind::Unsettled => {
                 self.serial += 1;
-                self.unsettled = Some(self.serial);
-                (earlier, CommandCall::Unsettled(self.serial))
+                CommandCall::Unsettled(self.serial)
             }
-            _ => (self.unsettled.take().is_some(), CommandCall::Press),
-        }
+        };
+        (earlier, call)
     }
 
     /// `COMMAND_TRAIN` after an unsettled call: true when it was a press,
     /// false when a repeat followed it or a later call already settled it.
     pub fn settle(&mut self, serial: u64) -> bool {
-        if self.unsettled == Some(serial) {
-            self.unsettled = None;
-            return true;
-        }
-        false
+        let (train, press) = self.train.timer(serial);
+        self.train = train;
+        press
     }
 }
 
@@ -354,6 +409,49 @@ mod tests {
         let mut times = held(0, 500, 30, 1_000);
         times.extend(held(1_300, 30, 30, 600));
         assert_eq!(command_toggles(&times), [0]);
+    }
+
+    /// Every state of the train against every event, as
+    /// `specs/tla/CommandCalls.tla` lists them: a call sooner than
+    /// `COMMAND_TRAIN`, one sooner than `COMMAND_QUIET`, one later, the
+    /// state's own timer and a stale one.
+    #[test]
+    fn the_command_train_decides_every_event_in_every_state() {
+        use CallKind::{Press, Repeat, Unsettled as Open};
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let last = at(10_000);
+        let settled = CommandTrain::Settled { last };
+        let unsettled = CommandTrain::Unsettled { last, serial: 7 };
+        let (soon, between, late) = (at(10_149), at(10_150), at(12_000));
+        let next = |now| CommandTrain::Settled { last: now };
+        let open = |now| CommandTrain::Unsettled {
+            last: now,
+            serial: 8,
+        };
+
+        // No call yet: whenever it comes, the first is a press.
+        for now in [soon, between, late] {
+            assert_eq!(CommandTrain::Idle.call(now, 8), (next(now), false, Press));
+        }
+        assert_eq!(CommandTrain::Idle.timer(7), (CommandTrain::Idle, false));
+
+        // After a decided call.
+        assert_eq!(settled.call(soon, 8), (next(soon), false, Repeat));
+        assert_eq!(settled.call(between, 8), (open(between), false, Open));
+        assert_eq!(settled.call(late, 8), (next(late), false, Press));
+        assert_eq!(settled.timer(7), (settled, false));
+
+        // After a call still open: a repeat shows it was one too, and any
+        // later call shows it was a press.
+        assert_eq!(unsettled.call(soon, 8), (next(soon), false, Repeat));
+        assert_eq!(unsettled.call(between, 8), (open(between), true, Open));
+        assert_eq!(unsettled.call(late, 8), (next(late), true, Press));
+        assert_eq!(unsettled.timer(7), (settled, true));
+        assert_eq!(unsettled.timer(6), (unsettled, false));
+
+        // A clock that reads earlier than the last call is a gap of nothing.
+        assert_eq!(settled.call(at(9_000), 8), (next(at(9_000)), false, Repeat));
     }
 
     #[test]
