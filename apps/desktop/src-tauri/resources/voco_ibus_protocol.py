@@ -89,7 +89,9 @@ def decode_request(line: bytes) -> dict[str, Any]:
     try:
         decoded = line.decode("utf-8")
         payload = json.loads(decoded)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    # A line of nothing but opening brackets is valid up to Python's recursion
+    # limit, and raises RecursionError beyond it.
+    except (ValueError, RecursionError) as error:
         raise ProtocolError("invalid JSON protocol request") from error
     if not isinstance(payload, dict):
         raise ProtocolError("protocol request must be a JSON object")

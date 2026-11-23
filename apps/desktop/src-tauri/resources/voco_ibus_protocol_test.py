@@ -73,6 +73,14 @@ class ProtocolTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ProtocolError):
                 decode_request(value)
 
+    def test_decoder_rejects_the_longest_lines_python_cannot_parse(self) -> None:
+        # Nesting past the recursion limit, and a number past the digit limit:
+        # neither is a JSONDecodeError, and neither may escape the engine's
+        # socket callback, which would keep its one client slot taken.
+        for value in (b"[" * (MAX_REQUEST_BYTES - 1), b'{"id":' + b"1" * 60_000 + b"}"):
+            with self.subTest(length=len(value)), self.assertRaises(ProtocolError):
+                decode_request(value)
+
     def test_encoder_does_not_escape_unicode_or_log_payloads(self) -> None:
         encoded = encode_message(
             {"version": PROTOCOL_VERSION, "id": 1, "text": "café 👩\u200d💻"},

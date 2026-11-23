@@ -1,2 +1,5 @@
 #!/bin/sh
-exec /usr/bin/python3 -u /usr/lib/voco/ibus/voco_ibus_engine.py --ibus "$@"
+# -E and -s as for the speech worker: the engine sees every key of IBus's
+# clients, so it takes no module from PYTHON* variables or the user's
+# site-packages. Not -I, which drops the script's folder and its own modules.
+exec /usr/bin/python3 -E -s -B -u /usr/lib/voco/ibus/voco_ibus_engine.py --ibus "$@"
