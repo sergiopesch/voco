@@ -732,6 +732,19 @@ it("an interrupted check fails where it was asked, without a notification or Rev
   expect(h.env.audioBufferRef.current.sampleCount).toBe(0);
 });
 
+it.each(["cursor", "words", "onboarding"] as const)("an interrupted %s recording cancels its native capture, so the next one can begin", async (purpose) => {
+  const h = harness();
+  h.state.dictationPurpose = purpose;
+  const cancel = vi.fn(async () => {});
+  h.env.nativeCaptureRef.current = { cancel } as unknown as NonNullable<typeof h.env.nativeCaptureRef.current>;
+  h.recordingWith(async () => { throw new Error("Recognition stopped responding."); });
+  if (purpose !== "cursor") h.pasteSession.current = false;
+  appendAudioSamples(h.env.audioBufferRef.current, new Float32Array([0.1]));
+  await h.stopRecording();
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(h.env.nativeCaptureRef.current).toBeNull();
+});
+
 it("handled unmount resets cursor store content and state", () => {
   const h = harness();
   h.state.transcript = "Synthetic in-flight text.";

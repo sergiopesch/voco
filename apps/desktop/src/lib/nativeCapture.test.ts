@@ -80,6 +80,30 @@ describe("native capture protocol and ownership",()=>{
     await new Promise(r=>setTimeout(r,5));await session.cancel();resolve(packet());await new Promise(r=>setTimeout(r,5));
     expect(opts.onSamples).not.toHaveBeenCalled();expect(api.cancel).toHaveBeenCalledExactlyOnceWith(identity);
   });
+  it("a cancelled capture neither stops nor polls, and says it was cancelled",async()=>{
+    // Cancelled before Stop: no Stop is sent for a capture that is gone.
+    const api=mockApi(),opts=callbacks(api),session=await beginNativeCapture(opts);
+    await session.cancel();session.startDelivery();await new Promise(r=>setTimeout(r,5));
+    await expect(session.stopAndDrain()).rejects.toThrow("Native capture cancelled");
+    expect(api.drain).not.toHaveBeenCalled();expect(api.stop).not.toHaveBeenCalled();
+    expect(opts.onInterrupted).not.toHaveBeenCalled();
+    // Cancelled while Stop waits for the tail: the wait ends with the same reason.
+    const slow=mockApi();let release!: (value:unknown)=>void;slow.stop=vi.fn(()=>new Promise(r=>{release=r;}));
+    const slowOptions=callbacks(slow),stopping=await beginNativeCapture(slowOptions);
+    const stopped=stopping.stopAndDrain();const outcome=expect(stopped).rejects.toThrow("Native capture cancelled");
+    await new Promise(r=>setTimeout(r,5));await stopping.cancel();release(receipt());await outcome;
+    expect(slowOptions.onInterrupted).not.toHaveBeenCalled();
+    expect(stopping.stopAndDrain()).toBe(stopped);
+  });
+  it("polls only between activation and Stop",async()=>{
+    const api=mockApi(),opts=callbacks(api),session=await beginNativeCapture(opts);
+    await new Promise(r=>setTimeout(r,5));expect(api.drain).not.toHaveBeenCalled();
+    await session.stopAndDrain();
+    const drains=vi.mocked(api.drain).mock.calls.length,stops=vi.mocked(api.stop).mock.calls.length;
+    // Activation after Stop starts nothing, and a second Stop is the first one's answer.
+    session.startDelivery();await session.stopAndDrain();await new Promise(r=>setTimeout(r,5));
+    expect(api.drain).toHaveBeenCalledTimes(drains);expect(api.stop).toHaveBeenCalledTimes(stops);
+  });
   it("serializes Stop behind an in-flight batch before final ACK",async()=>{
     let resolve!: (value:unknown)=>void; const api=mockApi(); let first=true;
     api.drain=vi.fn(request=>{if(first){first=false;return new Promise(r=>{resolve=r;});}return Promise.resolve(packet(request.ackThroughSequence,false));});

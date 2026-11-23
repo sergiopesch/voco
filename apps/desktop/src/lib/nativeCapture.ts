@@ -145,13 +145,21 @@ export async function beginNativeCapture(options: {
   const descriptor = createCaptureDescriptor({ backend: "native", sessionId: identity.sessionId, generation: identity.generation,
     sourceSampleRate: reply.sampleRate, sourceChannels: 2, deliveredChannels: 1,
     sourceIdentity: JSON.stringify(reply.source), conversion: "s16le-stereo-average" });
-  let cancelled = false, stopping = false, started = false, sequence = 0, frames = 0, failure: string | null = null;
+  // Where the capture stands: begun (open, nothing polled yet), delivering,
+  // stopping (Stop sent, the tail draining), stopped (the tail confirmed) or
+  // cancelled. Stop is asked for once, from begun or delivering; Cancel ends
+  // any of them. `failure` is an interruption, reported once: a failed
+  // capture polls no more, and its owner still stops or cancels it.
+  // specs/tla/NativeCapture.tla models these phases.
+  let phase: "begun" | "delivering" | "stopping" | "stopped" | "cancelled" = "begun";
+  const cancelled = () => phase === "cancelled";
+  let sequence = 0, frames = 0, failure: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let active: Promise<NativeCaptureReceipt> | null = null, stopPromise: Promise<NativeCaptureReceipt> | null = null;
   const remembered = new Map<number, { start: number; bytes: Uint8Array }>();
   let lastSampleAt = performance.now();
   function interrupt(error: unknown) {
-    if (failure || cancelled) return;
+    if (failure || cancelled()) return;
     failure = error instanceof Error ? error.message : String(error);
     options.onInterrupted(failure);
   }
@@ -159,7 +167,7 @@ export async function beginNativeCapture(options: {
     const requestedAck = sequence;
     const batch = parseNativeBatch(await bounded(api.drain({ ...identity, ackThroughSequence: requestedAck }), budgetMs), identity);
     if (batch.receipt.acknowledgedSequence > requestedAck) throw new Error("Native capture acknowledged unretained audio");
-    if (cancelled) throw new Error("Native capture cancelled");
+    if (cancelled()) throw new Error("Native capture cancelled");
     if (!batch.receipt.health.healthy) interrupt(batch.receipt.health.reason ?? "Native microphone capture interrupted");
     for (const b of batch.blocks) {
       const bytes = batch.pcm.slice(b.byteOffset, b.byteOffset + b.byteLength);
@@ -174,8 +182,8 @@ export async function beginNativeCapture(options: {
       sequence = b.sequence; frames += b.frames; remembered.set(sequence, { start: b.frameStart, bytes });
       if (remembered.size > 8) remembered.delete(remembered.keys().next().value!);
     }
-    if (!stopping && performance.now() - lastSampleAt >= 5000) interrupt("Native microphone stopped delivering audio");
-    if (batch.receipt.limitReached && !stopping) options.onLimit();
+    if (phase !== "stopping" && performance.now() - lastSampleAt >= 5000) interrupt("Native microphone stopped delivering audio");
+    if (batch.receipt.limitReached && phase !== "stopping") options.onLimit();
     return batch.receipt;
   }
   function nextDrain(budgetMs = timeoutMs): Promise<NativeCaptureReceipt> {
@@ -184,7 +192,7 @@ export async function beginNativeCapture(options: {
     return active;
   }
   function schedule() {
-    if (cancelled || stopping || failure) return;
+    if (phase !== "delivering" || failure) return;
     timer = setTimeout(() => {
       timer = null;
       void nextDrain().catch(interrupt).finally(schedule);
@@ -192,14 +200,15 @@ export async function beginNativeCapture(options: {
   }
   return {
     descriptor, identity,
-    startDelivery() { if (!started && !cancelled) { started = true; schedule(); } },
+    startDelivery() { if (phase === "begun") { phase = "delivering"; schedule(); } },
     stopAndDrain() {
       if (stopPromise) return stopPromise;
-      stopping = true; if (timer !== null) clearTimeout(timer); timer = null;
+      if (cancelled()) return stopPromise = Promise.reject(new Error("Native capture cancelled"));
+      phase = "stopping"; if (timer !== null) clearTimeout(timer); timer = null;
       stopPromise = (async () => {
         const deadline = performance.now() + timeoutMs;
         if (active) await active.catch(interrupt);
-        while (!cancelled && performance.now() < deadline) {
+        while (!cancelled() && performance.now() < deadline) {
           const terminal = parseNativeReceipt(await bounded(api.stop(identity), Math.max(1, deadline - performance.now())));
           if (!terminal.health.healthy) interrupt(terminal.health.reason ?? "Native microphone capture interrupted");
           const received = await nextDrain(Math.max(1, deadline - performance.now()));
@@ -207,17 +216,19 @@ export async function beginNativeCapture(options: {
               terminal.producedFrames === received.producedFrames && terminal.lastSequence === received.lastSequence &&
               received.lastSequence === sequence && received.acknowledgedSequence === sequence && received.producedFrames === frames) {
             if (failure || !received.corkAcknowledged || !received.barrierAcknowledged || !received.health.healthy) throw new Error(failure ?? "Native capture tail unconfirmed");
+            if (cancelled()) break;
+            phase = "stopped";
             return received;
           }
           await new Promise(resolve => setTimeout(resolve, pollMs));
         }
-        throw new Error("Native capture stop/drain deadline exceeded");
+        throw new Error(cancelled() ? "Native capture cancelled" : "Native capture stop/drain deadline exceeded");
       })().catch(error => { interrupt(error); throw error; });
       return stopPromise;
     },
     async cancel() {
-      if (cancelled) return;
-      cancelled = true; if (timer !== null) clearTimeout(timer); timer = null;
+      if (cancelled()) return;
+      phase = "cancelled"; if (timer !== null) clearTimeout(timer); timer = null;
       await bounded(api.cancel(identity), timeoutMs);
     },
   };

@@ -213,6 +213,11 @@ export function createDictationRecording(env: DictationRecordingEnv) {
     if (disposedRef.current) return;
     void browserDeliveryRef.current?.cancel();
     releaseRecordingOrigin();
+    // Whatever the recording was for, an interruption ends its native capture:
+    // Rust refuses the next one until a capture whose Stop failed is cancelled.
+    const native = nativeCaptureRef.current;
+    nativeCaptureRef.current = null;
+    void native?.cancel().catch(() => {});
     const current = useStore.getState();
     if (current.dictationPurpose === "cursor") {
       // A live notification already covered the Stop it asked for. The error
@@ -221,9 +226,6 @@ export function createDictationRecording(env: DictationRecordingEnv) {
       interruptionNotifiedSession = null;
       // Typed text is part of the transcript: without one nothing is missing.
       const typedNothing = !current.transcript;
-      const native = nativeCaptureRef.current;
-      nativeCaptureRef.current = null;
-      void native?.cancel().catch(() => {});
       dictationStreamRef.current = null;
       clearCapturedAudio();
       clearTranscript();
