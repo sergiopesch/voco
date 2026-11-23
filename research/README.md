@@ -11,3 +11,4 @@ now and links here for the evidence behind a choice.
 | [Ending sentences at pauses, October 2026](pause-sentence-ends-2026-10/README.md) | Can the worker end a sentence where you pause, without ending sentences where you pause to think? |
 | [Correcting by voice, November 2026](voice-correction-2026-11/README.md) | Can a few words said again, and a fixed rule, change the right words VOCO typed and nothing else? |
 | [Three changes to correcting by voice, November 2026](voice-correction-primitives-2026-11/README.md) | Do looser matching, a second stream and a checked change in the focused field move the first study's result? |
+| [Checking each step of correcting by voice, November 2026](voice-correction-checked-2026-11/README.md) | Does a check at each step remove the second study's limits, and does the chain hold from a recording to a changed field? |

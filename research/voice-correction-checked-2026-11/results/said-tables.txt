@@ -1,0 +1,24 @@
+== train-clean-100, fresh groups, other recording: 191 pairs, 126 clauses ==
+  rule 1, plain   right 73.3% (280/382)  collateral 0/764  wrong changes 9/764  far: 140/48/3/0  near: 140/48/3/0  same: 188/0/3/0  elsewhere: 191/0/0/0
+  rule 2, plain   right 85.3% (326/382)  collateral 0/764  wrong changes 16/764  far: 163/22/6/0  near: 163/24/4/0  same: 185/0/6/0  elsewhere: 191/0/0/0
+  rule 3, plain   right 84.8% (324/382)  collateral 0/764  wrong changes 12/764  far: 162/25/4/0  near: 162/26/3/0  same: 186/0/5/0  elsewhere: 191/0/0/0
+  rule 1, leaned  right 76.2% (291/382)  collateral 0/764  wrong changes 11/764  far: 146/41/4/0  near: 145/42/4/0  same: 188/0/3/0  elsewhere: 191/0/0/0
+  rule 2, leaned  right 87.4% (334/382)  collateral 0/764  wrong changes 15/764  far: 168/18/5/0  near: 166/21/4/0  same: 185/0/6/0  elsewhere: 191/0/0/0
+  rule 3, leaned  right 87.2% (333/382)  collateral 0/764  wrong changes 14/764  far: 167/19/5/0  near: 166/21/4/0  same: 186/0/5/0  elsewhere: 191/0/0/0
+
+== train-clean-100, fresh groups, same recording: 193 pairs, 128 clauses ==
+  rule 1, plain   right 83.9% (324/386)  collateral 0/772  wrong changes 6/772  far: 162/29/2/0  near: 162/29/2/0  same: 191/0/2/0  elsewhere: 193/0/0/0
+  rule 2, plain   right 89.6% (346/386)  collateral 0/772  wrong changes 17/772  far: 173/13/7/0  near: 173/15/5/0  same: 188/0/5/0  elsewhere: 193/0/0/0
+  rule 3, plain   right 89.1% (344/386)  collateral 0/772  wrong changes 10/772  far: 172/17/4/0  near: 172/18/3/0  same: 190/0/3/0  elsewhere: 193/0/0/0
+  rule 1, leaned  right 86.5% (334/386)  collateral 0/772  wrong changes 10/772  far: 167/22/4/0  near: 167/22/4/0  same: 191/0/2/0  elsewhere: 193/0/0/0
+  rule 2, leaned  right 90.4% (349/386)  collateral 0/772  wrong changes 16/772  far: 175/12/6/0  near: 174/14/5/0  same: 188/0/5/0  elsewhere: 193/0/0/0
+  rule 3, leaned  right 90.2% (348/386)  collateral 0/772  wrong changes 14/772  far: 174/13/6/0  near: 174/14/5/0  same: 190/0/3/0  elsewhere: 193/0/0/0
+
+== train-clean-100, fresh groups, third recording: 20 pairs, 20 clauses ==
+  rule 1, plain   right 80.0% (32/40)  collateral 0/80  wrong changes 0/80  far: 16/4/0/0  near: 16/4/0/0  same: 20/0/0/0  elsewhere: 20/0/0/0
+  rule 2, plain   right 85.0% (34/40)  collateral 0/80  wrong changes 3/80  far: 17/2/1/0  near: 17/2/1/0  same: 19/0/1/0  elsewhere: 20/0/0/0
+  rule 3, plain   right 85.0% (34/40)  collateral 0/80  wrong changes 3/80  far: 17/2/1/0  near: 17/2/1/0  same: 19/0/1/0  elsewhere: 20/0/0/0
+  rule 1, leaned  right 80.0% (32/40)  collateral 0/80  wrong changes 0/80  far: 16/4/0/0  near: 16/4/0/0  same: 20/0/0/0  elsewhere: 20/0/0/0
+  rule 2, leaned  right 85.0% (34/40)  collateral 0/80  wrong changes 3/80  far: 17/2/1/0  near: 17/2/1/0  same: 19/0/1/0  elsewhere: 20/0/0/0
+  rule 3, leaned  right 85.0% (34/40)  collateral 0/80  wrong changes 3/80  far: 17/2/1/0  near: 17/2/1/0  same: 19/0/1/0  elsewhere: 20/0/0/0
+

@@ -1,0 +1,19 @@
+ok   rule 1 decides as the second study's on 4059 recorded trials
+ok   rule 2 decides as the second study's on 4059 recorded trials
+ok   rule 3 differs from rule 2 only by refusing — refuses 12 of rule 2's changes there
+ok   trials built again from the items and the passages
+ok   own-summary.json computed again from the runs
+ok   own-tables.txt computed again from the runs
+ok   said-summary.json computed again from the runs
+ok   said-tables.txt computed again from the runs
+ok   chain.json built again from the runs and the rule
+ok   60 trial files built again, byte for byte
+ok   each trial file has the SHA-256 chain.json names
+ok   chain-summary.json computed again from the field runs
+ok   chain-tables.txt computed again from the field runs
+ok   180 chain runs in the field each name a trial file of chain.json by its SHA-256
+ok   each chain run pasted, asked for and expected what its trial file holds
+ok   field summary.json computed again from the runs
+ok   field summary.md computed again from the runs
+ok   40 sessions drawn by seed recognized again with the same text, audio and pushes — 40/40; {'P': 6, 'S': 6, 'L': 28}
+all checks passed

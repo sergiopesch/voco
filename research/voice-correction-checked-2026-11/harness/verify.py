@@ -129,7 +129,14 @@ def rules():
 def recognize(count):
     """Recorded sessions through the worker again: the same text?"""
     sys.path.insert(0, str(HERE))
-    import run, lean
+
+    def load(name, path):
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec); sys.modules[name] = module; spec.loader.exec_module(module)
+        return module
+    # This record's run.py imports the first study's driver by the same name.
+    load('run', FIRST / 'harness' / 'run.py')
+    run, lean = load('checked_run', HERE / 'run.py'), load('checked_lean', HERE / 'lean.py')
     items = {item['id']: item for item in json.loads((RESULTS / 'items.json').read_text())['items']}
     recorded = [json.loads(line) for name in ('runs.jsonl', 'lean.jsonl') for line in (RESULTS / name).read_text().splitlines()]
     drawn = random.Random(SEED).sample(recorded, count)
