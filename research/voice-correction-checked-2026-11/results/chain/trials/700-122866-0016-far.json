@@ -1,0 +1,13 @@
+{
+ "id": "700-122866-0016-far",
+ "parts": [
+  "I'm afraid I think too much about my nose",
+  " ever since I heard that compliment about",
+  " it long ago. Oh stupid look there's a rabbit"
+ ],
+ "start": 99,
+ "end": 105,
+ "replacement": "Diana",
+ "rest": " they're so white and still as if they were asleep and dreaming pretty dreams.",
+ "expected": "I'm afraid I think too much about my nose ever since I heard that compliment about it long ago. Oh Diana look there's a rabbit they're so white and still as if they were asleep and dreaming pretty dreams."
+}

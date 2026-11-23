@@ -1,0 +1,13 @@
+{
+ "id": "700-122867-0029-near",
+ "parts": [
+  "Anne wept then, but later on when she went",
+  " upstairs and looked in the glass",
+  ", she was calm with despair. Yes, I bill too"
+ ],
+ "start": 111,
+ "end": 115,
+ "replacement": "will",
+ "rest": ". I never thought I was a vain about my hair of all things, but now I know I was in spite of its being red because it was so long and thick and curly.",
+ "expected": "Anne wept then, but later on when she went upstairs and looked in the glass, she was calm with despair. Yes, I will too. I never thought I was a vain about my hair of all things, but now I know I was in spite of its being red because it was so long and thick and curly."
+}

@@ -1,0 +1,13 @@
+{
+ "id": "8288-274150-0005-far",
+ "parts": [
+  "Good, and dearest love",
+  " said the king, but he turned quickly",
+  ". No, no, not hunt day, sire"
+ ],
+ "start": 73,
+ "end": 77,
+ "replacement": "to",
+ "rest": ". I knew but too well that you had not ceased to love me.",
+ "expected": "Good, and dearest love said the king, but he turned quickly. No, no, not to day, sire. I knew but too well that you had not ceased to love me."
+}

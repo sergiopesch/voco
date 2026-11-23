@@ -1,0 +1,13 @@
+{
+ "id": "700-122868-0027-near",
+ "parts": [
+  "What has happened",
+  ", Anne asked Gilbert",
+  ", taking us his oars"
+ ],
+ "start": 46,
+ "end": 48,
+ "replacement": "up",
+ "rest": ". We were playing Elaine, explained Anne frigidly, without even looking at her rescuer, and I had to drift down to Camelot and the barge I mean the flat.",
+ "expected": "What has happened, Anne asked Gilbert, taking up his oars. We were playing Elaine, explained Anne frigidly, without even looking at her rescuer, and I had to drift down to Camelot and the barge I mean the flat."
+}

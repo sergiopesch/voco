@@ -1,0 +1,13 @@
+{
+ "id": "2803-154328-0016-far",
+ "parts": [
+  "Wilson and Albanette join their companions and all united to dig through the wall. John with his dagger",
+  ", the others with stones taken from the ground or with their nails, while Mulratty stretched along the",
+  " ground, watched the native guard through a crevice of the matting. What could stand the object did they"
+ ],
+ "start": 284,
+ "end": 289,
+ "replacement": "be",
+ "rest": " know of the existence of the prisoners or was it some private enterprise that led to the undertaking?",
+ "expected": "Wilson and Albanette join their companions and all united to dig through the wall. John with his dagger, the others with stones taken from the ground or with their nails, while Mulratty stretched along the ground, watched the native guard through a crevice of the matting. What could be the object did they know of the existence of the prisoners or was it some private enterprise that led to the undertaking?"
+}

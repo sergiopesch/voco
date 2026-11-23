@@ -1,0 +1,13 @@
+{
+ "id": "1630-73710-0005-far",
+ "parts": [
+  "Mine own what",
+  " measured what could you",
+  " do"
+ ],
+ "start": 14,
+ "end": 22,
+ "replacement": "did",
+ "rest": " a bit about my chamber like a filly bird in a cage?",
+ "expected": "Mine own what did what could you do a bit about my chamber like a filly bird in a cage?"
+}

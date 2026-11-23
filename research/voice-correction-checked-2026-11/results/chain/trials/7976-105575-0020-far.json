@@ -1,0 +1,13 @@
+{
+ "id": "7976-105575-0020-far",
+ "parts": [
+  "My friend with many others was being",
+  " carried out to die elsewhere",
+  ". I hastened back to retreat lines"
+ ],
+ "start": 86,
+ "end": 93,
+ "replacement": "the",
+ "rest": ". The cloud of rebels we had seen divided itself into three columns.",
+ "expected": "My friend with many others was being carried out to die elsewhere. I hastened back to the lines. The cloud of rebels we had seen divided itself into three columns."
+}

@@ -1,0 +1,13 @@
+{
+ "id": "1686-142278-0072-near",
+ "parts": [
+  "I cannot stand object",
+  "ions. They make me",
+  " go undecided"
+ ],
+ "start": 40,
+ "end": 42,
+ "replacement": "so",
+ "rest": ". Mister Hale continued. A few months ago when my misery of doubt became more than I could bear without speaking, I wrote to Mister Bell You remember Mister Bell Margaret?",
+ "expected": "I cannot stand objections. They make me so undecided. Mister Hale continued. A few months ago when my misery of doubt became more than I could bear without speaking, I wrote to Mister Bell You remember Mister Bell Margaret?"
+}

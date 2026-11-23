@@ -1522,6 +1522,8 @@ def main():
         if args.trial:
             if args.scenario != "plain":
                 raise ValueError("a trial runs in scenario plain")
+            # A trial that can't be loaded must never take a scenario's file name.
+            name = "trial-unreadable"
             req, trial = load_trial(args.trial)
             name = "trial-" + trial["id"]
             wanted = "untouched" if args.refuse_expected else "correct"

@@ -1,0 +1,13 @@
+{
+ "id": "3752-4943-0017-near",
+ "parts": [
+  "Do him good, curse him",
+  ". It's had",
+  " for such younguns"
+ ],
+ "start": 29,
+ "end": 32,
+ "replacement": "hard",
+ "rest": ". Have you ever been in that that place I was in last night? asked Kirkland.",
+ "expected": "Do him good, curse him. It's hard for such younguns. Have you ever been in that that place I was in last night? asked Kirkland."
+}

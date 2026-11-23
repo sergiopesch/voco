@@ -1,0 +1,13 @@
+{
+ "id": "6467-94831-0039-far",
+ "parts": [
+  "Demanded Sam innocently",
+  ". Isn't it a good picture",
+  "? Show burst off for the donkey"
+ ],
+ "start": 55,
+ "end": 60,
+ "replacement": "me",
+ "rest": ". A donkey or pelic I did nothing of the kind.",
+ "expected": "Demanded Sam innocently. Isn't it a good picture? Show me off for the donkey. A donkey or pelic I did nothing of the kind."
+}

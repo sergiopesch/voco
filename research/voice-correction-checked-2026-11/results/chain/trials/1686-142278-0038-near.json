@@ -1,0 +1,13 @@
+{
+ "id": "1686-142278-0038-near",
+ "parts": [
+  "Margaret, I tried to do it. I tried to content myself with simply refusing",
+  " the additional preferment and stopping quietly here, strangling my",
+  " conscience now as I had strained it before. God forgiven me"
+ ],
+ "start": 190,
+ "end": 198,
+ "replacement": "forgive",
+ "rest": ". He rose and walked up and down the room speaking low words of self reproach and humiliation of which Margaret was thankful to hear but a few.",
+ "expected": "Margaret, I tried to do it. I tried to content myself with simply refusing the additional preferment and stopping quietly here, strangling my conscience now as I had strained it before. God forgive me. He rose and walked up and down the room speaking low words of self reproach and humiliation of which Margaret was thankful to hear but a few."
+}

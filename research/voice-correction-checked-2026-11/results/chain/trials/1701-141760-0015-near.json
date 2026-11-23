@@ -1,0 +1,13 @@
+{
+ "id": "1701-141760-0015-near",
+ "parts": [
+  "You know, of course that his Imperial Highness rod",
+  "e with our regiment all the time so that we had every comfort",
+  " and every advantage. What receptions we had it Poland, what"
+ ],
+ "start": 156,
+ "end": 158,
+ "replacement": "in",
+ "rest": " dinners and balls I can't tell you!",
+ "expected": "You know, of course that his Imperial Highness rode with our regiment all the time so that we had every comfort and every advantage. What receptions we had in Poland, what dinners and balls I can't tell you!"
+}

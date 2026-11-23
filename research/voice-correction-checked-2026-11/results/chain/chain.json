@@ -1,0 +1,1268 @@
+{
+ "seed": 20261123,
+ "delay": 0.8,
+ "drawn": [
+  {
+   "id": "1255-90413-0003",
+   "kind": "far",
+   "heard": "But this was not all.",
+   "typedWords": 30,
+   "wanted": "Afterwards they kept apart awhile in the drawing room for form's sake, but eventually gravitated together again and finished the evening in each other's company. But this was not all but was he able?",
+   "change": {
+    "words": [
+     28,
+     29
+    ],
+    "new": [
+     "not"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1255-90413-0003-far.json",
+   "sha256": "ddea625daf34ff0901552c19ca0794f74ded75d89667b5d6df7d629f908e78ec"
+  },
+  {
+   "id": "1272-135031-0014",
+   "kind": "far",
+   "heard": "Where is that?",
+   "typedWords": 9,
+   "wanted": "Inquired Shaggy in the metal forest. Where is that? The metal forest is in the great domed cavern, the largest in all our dominions, replied Calico.",
+   "change": {
+    "words": [
+     7,
+     8
+    ],
+    "new": [
+     "is"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1272-135031-0014-far.json",
+   "sha256": "58ec8b7d7452728fe2ccfad9541364dfb8d8258b1edbceeac7fa60724232d824"
+  },
+  {
+   "id": "1272-135031-0019",
+   "kind": "far",
+   "heard": "That's funny, remarked Betsy thoughtfully.",
+   "typedWords": 14,
+   "wanted": "Oh no, I'm quite sure he didn't. That's funny, remarked Betsy thoughtfully. I don't believe Ann knew any magic or she'd have worked it before.",
+   "change": {
+    "words": [
+     9,
+     10
+    ],
+    "new": [
+     "remarked"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1272-135031-0019-far.json",
+   "sha256": "794bbf2641ff2b6e602f11adbee090663bb4deb97060e3cabdf70033fb943b5b"
+  },
+  {
+   "id": "1272-135031-0021",
+   "kind": "near",
+   "heard": "I do not know, confessed. Shaggy.",
+   "typedWords": 19,
+   "wanted": "I don't believe Ann knew any magic or she'd have worked it before. I do not know, confessed Shaggy. True, agreed Calico.",
+   "change": {
+    "words": [
+     15,
+     16
+    ],
+    "new": [
+     "not"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1272-135031-0021-near.json",
+   "sha256": "a33aecca7977ee3a540892cd2a84c752c0610ce6ca615d089f248a7c8de39220"
+  },
+  {
+   "id": "1272-141231-0024",
+   "kind": "far",
+   "heard": "This is physically impossible when conscious.",
+   "typedWords": 29,
+   "wanted": "The strength that enables someone in a trance to hold his body stiff and unsupported except at two points the head and heels. This is physically impossible when conscious. Others had died before during the twenties and death during the last round was in some ways easier than defeat.",
+   "change": {
+    "words": [
+     25,
+     26
+    ],
+    "new": [
+     "physically"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1272-141231-0024-far.json",
+   "sha256": "6d87995c8f6ac1c253b02ef3bd0c96a770597ce0e012f766ec02e69dfe351bfa"
+  },
+  {
+   "id": "1585-131718-0041",
+   "kind": "far",
+   "heard": "I didn't remember anything about it.",
+   "typedWords": 13,
+   "wanted": "I thought no more about the matter. I didn't remember anything about it. I was too busy on other things to denote. Us.",
+   "change": {
+    "words": [
+     10,
+     11
+    ],
+    "new": [
+     "anything"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1585-131718-0041-far.json",
+   "sha256": "faa2b957b0df12e13210819b1668d32ea1542ef80415c0cb79a0ed84a5fd6b86"
+  },
+  {
+   "id": "1630-73710-0005",
+   "kind": "far",
+   "heard": "What did what could you do?",
+   "typedWords": 8,
+   "wanted": "Mine own what did what could you do a bit about my chamber like a filly bird in a cage?",
+   "change": {
+    "words": [
+     3,
+     4
+    ],
+    "new": [
+     "did"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1630-73710-0005-far.json",
+   "sha256": "44993cbbfaf6118513e7288c67f7bab133599b5fd4bb6689f4bc13aafe8c2237"
+  },
+  {
+   "id": "1630-96099-0016",
+   "kind": "near",
+   "heard": "He left everything behind.",
+   "typedWords": 31,
+   "wanted": "It is only now at the eleventh hour that the Italian had become inculcated, and the question of his possible anxiety to escape had never been considered. He left everything behind. Hand it to me, said the chief. And when it came into his hands he began to turn over the leaves hurriedly.",
+   "change": {
+    "words": [
+     28,
+     29
+    ],
+    "new": [
+     "left"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1630-96099-0016-near.json",
+   "sha256": "7ba62a981d839fda27be0ef44c2c0ddc6e3f7d59fd9050d0b657640d50dd6b0c"
+  },
+  {
+   "id": "1650-167613-0031",
+   "kind": "far",
+   "heard": "All were silent the officers rose.",
+   "typedWords": 14,
+   "wanted": "It's now the day for that they say all were silent. The officers rose yes, yes, answered the Prince Andrew absently.",
+   "change": {
+    "words": [
+     9,
+     10
+    ],
+    "new": [
+     "were"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1650-167613-0031-far.json",
+   "sha256": "6a45556589eac001ec5b6daacebd59b82137f7f2cedcf520bbdebdb13a38a7e9"
+  },
+  {
+   "id": "1686-142278-0038",
+   "kind": "near",
+   "heard": "God forgive me.",
+   "typedWords": 34,
+   "wanted": "Margaret, I tried to do it. I tried to content myself with simply refusing the additional preferment and stopping quietly here, strangling my conscience now as I had strained it before. God forgive me. He rose and walked up and down the room speaking low words of self reproach and humiliation of which Margaret was thankful to hear but a few.",
+   "change": {
+    "words": [
+     32,
+     33
+    ],
+    "new": [
+     "forgive"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1686-142278-0038-near.json",
+   "sha256": "69f7e5a4c65ef2fd2d78403aa6cf4d5a03d433a9e407db7b1536970327293fd3"
+  },
+  {
+   "id": "1686-142278-0072",
+   "kind": "near",
+   "heard": "They make me so undecided.",
+   "typedWords": 9,
+   "wanted": "I cannot stand objections. They make me so undecided. Mister Hale continued. A few months ago when my misery of doubt became more than I could bear without speaking, I wrote to Mister Bell You remember Mister Bell Margaret?",
+   "change": {
+    "words": [
+     7,
+     8
+    ],
+    "new": [
+     "so"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1686-142278-0072-near.json",
+   "sha256": "27614d4a28b2f0526ed5885d4dc853cf37094f684b9637e3b6b281fc20889bae"
+  },
+  {
+   "id": "1686-142278-0084",
+   "kind": "far",
+   "heard": "I do not know exactly.",
+   "typedWords": 11,
+   "wanted": "When do we go? I do not know exactly. I wanted to talk it over with you.",
+   "change": {
+    "words": [
+     5,
+     6
+    ],
+    "new": [
+     "do"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1686-142278-0084-far.json",
+   "sha256": "9b0f65ce4023502777af265253aea537b1d2a51fdd5e8aafa4f765ccfc35ba9c"
+  },
+  {
+   "id": "1701-141760-0015",
+   "kind": "near",
+   "heard": "What receptions we had in Poland?",
+   "typedWords": 31,
+   "wanted": "You know, of course that his Imperial Highness rode with our regiment all the time so that we had every comfort and every advantage. What receptions we had in Poland, what dinners and balls I can't tell you!",
+   "change": {
+    "words": [
+     28,
+     29
+    ],
+    "new": [
+     "in"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/1701-141760-0015-near.json",
+   "sha256": "aa1635a6f682a69b06c29ebe62c885e2239cafab23c11cdce3730814fd10cb06"
+  },
+  {
+   "id": "2078-142845-0048",
+   "kind": "near",
+   "heard": "Seventeen thirty four.",
+   "typedWords": 29,
+   "wanted": "When we take into account that the Arabians are fond of lizards and locusts as articles of food, their cuisine altogether is scarcely a tempting one. Seventeen thirty four illustration rusks.",
+   "change": {
+    "words": [
+     27,
+     28
+    ],
+    "new": [
+     "thirty"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/2078-142845-0048-near.json",
+   "sha256": "27042cc2304594494fc630392dd42174b9bdb9c9133c8becd29d4dc553b584f6"
+  },
+  {
+   "id": "2428-83705-0003",
+   "kind": "near",
+   "heard": "It is most delightful.",
+   "typedWords": 54,
+   "wanted": "I do not know when it is going to be, but it will be either next week or the week after, certainly at the earliest possible moment, and I shouldn't be at all surprised to learn that all Marianne's things have been already bought and perhaps some of them marked. It is most delightful. It might just as well be some one else's wedding so unimportant is the part which I am set to play in it.",
+   "change": {
+    "words": [
+     52,
+     53
+    ],
+    "new": [
+     "most"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/2428-83705-0003-near.json",
+   "sha256": "cc9c597102d05fdddfe6650ba4fd26add32697fc457ae14d398f511fbb75f68f"
+  },
+  {
+   "id": "2506-13150-0004",
+   "kind": "far",
+   "heard": "One shall be cut to land.",
+   "typedWords": 8,
+   "wanted": "Sick sick one shall be cut a land. The wind chopped about.",
+   "change": {
+    "words": [
+     6,
+     7
+    ],
+    "new": [
+     "to"
+    ],
+    "step": 0
+   },
+   "right": false,
+   "exact": false,
+   "file": "trials/2506-13150-0004-far.json",
+   "sha256": "3ddef7e45e68064c07a3ef97e88a8f8f95e3e1a5387e05515877def341329352"
+  },
+  {
+   "id": "2803-154328-0016",
+   "kind": "far",
+   "heard": "What could be the object?",
+   "typedWords": 53,
+   "wanted": "Wilson and Albanette join their companions and all united to dig through the wall. John with his dagger, the others with stones taken from the ground or with their nails, while Mulratty stretched along the ground, watched the native guard through a crevice of the matting. What could be the object did they know of the existence of the prisoners or was it some private enterprise that led to the undertaking?",
+   "change": {
+    "words": [
+     48,
+     49
+    ],
+    "new": [
+     "be"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/2803-154328-0016-far.json",
+   "sha256": "196f98e16a4863f098e80e2bedf513ab7986b19fe1876cb659425153dc59726b"
+  },
+  {
+   "id": "3170-137482-0013",
+   "kind": "far",
+   "heard": "Where is my husband?",
+   "typedWords": 13,
+   "wanted": "We took our three prisoners to a large boat. Where is my husband? Never fear you shall see him again tomorrow.",
+   "change": {
+    "words": [
+     10,
+     11
+    ],
+    "new": [
+     "is"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/3170-137482-0013-far.json",
+   "sha256": "882d598cb8c720c62c0733bcfa0736bc74d46cfa818bfa63caae75d874e98890"
+  },
+  {
+   "id": "3752-4943-0017",
+   "kind": "near",
+   "heard": "It's hard for such youngs.",
+   "typedWords": 10,
+   "wanted": "Do him good, curse him. It's hard for such younguns. Have you ever been in that that place I was in last night? asked Kirkland.",
+   "change": {
+    "words": [
+     6,
+     7
+    ],
+    "new": [
+     "hard"
+    ],
+    "step": 1
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/3752-4943-0017-near.json",
+   "sha256": "5186127d6fee020ed18d87a7fa248598ca1833bd5ca2b6c719f478eb868479a6"
+  },
+  {
+   "id": "3752-4944-0014",
+   "kind": "far",
+   "heard": "A great rascal put In North.",
+   "typedWords": 23,
+   "wanted": "In fact, the ringleader John Rex gave me his confession and I sent it to the Bishop. A great rascal put in North. Well now said Meekin with asperity, I don't agree with you.",
+   "change": {
+    "words": [
+     20,
+     21
+    ],
+    "new": [
+     "put"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/3752-4944-0014-far.json",
+   "sha256": "7049b7879e13e5b8b7934015f14ece5206d99b3576eb82df80f403f05405ac37"
+  },
+  {
+   "id": "3752-4944-0037",
+   "kind": "far",
+   "heard": "McElwain shook his head seriously.",
+   "typedWords": 25,
+   "wanted": "An impulsive gentleman said Meekin to McElwain as the sound of Mister North's footsteps died away in the distance. McElwayne shook his head seriously. He is the strangest fits at times.",
+   "change": {
+    "words": [
+     20,
+     21
+    ],
+    "new": [
+     "shook"
+    ],
+    "step": 1
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/3752-4944-0037-far.json",
+   "sha256": "f85d0c6a4a0d27df71c1e82c654cc5178f975d44e1857d20d1535b91ad7dc165"
+  },
+  {
+   "id": "3853-163249-0034",
+   "kind": "far",
+   "heard": "Now Cynthia, be you satisfied?",
+   "typedWords": 14,
+   "wanted": "No, he ain't it's a trainer, added Anne Lizzie. Now Cynthia, be you satisfied and the inconsistent woman fell upon his buttony breast weeping copiously.",
+   "change": {
+    "words": [
+     12,
+     13
+    ],
+    "new": [
+     "you"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/3853-163249-0034-far.json",
+   "sha256": "553d15c4f712f59162611f64bb89e9a6d72440efd2d92de9fe305d63b9656e66"
+  },
+  {
+   "id": "4153-186222-0021",
+   "kind": "far",
+   "heard": "Louise seemed to meditate.",
+   "typedWords": 13,
+   "wanted": "But suppose she leaves it to you, persisted Beth. Louise seemed to meditate. It's a magnificent estate, said Beth, looking at her cousin doubtfully.",
+   "change": {
+    "words": [
+     10,
+     11
+    ],
+    "new": [
+     "seemed"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4153-186222-0021-far.json",
+   "sha256": "5839576e4d428feaa7c0ff80167dc38b474d101cdc9946cd131b700b990dabc9"
+  },
+  {
+   "id": "4153-186223-0014",
+   "kind": "near",
+   "heard": "John Merrick. That's me.",
+   "typedWords": 25,
+   "wanted": "Kenneth stopped short and the mayor stopped and the little man with a whimsical smile at the boy's astonishment also stopped. John Merrick, that's me. You were the tinsmith.",
+   "change": {
+    "words": [
+     22,
+     23
+    ],
+    "new": [
+     "merrick"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4153-186223-0014-near.json",
+   "sha256": "0e09291d11fe48c897389ee35ee9133b5eb76d9a2cfb231599a21fc437ce71fb"
+  },
+  {
+   "id": "4323-18416-0012",
+   "kind": "far",
+   "heard": "Well, my dear, what is it?",
+   "typedWords": 46,
+   "wanted": "Oh no, Grandpapa cried Phronsie in a rapture, I could never be too big for that. So she perched up as of old on his knee. Then she folded her hands and looked gravely in his face. Well, my dear, what is it? asked the old gentleman presently. You've come to tell me something, I suppose.",
+   "change": {
+    "words": [
+     38,
+     39
+    ],
+    "new": [
+     "my"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4323-18416-0012-far.json",
+   "sha256": "c6d78d972988da59d7edde8471a7267b3a5ffc4e45232be61233dc151da7dbf3"
+  },
+  {
+   "id": "4323-18416-0017",
+   "kind": "near",
+   "heard": "Charlotte poor repeated the old gentleman.",
+   "typedWords": 24,
+   "wanted": "Oh, she left you everything she had, Phronzie, a couple of millions or so it is why Charlotte poor repeated the old gentleman. Why no not exactly her father isn't rich, but Charlotte I think may do very well, especially as I intend to keep her here for a while and then I shall never let her suffer Phronsie never indeed.",
+   "change": {
+    "words": [
+     21,
+     22
+    ],
+    "new": [
+     "old"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4323-18416-0017-near.json",
+   "sha256": "67578042d840b5cba74062b1eb63e9132c8f16b5bc7cbc2c1ee807678409cdd0"
+  },
+  {
+   "id": "4323-55228-0048",
+   "kind": "far",
+   "heard": "You mean it'll be before October?",
+   "typedWords": 21,
+   "wanted": "We must go home, and William is here too, and wants to see you. You mean it'll be before October? Aunt Hannah glanced from one to the other uncertainly.",
+   "change": {
+    "words": [
+     18,
+     19
+    ],
+    "new": [
+     "before"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4323-55228-0048-far.json",
+   "sha256": "a66747f9d0ce980dcfd93ff6c778a8e7c84c0a17bce9a7bdec0a7b237acbb59d"
+  },
+  {
+   "id": "4515-11057-0077",
+   "kind": "far",
+   "heard": "I do wish it.",
+   "typedWords": 16,
+   "wanted": "How am I to live an hour in such uncertainty as this? I do wish it her emotion had an effect on him and his voice trembled.",
+   "change": {
+    "words": [
+     13,
+     14
+    ],
+    "new": [
+     "do"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4515-11057-0077-far.json",
+   "sha256": "55e97307d8c6a99df071b23c0f243cc5af94d740e5d46edd82d4030751fc5dd4"
+  },
+  {
+   "id": "4570-24733-0003",
+   "kind": "far",
+   "heard": "Must necessarily exist.",
+   "typedWords": 7,
+   "wanted": "In its nature infinite must necessarily exist. We have now granted, therefore thought not constituting the idea of God and accordingly the idea of God does not naturally follow from its nature in so far as it is absolute thought, for it is conceived as constituting and also as not constituting the idea of God, which is against our hypothesis.",
+   "change": {
+    "words": [
+     5,
+     6
+    ],
+    "new": [
+     "necessarily"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/4570-24733-0003-far.json",
+   "sha256": "14715d6903526b3dfa70e4e08809f9591ddb41cf25256df0ccba913667f67eba"
+  },
+  {
+   "id": "5338-284437-0023",
+   "kind": "near",
+   "heard": "No, our way is best.",
+   "typedWords": 38,
+   "wanted": "If I lived as luxuriously as my people do and had servants and costly gowns, the good pinkies would say that their queen had more than they themselves and it would be true. No, our way is best. The queen is nothing but the power to execute the laws, to adjust grievances, and to compel order.",
+   "change": {
+    "words": [
+     34,
+     35
+    ],
+    "new": [
+     "our"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5338-284437-0023-near.json",
+   "sha256": "4c5deb82c2c7285368cb9b18215db97e9af65e56d701450cfabe87cc661ff85a"
+  },
+  {
+   "id": "5543-27761-0005",
+   "kind": "far",
+   "heard": "She felt cold with her husband.",
+   "typedWords": 24,
+   "wanted": "But it was not these charms in Lalatchka that gave her mother the keenest joy. She felt cold with her husband. He was always fresh and cool with a frigid smile and wherever he passed cold currents seemed to move in the air.",
+   "change": {
+    "words": [
+     16,
+     17
+    ],
+    "new": [
+     "felt"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5543-27761-0005-far.json",
+   "sha256": "b153b3f3aa23528305b9be71b7979726be6720f835bcf12216565130086b7e1b"
+  },
+  {
+   "id": "5543-27761-0019",
+   "kind": "far",
+   "heard": "Her mother went to hide.",
+   "typedWords": 12,
+   "wanted": "Her mother's eyes glowed with passionate emotion. Her mother went to hide Lolucha turned away as though not to see, but watched her Momochka stealthily all the time.",
+   "change": {
+    "words": [
+     10,
+     11
+    ],
+    "new": [
+     "to"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5543-27761-0019-far.json",
+   "sha256": "b2418a3e74db9bce0f1d62581e14cedd9352c923d4a987087aceaa41cc54ad9c"
+  },
+  {
+   "id": "5543-27761-0046",
+   "kind": "far",
+   "heard": "Fidocious face made her anxious.",
+   "typedWords": 11,
+   "wanted": "Sarah Fema Alexandrovna gave a start. Fodosia's face made her anxious. What is it, Fido? she asked with great concern. Is there anything wrong with Lolachka?",
+   "change": {
+    "words": [
+     8,
+     9
+    ],
+    "new": [
+     "made"
+    ],
+    "step": 3
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5543-27761-0046-far.json",
+   "sha256": "2a1dd22ff43b328170b4e6626a83ea4ca5b6252adccf523bad51d5ae6ac74780"
+  },
+  {
+   "id": "5543-27761-0076",
+   "kind": "near",
+   "heard": "Several days passed. Lilucha caught cold.",
+   "typedWords": 19,
+   "wanted": "She prayed long that night, but the prayer did not relieve her sadness. Several days passed. Lilucha caught cold, the fever came upon her at night.",
+   "change": {
+    "words": [
+     14,
+     15
+    ],
+    "new": [
+     "days"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5543-27761-0076-near.json",
+   "sha256": "dbdbdae919ba5b11523c4c63e337b9a077f2c4c89b5596ab6b58d823422fb6a2"
+  },
+  {
+   "id": "5694-64029-0002",
+   "kind": "near",
+   "heard": "Our Army stopped at Murfreesboro.",
+   "typedWords": 19,
+   "wanted": "The Federal Army was concentrating at Nashville. There was no rest for the weary. Our army stopped at Murfreesboro from time to time. Different regiments were sent forward to do picket duty.",
+   "change": {
+    "words": [
+     17,
+     18
+    ],
+    "new": [
+     "at"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5694-64029-0002-near.json",
+   "sha256": "2ea901331eb0a6076df8814deef56a85e64de24fc8940394b0046c8df1d683aa"
+  },
+  {
+   "id": "5849-50873-0030",
+   "kind": "far",
+   "heard": "Where is the charter?",
+   "typedWords": 33,
+   "wanted": "The soldiers began the crowd about the house when at a signal from Captain Wadsworth the train bance came on the scene and prepared to grapple with the soldiers. Where is the charter? You have your soldiers at the door and we have the train bands of Connecticut ready to defend us against violence.",
+   "change": {
+    "words": [
+     31,
+     32
+    ],
+    "new": [
+     "the"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/5849-50873-0030-far.json",
+   "sha256": "cc8913b2940e6fff4b51c68234af7e1d347aab27ae95552c5e3d8bf539e37b38"
+  },
+  {
+   "id": "6267-53049-0021",
+   "kind": "near",
+   "heard": "Penelope thought her altogether charming.",
+   "typedWords": 21,
+   "wanted": "So Penelope went to Blanche's party and her dress was the admiration of every girl there. Penelope thought her altogether charming. She looks as if she had just stepped out of the frame of some lovely old picture, she said to herself.",
+   "change": {
+    "words": [
+     19,
+     20
+    ],
+    "new": [
+     "altogether"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6267-53049-0021-near.json",
+   "sha256": "5acf63aab6b4f239a723ee323f5daa0d90ff0c4e336d52d0a21a948dc2b17eb5"
+  },
+  {
+   "id": "6267-65525-0032",
+   "kind": "far",
+   "heard": "The good woman shook her head.",
+   "typedWords": 21,
+   "wanted": "Sydney did not sleep that night, but dozed restlessly about or cried in her pillow. The good woman shook her head. Sydney trod the way of the transgressor and found that its thorns burst to bone and marrow.",
+   "change": {
+    "words": [
+     17,
+     18
+    ],
+    "new": [
+     "woman"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6267-65525-0032-far.json",
+   "sha256": "50fd0f1b5c7a0cfd9b0234aa01ba367ff219fb673033f6486a092aa60d7463e4"
+  },
+  {
+   "id": "6267-65525-0043",
+   "kind": "far",
+   "heard": "Why did you deceive me?",
+   "typedWords": 14,
+   "wanted": "Then why did you write them? he asked blankly. Why did you deceive me? Oh, I didn't mean to deceive you. I never thought of such a thing.",
+   "change": {
+    "words": [
+     10,
+     11
+    ],
+    "new": [
+     "did"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6267-65525-0043-far.json",
+   "sha256": "58ab3fb6942422c7426fe9646c0ac6698f7373990e9d0aea7ae6aeef20e08a68"
+  },
+  {
+   "id": "6313-66125-0026",
+   "kind": "near",
+   "heard": "Sure thing, answered the boy.",
+   "typedWords": 20,
+   "wanted": "Shall we haul up? asked Ly, making a megaphone of his hands. Yes, haul away sure thing, answered the boy. Nor was his sense of security increased when in shifting his position the torch fell from his grasp, the faggot scattering as a slip down between the limbs of the tree and whirling in ever diminishing circles until finally he heard them clatter on the rocks below.",
+   "change": {
+    "words": [
+     18,
+     19
+    ],
+    "new": [
+     "the"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6313-66125-0026-near.json",
+   "sha256": "ae519f82aec88a0a2c62e5fd265c5a0d9921bf37cb3abdcd6e17defd14abfdf7"
+  },
+  {
+   "id": "6313-66129-0019",
+   "kind": "far",
+   "heard": "A temporary camp was quickly pitched.",
+   "typedWords": 26,
+   "wanted": "An early strat was made so that the party reached the promised tableland shortly before ten o'clock in the forenoon. A temporary camp was quickly pitched. The great green field surrounded on all sides by tall trees made the place an ideal one for their purpose.",
+   "change": {
+    "words": [
+     24,
+     25
+    ],
+    "new": [
+     "quickly"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6313-66129-0019-far.json",
+   "sha256": "704ae8567d5b0abb2638d71fba1fe3aec82b785556ff03fd8cc577b4f3e53d9a"
+  },
+  {
+   "id": "6319-64726-0014",
+   "kind": "far",
+   "heard": "I have waited long for you.",
+   "typedWords": 24,
+   "wanted": "He passed through one apartment after another where were ladies and gentlemen asleep in their chairs or standing. I have waited long for you. They talked for four hours and had not then said half that was in their heads to say.",
+   "change": {
+    "words": [
+     22,
+     23
+    ],
+    "new": [
+     "for"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6319-64726-0014-far.json",
+   "sha256": "046d3f855e84caee40b41aef037cdbed8c2edf12ebb6bf00bb3747425e92e013"
+  },
+  {
+   "id": "6455-67803-0012",
+   "kind": "far",
+   "heard": "It just smelled ever so faintly.",
+   "typedWords": 14,
+   "wanted": "Oh I always do it. I didn't guess it just smelled ever so faintly that one of the reasons why she loathes me so she added.",
+   "change": {
+    "words": [
+     12,
+     13
+    ],
+    "new": [
+     "so"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6455-67803-0012-far.json",
+   "sha256": "4411f5984dfd82f2313e9738bc176a8a76f4ada4d32019fdac3afce8ef7cbc24"
+  },
+  {
+   "id": "6455-67803-0012",
+   "kind": "near",
+   "heard": "It just smelled ever so faintly.",
+   "typedWords": 14,
+   "wanted": "Oh I always do it. I didn't guess it just smelled ever so faintly that one of the reasons why she loathes me so she added.",
+   "change": {
+    "words": [
+     12,
+     13
+    ],
+    "new": [
+     "so"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6455-67803-0012-near.json",
+   "sha256": "05d997f5911954b19f1344d69266293497c75e2bf9a5cabb37a7c5c2adeb1854"
+  },
+  {
+   "id": "6467-94831-0039",
+   "kind": "far",
+   "heard": "Show me off for the donkey.",
+   "typedWords": 14,
+   "wanted": "Demanded Sam innocently. Isn't it a good picture? Show me off for the donkey. A donkey or pelic I did nothing of the kind.",
+   "change": {
+    "words": [
+     9,
+     10
+    ],
+    "new": [
+     "me"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6467-94831-0039-far.json",
+   "sha256": "8cf8f6f667541586165600b60a7120eeb0e8b7d20d81e2c9cb738beba300aa0f"
+  },
+  {
+   "id": "6467-94831-0041",
+   "kind": "far",
+   "heard": "It's A donkey's head. I say.",
+   "typedWords": 16,
+   "wanted": "A donkey or pelic. I did nothing of the kind. It's a donkey's head, I say, and I say it. Your picture.",
+   "change": {
+    "words": [
+     13,
+     14
+    ],
+    "new": [
+     "head"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6467-94831-0041-far.json",
+   "sha256": "3f3dce519f02203c0c10e4a2bc560de134ecae92049ba9ec7b3f3760da072dbb"
+  },
+  {
+   "id": "6841-88294-0028",
+   "kind": "near",
+   "heard": "Where's my coat? He asked.",
+   "typedWords": 10,
+   "wanted": "I've been robbed, he cried. Where's my coat? he asked. You had no coat when I picked you up, I replied.",
+   "change": {
+    "words": [
+     7,
+     8
+    ],
+    "new": [
+     "coat"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/6841-88294-0028-near.json",
+   "sha256": "d4a00009060c7b445f251a452beea253927dda1f3e1daa953f5b08252bda7262"
+  },
+  {
+   "id": "700-122866-0016",
+   "kind": "far",
+   "heard": "Oh Diana, look there's a rabbit.",
+   "typedWords": 25,
+   "wanted": "I'm afraid I think too much about my nose ever since I heard that compliment about it long ago. Oh Diana look there's a rabbit they're so white and still as if they were asleep and dreaming pretty dreams.",
+   "change": {
+    "words": [
+     20,
+     21
+    ],
+    "new": [
+     "diana"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/700-122866-0016-far.json",
+   "sha256": "ee8f149a1632860cbea5bab78119b49753d603d1779b616250549923743af581"
+  },
+  {
+   "id": "700-122867-0029",
+   "kind": "near",
+   "heard": "Yes, I will too.",
+   "typedWords": 24,
+   "wanted": "Anne wept then, but later on when she went upstairs and looked in the glass, she was calm with despair. Yes, I will too. I never thought I was a vain about my hair of all things, but now I know I was in spite of its being red because it was so long and thick and curly.",
+   "change": {
+    "words": [
+     22,
+     23
+    ],
+    "new": [
+     "will"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/700-122867-0029-near.json",
+   "sha256": "fa171eb9fa6201e79f48d2335244958cc48aa6c56787a1c16bbc28942ee2a5fd"
+  },
+  {
+   "id": "700-122868-0014",
+   "kind": "far",
+   "heard": "Left behind at the landing.",
+   "typedWords": 10,
+   "wanted": "Jane rose to the occasion, left behind at the landing. Anne gave one gasping little scream which nobody ever heard. She was white to the lips, but she did not lose her self possession.",
+   "change": {
+    "words": [
+     7,
+     8
+    ],
+    "new": [
+     "at"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/700-122868-0014-far.json",
+   "sha256": "d06c74c5da8a98487e2cda0ad794f68acb07eda99eff32410364dadddd2a299d"
+  },
+  {
+   "id": "700-122868-0027",
+   "kind": "near",
+   "heard": "Asked Gilbert, taking up his oars.",
+   "typedWords": 10,
+   "wanted": "What has happened, Anne asked Gilbert, taking up his oars. We were playing Elaine, explained Anne frigidly, without even looking at her rescuer, and I had to drift down to Camelot and the barge I mean the flat.",
+   "change": {
+    "words": [
+     7,
+     8
+    ],
+    "new": [
+     "up"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/700-122868-0027-near.json",
+   "sha256": "9c3927c0da08c6ea75d68bfda24352f575b6c128e62d7190ca18eeada10b39bc"
+  },
+  {
+   "id": "7976-105575-0017",
+   "kind": "far",
+   "heard": "I could not help my friend.",
+   "typedWords": 38,
+   "wanted": "Once in the night I slipped away from the bivouac and hurried to the old Tishamingo Hotel to see a lieutenant of my company who had been shot through the breast. I could not help my friend go back to the regiment, he said, smiling. All will be needed.",
+   "change": {
+    "words": [
+     32,
+     33
+    ],
+    "new": [
+     "could"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/7976-105575-0017-far.json",
+   "sha256": "c94d73c3cb26982676cd63a31bff0945c47e0c86fbc3ed7ac8e547404f0b6ac1"
+  },
+  {
+   "id": "7976-105575-0020",
+   "kind": "far",
+   "heard": "I hastened back to the lines.",
+   "typedWords": 18,
+   "wanted": "My friend with many others was being carried out to die elsewhere. I hastened back to the lines. The cloud of rebels we had seen divided itself into three columns.",
+   "change": {
+    "words": [
+     16,
+     17
+    ],
+    "new": [
+     "the"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/7976-105575-0020-far.json",
+   "sha256": "382a5e437c31aa189a4511dbc1a48ce5c61a4a96871c287d71582c8666f652a0"
+  },
+  {
+   "id": "8173-294714-0037",
+   "kind": "near",
+   "heard": "Why need you hesitate?",
+   "typedWords": 18,
+   "wanted": "Does speaking of him again mean speaking of his debts? I asked. Why need you hesitate? You know that there is nothing I will not do to relieve your anxiety.",
+   "change": {
+    "words": [
+     14,
+     15
+    ],
+    "new": [
+     "you"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/8173-294714-0037-near.json",
+   "sha256": "590d80286300cacabdc2be9f3a8dffa07d973aa1d98c16c068ccfcb71c71bcf3"
+  },
+  {
+   "id": "8173-294714-0048",
+   "kind": "far",
+   "heard": "You are quite mistaken, I replied.",
+   "typedWords": 40,
+   "wanted": "I could offer to lend the scoundrel the money that he wanted at an hour's notice, and he was the man to accept my proposal quite as easily as I could make it. You are quite mistaken, I replied. I am only doubting whether your plan for relieving Mr. Van Brandt of his embarrassments is quite so simple as you suppose.",
+   "change": {
+    "words": [
+     35,
+     36
+    ],
+    "new": [
+     "quite"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/8173-294714-0048-far.json",
+   "sha256": "50e4893ba17973091126ecb964ce93c4141d034741c9c44a68f9393939b28af7"
+  },
+  {
+   "id": "8173-294714-0056",
+   "kind": "far",
+   "heard": "I could honestly Promise that",
+   "typedWords": 29,
+   "wanted": "Promise that you won't ask me to borrow money of you for Mister Van Brandt, she rejoined, and I will accept your help gratefully. I could honestly promise that my one chance of saving her lay in keeping from her knowledge the course that I had now determined to pursue.",
+   "change": {
+    "words": [
+     25,
+     26
+    ],
+    "new": [
+     "could"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/8173-294714-0056-far.json",
+   "sha256": "cdfa13a6236942567189333d1a69511b29d4f68ba7a849e22f5ce35eaad05d81"
+  },
+  {
+   "id": "8254-84205-0015",
+   "kind": "far",
+   "heard": "Because I've seen Indians again.",
+   "typedWords": 12,
+   "wanted": "But we shan't, my lad, why not? Because I've seen Indians again. Oh, you're always seeing Indians again.",
+   "change": {
+    "words": [
+     9,
+     10
+    ],
+    "new": [
+     "seen"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/8254-84205-0015-far.json",
+   "sha256": "71c5b4cdc928af09ca5f5fdbfdc25a12717d85558cc85bf0fb21ff7993fc544d"
+  },
+  {
+   "id": "8254-84205-0064",
+   "kind": "far",
+   "heard": "What for said Guys? Sharply.",
+   "typedWords": 23,
+   "wanted": "But before any more is said, Griggs, I want to offer you the opportunity to draw back what for said Griggs sharply. Not a bit of it, sir. I'm going to take care they don't hit me.",
+   "change": {
+    "words": [
+     18,
+     21
+    ],
+    "new": [
+     "for",
+     "said",
+     "guys"
+    ],
+    "step": 0
+   },
+   "right": false,
+   "exact": false,
+   "file": "trials/8254-84205-0064-far.json",
+   "sha256": "f36d1a2d5b665686f1ac91e9a1db9040a937b571f23392bfdbabc2aeafcd05d5"
+  },
+  {
+   "id": "8288-274150-0005",
+   "kind": "far",
+   "heard": "No, No not to day. Sire.",
+   "typedWords": 17,
+   "wanted": "Good, and dearest love said the king, but he turned quickly. No, no, not to day, sire. I knew but too well that you had not ceased to love me.",
+   "change": {
+    "words": [
+     14,
+     15
+    ],
+    "new": [
+     "to"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/8288-274150-0005-far.json",
+   "sha256": "fece945879274760349f0f249320a8b6935b7729f89fbdc1059da992c8310aeb"
+  },
+  {
+   "id": "8288-274162-0063",
+   "kind": "near",
+   "heard": "I could not so much the worse.",
+   "typedWords": 11,
+   "wanted": "Wait if you can. I could not so much the worse. Ah, said Raoul, snatching eagerly at the pen which the captain held out to him.",
+   "change": {
+    "words": [
+     8,
+     9
+    ],
+    "new": [
+     "much"
+    ],
+    "step": 0
+   },
+   "right": true,
+   "exact": true,
+   "file": "trials/8288-274162-0063-near.json",
+   "sha256": "22e8e2c4ae0583f3e6d133b3fc0a5b2d74d081e2bced9498caac3e681cfe6319"
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+{
+ "id": "1272-135031-0019-far",
+ "parts": [
+  "Oh no, I'm quite sure he",
+  " didn't. That's funny, women",
+  " Betsy thoughtfully. I don't"
+ ],
+ "start": 47,
+ "end": 52,
+ "replacement": "remarked",
+ "rest": " believe Ann knew any magic or she'd have worked it before.",
+ "expected": "Oh no, I'm quite sure he didn't. That's funny, remarked Betsy thoughtfully. I don't believe Ann knew any magic or she'd have worked it before."
+}

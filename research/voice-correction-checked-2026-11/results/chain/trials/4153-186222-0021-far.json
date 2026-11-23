@@ -1,0 +1,13 @@
+{
+ "id": "4153-186222-0021-far",
+ "parts": [
+  "But suppose she leaves",
+  " it to you, persisted Beth",
+  ". Louise science to meditate"
+ ],
+ "start": 57,
+ "end": 64,
+ "replacement": "seemed",
+ "rest": ". It's a magnificent estate, said Beth, looking at her cousin doubtfully.",
+ "expected": "But suppose she leaves it to you, persisted Beth. Louise seemed to meditate. It's a magnificent estate, said Beth, looking at her cousin doubtfully."
+}

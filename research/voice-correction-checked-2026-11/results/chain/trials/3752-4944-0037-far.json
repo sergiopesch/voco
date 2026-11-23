@@ -1,0 +1,13 @@
+{
+ "id": "3752-4944-0037-far",
+ "parts": [
+  "An impulsive gentleman said Meekin to McElwain as",
+  " the sound of Mister North's footsteps died away in the",
+  " distance. McElwayne mercurial his head seriously. He"
+ ],
+ "start": 125,
+ "end": 134,
+ "replacement": "shook",
+ "rest": " is the strangest fits at times.",
+ "expected": "An impulsive gentleman said Meekin to McElwain as the sound of Mister North's footsteps died away in the distance. McElwayne shook his head seriously. He is the strangest fits at times."
+}

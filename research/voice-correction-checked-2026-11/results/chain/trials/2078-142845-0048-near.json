@@ -1,0 +1,13 @@
+{
+ "id": "2078-142845-0048-near",
+ "parts": [
+  "When we take into account that the Arabians are fond of",
+  " lizards and locusts as articles of food, their cuisine",
+  " altogether is scarcely a tempting one. Seventeen shirt four"
+ ],
+ "start": 160,
+ "end": 165,
+ "replacement": "thirty",
+ "rest": " illustration rusks.",
+ "expected": "When we take into account that the Arabians are fond of lizards and locusts as articles of food, their cuisine altogether is scarcely a tempting one. Seventeen thirty four illustration rusks."
+}

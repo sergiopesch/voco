@@ -1,0 +1,13 @@
+{
+ "id": "6319-64726-0014-far",
+ "parts": [
+  "He passed through one apartment after another",
+  " where were ladies and gentlemen asleep in their chairs",
+  " or standing. I have waited long finds you"
+ ],
+ "start": 133,
+ "end": 138,
+ "replacement": "for",
+ "rest": ". They talked for four hours and had not then said half that was in their heads to say.",
+ "expected": "He passed through one apartment after another where were ladies and gentlemen asleep in their chairs or standing. I have waited long for you. They talked for four hours and had not then said half that was in their heads to say."
+}

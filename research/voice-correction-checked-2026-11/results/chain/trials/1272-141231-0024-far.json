@@ -1,0 +1,13 @@
+{
+ "id": "1272-141231-0024-far",
+ "parts": [
+  "The strength that enables someone in a trance to hold",
+  " his body stiff and unsupported except at two points",
+  " the head and heels. This is invite impossible when conscious"
+ ],
+ "start": 134,
+ "end": 140,
+ "replacement": "physically",
+ "rest": ". Others had died before during the twenties and death during the last round was in some ways easier than defeat.",
+ "expected": "The strength that enables someone in a trance to hold his body stiff and unsupported except at two points the head and heels. This is physically impossible when conscious. Others had died before during the twenties and death during the last round was in some ways easier than defeat."
+}

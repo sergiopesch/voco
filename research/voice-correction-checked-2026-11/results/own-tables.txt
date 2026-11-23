@@ -1,0 +1,97 @@
+== Experiment 1, all: 370 items, the window complete ==
+  rule 1, plain                      right 83.4% (617/740)  collateral 1/1480  wrong changes 62/1480  far: 309/43/18/0  near: 308/44/18/0  same: 344/0/25/1  elsewhere: 370/0/0/0
+  rule 2, plain                      right 88.6% (656/740)  collateral 2/1480  wrong changes 67/1480  far: 329/22/19/0  near: 327/23/20/0  same: 343/0/26/1  elsewhere: 369/0/0/1
+  rule 3, plain                      right 88.6% (656/740)  collateral 2/1480  wrong changes 67/1480  far: 329/22/19/0  near: 327/23/20/0  same: 343/0/26/1  elsewhere: 369/0/0/1
+  rule 1, leaned                     right 87.8% (650/740)  collateral 1/1480  wrong changes 49/1480  far: 326/28/16/0  near: 324/30/16/0  same: 353/0/16/1  elsewhere: 370/0/0/0
+  rule 2, leaned                     right 91.5% (677/740)  collateral 2/1480  wrong changes 53/1480  far: 340/13/17/0  near: 337/16/17/0  same: 352/0/17/1  elsewhere: 369/0/0/1
+  rule 3, leaned                     right 91.5% (677/740)  collateral 2/1480  wrong changes 53/1480  far: 340/13/17/0  near: 337/16/17/0  same: 352/0/17/1  elsewhere: 369/0/0/1
+
+== Experiment 2, all: 370 items, decided some time into the next utterance ==
+  typed text holds every word of the phrase 0 s into the next utterance: 54.6% (202/370)
+  typed text holds every word of the phrase 0.4 s into the next utterance: 93.0% (344/370)
+  typed text holds every word of the phrase 0.8 s into the next utterance: 99.7% (369/370)
+  typed text holds every word of the phrase 1.2 s into the next utterance: 100.0% (370/370)
+  rule 2, plain, decided at 0 s      right 72.6% (537/740)  collateral 2/1480  wrong changes 47/1480  far: 269/88/12/1  near: 268/86/15/1  same: 352/0/18/0  elsewhere: 370/0/0/0
+  rule 2, plain, decided at 0.4 s    right 87.7% (649/740)  collateral 0/1480  wrong changes 62/1480  far: 325/27/18/0  near: 324/27/19/0  same: 345/0/25/0  elsewhere: 370/0/0/0
+  rule 2, plain, decided at 0.8 s    right 88.6% (656/740)  collateral 0/1480  wrong changes 65/1480  far: 329/22/19/0  near: 327/23/20/0  same: 344/0/26/0  elsewhere: 370/0/0/0
+  rule 2, plain, decided at 1.2 s    right 88.6% (656/740)  collateral 1/1480  wrong changes 66/1480  far: 329/22/19/0  near: 327/23/20/0  same: 343/0/26/1  elsewhere: 370/0/0/0
+  rule 2, leaned at the key press, decided at 0 s right 73.9% (547/740)  collateral 2/1480  wrong changes 36/1480  far: 275/83/11/1  near: 272/85/12/1  same: 359/0/11/0  elsewhere: 370/0/0/0
+  rule 2, leaned at the key press, decided at 0.4 s right 89.9% (665/740)  collateral 0/1480  wrong changes 46/1480  far: 334/21/15/0  near: 331/24/15/0  same: 354/0/16/0  elsewhere: 370/0/0/0
+  rule 2, leaned at the key press, decided at 0.8 s right 91.1% (674/740)  collateral 0/1480  wrong changes 49/1480  far: 339/15/16/0  near: 335/19/16/0  same: 353/0/17/0  elsewhere: 370/0/0/0
+  rule 2, leaned at the key press, decided at 1.2 s right 91.1% (674/740)  collateral 1/1480  wrong changes 50/1480  far: 339/15/16/0  near: 335/19/16/0  same: 352/0/17/1  elsewhere: 370/0/0/0
+  rule 2, leaned at the key press, decided on the complete window right 91.1% (674/740)  collateral 2/1480  wrong changes 51/1480  far: 339/15/16/0  near: 335/19/16/0  same: 352/0/17/1  elsewhere: 369/0/0/1
+  rule 3, plain, decided at 0 s      right 72.0% (533/740)  collateral 0/1480  wrong changes 45/1480  far: 267/91/12/0  near: 266/89/15/0  same: 352/0/18/0  elsewhere: 370/0/0/0
+  rule 3, plain, decided at 0.4 s    right 87.7% (649/740)  collateral 0/1480  wrong changes 62/1480  far: 325/27/18/0  near: 324/27/19/0  same: 345/0/25/0  elsewhere: 370/0/0/0
+  rule 3, plain, decided at 0.8 s    right 88.6% (656/740)  collateral 0/1480  wrong changes 65/1480  far: 329/22/19/0  near: 327/23/20/0  same: 344/0/26/0  elsewhere: 370/0/0/0
+  rule 3, plain, decided at 1.2 s    right 88.6% (656/740)  collateral 1/1480  wrong changes 66/1480  far: 329/22/19/0  near: 327/23/20/0  same: 343/0/26/1  elsewhere: 370/0/0/0
+  rule 3, leaned at the key press, decided at 0 s right 73.4% (543/740)  collateral 0/1480  wrong changes 34/1480  far: 273/86/11/0  near: 270/88/12/0  same: 359/0/11/0  elsewhere: 370/0/0/0
+  rule 3, leaned at the key press, decided at 0.4 s right 89.9% (665/740)  collateral 0/1480  wrong changes 46/1480  far: 334/21/15/0  near: 331/24/15/0  same: 354/0/16/0  elsewhere: 370/0/0/0
+  rule 3, leaned at the key press, decided at 0.8 s right 91.1% (674/740)  collateral 0/1480  wrong changes 49/1480  far: 339/15/16/0  near: 335/19/16/0  same: 353/0/17/0  elsewhere: 370/0/0/0
+  rule 3, leaned at the key press, decided at 1.2 s right 91.1% (674/740)  collateral 1/1480  wrong changes 50/1480  far: 339/15/16/0  near: 335/19/16/0  same: 352/0/17/1  elsewhere: 370/0/0/0
+  rule 3, leaned at the key press, decided on the complete window right 91.1% (674/740)  collateral 2/1480  wrong changes 51/1480  far: 339/15/16/0  near: 335/19/16/0  same: 352/0/17/1  elsewhere: 369/0/0/1
+
+== Experiment 1, dev-clean: 150 items, the window complete ==
+  rule 1, plain                      right 87.3% (262/300)  collateral 0/600  wrong changes 14/600  far: 131/15/4/0  near: 131/15/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 2, plain                      right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 3, plain                      right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 1, leaned                     right 91.0% (273/300)  collateral 0/600  wrong changes 11/600  far: 137/9/4/0  near: 136/10/4/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 2, leaned                     right 95.7% (287/300)  collateral 0/600  wrong changes 11/600  far: 144/2/4/0  near: 143/3/4/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 3, leaned                     right 95.7% (287/300)  collateral 0/600  wrong changes 11/600  far: 144/2/4/0  near: 143/3/4/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+
+== Experiment 2, dev-clean: 150 items, decided some time into the next utterance ==
+  typed text holds every word of the phrase 0 s into the next utterance: 62.0% (93/150)
+  typed text holds every word of the phrase 0.4 s into the next utterance: 97.3% (146/150)
+  typed text holds every word of the phrase 0.8 s into the next utterance: 100.0% (150/150)
+  typed text holds every word of the phrase 1.2 s into the next utterance: 100.0% (150/150)
+  rule 2, plain, decided at 0 s      right 78.7% (236/300)  collateral 0/600  wrong changes 12/600  far: 118/30/2/0  near: 118/28/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 2, plain, decided at 0.4 s    right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 2, plain, decided at 0.8 s    right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 2, plain, decided at 1.2 s    right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 2, leaned at the key press, decided at 0 s right 79.0% (237/300)  collateral 0/600  wrong changes 8/600  far: 119/29/2/0  near: 118/29/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 2, leaned at the key press, decided at 0.4 s right 95.0% (285/300)  collateral 0/600  wrong changes 9/600  far: 143/4/3/0  near: 142/5/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 2, leaned at the key press, decided at 0.8 s right 95.7% (287/300)  collateral 0/600  wrong changes 9/600  far: 144/3/3/0  near: 143/4/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 2, leaned at the key press, decided at 1.2 s right 95.7% (287/300)  collateral 0/600  wrong changes 9/600  far: 144/3/3/0  near: 143/4/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 2, leaned at the key press, decided on the complete window right 95.7% (287/300)  collateral 0/600  wrong changes 9/600  far: 144/3/3/0  near: 143/4/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 3, plain, decided at 0 s      right 78.7% (236/300)  collateral 0/600  wrong changes 12/600  far: 118/30/2/0  near: 118/28/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 3, plain, decided at 0.4 s    right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 3, plain, decided at 0.8 s    right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 3, plain, decided at 1.2 s    right 94.0% (282/300)  collateral 0/600  wrong changes 14/600  far: 141/5/4/0  near: 141/5/4/0  same: 144/0/6/0  elsewhere: 150/0/0/0
+  rule 3, leaned at the key press, decided at 0 s right 79.0% (237/300)  collateral 0/600  wrong changes 8/600  far: 119/29/2/0  near: 118/29/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 3, leaned at the key press, decided at 0.4 s right 95.0% (285/300)  collateral 0/600  wrong changes 9/600  far: 143/4/3/0  near: 142/5/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 3, leaned at the key press, decided at 0.8 s right 95.7% (287/300)  collateral 0/600  wrong changes 9/600  far: 144/3/3/0  near: 143/4/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 3, leaned at the key press, decided at 1.2 s right 95.7% (287/300)  collateral 0/600  wrong changes 9/600  far: 144/3/3/0  near: 143/4/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+  rule 3, leaned at the key press, decided on the complete window right 95.7% (287/300)  collateral 0/600  wrong changes 9/600  far: 144/3/3/0  near: 143/4/3/0  same: 147/0/3/0  elsewhere: 150/0/0/0
+
+== Experiment 1, dev-other: 220 items, the window complete ==
+  rule 1, plain                      right 80.7% (355/440)  collateral 1/880  wrong changes 48/880  far: 178/28/14/0  near: 177/29/14/0  same: 200/0/19/1  elsewhere: 220/0/0/0
+  rule 2, plain                      right 85.0% (374/440)  collateral 2/880  wrong changes 53/880  far: 188/17/15/0  near: 186/18/16/0  same: 199/0/20/1  elsewhere: 219/0/0/1
+  rule 3, plain                      right 85.0% (374/440)  collateral 2/880  wrong changes 53/880  far: 188/17/15/0  near: 186/18/16/0  same: 199/0/20/1  elsewhere: 219/0/0/1
+  rule 1, leaned                     right 85.7% (377/440)  collateral 1/880  wrong changes 38/880  far: 189/19/12/0  near: 188/20/12/0  same: 206/0/13/1  elsewhere: 220/0/0/0
+  rule 2, leaned                     right 88.6% (390/440)  collateral 2/880  wrong changes 42/880  far: 196/11/13/0  near: 194/13/13/0  same: 205/0/14/1  elsewhere: 219/0/0/1
+  rule 3, leaned                     right 88.6% (390/440)  collateral 2/880  wrong changes 42/880  far: 196/11/13/0  near: 194/13/13/0  same: 205/0/14/1  elsewhere: 219/0/0/1
+
+== Experiment 2, dev-other: 220 items, decided some time into the next utterance ==
+  typed text holds every word of the phrase 0 s into the next utterance: 49.5% (109/220)
+  typed text holds every word of the phrase 0.4 s into the next utterance: 90.0% (198/220)
+  typed text holds every word of the phrase 0.8 s into the next utterance: 99.5% (219/220)
+  typed text holds every word of the phrase 1.2 s into the next utterance: 100.0% (220/220)
+  rule 2, plain, decided at 0 s      right 68.4% (301/440)  collateral 2/880  wrong changes 35/880  far: 151/58/10/1  near: 150/58/11/1  same: 208/0/12/0  elsewhere: 220/0/0/0
+  rule 2, plain, decided at 0.4 s    right 83.4% (367/440)  collateral 0/880  wrong changes 48/880  far: 184/22/14/0  near: 183/22/15/0  same: 201/0/19/0  elsewhere: 220/0/0/0
+  rule 2, plain, decided at 0.8 s    right 85.0% (374/440)  collateral 0/880  wrong changes 51/880  far: 188/17/15/0  near: 186/18/16/0  same: 200/0/20/0  elsewhere: 220/0/0/0
+  rule 2, plain, decided at 1.2 s    right 85.0% (374/440)  collateral 1/880  wrong changes 52/880  far: 188/17/15/0  near: 186/18/16/0  same: 199/0/20/1  elsewhere: 220/0/0/0
+  rule 2, leaned at the key press, decided at 0 s right 70.5% (310/440)  collateral 2/880  wrong changes 28/880  far: 156/54/9/1  near: 154/56/9/1  same: 212/0/8/0  elsewhere: 220/0/0/0
+  rule 2, leaned at the key press, decided at 0.4 s right 86.4% (380/440)  collateral 0/880  wrong changes 37/880  far: 191/17/12/0  near: 189/19/12/0  same: 207/0/13/0  elsewhere: 220/0/0/0
+  rule 2, leaned at the key press, decided at 0.8 s right 88.0% (387/440)  collateral 0/880  wrong changes 40/880  far: 195/12/13/0  near: 192/15/13/0  same: 206/0/14/0  elsewhere: 220/0/0/0
+  rule 2, leaned at the key press, decided at 1.2 s right 88.0% (387/440)  collateral 1/880  wrong changes 41/880  far: 195/12/13/0  near: 192/15/13/0  same: 205/0/14/1  elsewhere: 220/0/0/0
+  rule 2, leaned at the key press, decided on the complete window right 88.0% (387/440)  collateral 2/880  wrong changes 42/880  far: 195/12/13/0  near: 192/15/13/0  same: 205/0/14/1  elsewhere: 219/0/0/1
+  rule 3, plain, decided at 0 s      right 67.5% (297/440)  collateral 0/880  wrong changes 33/880  far: 149/61/10/0  near: 148/61/11/0  same: 208/0/12/0  elsewhere: 220/0/0/0
+  rule 3, plain, decided at 0.4 s    right 83.4% (367/440)  collateral 0/880  wrong changes 48/880  far: 184/22/14/0  near: 183/22/15/0  same: 201/0/19/0  elsewhere: 220/0/0/0
+  rule 3, plain, decided at 0.8 s    right 85.0% (374/440)  collateral 0/880  wrong changes 51/880  far: 188/17/15/0  near: 186/18/16/0  same: 200/0/20/0  elsewhere: 220/0/0/0
+  rule 3, plain, decided at 1.2 s    right 85.0% (374/440)  collateral 1/880  wrong changes 52/880  far: 188/17/15/0  near: 186/18/16/0  same: 199/0/20/1  elsewhere: 220/0/0/0
+  rule 3, leaned at the key press, decided at 0 s right 69.5% (306/440)  collateral 0/880  wrong changes 26/880  far: 154/57/9/0  near: 152/59/9/0  same: 212/0/8/0  elsewhere: 220/0/0/0
+  rule 3, leaned at the key press, decided at 0.4 s right 86.4% (380/440)  collateral 0/880  wrong changes 37/880  far: 191/17/12/0  near: 189/19/12/0  same: 207/0/13/0  elsewhere: 220/0/0/0
+  rule 3, leaned at the key press, decided at 0.8 s right 88.0% (387/440)  collateral 0/880  wrong changes 40/880  far: 195/12/13/0  near: 192/15/13/0  same: 206/0/14/0  elsewhere: 220/0/0/0
+  rule 3, leaned at the key press, decided at 1.2 s right 88.0% (387/440)  collateral 1/880  wrong changes 41/880  far: 195/12/13/0  near: 192/15/13/0  same: 205/0/14/1  elsewhere: 220/0/0/0
+  rule 3, leaned at the key press, decided on the complete window right 88.0% (387/440)  collateral 2/880  wrong changes 42/880  far: 195/12/13/0  near: 192/15/13/0  same: 205/0/14/1  elsewhere: 219/0/0/1
+
+Passages where a push returned text the final text does not start with: 0/380

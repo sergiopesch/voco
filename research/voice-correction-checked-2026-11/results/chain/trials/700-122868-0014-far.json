@@ -1,0 +1,13 @@
+{
+ "id": "700-122868-0014-far",
+ "parts": [
+  "Jane rose to the occas",
+  "ion, left behind",
+  " broke the landing"
+ ],
+ "start": 39,
+ "end": 44,
+ "replacement": "at",
+ "rest": ". Anne gave one gasping little scream which nobody ever heard. She was white to the lips, but she did not lose her self possession.",
+ "expected": "Jane rose to the occasion, left behind at the landing. Anne gave one gasping little scream which nobody ever heard. She was white to the lips, but she did not lose her self possession."
+}

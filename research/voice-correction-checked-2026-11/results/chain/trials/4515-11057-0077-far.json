@@ -1,0 +1,13 @@
+{
+ "id": "4515-11057-0077-far",
+ "parts": [
+  "How am I to live an hour",
+  " in such uncertainty as",
+  " this? I white wish it"
+ ],
+ "start": 56,
+ "end": 61,
+ "replacement": "do",
+ "rest": " her emotion had an effect on him and his voice trembled.",
+ "expected": "How am I to live an hour in such uncertainty as this? I do wish it her emotion had an effect on him and his voice trembled."
+}

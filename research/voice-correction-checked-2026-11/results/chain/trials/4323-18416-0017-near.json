@@ -1,0 +1,13 @@
+{
+ "id": "4323-18416-0017-near",
+ "parts": [
+  "Oh, she left you everything she had, Phronzie",
+  ", a couple of millions or so it is why",
+  " Charlotte poor repeated the hold gentleman. Why"
+ ],
+ "start": 112,
+ "end": 116,
+ "replacement": "old",
+ "rest": " no not exactly her father isn't rich, but Charlotte I think may do very well, especially as I intend to keep her here for a while and then I shall never let her suffer Phronsie never indeed.",
+ "expected": "Oh, she left you everything she had, Phronzie, a couple of millions or so it is why Charlotte poor repeated the old gentleman. Why no not exactly her father isn't rich, but Charlotte I think may do very well, especially as I intend to keep her here for a while and then I shall never let her suffer Phronsie never indeed."
+}

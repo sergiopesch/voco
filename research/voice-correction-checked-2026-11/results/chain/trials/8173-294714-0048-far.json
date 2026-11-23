@@ -1,0 +1,13 @@
+{
+ "id": "8173-294714-0048-far",
+ "parts": [
+  "I could offer to lend the scoundrel the money that he wanted at an",
+  " hour's notice, and he was the man to accept my proposal quite as",
+  " easily as I could make it. You are led mistaken, I replied. I"
+ ],
+ "start": 167,
+ "end": 170,
+ "replacement": "quite",
+ "rest": " am only doubting whether your plan for relieving Mr. Van Brandt of his embarrassments is quite so simple as you suppose.",
+ "expected": "I could offer to lend the scoundrel the money that he wanted at an hour's notice, and he was the man to accept my proposal quite as easily as I could make it. You are quite mistaken, I replied. I am only doubting whether your plan for relieving Mr. Van Brandt of his embarrassments is quite so simple as you suppose."
+}

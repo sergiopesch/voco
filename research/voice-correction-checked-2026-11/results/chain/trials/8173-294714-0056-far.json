@@ -1,0 +1,13 @@
+{
+ "id": "8173-294714-0056-far",
+ "parts": [
+  "Promise that you won't ask me to borrow money of you",
+  " for Mister Van Brandt, she rejoined, and I will accept your",
+  " help gratefully. I hadn't honestly promise that"
+ ],
+ "start": 132,
+ "end": 138,
+ "replacement": "could",
+ "rest": " my one chance of saving her lay in keeping from her knowledge the course that I had now determined to pursue.",
+ "expected": "Promise that you won't ask me to borrow money of you for Mister Van Brandt, she rejoined, and I will accept your help gratefully. I could honestly promise that my one chance of saving her lay in keeping from her knowledge the course that I had now determined to pursue."
+}

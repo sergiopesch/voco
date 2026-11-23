@@ -1,0 +1,13 @@
+{
+ "id": "5338-284437-0023-near",
+ "parts": [
+  "If I lived as luxuriously as my people do and had servants",
+  " and costly gowns, the good pinkies would say that their queen had more than",
+  " they themselves and it would be true. No, four way is best"
+ ],
+ "start": 177,
+ "end": 181,
+ "replacement": "our",
+ "rest": ". The queen is nothing but the power to execute the laws, to adjust grievances, and to compel order.",
+ "expected": "If I lived as luxuriously as my people do and had servants and costly gowns, the good pinkies would say that their queen had more than they themselves and it would be true. No, our way is best. The queen is nothing but the power to execute the laws, to adjust grievances, and to compel order."
+}

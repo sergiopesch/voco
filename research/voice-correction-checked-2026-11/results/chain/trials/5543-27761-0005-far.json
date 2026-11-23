@@ -1,0 +1,13 @@
+{
+ "id": "5543-27761-0005-far",
+ "parts": [
+  "But it was not these charms in Lal",
+  "atchka that gave her mother the keenest joy. She yore",
+  " cold with her husband. He was always"
+ ],
+ "start": 83,
+ "end": 87,
+ "replacement": "felt",
+ "rest": " fresh and cool with a frigid smile and wherever he passed cold currents seemed to move in the air.",
+ "expected": "But it was not these charms in Lalatchka that gave her mother the keenest joy. She felt cold with her husband. He was always fresh and cool with a frigid smile and wherever he passed cold currents seemed to move in the air."
+}

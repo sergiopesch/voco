@@ -1,0 +1,13 @@
+{
+ "id": "6455-67803-0012-near",
+ "parts": [
+  "Oh I always do it. I didn't",
+  " guess it just",
+  " smelled ever do faintly"
+ ],
+ "start": 55,
+ "end": 57,
+ "replacement": "so",
+ "rest": " that one of the reasons why she loathes me so she added.",
+ "expected": "Oh I always do it. I didn't guess it just smelled ever so faintly that one of the reasons why she loathes me so she added."
+}

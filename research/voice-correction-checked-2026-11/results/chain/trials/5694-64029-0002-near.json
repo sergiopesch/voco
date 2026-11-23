@@ -1,0 +1,13 @@
+{
+ "id": "5694-64029-0002-near",
+ "parts": [
+  "The Federal Army was concentrating",
+  " at Nashville. There was no rest for the",
+  " weary. Our army stopped it Murfreesboro"
+ ],
+ "start": 99,
+ "end": 101,
+ "replacement": "at",
+ "rest": " from time to time. Different regiments were sent forward to do picket duty.",
+ "expected": "The Federal Army was concentrating at Nashville. There was no rest for the weary. Our army stopped at Murfreesboro from time to time. Different regiments were sent forward to do picket duty."
+}

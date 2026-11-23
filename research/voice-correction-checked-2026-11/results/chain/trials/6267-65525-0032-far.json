@@ -1,0 +1,13 @@
+{
+ "id": "6267-65525-0032-far",
+ "parts": [
+  "Sydney did not sleep that night, but",
+  " dozed restlessly about or cried in her",
+  " pillow. The good but shook her head"
+ ],
+ "start": 93,
+ "end": 96,
+ "replacement": "woman",
+ "rest": ". Sydney trod the way of the transgressor and found that its thorns burst to bone and marrow.",
+ "expected": "Sydney did not sleep that night, but dozed restlessly about or cried in her pillow. The good woman shook her head. Sydney trod the way of the transgressor and found that its thorns burst to bone and marrow."
+}

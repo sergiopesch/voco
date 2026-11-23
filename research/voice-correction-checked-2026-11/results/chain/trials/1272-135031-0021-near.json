@@ -1,0 +1,13 @@
+{
+ "id": "1272-135031-0021-near",
+ "parts": [
+  "I don't believe Ann knew any magic",
+  " or she'd have worked it before",
+  ". I do note know, confessed Shaggy"
+ ],
+ "start": 72,
+ "end": 76,
+ "replacement": "not",
+ "rest": ". True, agreed Calico.",
+ "expected": "I don't believe Ann knew any magic or she'd have worked it before. I do not know, confessed Shaggy. True, agreed Calico."
+}

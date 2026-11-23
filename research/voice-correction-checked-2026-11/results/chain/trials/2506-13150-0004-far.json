@@ -1,0 +1,13 @@
+{
+ "id": "2506-13150-0004-far",
+ "parts": [
+  "Sick sick",
+  " one shall be cut",
+  " sidney's land"
+ ],
+ "start": 27,
+ "end": 35,
+ "replacement": "to",
+ "rest": ". The wind chopped about.",
+ "expected": "Sick sick one shall be cut to land. The wind chopped about."
+}

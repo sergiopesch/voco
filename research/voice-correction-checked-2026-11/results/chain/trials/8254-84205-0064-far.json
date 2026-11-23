@@ -1,0 +1,13 @@
+{
+ "id": "8254-84205-0064-far",
+ "parts": [
+  "But before any more is said, Griggs, I want",
+  " to offer you the opportunity to draw back",
+  " what beauregard said Griggs sharply. Not"
+ ],
+ "start": 91,
+ "end": 113,
+ "replacement": "for said Guys",
+ "rest": " a bit of it, sir. I'm going to take care they don't hit me.",
+ "expected": "But before any more is said, Griggs, I want to offer you the opportunity to draw back what for said Guys sharply. Not a bit of it, sir. I'm going to take care they don't hit me."
+}

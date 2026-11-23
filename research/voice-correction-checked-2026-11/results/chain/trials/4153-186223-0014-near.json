@@ -1,0 +1,13 @@
+{
+ "id": "4153-186223-0014-near",
+ "parts": [
+  "Kenneth stopped short and the mayor stopped",
+  " and the little man with a whimsical smile at the",
+  " boy's astonishment also stopped. John married, that's me"
+ ],
+ "start": 131,
+ "end": 139,
+ "replacement": "Merrick,",
+ "rest": ". You were the tinsmith.",
+ "expected": "Kenneth stopped short and the mayor stopped and the little man with a whimsical smile at the boy's astonishment also stopped. John Merrick, that's me. You were the tinsmith."
+}

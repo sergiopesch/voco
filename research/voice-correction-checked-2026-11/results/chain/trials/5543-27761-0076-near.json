@@ -1,0 +1,13 @@
+{
+ "id": "5543-27761-0076-near",
+ "parts": [
+  "She prayed long that night, but the prayer did",
+  " not relieve her sadness",
+  ". Several day passed. Lilucha caught cold"
+ ],
+ "start": 80,
+ "end": 83,
+ "replacement": "days",
+ "rest": ", the fever came upon her at night.",
+ "expected": "She prayed long that night, but the prayer did not relieve her sadness. Several days passed. Lilucha caught cold, the fever came upon her at night."
+}

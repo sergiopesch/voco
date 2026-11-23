@@ -1,0 +1,13 @@
+{
+ "id": "1686-142278-0084-far",
+ "parts": [
+  "When do we go",
+  "? I though not",
+  " know exactly. I want"
+ ],
+ "start": 17,
+ "end": 23,
+ "replacement": "do",
+ "rest": "ed to talk it over with you.",
+ "expected": "When do we go? I do not know exactly. I wanted to talk it over with you."
+}

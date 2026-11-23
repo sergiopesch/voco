@@ -1,0 +1,13 @@
+{
+ "id": "5849-50873-0030-far",
+ "parts": [
+  "The soldiers began the crowd about the house when at a signal from",
+  " Captain Wadsworth the train bance came on the scene",
+  " and prepared to grapple with the soldiers. Where is tender charter"
+ ],
+ "start": 171,
+ "end": 177,
+ "replacement": "the",
+ "rest": "? You have your soldiers at the door and we have the train bands of Connecticut ready to defend us against violence.",
+ "expected": "The soldiers began the crowd about the house when at a signal from Captain Wadsworth the train bance came on the scene and prepared to grapple with the soldiers. Where is the charter? You have your soldiers at the door and we have the train bands of Connecticut ready to defend us against violence."
+}

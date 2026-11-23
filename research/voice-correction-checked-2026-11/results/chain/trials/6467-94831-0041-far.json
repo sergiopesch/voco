@@ -1,0 +1,13 @@
+{
+ "id": "6467-94831-0041-far",
+ "parts": [
+  "A donkey or pelic",
+  ". I did nothing of the kind",
+  ". It's a donkey's sides, I say"
+ ],
+ "start": 62,
+ "end": 68,
+ "replacement": "head,",
+ "rest": ", and I say it. Your picture.",
+ "expected": "A donkey or pelic. I did nothing of the kind. It's a donkey's head, I say, and I say it. Your picture."
+}

@@ -1,0 +1,13 @@
+{
+ "id": "8288-274162-0063-near",
+ "parts": [
+  "Wait if you can",
+  ". I could not",
+  " so such the worse"
+ ],
+ "start": 32,
+ "end": 36,
+ "replacement": "much",
+ "rest": ". Ah, said Raoul, snatching eagerly at the pen which the captain held out to him.",
+ "expected": "Wait if you can. I could not so much the worse. Ah, said Raoul, snatching eagerly at the pen which the captain held out to him."
+}

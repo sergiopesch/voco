@@ -1,0 +1,13 @@
+{
+ "id": "6313-66129-0019-far",
+ "parts": [
+  "An early strat was made so that the party reached",
+  " the promised tableland shortly before ten o'clock",
+  " in the forenoon. A temporary camp was message pitched"
+ ],
+ "start": 138,
+ "end": 145,
+ "replacement": "quickly",
+ "rest": ". The great green field surrounded on all sides by tall trees made the place an ideal one for their purpose.",
+ "expected": "An early strat was made so that the party reached the promised tableland shortly before ten o'clock in the forenoon. A temporary camp was quickly pitched. The great green field surrounded on all sides by tall trees made the place an ideal one for their purpose."
+}

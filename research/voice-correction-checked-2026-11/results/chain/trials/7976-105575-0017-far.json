@@ -1,0 +1,13 @@
+{
+ "id": "7976-105575-0017-far",
+ "parts": [
+  "Once in the night I slipped away from the bivouac and hurried to",
+  " the old Tishamingo Hotel to see a lieutenant of my company who had been",
+  " shot through the breast. I stretchers not help my friend go"
+ ],
+ "start": 164,
+ "end": 174,
+ "replacement": "could",
+ "rest": " back to the regiment, he said, smiling. All will be needed.",
+ "expected": "Once in the night I slipped away from the bivouac and hurried to the old Tishamingo Hotel to see a lieutenant of my company who had been shot through the breast. I could not help my friend go back to the regiment, he said, smiling. All will be needed."
+}

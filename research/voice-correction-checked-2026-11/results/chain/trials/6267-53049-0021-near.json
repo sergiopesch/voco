@@ -1,0 +1,13 @@
+{
+ "id": "6267-53049-0021-near",
+ "parts": [
+  "So Penelope went to Blanche's party and her dress",
+  " was the admiration of every girl there",
+  ". Penelope thought her together charming"
+ ],
+ "start": 111,
+ "end": 119,
+ "replacement": "altogether",
+ "rest": ". She looks as if she had just stepped out of the frame of some lovely old picture, she said to herself.",
+ "expected": "So Penelope went to Blanche's party and her dress was the admiration of every girl there. Penelope thought her altogether charming. She looks as if she had just stepped out of the frame of some lovely old picture, she said to herself."
+}

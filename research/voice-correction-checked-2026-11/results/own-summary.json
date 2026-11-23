@@ -1,0 +1,2514 @@
+{
+ "1 | all | rule 1, plain": {
+  "right": 617,
+  "asked": 740,
+  "share": 0.8338,
+  "collateral": 1,
+  "wrong": 62,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 309,
+    "none": 43,
+    "contained": 18,
+    "collateral": 0
+   },
+   "near": {
+    "right": 308,
+    "none": 44,
+    "contained": 18,
+    "collateral": 0
+   },
+   "same": {
+    "right": 344,
+    "none": 0,
+    "contained": 25,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | all | rule 2, plain": {
+  "right": 656,
+  "asked": 740,
+  "share": 0.8865,
+  "collateral": 2,
+  "wrong": 67,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 329,
+    "none": 22,
+    "contained": 19,
+    "collateral": 0
+   },
+   "near": {
+    "right": 327,
+    "none": 23,
+    "contained": 20,
+    "collateral": 0
+   },
+   "same": {
+    "right": 343,
+    "none": 0,
+    "contained": 26,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 369,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | all | rule 3, plain": {
+  "right": 656,
+  "asked": 740,
+  "share": 0.8865,
+  "collateral": 2,
+  "wrong": 67,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 329,
+    "none": 22,
+    "contained": 19,
+    "collateral": 0
+   },
+   "near": {
+    "right": 327,
+    "none": 23,
+    "contained": 20,
+    "collateral": 0
+   },
+   "same": {
+    "right": 343,
+    "none": 0,
+    "contained": 26,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 369,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | all | rule 1, leaned": {
+  "right": 650,
+  "asked": 740,
+  "share": 0.8784,
+  "collateral": 1,
+  "wrong": 49,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 326,
+    "none": 28,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 324,
+    "none": 30,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 353,
+    "none": 0,
+    "contained": 16,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | all | rule 2, leaned": {
+  "right": 677,
+  "asked": 740,
+  "share": 0.9149,
+  "collateral": 2,
+  "wrong": 53,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 340,
+    "none": 13,
+    "contained": 17,
+    "collateral": 0
+   },
+   "near": {
+    "right": 337,
+    "none": 16,
+    "contained": 17,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 17,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 369,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | all | rule 3, leaned": {
+  "right": 677,
+  "asked": 740,
+  "share": 0.9149,
+  "collateral": 2,
+  "wrong": 53,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 340,
+    "none": 13,
+    "contained": 17,
+    "collateral": 0
+   },
+   "near": {
+    "right": 337,
+    "none": 16,
+    "contained": 17,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 17,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 369,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "2 | all | window complete at 0 s": {
+  "items": 202,
+  "of": 370,
+  "share": 0.5459
+ },
+ "2 | all | window complete at 0.4 s": {
+  "items": 344,
+  "of": 370,
+  "share": 0.9297
+ },
+ "2 | all | window complete at 0.8 s": {
+  "items": 369,
+  "of": 370,
+  "share": 0.9973
+ },
+ "2 | all | window complete at 1.2 s": {
+  "items": 370,
+  "of": 370,
+  "share": 1.0
+ },
+ "2 | all | rule 2, plain, decided at 0 s": {
+  "right": 537,
+  "asked": 740,
+  "share": 0.7257,
+  "collateral": 2,
+  "wrong": 47,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 269,
+    "none": 88,
+    "contained": 12,
+    "collateral": 1
+   },
+   "near": {
+    "right": 268,
+    "none": 86,
+    "contained": 15,
+    "collateral": 1
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 18,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, plain, decided at 0.4 s": {
+  "right": 649,
+  "asked": 740,
+  "share": 0.877,
+  "collateral": 0,
+  "wrong": 62,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 325,
+    "none": 27,
+    "contained": 18,
+    "collateral": 0
+   },
+   "near": {
+    "right": 324,
+    "none": 27,
+    "contained": 19,
+    "collateral": 0
+   },
+   "same": {
+    "right": 345,
+    "none": 0,
+    "contained": 25,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, plain, decided at 0.8 s": {
+  "right": 656,
+  "asked": 740,
+  "share": 0.8865,
+  "collateral": 0,
+  "wrong": 65,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 329,
+    "none": 22,
+    "contained": 19,
+    "collateral": 0
+   },
+   "near": {
+    "right": 327,
+    "none": 23,
+    "contained": 20,
+    "collateral": 0
+   },
+   "same": {
+    "right": 344,
+    "none": 0,
+    "contained": 26,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, plain, decided at 1.2 s": {
+  "right": 656,
+  "asked": 740,
+  "share": 0.8865,
+  "collateral": 1,
+  "wrong": 66,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 329,
+    "none": 22,
+    "contained": 19,
+    "collateral": 0
+   },
+   "near": {
+    "right": 327,
+    "none": 23,
+    "contained": 20,
+    "collateral": 0
+   },
+   "same": {
+    "right": 343,
+    "none": 0,
+    "contained": 26,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, leaned at the key press, decided at 0 s": {
+  "right": 547,
+  "asked": 740,
+  "share": 0.7392,
+  "collateral": 2,
+  "wrong": 36,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 275,
+    "none": 83,
+    "contained": 11,
+    "collateral": 1
+   },
+   "near": {
+    "right": 272,
+    "none": 85,
+    "contained": 12,
+    "collateral": 1
+   },
+   "same": {
+    "right": 359,
+    "none": 0,
+    "contained": 11,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, leaned at the key press, decided at 0.4 s": {
+  "right": 665,
+  "asked": 740,
+  "share": 0.8986,
+  "collateral": 0,
+  "wrong": 46,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 334,
+    "none": 21,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 331,
+    "none": 24,
+    "contained": 15,
+    "collateral": 0
+   },
+   "same": {
+    "right": 354,
+    "none": 0,
+    "contained": 16,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, leaned at the key press, decided at 0.8 s": {
+  "right": 674,
+  "asked": 740,
+  "share": 0.9108,
+  "collateral": 0,
+  "wrong": 49,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 339,
+    "none": 15,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 335,
+    "none": 19,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 353,
+    "none": 0,
+    "contained": 17,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, leaned at the key press, decided at 1.2 s": {
+  "right": 674,
+  "asked": 740,
+  "share": 0.9108,
+  "collateral": 1,
+  "wrong": 50,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 339,
+    "none": 15,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 335,
+    "none": 19,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 17,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 2, leaned at the key press, decided on the complete window": {
+  "right": 674,
+  "asked": 740,
+  "share": 0.9108,
+  "collateral": 2,
+  "wrong": 51,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 339,
+    "none": 15,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 335,
+    "none": 19,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 17,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 369,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "2 | all | rule 3, plain, decided at 0 s": {
+  "right": 533,
+  "asked": 740,
+  "share": 0.7203,
+  "collateral": 0,
+  "wrong": 45,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 267,
+    "none": 91,
+    "contained": 12,
+    "collateral": 0
+   },
+   "near": {
+    "right": 266,
+    "none": 89,
+    "contained": 15,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 18,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, plain, decided at 0.4 s": {
+  "right": 649,
+  "asked": 740,
+  "share": 0.877,
+  "collateral": 0,
+  "wrong": 62,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 325,
+    "none": 27,
+    "contained": 18,
+    "collateral": 0
+   },
+   "near": {
+    "right": 324,
+    "none": 27,
+    "contained": 19,
+    "collateral": 0
+   },
+   "same": {
+    "right": 345,
+    "none": 0,
+    "contained": 25,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, plain, decided at 0.8 s": {
+  "right": 656,
+  "asked": 740,
+  "share": 0.8865,
+  "collateral": 0,
+  "wrong": 65,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 329,
+    "none": 22,
+    "contained": 19,
+    "collateral": 0
+   },
+   "near": {
+    "right": 327,
+    "none": 23,
+    "contained": 20,
+    "collateral": 0
+   },
+   "same": {
+    "right": 344,
+    "none": 0,
+    "contained": 26,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, plain, decided at 1.2 s": {
+  "right": 656,
+  "asked": 740,
+  "share": 0.8865,
+  "collateral": 1,
+  "wrong": 66,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 329,
+    "none": 22,
+    "contained": 19,
+    "collateral": 0
+   },
+   "near": {
+    "right": 327,
+    "none": 23,
+    "contained": 20,
+    "collateral": 0
+   },
+   "same": {
+    "right": 343,
+    "none": 0,
+    "contained": 26,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, leaned at the key press, decided at 0 s": {
+  "right": 543,
+  "asked": 740,
+  "share": 0.7338,
+  "collateral": 0,
+  "wrong": 34,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 273,
+    "none": 86,
+    "contained": 11,
+    "collateral": 0
+   },
+   "near": {
+    "right": 270,
+    "none": 88,
+    "contained": 12,
+    "collateral": 0
+   },
+   "same": {
+    "right": 359,
+    "none": 0,
+    "contained": 11,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, leaned at the key press, decided at 0.4 s": {
+  "right": 665,
+  "asked": 740,
+  "share": 0.8986,
+  "collateral": 0,
+  "wrong": 46,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 334,
+    "none": 21,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 331,
+    "none": 24,
+    "contained": 15,
+    "collateral": 0
+   },
+   "same": {
+    "right": 354,
+    "none": 0,
+    "contained": 16,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, leaned at the key press, decided at 0.8 s": {
+  "right": 674,
+  "asked": 740,
+  "share": 0.9108,
+  "collateral": 0,
+  "wrong": 49,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 339,
+    "none": 15,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 335,
+    "none": 19,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 353,
+    "none": 0,
+    "contained": 17,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, leaned at the key press, decided at 1.2 s": {
+  "right": 674,
+  "asked": 740,
+  "share": 0.9108,
+  "collateral": 1,
+  "wrong": 50,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 339,
+    "none": 15,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 335,
+    "none": 19,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 17,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 370,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | all | rule 3, leaned at the key press, decided on the complete window": {
+  "right": 674,
+  "asked": 740,
+  "share": 0.9108,
+  "collateral": 2,
+  "wrong": 51,
+  "trials": 1480,
+  "outcomes": {
+   "far": {
+    "right": 339,
+    "none": 15,
+    "contained": 16,
+    "collateral": 0
+   },
+   "near": {
+    "right": 335,
+    "none": 19,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 352,
+    "none": 0,
+    "contained": 17,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 369,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | dev-clean | rule 1, plain": {
+  "right": 262,
+  "asked": 300,
+  "share": 0.8733,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 131,
+    "none": 15,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 131,
+    "none": 15,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-clean | rule 2, plain": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-clean | rule 3, plain": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-clean | rule 1, leaned": {
+  "right": 273,
+  "asked": 300,
+  "share": 0.91,
+  "collateral": 0,
+  "wrong": 11,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 137,
+    "none": 9,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 136,
+    "none": 10,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-clean | rule 2, leaned": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 11,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 2,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 3,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-clean | rule 3, leaned": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 11,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 2,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 3,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | window complete at 0 s": {
+  "items": 93,
+  "of": 150,
+  "share": 0.62
+ },
+ "2 | dev-clean | window complete at 0.4 s": {
+  "items": 146,
+  "of": 150,
+  "share": 0.9733
+ },
+ "2 | dev-clean | window complete at 0.8 s": {
+  "items": 150,
+  "of": 150,
+  "share": 1.0
+ },
+ "2 | dev-clean | window complete at 1.2 s": {
+  "items": 150,
+  "of": 150,
+  "share": 1.0
+ },
+ "2 | dev-clean | rule 2, plain, decided at 0 s": {
+  "right": 236,
+  "asked": 300,
+  "share": 0.7867,
+  "collateral": 0,
+  "wrong": 12,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 118,
+    "none": 30,
+    "contained": 2,
+    "collateral": 0
+   },
+   "near": {
+    "right": 118,
+    "none": 28,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, plain, decided at 0.4 s": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, plain, decided at 0.8 s": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, plain, decided at 1.2 s": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, leaned at the key press, decided at 0 s": {
+  "right": 237,
+  "asked": 300,
+  "share": 0.79,
+  "collateral": 0,
+  "wrong": 8,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 119,
+    "none": 29,
+    "contained": 2,
+    "collateral": 0
+   },
+   "near": {
+    "right": 118,
+    "none": 29,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, leaned at the key press, decided at 0.4 s": {
+  "right": 285,
+  "asked": 300,
+  "share": 0.95,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 142,
+    "none": 5,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, leaned at the key press, decided at 0.8 s": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 3,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, leaned at the key press, decided at 1.2 s": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 3,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 2, leaned at the key press, decided on the complete window": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 3,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, plain, decided at 0 s": {
+  "right": 236,
+  "asked": 300,
+  "share": 0.7867,
+  "collateral": 0,
+  "wrong": 12,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 118,
+    "none": 30,
+    "contained": 2,
+    "collateral": 0
+   },
+   "near": {
+    "right": 118,
+    "none": 28,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, plain, decided at 0.4 s": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, plain, decided at 0.8 s": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, plain, decided at 1.2 s": {
+  "right": 282,
+  "asked": 300,
+  "share": 0.94,
+  "collateral": 0,
+  "wrong": 14,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "near": {
+    "right": 141,
+    "none": 5,
+    "contained": 4,
+    "collateral": 0
+   },
+   "same": {
+    "right": 144,
+    "none": 0,
+    "contained": 6,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, leaned at the key press, decided at 0 s": {
+  "right": 237,
+  "asked": 300,
+  "share": 0.79,
+  "collateral": 0,
+  "wrong": 8,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 119,
+    "none": 29,
+    "contained": 2,
+    "collateral": 0
+   },
+   "near": {
+    "right": 118,
+    "none": 29,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, leaned at the key press, decided at 0.4 s": {
+  "right": 285,
+  "asked": 300,
+  "share": 0.95,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 142,
+    "none": 5,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, leaned at the key press, decided at 0.8 s": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 3,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, leaned at the key press, decided at 1.2 s": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 3,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-clean | rule 3, leaned at the key press, decided on the complete window": {
+  "right": 287,
+  "asked": 300,
+  "share": 0.9567,
+  "collateral": 0,
+  "wrong": 9,
+  "trials": 600,
+  "outcomes": {
+   "far": {
+    "right": 144,
+    "none": 3,
+    "contained": 3,
+    "collateral": 0
+   },
+   "near": {
+    "right": 143,
+    "none": 4,
+    "contained": 3,
+    "collateral": 0
+   },
+   "same": {
+    "right": 147,
+    "none": 0,
+    "contained": 3,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 150,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-other | rule 1, plain": {
+  "right": 355,
+  "asked": 440,
+  "share": 0.8068,
+  "collateral": 1,
+  "wrong": 48,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 178,
+    "none": 28,
+    "contained": 14,
+    "collateral": 0
+   },
+   "near": {
+    "right": 177,
+    "none": 29,
+    "contained": 14,
+    "collateral": 0
+   },
+   "same": {
+    "right": 200,
+    "none": 0,
+    "contained": 19,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-other | rule 2, plain": {
+  "right": 374,
+  "asked": 440,
+  "share": 0.85,
+  "collateral": 2,
+  "wrong": 53,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 188,
+    "none": 17,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 186,
+    "none": 18,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 199,
+    "none": 0,
+    "contained": 20,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 219,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | dev-other | rule 3, plain": {
+  "right": 374,
+  "asked": 440,
+  "share": 0.85,
+  "collateral": 2,
+  "wrong": 53,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 188,
+    "none": 17,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 186,
+    "none": 18,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 199,
+    "none": 0,
+    "contained": 20,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 219,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | dev-other | rule 1, leaned": {
+  "right": 377,
+  "asked": 440,
+  "share": 0.8568,
+  "collateral": 1,
+  "wrong": 38,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 189,
+    "none": 19,
+    "contained": 12,
+    "collateral": 0
+   },
+   "near": {
+    "right": 188,
+    "none": 20,
+    "contained": 12,
+    "collateral": 0
+   },
+   "same": {
+    "right": 206,
+    "none": 0,
+    "contained": 13,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "1 | dev-other | rule 2, leaned": {
+  "right": 390,
+  "asked": 440,
+  "share": 0.8864,
+  "collateral": 2,
+  "wrong": 42,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 196,
+    "none": 11,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 194,
+    "none": 13,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 205,
+    "none": 0,
+    "contained": 14,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 219,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "1 | dev-other | rule 3, leaned": {
+  "right": 390,
+  "asked": 440,
+  "share": 0.8864,
+  "collateral": 2,
+  "wrong": 42,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 196,
+    "none": 11,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 194,
+    "none": 13,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 205,
+    "none": 0,
+    "contained": 14,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 219,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "2 | dev-other | window complete at 0 s": {
+  "items": 109,
+  "of": 220,
+  "share": 0.4955
+ },
+ "2 | dev-other | window complete at 0.4 s": {
+  "items": 198,
+  "of": 220,
+  "share": 0.9
+ },
+ "2 | dev-other | window complete at 0.8 s": {
+  "items": 219,
+  "of": 220,
+  "share": 0.9955
+ },
+ "2 | dev-other | window complete at 1.2 s": {
+  "items": 220,
+  "of": 220,
+  "share": 1.0
+ },
+ "2 | dev-other | rule 2, plain, decided at 0 s": {
+  "right": 301,
+  "asked": 440,
+  "share": 0.6841,
+  "collateral": 2,
+  "wrong": 35,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 151,
+    "none": 58,
+    "contained": 10,
+    "collateral": 1
+   },
+   "near": {
+    "right": 150,
+    "none": 58,
+    "contained": 11,
+    "collateral": 1
+   },
+   "same": {
+    "right": 208,
+    "none": 0,
+    "contained": 12,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, plain, decided at 0.4 s": {
+  "right": 367,
+  "asked": 440,
+  "share": 0.8341,
+  "collateral": 0,
+  "wrong": 48,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 184,
+    "none": 22,
+    "contained": 14,
+    "collateral": 0
+   },
+   "near": {
+    "right": 183,
+    "none": 22,
+    "contained": 15,
+    "collateral": 0
+   },
+   "same": {
+    "right": 201,
+    "none": 0,
+    "contained": 19,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, plain, decided at 0.8 s": {
+  "right": 374,
+  "asked": 440,
+  "share": 0.85,
+  "collateral": 0,
+  "wrong": 51,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 188,
+    "none": 17,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 186,
+    "none": 18,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 200,
+    "none": 0,
+    "contained": 20,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, plain, decided at 1.2 s": {
+  "right": 374,
+  "asked": 440,
+  "share": 0.85,
+  "collateral": 1,
+  "wrong": 52,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 188,
+    "none": 17,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 186,
+    "none": 18,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 199,
+    "none": 0,
+    "contained": 20,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, leaned at the key press, decided at 0 s": {
+  "right": 310,
+  "asked": 440,
+  "share": 0.7045,
+  "collateral": 2,
+  "wrong": 28,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 156,
+    "none": 54,
+    "contained": 9,
+    "collateral": 1
+   },
+   "near": {
+    "right": 154,
+    "none": 56,
+    "contained": 9,
+    "collateral": 1
+   },
+   "same": {
+    "right": 212,
+    "none": 0,
+    "contained": 8,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, leaned at the key press, decided at 0.4 s": {
+  "right": 380,
+  "asked": 440,
+  "share": 0.8636,
+  "collateral": 0,
+  "wrong": 37,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 191,
+    "none": 17,
+    "contained": 12,
+    "collateral": 0
+   },
+   "near": {
+    "right": 189,
+    "none": 19,
+    "contained": 12,
+    "collateral": 0
+   },
+   "same": {
+    "right": 207,
+    "none": 0,
+    "contained": 13,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, leaned at the key press, decided at 0.8 s": {
+  "right": 387,
+  "asked": 440,
+  "share": 0.8795,
+  "collateral": 0,
+  "wrong": 40,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 195,
+    "none": 12,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 192,
+    "none": 15,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 206,
+    "none": 0,
+    "contained": 14,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, leaned at the key press, decided at 1.2 s": {
+  "right": 387,
+  "asked": 440,
+  "share": 0.8795,
+  "collateral": 1,
+  "wrong": 41,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 195,
+    "none": 12,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 192,
+    "none": 15,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 205,
+    "none": 0,
+    "contained": 14,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 2, leaned at the key press, decided on the complete window": {
+  "right": 387,
+  "asked": 440,
+  "share": 0.8795,
+  "collateral": 2,
+  "wrong": 42,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 195,
+    "none": 12,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 192,
+    "none": 15,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 205,
+    "none": 0,
+    "contained": 14,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 219,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "2 | dev-other | rule 3, plain, decided at 0 s": {
+  "right": 297,
+  "asked": 440,
+  "share": 0.675,
+  "collateral": 0,
+  "wrong": 33,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 149,
+    "none": 61,
+    "contained": 10,
+    "collateral": 0
+   },
+   "near": {
+    "right": 148,
+    "none": 61,
+    "contained": 11,
+    "collateral": 0
+   },
+   "same": {
+    "right": 208,
+    "none": 0,
+    "contained": 12,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, plain, decided at 0.4 s": {
+  "right": 367,
+  "asked": 440,
+  "share": 0.8341,
+  "collateral": 0,
+  "wrong": 48,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 184,
+    "none": 22,
+    "contained": 14,
+    "collateral": 0
+   },
+   "near": {
+    "right": 183,
+    "none": 22,
+    "contained": 15,
+    "collateral": 0
+   },
+   "same": {
+    "right": 201,
+    "none": 0,
+    "contained": 19,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, plain, decided at 0.8 s": {
+  "right": 374,
+  "asked": 440,
+  "share": 0.85,
+  "collateral": 0,
+  "wrong": 51,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 188,
+    "none": 17,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 186,
+    "none": 18,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 200,
+    "none": 0,
+    "contained": 20,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, plain, decided at 1.2 s": {
+  "right": 374,
+  "asked": 440,
+  "share": 0.85,
+  "collateral": 1,
+  "wrong": 52,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 188,
+    "none": 17,
+    "contained": 15,
+    "collateral": 0
+   },
+   "near": {
+    "right": 186,
+    "none": 18,
+    "contained": 16,
+    "collateral": 0
+   },
+   "same": {
+    "right": 199,
+    "none": 0,
+    "contained": 20,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, leaned at the key press, decided at 0 s": {
+  "right": 306,
+  "asked": 440,
+  "share": 0.6955,
+  "collateral": 0,
+  "wrong": 26,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 154,
+    "none": 57,
+    "contained": 9,
+    "collateral": 0
+   },
+   "near": {
+    "right": 152,
+    "none": 59,
+    "contained": 9,
+    "collateral": 0
+   },
+   "same": {
+    "right": 212,
+    "none": 0,
+    "contained": 8,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, leaned at the key press, decided at 0.4 s": {
+  "right": 380,
+  "asked": 440,
+  "share": 0.8636,
+  "collateral": 0,
+  "wrong": 37,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 191,
+    "none": 17,
+    "contained": 12,
+    "collateral": 0
+   },
+   "near": {
+    "right": 189,
+    "none": 19,
+    "contained": 12,
+    "collateral": 0
+   },
+   "same": {
+    "right": 207,
+    "none": 0,
+    "contained": 13,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, leaned at the key press, decided at 0.8 s": {
+  "right": 387,
+  "asked": 440,
+  "share": 0.8795,
+  "collateral": 0,
+  "wrong": 40,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 195,
+    "none": 12,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 192,
+    "none": 15,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 206,
+    "none": 0,
+    "contained": 14,
+    "collateral": 0
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, leaned at the key press, decided at 1.2 s": {
+  "right": 387,
+  "asked": 440,
+  "share": 0.8795,
+  "collateral": 1,
+  "wrong": 41,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 195,
+    "none": 12,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 192,
+    "none": 15,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 205,
+    "none": 0,
+    "contained": 14,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 220,
+    "none": 0,
+    "contained": 0,
+    "collateral": 0
+   }
+  }
+ },
+ "2 | dev-other | rule 3, leaned at the key press, decided on the complete window": {
+  "right": 387,
+  "asked": 440,
+  "share": 0.8795,
+  "collateral": 2,
+  "wrong": 42,
+  "trials": 880,
+  "outcomes": {
+   "far": {
+    "right": 195,
+    "none": 12,
+    "contained": 13,
+    "collateral": 0
+   },
+   "near": {
+    "right": 192,
+    "none": 15,
+    "contained": 13,
+    "collateral": 0
+   },
+   "same": {
+    "right": 205,
+    "none": 0,
+    "contained": 14,
+    "collateral": 1
+   },
+   "elsewhere": {
+    "right": 219,
+    "none": 0,
+    "contained": 0,
+    "collateral": 1
+   }
+  }
+ },
+ "append only": {
+  "passagesWithARevisedPush": 0,
+  "passages": 380
+ }
+}

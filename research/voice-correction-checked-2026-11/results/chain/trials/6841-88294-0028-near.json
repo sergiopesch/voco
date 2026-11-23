@@ -1,0 +1,13 @@
+{
+ "id": "6841-88294-0028-near",
+ "parts": [
+  "I've been robbed",
+  ", he cried. Where",
+  "'s my boat? he asked"
+ ],
+ "start": 39,
+ "end": 44,
+ "replacement": "coat?",
+ "rest": ". You had no coat when I picked you up, I replied.",
+ "expected": "I've been robbed, he cried. Where's my coat? he asked. You had no coat when I picked you up, I replied."
+}

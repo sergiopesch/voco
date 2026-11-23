@@ -1,0 +1,3706 @@
+{
+ "seed": 20261123,
+ "leftOut": 10,
+ "trials": [
+  {
+   "id": "116-288045-0015",
+   "subset": "dev-other",
+   "first": 2,
+   "last": 7,
+   "target": 6,
+   "far": "deluded",
+   "near": "hat",
+   "after": 0
+  },
+  {
+   "id": "116-288045-0017",
+   "subset": "dev-other",
+   "first": 33,
+   "last": 36,
+   "target": 34,
+   "far": "required",
+   "near": "your",
+   "after": 4
+  },
+  {
+   "id": "116-288046-0009",
+   "subset": "dev-other",
+   "first": 20,
+   "last": 25,
+   "target": 24,
+   "far": "yourself",
+   "near": "yo",
+   "after": 8
+  },
+  {
+   "id": "116-288047-0008",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 9,
+   "far": "their",
+   "near": "thanks",
+   "after": 0
+  },
+  {
+   "id": "116-288047-0014",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 12,
+   "target": 9,
+   "far": "mundane",
+   "near": "us",
+   "after": 4
+  },
+  {
+   "id": "116-288048-0011",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 23,
+   "target": 19,
+   "far": "traits",
+   "near": "ways",
+   "after": 8
+  },
+  {
+   "id": "116-288048-0026",
+   "subset": "dev-other",
+   "first": 41,
+   "last": 45,
+   "target": 42,
+   "far": "groaned",
+   "near": "there",
+   "after": 0
+  },
+  {
+   "id": "1255-138279-0018",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 12,
+   "far": "thought",
+   "near": "your",
+   "after": 4
+  },
+  {
+   "id": "1255-138279-0020",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 13,
+   "target": 12,
+   "far": "beside",
+   "near": "hate",
+   "after": 8
+  },
+  {
+   "id": "1255-74899-0021",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 13,
+   "target": 10,
+   "far": "peering",
+   "near": "van",
+   "after": 0
+  },
+  {
+   "id": "1255-90407-0002",
+   "subset": "dev-other",
+   "first": 22,
+   "last": 25,
+   "target": 23,
+   "far": "edition",
+   "near": "now",
+   "after": 4
+  },
+  {
+   "id": "1255-90407-0005",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 12,
+   "target": 11,
+   "far": "sighed",
+   "near": "thank",
+   "after": 8
+  },
+  {
+   "id": "1255-90407-0006",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 7,
+   "target": 6,
+   "far": "miles",
+   "near": "rather",
+   "after": 0
+  },
+  {
+   "id": "1255-90407-0010",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 13,
+   "target": 12,
+   "far": "shining",
+   "near": "heart",
+   "after": 4
+  },
+  {
+   "id": "1255-90407-0018",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 29,
+   "target": 28,
+   "far": "wolves",
+   "near": "land",
+   "after": 0
+  },
+  {
+   "id": "1255-90413-0003",
+   "subset": "dev-other",
+   "first": 25,
+   "last": 29,
+   "target": 28,
+   "far": "puffing",
+   "near": "now",
+   "after": 4
+  },
+  {
+   "id": "1255-90413-0004",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 8,
+   "target": 7,
+   "far": "home",
+   "near": "her",
+   "after": 8
+  },
+  {
+   "id": "1255-90413-0015",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 13,
+   "target": 11,
+   "far": "beggar",
+   "near": "it",
+   "after": 0
+  },
+  {
+   "id": "1255-90413-0023",
+   "subset": "dev-other",
+   "first": 35,
+   "last": 40,
+   "target": 39,
+   "far": "power",
+   "near": "mist",
+   "after": 4
+  },
+  {
+   "id": "1272-135031-0009",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 12,
+   "far": "fair",
+   "near": "as",
+   "after": 8
+  },
+  {
+   "id": "1272-135031-0011",
+   "subset": "dev-clean",
+   "first": 30,
+   "last": 33,
+   "target": 31,
+   "far": "mourned",
+   "near": "partly",
+   "after": 0
+  },
+  {
+   "id": "1272-135031-0012",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 9,
+   "target": 8,
+   "far": "printed",
+   "near": "other",
+   "after": 4
+  },
+  {
+   "id": "1272-135031-0013",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 10,
+   "target": 7,
+   "far": "duration",
+   "near": "on",
+   "after": 8
+  },
+  {
+   "id": "1272-135031-0014",
+   "subset": "dev-clean",
+   "first": 6,
+   "last": 8,
+   "target": 7,
+   "far": "sake",
+   "near": "i",
+   "after": 0
+  },
+  {
+   "id": "1272-135031-0019",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 11,
+   "target": 9,
+   "far": "women",
+   "near": "marked",
+   "after": 4
+  },
+  {
+   "id": "1272-135031-0021",
+   "subset": "dev-clean",
+   "first": 13,
+   "last": 18,
+   "target": 15,
+   "far": "ganny",
+   "near": "note",
+   "after": 8
+  },
+  {
+   "id": "1272-135031-0022",
+   "subset": "dev-clean",
+   "first": 6,
+   "last": 8,
+   "target": 7,
+   "far": "vast",
+   "near": "agrees",
+   "after": 0
+  },
+  {
+   "id": "1272-141231-0024",
+   "subset": "dev-clean",
+   "first": 23,
+   "last": 28,
+   "target": 25,
+   "far": "invite",
+   "near": "ironically",
+   "after": 4
+  },
+  {
+   "id": "1585-131718-0041",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 12,
+   "target": 10,
+   "far": "forth",
+   "near": "nothing",
+   "after": 8
+  },
+  {
+   "id": "1630-141772-0002",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 21,
+   "target": 20,
+   "far": "drive",
+   "near": "fits",
+   "after": 0
+  },
+  {
+   "id": "1630-141772-0020",
+   "subset": "dev-other",
+   "first": 42,
+   "last": 45,
+   "target": 44,
+   "far": "hole",
+   "near": "move",
+   "after": 4
+  },
+  {
+   "id": "1630-73710-0005",
+   "subset": "dev-other",
+   "first": 2,
+   "last": 7,
+   "target": 3,
+   "far": "measured",
+   "near": "die",
+   "after": 8
+  },
+  {
+   "id": "1630-73710-0009",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 10,
+   "target": 8,
+   "far": "prefer",
+   "near": "don",
+   "after": 0
+  },
+  {
+   "id": "1630-73710-0011",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 10,
+   "target": 9,
+   "far": "carpenter",
+   "near": "do",
+   "after": 4
+  },
+  {
+   "id": "1630-96099-0004",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 11,
+   "target": 10,
+   "far": "appeared",
+   "near": "temple",
+   "after": 8
+  },
+  {
+   "id": "1630-96099-0007",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 12,
+   "target": 11,
+   "far": "find",
+   "near": "lost",
+   "after": 0
+  },
+  {
+   "id": "1630-96099-0012",
+   "subset": "dev-other",
+   "first": 33,
+   "last": 37,
+   "target": 35,
+   "far": "elevator",
+   "near": "once",
+   "after": 4
+  },
+  {
+   "id": "1630-96099-0016",
+   "subset": "dev-other",
+   "first": 27,
+   "last": 30,
+   "target": 28,
+   "far": "maybe",
+   "near": "let",
+   "after": 8
+  },
+  {
+   "id": "1630-96099-0019",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 16,
+   "target": 14,
+   "far": "soldiers",
+   "near": "nor",
+   "after": 0
+  },
+  {
+   "id": "1650-157641-0003",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 16,
+   "far": "andrew",
+   "near": "moreover",
+   "after": 4
+  },
+  {
+   "id": "1650-157641-0012",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 17,
+   "target": 15,
+   "far": "knees",
+   "near": "an",
+   "after": 8
+  },
+  {
+   "id": "1650-167613-0013",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 18,
+   "far": "ought",
+   "near": "beer",
+   "after": 0
+  },
+  {
+   "id": "1650-167613-0017",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 18,
+   "target": 17,
+   "far": "languages",
+   "near": "repelled",
+   "after": 4
+  },
+  {
+   "id": "1650-167613-0026",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 14,
+   "target": 10,
+   "far": "case",
+   "near": "morrow",
+   "after": 0
+  },
+  {
+   "id": "1650-167613-0027",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 11,
+   "target": 7,
+   "far": "however",
+   "near": "an",
+   "after": 4
+  },
+  {
+   "id": "1650-167613-0031",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 9,
+   "far": "instance",
+   "near": "we're",
+   "after": 8
+  },
+  {
+   "id": "1650-167613-0032",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 12,
+   "target": 9,
+   "far": "progress",
+   "near": "then",
+   "after": 0
+  },
+  {
+   "id": "1651-136854-0013",
+   "subset": "dev-other",
+   "first": 1,
+   "last": 4,
+   "target": 3,
+   "far": "hurriedly",
+   "near": "live",
+   "after": 8
+  },
+  {
+   "id": "1651-136854-0016",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 12,
+   "target": 11,
+   "far": "foliage",
+   "near": "hinder",
+   "after": 0
+  },
+  {
+   "id": "1651-136854-0017",
+   "subset": "dev-other",
+   "first": 3,
+   "last": 7,
+   "target": 4,
+   "far": "transgressor",
+   "near": "produced",
+   "after": 4
+  },
+  {
+   "id": "1686-142278-0010",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 17,
+   "target": 16,
+   "far": "beholds",
+   "near": "as",
+   "after": 8
+  },
+  {
+   "id": "1686-142278-0038",
+   "subset": "dev-other",
+   "first": 31,
+   "last": 33,
+   "target": 32,
+   "far": "exhaustion",
+   "near": "forgiven",
+   "after": 0
+  },
+  {
+   "id": "1686-142278-0047",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 10,
+   "target": 8,
+   "far": "toddle",
+   "near": "dies",
+   "after": 4
+  },
+  {
+   "id": "1686-142278-0049",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 19,
+   "target": 18,
+   "far": "ned",
+   "near": "sand",
+   "after": 8
+  },
+  {
+   "id": "1686-142278-0056",
+   "subset": "dev-other",
+   "first": 29,
+   "last": 34,
+   "target": 31,
+   "far": "silas",
+   "near": "de",
+   "after": 0
+  },
+  {
+   "id": "1686-142278-0071",
+   "subset": "dev-other",
+   "first": 38,
+   "last": 41,
+   "target": 39,
+   "far": "hang",
+   "near": "can't",
+   "after": 4
+  },
+  {
+   "id": "1686-142278-0072",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 8,
+   "target": 7,
+   "far": "sea",
+   "near": "go",
+   "after": 8
+  },
+  {
+   "id": "1686-142278-0077",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 11,
+   "target": 10,
+   "far": "serafima",
+   "near": "privately",
+   "after": 0
+  },
+  {
+   "id": "1686-142278-0084",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 8,
+   "target": 5,
+   "far": "though",
+   "near": "so",
+   "after": 4
+  },
+  {
+   "id": "1686-142278-0087",
+   "subset": "dev-other",
+   "first": 30,
+   "last": 33,
+   "target": 31,
+   "far": "substance",
+   "near": "has",
+   "after": 8
+  },
+  {
+   "id": "1686-142278-0088",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 8,
+   "target": 6,
+   "far": "shouted",
+   "near": "covered",
+   "after": 0
+  },
+  {
+   "id": "1686-142278-0090",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 15,
+   "target": 14,
+   "far": "france",
+   "near": "pour",
+   "after": 4
+  },
+  {
+   "id": "1701-141760-0007",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 17,
+   "target": 15,
+   "far": "flew",
+   "near": "thee",
+   "after": 8
+  },
+  {
+   "id": "1701-141760-0008",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 11,
+   "target": 10,
+   "far": "sprucewood",
+   "near": "wave",
+   "after": 0
+  },
+  {
+   "id": "1701-141760-0015",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 29,
+   "target": 28,
+   "far": "weep",
+   "near": "it",
+   "after": 4
+  },
+  {
+   "id": "1988-147956-0003",
+   "subset": "dev-clean",
+   "first": 12,
+   "last": 16,
+   "target": 13,
+   "far": "as",
+   "near": "way",
+   "after": 8
+  },
+  {
+   "id": "1988-147956-0014",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 10,
+   "far": "mainly",
+   "near": "we",
+   "after": 0
+  },
+  {
+   "id": "1988-147956-0025",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 15,
+   "target": 11,
+   "far": "worsted",
+   "near": "gas",
+   "after": 4
+  },
+  {
+   "id": "1988-24833-0006",
+   "subset": "dev-clean",
+   "first": 16,
+   "last": 19,
+   "target": 17,
+   "far": "colored",
+   "near": "its",
+   "after": 8
+  },
+  {
+   "id": "1988-24833-0010",
+   "subset": "dev-clean",
+   "first": 20,
+   "last": 23,
+   "target": 21,
+   "far": "trance",
+   "near": "the",
+   "after": 0
+  },
+  {
+   "id": "1993-147965-0001",
+   "subset": "dev-clean",
+   "first": 11,
+   "last": 16,
+   "target": 15,
+   "far": "use",
+   "near": "thank",
+   "after": 4
+  },
+  {
+   "id": "1993-147966-0003",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 14,
+   "target": 13,
+   "far": "certainly",
+   "near": "comes",
+   "after": 8
+  },
+  {
+   "id": "2035-147960-0015",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 18,
+   "target": 16,
+   "far": "occasion",
+   "near": "winter",
+   "after": 0
+  },
+  {
+   "id": "2035-147961-0017",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 14,
+   "target": 11,
+   "far": "cicero",
+   "near": "homer",
+   "after": 4
+  },
+  {
+   "id": "2035-147961-0027",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 12,
+   "target": 11,
+   "far": "prefect",
+   "near": "row",
+   "after": 8
+  },
+  {
+   "id": "2035-147961-0028",
+   "subset": "dev-clean",
+   "first": 3,
+   "last": 5,
+   "target": 4,
+   "far": "occasion",
+   "near": "shirt",
+   "after": 0
+  },
+  {
+   "id": "2078-142845-0009",
+   "subset": "dev-clean",
+   "first": 53,
+   "last": 55,
+   "target": 54,
+   "far": "around",
+   "near": "alien",
+   "after": 4
+  },
+  {
+   "id": "2078-142845-0016",
+   "subset": "dev-clean",
+   "first": 26,
+   "last": 28,
+   "target": 27,
+   "far": "odour",
+   "near": "maid",
+   "after": 8
+  },
+  {
+   "id": "2078-142845-0024",
+   "subset": "dev-clean",
+   "first": 2,
+   "last": 4,
+   "target": 3,
+   "far": "vacancy",
+   "near": "went",
+   "after": 0
+  },
+  {
+   "id": "2078-142845-0036",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 11,
+   "target": 10,
+   "far": "nests",
+   "near": "tenth",
+   "after": 4
+  },
+  {
+   "id": "2078-142845-0042",
+   "subset": "dev-clean",
+   "first": 2,
+   "last": 6,
+   "target": 4,
+   "far": "gascon",
+   "near": "invented",
+   "after": 8
+  },
+  {
+   "id": "2078-142845-0048",
+   "subset": "dev-clean",
+   "first": 26,
+   "last": 28,
+   "target": 27,
+   "far": "missing",
+   "near": "shirt",
+   "after": 0
+  },
+  {
+   "id": "2412-153947-0012",
+   "subset": "dev-clean",
+   "first": 30,
+   "last": 34,
+   "target": 32,
+   "far": "clay",
+   "near": "all",
+   "after": 4
+  },
+  {
+   "id": "2428-83699-0009",
+   "subset": "dev-clean",
+   "first": 30,
+   "last": 33,
+   "target": 32,
+   "far": "trying",
+   "near": "so",
+   "after": 8
+  },
+  {
+   "id": "2428-83699-0015",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 9,
+   "target": 6,
+   "far": "mainly",
+   "near": "gas",
+   "after": 0
+  },
+  {
+   "id": "2428-83699-0035",
+   "subset": "dev-clean",
+   "first": 22,
+   "last": 26,
+   "target": 25,
+   "far": "meals",
+   "near": "whom",
+   "after": 4
+  },
+  {
+   "id": "2428-83699-0039",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 11,
+   "target": 8,
+   "far": "sense",
+   "near": "sold",
+   "after": 8
+  },
+  {
+   "id": "2428-83699-0041",
+   "subset": "dev-clean",
+   "first": 25,
+   "last": 29,
+   "target": 27,
+   "far": "reluctance",
+   "near": "prisoner",
+   "after": 0
+  },
+  {
+   "id": "2428-83705-0003",
+   "subset": "dev-clean",
+   "first": 50,
+   "last": 53,
+   "target": 52,
+   "far": "possession",
+   "near": "post",
+   "after": 4
+  },
+  {
+   "id": "2428-83705-0008",
+   "subset": "dev-clean",
+   "first": 11,
+   "last": 14,
+   "target": 13,
+   "far": "pounded",
+   "near": "possibly",
+   "after": 8
+  },
+  {
+   "id": "2428-83705-0009",
+   "subset": "dev-clean",
+   "first": 4,
+   "last": 8,
+   "target": 6,
+   "far": "nomes",
+   "near": "don",
+   "after": 0
+  },
+  {
+   "id": "2428-83705-0027",
+   "subset": "dev-clean",
+   "first": 34,
+   "last": 37,
+   "target": 35,
+   "far": "arched",
+   "near": "as",
+   "after": 4
+  },
+  {
+   "id": "2506-11267-0011",
+   "subset": "dev-other",
+   "first": 16,
+   "last": 21,
+   "target": 17,
+   "far": "pairs",
+   "near": "at",
+   "after": 8
+  },
+  {
+   "id": "2506-11278-0003",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 23,
+   "target": 21,
+   "far": "tennessee",
+   "near": "if",
+   "after": 0
+  },
+  {
+   "id": "2506-11278-0029",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 11,
+   "target": 8,
+   "far": "watchman",
+   "near": "knows",
+   "after": 4
+  },
+  {
+   "id": "2506-13150-0004",
+   "subset": "dev-other",
+   "first": 2,
+   "last": 7,
+   "target": 6,
+   "far": "sidney's",
+   "near": "i",
+   "after": 8
+  },
+  {
+   "id": "2506-13150-0005",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 7,
+   "target": 5,
+   "far": "beholds",
+   "near": "find",
+   "after": 0
+  },
+  {
+   "id": "2803-154320-0006",
+   "subset": "dev-clean",
+   "first": 8,
+   "last": 11,
+   "target": 10,
+   "far": "apprehension",
+   "near": "may",
+   "after": 4
+  },
+  {
+   "id": "2803-154328-0002",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 12,
+   "target": 11,
+   "far": "granted",
+   "near": "real",
+   "after": 8
+  },
+  {
+   "id": "2803-154328-0006",
+   "subset": "dev-clean",
+   "first": 14,
+   "last": 19,
+   "target": 17,
+   "far": "things",
+   "near": "still",
+   "after": 0
+  },
+  {
+   "id": "2803-154328-0016",
+   "subset": "dev-clean",
+   "first": 46,
+   "last": 50,
+   "target": 48,
+   "far": "stand",
+   "near": "he",
+   "after": 4
+  },
+  {
+   "id": "2803-154328-0021",
+   "subset": "dev-clean",
+   "first": 34,
+   "last": 39,
+   "target": 37,
+   "far": "constituting",
+   "near": "side",
+   "after": 8
+  },
+  {
+   "id": "2902-9008-0008",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 20,
+   "target": 16,
+   "far": "love",
+   "near": "go",
+   "after": 0
+  },
+  {
+   "id": "2902-9008-0015",
+   "subset": "dev-clean",
+   "first": 37,
+   "last": 41,
+   "target": 40,
+   "far": "soldier",
+   "near": "they",
+   "after": 4
+  },
+  {
+   "id": "3000-15664-0030",
+   "subset": "dev-clean",
+   "first": 11,
+   "last": 14,
+   "target": 12,
+   "far": "sky",
+   "near": "darker",
+   "after": 8
+  },
+  {
+   "id": "3081-166546-0002",
+   "subset": "dev-clean",
+   "first": 24,
+   "last": 29,
+   "target": 26,
+   "far": "reverence",
+   "near": "ay",
+   "after": 0
+  },
+  {
+   "id": "3081-166546-0015",
+   "subset": "dev-clean",
+   "first": 8,
+   "last": 13,
+   "target": 10,
+   "far": "bunch",
+   "near": "loving",
+   "after": 4
+  },
+  {
+   "id": "3081-166546-0018",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 10,
+   "target": 8,
+   "far": "proposition",
+   "near": "dies",
+   "after": 8
+  },
+  {
+   "id": "3081-166546-0021",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 17,
+   "target": 16,
+   "far": "direct",
+   "near": "emphasised",
+   "after": 0
+  },
+  {
+   "id": "3081-166546-0032",
+   "subset": "dev-clean",
+   "first": 24,
+   "last": 28,
+   "target": 25,
+   "far": "arrival",
+   "near": "thee",
+   "after": 4
+  },
+  {
+   "id": "3081-166546-0033",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 10,
+   "target": 9,
+   "far": "listen",
+   "near": "absolute",
+   "after": 8
+  },
+  {
+   "id": "3081-166546-0038",
+   "subset": "dev-clean",
+   "first": 14,
+   "last": 19,
+   "target": 15,
+   "far": "scarcely",
+   "near": "bad",
+   "after": 0
+  },
+  {
+   "id": "3081-166546-0053",
+   "subset": "dev-clean",
+   "first": 12,
+   "last": 16,
+   "target": 13,
+   "far": "engage",
+   "near": "the",
+   "after": 4
+  },
+  {
+   "id": "3081-166546-0054",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 9,
+   "target": 7,
+   "far": "necessity",
+   "near": "aid",
+   "after": 8
+  },
+  {
+   "id": "3081-166546-0057",
+   "subset": "dev-clean",
+   "first": 11,
+   "last": 16,
+   "target": 15,
+   "far": "followed",
+   "near": "care",
+   "after": 0
+  },
+  {
+   "id": "3081-166546-0065",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 10,
+   "target": 9,
+   "far": "atheist",
+   "near": "boy",
+   "after": 8
+  },
+  {
+   "id": "3081-166546-0075",
+   "subset": "dev-clean",
+   "first": 28,
+   "last": 30,
+   "target": 29,
+   "far": "idea",
+   "near": "mary",
+   "after": 0
+  },
+  {
+   "id": "3081-166546-0076",
+   "subset": "dev-clean",
+   "first": 3,
+   "last": 6,
+   "target": 4,
+   "far": "least",
+   "near": "mode",
+   "after": 4
+  },
+  {
+   "id": "3081-166546-0083",
+   "subset": "dev-clean",
+   "first": 20,
+   "last": 25,
+   "target": 21,
+   "far": "sense",
+   "near": "ill",
+   "after": 8
+  },
+  {
+   "id": "3081-166546-0084",
+   "subset": "dev-clean",
+   "first": 6,
+   "last": 11,
+   "target": 7,
+   "far": "kisses",
+   "near": "hell",
+   "after": 0
+  },
+  {
+   "id": "3170-137482-0013",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 12,
+   "target": 10,
+   "far": "different",
+   "near": "if",
+   "after": 4
+  },
+  {
+   "id": "3170-137482-0033",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 11,
+   "target": 10,
+   "far": "shortly",
+   "near": "where",
+   "after": 8
+  },
+  {
+   "id": "3536-8226-0009",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 20,
+   "target": 19,
+   "far": "stars",
+   "near": "man",
+   "after": 0
+  },
+  {
+   "id": "3576-138058-0006",
+   "subset": "dev-clean",
+   "first": 57,
+   "last": 62,
+   "target": 58,
+   "far": "alcestis",
+   "near": "n",
+   "after": 4
+  },
+  {
+   "id": "3576-138058-0031",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 20,
+   "target": 16,
+   "far": "young",
+   "near": "mare",
+   "after": 8
+  },
+  {
+   "id": "3660-172182-0022",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 15,
+   "far": "appeared",
+   "near": "wet",
+   "after": 0
+  },
+  {
+   "id": "3660-172183-0002",
+   "subset": "dev-other",
+   "first": 23,
+   "last": 27,
+   "target": 26,
+   "far": "shall",
+   "near": "so",
+   "after": 4
+  },
+  {
+   "id": "3660-172183-0006",
+   "subset": "dev-other",
+   "first": 25,
+   "last": 30,
+   "target": 27,
+   "far": "humdrum",
+   "near": "want",
+   "after": 8
+  },
+  {
+   "id": "3660-172183-0022",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 19,
+   "target": 16,
+   "far": "maniacs",
+   "near": "on",
+   "after": 0
+  },
+  {
+   "id": "3660-6517-0014",
+   "subset": "dev-other",
+   "first": 35,
+   "last": 40,
+   "target": 37,
+   "far": "cannot",
+   "near": "miss",
+   "after": 4
+  },
+  {
+   "id": "3660-6517-0029",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 11,
+   "target": 9,
+   "far": "seventeen",
+   "near": "o'clock",
+   "after": 8
+  },
+  {
+   "id": "3752-4943-0006",
+   "subset": "dev-clean",
+   "first": 8,
+   "last": 13,
+   "target": 10,
+   "far": "duskly",
+   "near": "some",
+   "after": 0
+  },
+  {
+   "id": "3752-4943-0015",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 11,
+   "far": "punishment",
+   "near": "beggars",
+   "after": 4
+  },
+  {
+   "id": "3752-4943-0016",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 9,
+   "target": 7,
+   "far": "poorer",
+   "near": "gold",
+   "after": 8
+  },
+  {
+   "id": "3752-4943-0017",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 9,
+   "target": 6,
+   "far": "live",
+   "near": "had",
+   "after": 0
+  },
+  {
+   "id": "3752-4943-0019",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 19,
+   "target": 18,
+   "far": "fagots",
+   "near": "came",
+   "after": 4
+  },
+  {
+   "id": "3752-4943-0027",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 15,
+   "target": 13,
+   "far": "music",
+   "near": "pity",
+   "after": 8
+  },
+  {
+   "id": "3752-4944-0004",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 15,
+   "target": 11,
+   "far": "become",
+   "near": "yo",
+   "after": 0
+  },
+  {
+   "id": "3752-4944-0005",
+   "subset": "dev-clean",
+   "first": 6,
+   "last": 10,
+   "target": 7,
+   "far": "adjust",
+   "near": "hell",
+   "after": 4
+  },
+  {
+   "id": "3752-4944-0014",
+   "subset": "dev-clean",
+   "first": 17,
+   "last": 22,
+   "target": 20,
+   "far": "drop",
+   "near": "out",
+   "after": 8
+  },
+  {
+   "id": "3752-4944-0019",
+   "subset": "dev-clean",
+   "first": 17,
+   "last": 22,
+   "target": 18,
+   "far": "awe",
+   "near": "hale",
+   "after": 0
+  },
+  {
+   "id": "3752-4944-0023",
+   "subset": "dev-clean",
+   "first": 46,
+   "last": 49,
+   "target": 48,
+   "far": "wilson",
+   "near": "door",
+   "after": 4
+  },
+  {
+   "id": "3752-4944-0024",
+   "subset": "dev-clean",
+   "first": 4,
+   "last": 9,
+   "target": 6,
+   "far": "these",
+   "near": "she",
+   "after": 8
+  },
+  {
+   "id": "3752-4944-0026",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 10,
+   "far": "doubting",
+   "near": "reads",
+   "after": 0
+  },
+  {
+   "id": "3752-4944-0037",
+   "subset": "dev-clean",
+   "first": 19,
+   "last": 23,
+   "target": 20,
+   "far": "mercurial",
+   "near": "stoop",
+   "after": 4
+  },
+  {
+   "id": "3752-4944-0041",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 12,
+   "far": "children",
+   "near": "glass",
+   "after": 8
+  },
+  {
+   "id": "3752-4944-0044",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 9,
+   "target": 8,
+   "far": "scolding",
+   "near": "macklewain's",
+   "after": 0
+  },
+  {
+   "id": "3752-4944-0046",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 11,
+   "target": 8,
+   "far": "foolish",
+   "near": "gives",
+   "after": 4
+  },
+  {
+   "id": "3752-4944-0055",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 11,
+   "target": 10,
+   "far": "equally",
+   "near": "us",
+   "after": 8
+  },
+  {
+   "id": "3752-4944-0058",
+   "subset": "dev-clean",
+   "first": 8,
+   "last": 13,
+   "target": 9,
+   "far": "box",
+   "near": "revolt",
+   "after": 0
+  },
+  {
+   "id": "3752-4944-0061",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 14,
+   "target": 12,
+   "far": "corrected",
+   "near": "own",
+   "after": 4
+  },
+  {
+   "id": "3752-4944-0063",
+   "subset": "dev-clean",
+   "first": 14,
+   "last": 19,
+   "target": 17,
+   "far": "stuff",
+   "near": "nor",
+   "after": 8
+  },
+  {
+   "id": "3853-163249-0015",
+   "subset": "dev-clean",
+   "first": 36,
+   "last": 41,
+   "target": 39,
+   "far": "lit",
+   "near": "aid",
+   "after": 0
+  },
+  {
+   "id": "3853-163249-0034",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 12,
+   "far": "elaine",
+   "near": "your",
+   "after": 4
+  },
+  {
+   "id": "4153-186222-0001",
+   "subset": "dev-other",
+   "first": 20,
+   "last": 22,
+   "target": 21,
+   "far": "afterwards",
+   "near": "who",
+   "after": 8
+  },
+  {
+   "id": "4153-186222-0006",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 23,
+   "target": 22,
+   "far": "numb",
+   "near": "collected",
+   "after": 0
+  },
+  {
+   "id": "4153-186222-0007",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 10,
+   "target": 8,
+   "far": "ugly",
+   "near": "africa",
+   "after": 4
+  },
+  {
+   "id": "4153-186222-0018",
+   "subset": "dev-other",
+   "first": 20,
+   "last": 24,
+   "target": 23,
+   "far": "age",
+   "near": "both",
+   "after": 8
+  },
+  {
+   "id": "4153-186222-0021",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 12,
+   "target": 10,
+   "far": "science",
+   "near": "seem",
+   "after": 0
+  },
+  {
+   "id": "4153-186222-0029",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 16,
+   "target": 15,
+   "far": "forgetting",
+   "near": "miserable",
+   "after": 4
+  },
+  {
+   "id": "4153-186222-0032",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 29,
+   "target": 25,
+   "far": "beautiful",
+   "near": "mare",
+   "after": 8
+  },
+  {
+   "id": "4153-186223-0007",
+   "subset": "dev-other",
+   "first": 23,
+   "last": 27,
+   "target": 25,
+   "far": "repaid",
+   "near": "rice",
+   "after": 0
+  },
+  {
+   "id": "4153-186223-0009",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 12,
+   "far": "clever",
+   "near": "stake",
+   "after": 4
+  },
+  {
+   "id": "4153-186223-0011",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 14,
+   "target": 11,
+   "far": "apology",
+   "near": "hunt",
+   "after": 8
+  },
+  {
+   "id": "4153-186223-0014",
+   "subset": "dev-other",
+   "first": 21,
+   "last": 24,
+   "target": 22,
+   "far": "evening",
+   "near": "married",
+   "after": 0
+  },
+  {
+   "id": "4153-186223-0015",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 7,
+   "target": 6,
+   "far": "regal",
+   "near": "they",
+   "after": 4
+  },
+  {
+   "id": "4153-186223-0018",
+   "subset": "dev-other",
+   "first": 26,
+   "last": 30,
+   "target": 27,
+   "far": "thus",
+   "near": "ill",
+   "after": 8
+  },
+  {
+   "id": "4323-18416-0012",
+   "subset": "dev-other",
+   "first": 37,
+   "last": 42,
+   "target": 38,
+   "far": "gascon",
+   "near": "amy",
+   "after": 0
+  },
+  {
+   "id": "4323-18416-0017",
+   "subset": "dev-other",
+   "first": 17,
+   "last": 22,
+   "target": 21,
+   "far": "button",
+   "near": "hold",
+   "after": 4
+  },
+  {
+   "id": "4323-18416-0031",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 15,
+   "target": 11,
+   "far": "murmur",
+   "near": "if",
+   "after": 8
+  },
+  {
+   "id": "4323-55228-0018",
+   "subset": "dev-other",
+   "first": 20,
+   "last": 24,
+   "target": 22,
+   "far": "breathe",
+   "near": "hungry",
+   "after": 0
+  },
+  {
+   "id": "4323-55228-0021",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 13,
+   "target": 12,
+   "far": "brandt",
+   "near": "suffering",
+   "after": 4
+  },
+  {
+   "id": "4323-55228-0023",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 16,
+   "target": 13,
+   "far": "van",
+   "near": "he",
+   "after": 8
+  },
+  {
+   "id": "4323-55228-0038",
+   "subset": "dev-other",
+   "first": 20,
+   "last": 23,
+   "target": 22,
+   "far": "jane's",
+   "near": "need",
+   "after": 0
+  },
+  {
+   "id": "4323-55228-0045",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 14,
+   "target": 13,
+   "far": "pulling",
+   "near": "by",
+   "after": 4
+  },
+  {
+   "id": "4323-55228-0048",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 19,
+   "target": 18,
+   "far": "breastworks",
+   "near": "fore",
+   "after": 8
+  },
+  {
+   "id": "4515-11057-0006",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 18,
+   "target": 17,
+   "far": "guide",
+   "near": "lo",
+   "after": 0
+  },
+  {
+   "id": "4515-11057-0011",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 12,
+   "target": 11,
+   "far": "behind",
+   "near": "once",
+   "after": 4
+  },
+  {
+   "id": "4515-11057-0013",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 19,
+   "target": 17,
+   "far": "cloud",
+   "near": "no",
+   "after": 8
+  },
+  {
+   "id": "4515-11057-0014",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 8,
+   "target": 7,
+   "far": "fagots",
+   "near": "any",
+   "after": 0
+  },
+  {
+   "id": "4515-11057-0027",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 26,
+   "target": 25,
+   "far": "floods",
+   "near": "has",
+   "after": 4
+  },
+  {
+   "id": "4515-11057-0045",
+   "subset": "dev-other",
+   "first": 29,
+   "last": 31,
+   "target": 30,
+   "far": "those",
+   "near": "begun",
+   "after": 8
+  },
+  {
+   "id": "4515-11057-0050",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 14,
+   "target": 12,
+   "far": "care",
+   "near": "wrote",
+   "after": 0
+  },
+  {
+   "id": "4515-11057-0051",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 11,
+   "target": 9,
+   "far": "those",
+   "near": "hell",
+   "after": 4
+  },
+  {
+   "id": "4515-11057-0062",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 15,
+   "target": 14,
+   "far": "indians",
+   "near": "end",
+   "after": 8
+  },
+  {
+   "id": "4515-11057-0066",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 19,
+   "target": 16,
+   "far": "as",
+   "near": "your",
+   "after": 0
+  },
+  {
+   "id": "4515-11057-0068",
+   "subset": "dev-other",
+   "first": 16,
+   "last": 19,
+   "target": 17,
+   "far": "start",
+   "near": "won't",
+   "after": 4
+  },
+  {
+   "id": "4515-11057-0069",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 9,
+   "target": 5,
+   "far": "griggs",
+   "near": "hall",
+   "after": 8
+  },
+  {
+   "id": "4515-11057-0070",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 10,
+   "target": 7,
+   "far": "came",
+   "near": "us",
+   "after": 0
+  },
+  {
+   "id": "4515-11057-0077",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 15,
+   "target": 13,
+   "far": "white",
+   "near": "de",
+   "after": 4
+  },
+  {
+   "id": "4515-11057-0083",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 15,
+   "target": 12,
+   "far": "ways",
+   "near": "de",
+   "after": 8
+  },
+  {
+   "id": "4515-11057-0099",
+   "subset": "dev-other",
+   "first": 22,
+   "last": 26,
+   "target": 25,
+   "far": "beautiful",
+   "near": "he",
+   "after": 0
+  },
+  {
+   "id": "4570-24733-0002",
+   "subset": "dev-other",
+   "first": 56,
+   "last": 59,
+   "target": 57,
+   "far": "near",
+   "near": "it's",
+   "after": 8
+  },
+  {
+   "id": "4570-24733-0003",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 6,
+   "target": 5,
+   "far": "number",
+   "near": "necessary",
+   "after": 0
+  },
+  {
+   "id": "4572-112383-0001",
+   "subset": "dev-other",
+   "first": 2,
+   "last": 5,
+   "target": 3,
+   "far": "sizzled",
+   "near": "there",
+   "after": 4
+  },
+  {
+   "id": "5338-284437-0002",
+   "subset": "dev-clean",
+   "first": 24,
+   "last": 27,
+   "target": 25,
+   "far": "lies",
+   "near": "than",
+   "after": 8
+  },
+  {
+   "id": "5338-284437-0003",
+   "subset": "dev-clean",
+   "first": 4,
+   "last": 7,
+   "target": 5,
+   "far": "indignation",
+   "near": "trod",
+   "after": 0
+  },
+  {
+   "id": "5338-284437-0014",
+   "subset": "dev-clean",
+   "first": 30,
+   "last": 33,
+   "target": 31,
+   "far": "de",
+   "near": "yo",
+   "after": 4
+  },
+  {
+   "id": "5338-284437-0023",
+   "subset": "dev-clean",
+   "first": 33,
+   "last": 37,
+   "target": 34,
+   "far": "fact",
+   "near": "four",
+   "after": 8
+  },
+  {
+   "id": "5338-284437-0025",
+   "subset": "dev-clean",
+   "first": 18,
+   "last": 22,
+   "target": 21,
+   "far": "balustrade",
+   "near": "beat",
+   "after": 0
+  },
+  {
+   "id": "5536-43358-0016",
+   "subset": "dev-clean",
+   "first": 18,
+   "last": 22,
+   "target": 19,
+   "far": "drowsy",
+   "near": "mad",
+   "after": 4
+  },
+  {
+   "id": "5543-27761-0005",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 16,
+   "far": "yore",
+   "near": "feet",
+   "after": 8
+  },
+  {
+   "id": "5543-27761-0019",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 11,
+   "target": 10,
+   "far": "days",
+   "near": "lo",
+   "after": 0
+  },
+  {
+   "id": "5543-27761-0021",
+   "subset": "dev-other",
+   "first": 16,
+   "last": 21,
+   "target": 19,
+   "far": "lucky",
+   "near": "mamochka",
+   "after": 4
+  },
+  {
+   "id": "5543-27761-0038",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 22,
+   "target": 19,
+   "far": "blurred",
+   "near": "lasted",
+   "after": 8
+  },
+  {
+   "id": "5543-27761-0042",
+   "subset": "dev-other",
+   "first": 17,
+   "last": 20,
+   "target": 18,
+   "far": "drowsy",
+   "near": "then",
+   "after": 0
+  },
+  {
+   "id": "5543-27761-0045",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 13,
+   "target": 12,
+   "far": "traitor",
+   "near": "la",
+   "after": 4
+  },
+  {
+   "id": "5543-27761-0046",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 10,
+   "target": 8,
+   "far": "bright's",
+   "near": "mare",
+   "after": 8
+  },
+  {
+   "id": "5543-27761-0054",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 18,
+   "target": 17,
+   "far": "ghastly",
+   "near": "serafima",
+   "after": 0
+  },
+  {
+   "id": "5543-27761-0076",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 14,
+   "far": "evening",
+   "near": "day",
+   "after": 4
+  },
+  {
+   "id": "5543-27761-0085",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 18,
+   "target": 16,
+   "far": "sophists",
+   "near": "mamochka",
+   "after": 8
+  },
+  {
+   "id": "5543-27761-0104",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 14,
+   "target": 11,
+   "far": "staying",
+   "near": "on",
+   "after": 0
+  },
+  {
+   "id": "5694-64025-0006",
+   "subset": "dev-clean",
+   "first": 23,
+   "last": 28,
+   "target": 26,
+   "far": "lantern",
+   "near": "ah",
+   "after": 4
+  },
+  {
+   "id": "5694-64025-0013",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 15,
+   "target": 12,
+   "far": "destiny",
+   "near": "them",
+   "after": 8
+  },
+  {
+   "id": "5694-64029-0002",
+   "subset": "dev-clean",
+   "first": 14,
+   "last": 18,
+   "target": 17,
+   "far": "tutor",
+   "near": "it",
+   "after": 0
+  },
+  {
+   "id": "5694-64038-0006",
+   "subset": "dev-clean",
+   "first": 11,
+   "last": 15,
+   "target": 12,
+   "far": "hopeless",
+   "near": "makes",
+   "after": 4
+  },
+  {
+   "id": "5694-64038-0021",
+   "subset": "dev-clean",
+   "first": 11,
+   "last": 16,
+   "target": 14,
+   "far": "exist",
+   "near": "glowed",
+   "after": 8
+  },
+  {
+   "id": "5849-50873-0030",
+   "subset": "dev-other",
+   "first": 29,
+   "last": 32,
+   "target": 31,
+   "far": "tender",
+   "near": "thy",
+   "after": 0
+  },
+  {
+   "id": "5849-50873-0032",
+   "subset": "dev-other",
+   "first": 21,
+   "last": 26,
+   "target": 23,
+   "far": "fasten",
+   "near": "yo",
+   "after": 4
+  },
+  {
+   "id": "5849-50962-0004",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 18,
+   "target": 16,
+   "far": "quietly",
+   "near": "objections",
+   "after": 8
+  },
+  {
+   "id": "5849-50963-0001",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 14,
+   "target": 11,
+   "far": "generals",
+   "near": "everyday",
+   "after": 0
+  },
+  {
+   "id": "5849-50963-0004",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 29,
+   "target": 26,
+   "far": "mythical",
+   "near": "that",
+   "after": 4
+  },
+  {
+   "id": "5895-34615-0005",
+   "subset": "dev-clean",
+   "first": 35,
+   "last": 38,
+   "target": 36,
+   "far": "chaffinch",
+   "near": "has",
+   "after": 8
+  },
+  {
+   "id": "5895-34615-0006",
+   "subset": "dev-clean",
+   "first": 4,
+   "last": 9,
+   "target": 6,
+   "far": "advancing",
+   "near": "herself",
+   "after": 0
+  },
+  {
+   "id": "5895-34615-0018",
+   "subset": "dev-clean",
+   "first": 20,
+   "last": 23,
+   "target": 21,
+   "far": "denied",
+   "near": "tad",
+   "after": 4
+  },
+  {
+   "id": "5895-34622-0015",
+   "subset": "dev-clean",
+   "first": 13,
+   "last": 18,
+   "target": 17,
+   "far": "melancholy",
+   "near": "them",
+   "after": 8
+  },
+  {
+   "id": "5895-34629-0005",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 14,
+   "target": 12,
+   "far": "duds",
+   "near": "there",
+   "after": 0
+  },
+  {
+   "id": "5895-34629-0010",
+   "subset": "dev-clean",
+   "first": 13,
+   "last": 16,
+   "target": 14,
+   "far": "surest",
+   "near": "begin",
+   "after": 4
+  },
+  {
+   "id": "5895-34629-0014",
+   "subset": "dev-clean",
+   "first": 12,
+   "last": 16,
+   "target": 14,
+   "far": "petty",
+   "near": "us",
+   "after": 8
+  },
+  {
+   "id": "5895-34629-0020",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 12,
+   "target": 11,
+   "far": "danger",
+   "near": "remarked",
+   "after": 0
+  },
+  {
+   "id": "5895-34629-0032",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 15,
+   "target": 12,
+   "far": "lives",
+   "near": "made",
+   "after": 4
+  },
+  {
+   "id": "6123-59150-0022",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 29,
+   "target": 27,
+   "far": "obstinately",
+   "near": "should",
+   "after": 8
+  },
+  {
+   "id": "6123-59186-0009",
+   "subset": "dev-other",
+   "first": 17,
+   "last": 22,
+   "target": 18,
+   "far": "i've",
+   "near": "case",
+   "after": 0
+  },
+  {
+   "id": "6123-59186-0010",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 11,
+   "target": 8,
+   "far": "mankind",
+   "near": "nine",
+   "after": 4
+  },
+  {
+   "id": "6241-66616-0023",
+   "subset": "dev-clean",
+   "first": 23,
+   "last": 28,
+   "target": 27,
+   "far": "said",
+   "near": "wabigoon's",
+   "after": 8
+  },
+  {
+   "id": "6267-53049-0006",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 12,
+   "target": 9,
+   "far": "ended",
+   "near": "peel",
+   "after": 0
+  },
+  {
+   "id": "6267-53049-0007",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 9,
+   "target": 7,
+   "far": "replied",
+   "near": "peel",
+   "after": 4
+  },
+  {
+   "id": "6267-53049-0008",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 10,
+   "target": 8,
+   "far": "inquiries",
+   "near": "hunt",
+   "after": 8
+  },
+  {
+   "id": "6267-53049-0021",
+   "subset": "dev-other",
+   "first": 16,
+   "last": 20,
+   "target": 19,
+   "far": "obey",
+   "near": "together",
+   "after": 0
+  },
+  {
+   "id": "6267-65525-0022",
+   "subset": "dev-other",
+   "first": 60,
+   "last": 65,
+   "target": 62,
+   "far": "phoebe",
+   "near": "painted",
+   "after": 4
+  },
+  {
+   "id": "6267-65525-0029",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 12,
+   "target": 10,
+   "far": "homer",
+   "near": "scarcely",
+   "after": 8
+  },
+  {
+   "id": "6267-65525-0032",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 17,
+   "far": "but",
+   "near": "women",
+   "after": 0
+  },
+  {
+   "id": "6267-65525-0034",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 24,
+   "target": 21,
+   "far": "despair",
+   "near": "hat",
+   "after": 4
+  },
+  {
+   "id": "6267-65525-0038",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 16,
+   "target": 12,
+   "far": "earth",
+   "near": "won't",
+   "after": 8
+  },
+  {
+   "id": "6267-65525-0043",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 13,
+   "target": 10,
+   "far": "trees",
+   "near": "dig",
+   "after": 0
+  },
+  {
+   "id": "6267-65525-0047",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 17,
+   "target": 14,
+   "far": "around",
+   "near": "in",
+   "after": 4
+  },
+  {
+   "id": "6267-65525-0055",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 17,
+   "target": 14,
+   "far": "hotel",
+   "near": "thing",
+   "after": 8
+  },
+  {
+   "id": "6295-244435-0006",
+   "subset": "dev-clean",
+   "first": 13,
+   "last": 18,
+   "target": 16,
+   "far": "crawling",
+   "near": "where",
+   "after": 0
+  },
+  {
+   "id": "6295-244435-0014",
+   "subset": "dev-clean",
+   "first": 13,
+   "last": 18,
+   "target": 16,
+   "far": "pairs",
+   "near": "write",
+   "after": 4
+  },
+  {
+   "id": "6295-244435-0015",
+   "subset": "dev-clean",
+   "first": 6,
+   "last": 9,
+   "target": 7,
+   "far": "gained",
+   "near": "person",
+   "after": 8
+  },
+  {
+   "id": "6295-244435-0027",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 14,
+   "target": 11,
+   "far": "this",
+   "near": "gong",
+   "after": 0
+  },
+  {
+   "id": "6313-66125-0009",
+   "subset": "dev-clean",
+   "first": 13,
+   "last": 17,
+   "target": 16,
+   "far": "hurrah",
+   "near": "thy",
+   "after": 4
+  },
+  {
+   "id": "6313-66125-0026",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 19,
+   "target": 18,
+   "far": "ask",
+   "near": "she",
+   "after": 8
+  },
+  {
+   "id": "6313-66129-0019",
+   "subset": "dev-clean",
+   "first": 20,
+   "last": 25,
+   "target": 24,
+   "far": "message",
+   "near": "sickly",
+   "after": 0
+  },
+  {
+   "id": "6313-66129-0028",
+   "subset": "dev-clean",
+   "first": 12,
+   "last": 16,
+   "target": 13,
+   "far": "swinging",
+   "near": "i",
+   "after": 4
+  },
+  {
+   "id": "6313-66129-0030",
+   "subset": "dev-clean",
+   "first": 27,
+   "last": 32,
+   "target": 31,
+   "far": "moment's",
+   "near": "led",
+   "after": 8
+  },
+  {
+   "id": "6313-66129-0032",
+   "subset": "dev-clean",
+   "first": 14,
+   "last": 19,
+   "target": 17,
+   "far": "calm",
+   "near": "moved",
+   "after": 0
+  },
+  {
+   "id": "6313-76958-0008",
+   "subset": "dev-clean",
+   "first": 16,
+   "last": 19,
+   "target": 18,
+   "far": "curiosity",
+   "near": "curley",
+   "after": 4
+  },
+  {
+   "id": "6313-76958-0020",
+   "subset": "dev-clean",
+   "first": 8,
+   "last": 13,
+   "target": 10,
+   "far": "scolding",
+   "near": "the",
+   "after": 8
+  },
+  {
+   "id": "6313-76958-0030",
+   "subset": "dev-clean",
+   "first": 22,
+   "last": 24,
+   "target": 23,
+   "far": "scalp",
+   "near": "used",
+   "after": 0
+  },
+  {
+   "id": "6319-275224-0007",
+   "subset": "dev-clean",
+   "first": 44,
+   "last": 49,
+   "target": 47,
+   "far": "severity",
+   "near": "two",
+   "after": 4
+  },
+  {
+   "id": "6319-57405-0010",
+   "subset": "dev-clean",
+   "first": 36,
+   "last": 41,
+   "target": 40,
+   "far": "straight",
+   "near": "ask",
+   "after": 8
+  },
+  {
+   "id": "6319-64726-0014",
+   "subset": "dev-clean",
+   "first": 18,
+   "last": 23,
+   "target": 22,
+   "far": "finds",
+   "near": "fore",
+   "after": 0
+  },
+  {
+   "id": "6345-93302-0028",
+   "subset": "dev-clean",
+   "first": 27,
+   "last": 31,
+   "target": 29,
+   "far": "silas",
+   "near": "them",
+   "after": 4
+  },
+  {
+   "id": "6455-67803-0007",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 17,
+   "target": 16,
+   "far": "using",
+   "near": "yo",
+   "after": 8
+  },
+  {
+   "id": "6455-67803-0012",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 12,
+   "far": "speak",
+   "near": "do",
+   "after": 0
+  },
+  {
+   "id": "6455-67803-0015",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 22,
+   "target": 21,
+   "far": "tried",
+   "near": "natural",
+   "after": 4
+  },
+  {
+   "id": "6455-67803-0028",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 15,
+   "far": "gate",
+   "near": "per",
+   "after": 8
+  },
+  {
+   "id": "6455-67804-0008",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 14,
+   "target": 13,
+   "far": "glowed",
+   "near": "affair",
+   "after": 0
+  },
+  {
+   "id": "6455-67804-0015",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 13,
+   "target": 11,
+   "far": "vega",
+   "near": "men",
+   "after": 4
+  },
+  {
+   "id": "6467-56885-0005",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 16,
+   "far": "forbidding",
+   "near": "want",
+   "after": 8
+  },
+  {
+   "id": "6467-94831-0006",
+   "subset": "dev-other",
+   "first": 2,
+   "last": 6,
+   "target": 4,
+   "far": "way",
+   "near": "lifted",
+   "after": 0
+  },
+  {
+   "id": "6467-94831-0015",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 17,
+   "far": "serious",
+   "near": "robbed",
+   "after": 4
+  },
+  {
+   "id": "6467-94831-0028",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 14,
+   "target": 12,
+   "far": "man's",
+   "near": "aid",
+   "after": 8
+  },
+  {
+   "id": "6467-94831-0035",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 16,
+   "target": 13,
+   "far": "boy",
+   "near": "am",
+   "after": 0
+  },
+  {
+   "id": "6467-94831-0039",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 9,
+   "far": "burst",
+   "near": "my",
+   "after": 4
+  },
+  {
+   "id": "6467-94831-0041",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 15,
+   "target": 13,
+   "far": "sides",
+   "near": "read",
+   "after": 8
+  },
+  {
+   "id": "6467-94831-0042",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 11,
+   "target": 7,
+   "far": "catch",
+   "near": "it",
+   "after": 0
+  },
+  {
+   "id": "6467-94831-0044",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 15,
+   "far": "accepted",
+   "near": "i",
+   "after": 4
+  },
+  {
+   "id": "6599-38591-0003",
+   "subset": "dev-other",
+   "first": 27,
+   "last": 32,
+   "target": 30,
+   "far": "guarded",
+   "near": "decide",
+   "after": 8
+  },
+  {
+   "id": "6841-88291-0021",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 10,
+   "target": 9,
+   "far": "knew",
+   "near": "she",
+   "after": 0
+  },
+  {
+   "id": "6841-88291-0037",
+   "subset": "dev-other",
+   "first": 17,
+   "last": 22,
+   "target": 20,
+   "far": "vigorously",
+   "near": "wheat",
+   "after": 4
+  },
+  {
+   "id": "6841-88291-0043",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 14,
+   "target": 13,
+   "far": "contentment",
+   "near": "hand",
+   "after": 8
+  },
+  {
+   "id": "6841-88291-0044",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 9,
+   "target": 8,
+   "far": "bull",
+   "near": "thee",
+   "after": 0
+  },
+  {
+   "id": "6841-88291-0048",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 28,
+   "target": 26,
+   "far": "conditioned",
+   "near": "thee",
+   "after": 4
+  },
+  {
+   "id": "6841-88294-0027",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 14,
+   "target": 13,
+   "far": "heads",
+   "near": "de",
+   "after": 8
+  },
+  {
+   "id": "6841-88294-0028",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 9,
+   "target": 7,
+   "far": "bundled",
+   "near": "boat",
+   "after": 0
+  },
+  {
+   "id": "6841-88294-0037",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 16,
+   "target": 14,
+   "far": "observant",
+   "near": "jim",
+   "after": 4
+  },
+  {
+   "id": "700-122866-0007",
+   "subset": "dev-other",
+   "first": 47,
+   "last": 51,
+   "target": 50,
+   "far": "south",
+   "near": "gripped",
+   "after": 8
+  },
+  {
+   "id": "700-122866-0016",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 24,
+   "target": 20,
+   "far": "stupid",
+   "near": "drank",
+   "after": 0
+  },
+  {
+   "id": "700-122866-0018",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 19,
+   "target": 17,
+   "far": "suckle",
+   "near": "mast",
+   "after": 4
+  },
+  {
+   "id": "700-122866-0021",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 17,
+   "target": 15,
+   "far": "french",
+   "near": "lad",
+   "after": 8
+  },
+  {
+   "id": "700-122867-0010",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 13,
+   "target": 12,
+   "far": "later",
+   "near": "mourned",
+   "after": 0
+  },
+  {
+   "id": "700-122867-0027",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 16,
+   "far": "it's",
+   "near": "seem",
+   "after": 4
+  },
+  {
+   "id": "700-122867-0029",
+   "subset": "dev-other",
+   "first": 20,
+   "last": 23,
+   "target": 22,
+   "far": "performances",
+   "near": "bill",
+   "after": 8
+  },
+  {
+   "id": "700-122867-0040",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 14,
+   "target": 13,
+   "far": "do",
+   "near": "letter",
+   "after": 0
+  },
+  {
+   "id": "700-122868-0003",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 14,
+   "far": "die",
+   "near": "lain",
+   "after": 4
+  },
+  {
+   "id": "700-122868-0013",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 14,
+   "target": 13,
+   "far": "rebels",
+   "near": "thee",
+   "after": 8
+  },
+  {
+   "id": "700-122868-0014",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 9,
+   "target": 7,
+   "far": "broke",
+   "near": "am",
+   "after": 0
+  },
+  {
+   "id": "700-122868-0016",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 29,
+   "target": 27,
+   "far": "doubtfully",
+   "near": "change",
+   "after": 4
+  },
+  {
+   "id": "700-122868-0026",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 14,
+   "target": 12,
+   "far": "being",
+   "near": "was",
+   "after": 8
+  },
+  {
+   "id": "700-122868-0027",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 9,
+   "target": 7,
+   "far": "thoughtfully",
+   "near": "us",
+   "after": 0
+  },
+  {
+   "id": "700-122868-0029",
+   "subset": "dev-other",
+   "first": 28,
+   "last": 32,
+   "target": 31,
+   "far": "will",
+   "near": "ann",
+   "after": 4
+  },
+  {
+   "id": "700-122868-0039",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 14,
+   "target": 11,
+   "far": "sylvania",
+   "near": "seem",
+   "after": 8
+  },
+  {
+   "id": "7601-175351-0002",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 16,
+   "target": 15,
+   "far": "meekin",
+   "near": "explained",
+   "after": 0
+  },
+  {
+   "id": "7601-175351-0003",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 8,
+   "target": 7,
+   "far": "lie",
+   "near": "talked",
+   "after": 4
+  },
+  {
+   "id": "7601-175351-0005",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 12,
+   "target": 10,
+   "far": "sire",
+   "near": "yo",
+   "after": 8
+  },
+  {
+   "id": "7601-175351-0006",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 7,
+   "target": 6,
+   "far": "pray",
+   "near": "tried",
+   "after": 0
+  },
+  {
+   "id": "7601-175351-0011",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 22,
+   "target": 20,
+   "far": "penelope",
+   "near": "murmured",
+   "after": 4
+  },
+  {
+   "id": "7641-96684-0019",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 24,
+   "target": 22,
+   "far": "think",
+   "near": "seems",
+   "after": 8
+  },
+  {
+   "id": "7641-96684-0025",
+   "subset": "dev-other",
+   "first": 13,
+   "last": 18,
+   "target": 16,
+   "far": "saddle",
+   "near": "fame",
+   "after": 0
+  },
+  {
+   "id": "7697-105815-0005",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 22,
+   "target": 21,
+   "far": "lively",
+   "near": "thin",
+   "after": 4
+  },
+  {
+   "id": "7697-105815-0007",
+   "subset": "dev-other",
+   "first": 27,
+   "last": 30,
+   "target": 28,
+   "far": "unsupported",
+   "near": "wheat",
+   "after": 8
+  },
+  {
+   "id": "777-126732-0001",
+   "subset": "dev-clean",
+   "first": 5,
+   "last": 10,
+   "target": 6,
+   "far": "epithets",
+   "near": "thy",
+   "after": 0
+  },
+  {
+   "id": "777-126732-0020",
+   "subset": "dev-clean",
+   "first": 12,
+   "last": 15,
+   "target": 13,
+   "far": "gentlemen",
+   "near": "way",
+   "after": 4
+  },
+  {
+   "id": "777-126732-0026",
+   "subset": "dev-clean",
+   "first": 23,
+   "last": 28,
+   "target": 25,
+   "far": "blasphemy",
+   "near": "seen",
+   "after": 8
+  },
+  {
+   "id": "777-126732-0033",
+   "subset": "dev-clean",
+   "first": 14,
+   "last": 19,
+   "target": 18,
+   "far": "everywhere",
+   "near": "wish",
+   "after": 0
+  },
+  {
+   "id": "777-126732-0049",
+   "subset": "dev-clean",
+   "first": 23,
+   "last": 26,
+   "target": 24,
+   "far": "should",
+   "near": "curley",
+   "after": 4
+  },
+  {
+   "id": "777-126732-0062",
+   "subset": "dev-clean",
+   "first": 16,
+   "last": 20,
+   "target": 17,
+   "far": "easily",
+   "near": "got",
+   "after": 8
+  },
+  {
+   "id": "7850-281318-0005",
+   "subset": "dev-clean",
+   "first": 23,
+   "last": 28,
+   "target": 27,
+   "far": "meals",
+   "near": "closer",
+   "after": 0
+  },
+  {
+   "id": "7850-281318-0016",
+   "subset": "dev-clean",
+   "first": 8,
+   "last": 13,
+   "target": 12,
+   "far": "van",
+   "near": "he",
+   "after": 4
+  },
+  {
+   "id": "7850-281318-0020",
+   "subset": "dev-clean",
+   "first": 16,
+   "last": 20,
+   "target": 18,
+   "far": "exasperation",
+   "near": "say",
+   "after": 8
+  },
+  {
+   "id": "7850-286674-0001",
+   "subset": "dev-clean",
+   "first": 28,
+   "last": 30,
+   "target": 29,
+   "far": "ways",
+   "near": "us",
+   "after": 0
+  },
+  {
+   "id": "7850-286674-0012",
+   "subset": "dev-clean",
+   "first": 28,
+   "last": 33,
+   "target": 29,
+   "far": "embrace",
+   "near": "huh",
+   "after": 4
+  },
+  {
+   "id": "7850-73752-0005",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 11,
+   "far": "decided",
+   "near": "need",
+   "after": 0
+  },
+  {
+   "id": "7976-105575-0002",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 11,
+   "target": 9,
+   "far": "miss",
+   "near": "has",
+   "after": 4
+  },
+  {
+   "id": "7976-105575-0017",
+   "subset": "dev-clean",
+   "first": 31,
+   "last": 36,
+   "target": 32,
+   "far": "stretchers",
+   "near": "cold",
+   "after": 8
+  },
+  {
+   "id": "7976-105575-0020",
+   "subset": "dev-clean",
+   "first": 12,
+   "last": 17,
+   "target": 16,
+   "far": "retreat",
+   "near": "she",
+   "after": 0
+  },
+  {
+   "id": "7976-105575-0026",
+   "subset": "dev-clean",
+   "first": 15,
+   "last": 20,
+   "target": 16,
+   "far": "compassionately",
+   "near": "protest",
+   "after": 4
+  },
+  {
+   "id": "8173-294714-0009",
+   "subset": "dev-other",
+   "first": 25,
+   "last": 30,
+   "target": 27,
+   "far": "conscience",
+   "near": "mare",
+   "after": 8
+  },
+  {
+   "id": "8173-294714-0015",
+   "subset": "dev-other",
+   "first": 21,
+   "last": 26,
+   "target": 24,
+   "far": "conquered",
+   "near": "edition",
+   "after": 0
+  },
+  {
+   "id": "8173-294714-0023",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 19,
+   "far": "note",
+   "near": "mode",
+   "after": 4
+  },
+  {
+   "id": "8173-294714-0029",
+   "subset": "dev-other",
+   "first": 16,
+   "last": 21,
+   "target": 19,
+   "far": "veiled",
+   "near": "o",
+   "after": 8
+  },
+  {
+   "id": "8173-294714-0037",
+   "subset": "dev-other",
+   "first": 12,
+   "last": 15,
+   "target": 14,
+   "far": "ladyship",
+   "near": "yo",
+   "after": 0
+  },
+  {
+   "id": "8173-294714-0048",
+   "subset": "dev-other",
+   "first": 33,
+   "last": 38,
+   "target": 35,
+   "far": "led",
+   "near": "quilt",
+   "after": 4
+  },
+  {
+   "id": "8173-294714-0056",
+   "subset": "dev-other",
+   "first": 24,
+   "last": 28,
+   "target": 25,
+   "far": "hadn't",
+   "near": "would",
+   "after": 8
+  },
+  {
+   "id": "8254-84205-0008",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 20,
+   "target": 18,
+   "far": "him",
+   "near": "thin",
+   "after": 8
+  },
+  {
+   "id": "8254-84205-0013",
+   "subset": "dev-other",
+   "first": 9,
+   "last": 11,
+   "target": 10,
+   "far": "thee",
+   "near": "tried",
+   "after": 0
+  },
+  {
+   "id": "8254-84205-0015",
+   "subset": "dev-other",
+   "first": 7,
+   "last": 11,
+   "target": 9,
+   "far": "struck",
+   "near": "see",
+   "after": 4
+  },
+  {
+   "id": "8254-84205-0016",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 10,
+   "target": 7,
+   "far": "horse",
+   "near": "ways",
+   "after": 8
+  },
+  {
+   "id": "8254-84205-0026",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 13,
+   "target": 12,
+   "far": "agree",
+   "near": "tried",
+   "after": 0
+  },
+  {
+   "id": "8254-84205-0028",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 14,
+   "target": 13,
+   "far": "austere",
+   "near": "door",
+   "after": 4
+  },
+  {
+   "id": "8254-84205-0031",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 12,
+   "target": 9,
+   "far": "leaped",
+   "near": "yo",
+   "after": 8
+  },
+  {
+   "id": "8254-84205-0062",
+   "subset": "dev-other",
+   "first": 15,
+   "last": 18,
+   "target": 16,
+   "far": "someone",
+   "near": "realized",
+   "after": 0
+  },
+  {
+   "id": "8254-84205-0064",
+   "subset": "dev-other",
+   "first": 17,
+   "last": 21,
+   "target": 18,
+   "far": "beauregard",
+   "near": "or",
+   "after": 4
+  },
+  {
+   "id": "8288-274150-0005",
+   "subset": "dev-other",
+   "first": 11,
+   "last": 16,
+   "target": 14,
+   "far": "hunt",
+   "near": "o",
+   "after": 8
+  },
+  {
+   "id": "8288-274162-0010",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 18,
+   "target": 16,
+   "far": "marvelous",
+   "near": "got",
+   "after": 0
+  },
+  {
+   "id": "8288-274162-0011",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 10,
+   "target": 6,
+   "far": "literature",
+   "near": "hard",
+   "after": 4
+  },
+  {
+   "id": "8288-274162-0012",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 10,
+   "target": 8,
+   "far": "else's",
+   "near": "his",
+   "after": 8
+  },
+  {
+   "id": "8288-274162-0026",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 13,
+   "target": 12,
+   "far": "followed",
+   "near": "bit",
+   "after": 4
+  },
+  {
+   "id": "8288-274162-0028",
+   "subset": "dev-other",
+   "first": 8,
+   "last": 13,
+   "target": 11,
+   "far": "failed",
+   "near": "wore",
+   "after": 8
+  },
+  {
+   "id": "8288-274162-0032",
+   "subset": "dev-other",
+   "first": 18,
+   "last": 20,
+   "target": 19,
+   "far": "productive",
+   "near": "thy",
+   "after": 0
+  },
+  {
+   "id": "8288-274162-0038",
+   "subset": "dev-other",
+   "first": 21,
+   "last": 26,
+   "target": 22,
+   "far": "hotel",
+   "near": "such",
+   "after": 4
+  },
+  {
+   "id": "8288-274162-0046",
+   "subset": "dev-other",
+   "first": 14,
+   "last": 19,
+   "target": 17,
+   "far": "above",
+   "near": "yo",
+   "after": 8
+  },
+  {
+   "id": "8288-274162-0049",
+   "subset": "dev-other",
+   "first": 5,
+   "last": 8,
+   "target": 6,
+   "far": "toilette",
+   "near": "whole",
+   "after": 4
+  },
+  {
+   "id": "8288-274162-0051",
+   "subset": "dev-other",
+   "first": 16,
+   "last": 21,
+   "target": 18,
+   "far": "refuses",
+   "near": "painted",
+   "after": 8
+  },
+  {
+   "id": "8288-274162-0056",
+   "subset": "dev-other",
+   "first": 10,
+   "last": 14,
+   "target": 13,
+   "far": "wise",
+   "near": "k",
+   "after": 0
+  },
+  {
+   "id": "8288-274162-0059",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 22,
+   "target": 21,
+   "far": "fancy",
+   "near": "amid",
+   "after": 4
+  },
+  {
+   "id": "8288-274162-0061",
+   "subset": "dev-other",
+   "first": 19,
+   "last": 24,
+   "target": 20,
+   "far": "security",
+   "near": "mistress",
+   "after": 8
+  },
+  {
+   "id": "8288-274162-0062",
+   "subset": "dev-other",
+   "first": 6,
+   "last": 9,
+   "target": 7,
+   "far": "jealous",
+   "near": "in",
+   "after": 0
+  },
+  {
+   "id": "8288-274162-0063",
+   "subset": "dev-other",
+   "first": 4,
+   "last": 10,
+   "target": 8,
+   "far": "frown",
+   "near": "such",
+   "after": 4
+  },
+  {
+   "id": "8297-275154-0005",
+   "subset": "dev-clean",
+   "first": 20,
+   "last": 24,
+   "target": 23,
+   "far": "unhappy",
+   "near": "fascinating",
+   "after": 8
+  },
+  {
+   "id": "8297-275154-0009",
+   "subset": "dev-clean",
+   "first": 9,
+   "last": 13,
+   "target": 11,
+   "far": "earliest",
+   "near": "he",
+   "after": 0
+  },
+  {
+   "id": "8297-275154-0018",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 10,
+   "target": 9,
+   "far": "board",
+   "near": "we",
+   "after": 4
+  },
+  {
+   "id": "8297-275154-0022",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 13,
+   "target": 12,
+   "far": "tobacco",
+   "near": "to",
+   "after": 8
+  },
+  {
+   "id": "8297-275155-0008",
+   "subset": "dev-clean",
+   "first": 10,
+   "last": 15,
+   "target": 13,
+   "far": "proper",
+   "near": "am",
+   "after": 0
+  },
+  {
+   "id": "8297-275155-0026",
+   "subset": "dev-clean",
+   "first": 6,
+   "last": 11,
+   "target": 10,
+   "far": "fortnight",
+   "near": "he",
+   "after": 4
+  },
+  {
+   "id": "8297-275155-0028",
+   "subset": "dev-clean",
+   "first": 7,
+   "last": 12,
+   "target": 11,
+   "far": "clatter",
+   "near": "must",
+   "after": 8
+  },
+  {
+   "id": "8297-275155-0030",
+   "subset": "dev-clean",
+   "first": 24,
+   "last": 27,
+   "target": 26,
+   "far": "tree",
+   "near": "dead",
+   "after": 0
+  },
+  {
+   "id": "8842-304647-0001",
+   "subset": "dev-clean",
+   "first": 25,
+   "last": 27,
+   "target": 26,
+   "far": "following",
+   "near": "impara",
+   "after": 4
+  }
+ ]
+}

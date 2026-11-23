@@ -1,0 +1,13 @@
+{
+ "id": "5543-27761-0019-far",
+ "parts": [
+  "Her mother's eyes glow",
+  "ed with passionate emotion",
+  ". Her mother went days hide"
+ ],
+ "start": 66,
+ "end": 70,
+ "replacement": "to",
+ "rest": " Lolucha turned away as though not to see, but watched her Momochka stealthily all the time.",
+ "expected": "Her mother's eyes glowed with passionate emotion. Her mother went to hide Lolucha turned away as though not to see, but watched her Momochka stealthily all the time."
+}

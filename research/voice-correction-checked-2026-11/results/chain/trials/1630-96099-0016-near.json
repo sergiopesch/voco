@@ -1,0 +1,13 @@
+{
+ "id": "1630-96099-0016-near",
+ "parts": [
+  "It is only now at the eleventh hour that the Italian had",
+  " become inculcated, and the question of his possible anxiety to esca",
+  "pe had never been considered. He let everything behind"
+ ],
+ "start": 157,
+ "end": 160,
+ "replacement": "left",
+ "rest": ". Hand it to me, said the chief. And when it came into his hands he began to turn over the leaves hurriedly.",
+ "expected": "It is only now at the eleventh hour that the Italian had become inculcated, and the question of his possible anxiety to escape had never been considered. He left everything behind. Hand it to me, said the chief. And when it came into his hands he began to turn over the leaves hurriedly."
+}

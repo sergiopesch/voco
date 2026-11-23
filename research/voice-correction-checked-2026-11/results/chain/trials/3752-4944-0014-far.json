@@ -1,0 +1,13 @@
+{
+ "id": "3752-4944-0014-far",
+ "parts": [
+  "In fact, the ringleader John Rex",
+  " gave me his confession and I sent it to",
+  " the Bishop. A great rascal drop in North"
+ ],
+ "start": 100,
+ "end": 104,
+ "replacement": "put",
+ "rest": ". Well now said Meekin with asperity, I don't agree with you.",
+ "expected": "In fact, the ringleader John Rex gave me his confession and I sent it to the Bishop. A great rascal put in North. Well now said Meekin with asperity, I don't agree with you."
+}

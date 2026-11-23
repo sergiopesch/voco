@@ -1,0 +1,13 @@
+{
+ "id": "2428-83705-0003-near",
+ "parts": [
+  "I do not know when it is going to be, but it will be either next week or the week after",
+  ", certainly at the earliest possible moment, and I shouldn't be at all surprised to learn that all Marian",
+  "ne's things have been already bought and perhaps some of them marked. It is post delightful"
+ ],
+ "start": 268,
+ "end": 272,
+ "replacement": "most",
+ "rest": ". It might just as well be some one else's wedding so unimportant is the part which I am set to play in it.",
+ "expected": "I do not know when it is going to be, but it will be either next week or the week after, certainly at the earliest possible moment, and I shouldn't be at all surprised to learn that all Marianne's things have been already bought and perhaps some of them marked. It is most delightful. It might just as well be some one else's wedding so unimportant is the part which I am set to play in it."
+}

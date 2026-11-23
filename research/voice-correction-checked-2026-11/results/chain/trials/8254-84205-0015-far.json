@@ -1,0 +1,13 @@
+{
+ "id": "8254-84205-0015-far",
+ "parts": [
+  "But we shan't, my lad",
+  ", why not? Because",
+  " I've struck Indians again"
+ ],
+ "start": 45,
+ "end": 51,
+ "replacement": "seen",
+ "rest": ". Oh, you're always seeing Indians again.",
+ "expected": "But we shan't, my lad, why not? Because I've seen Indians again. Oh, you're always seeing Indians again."
+}

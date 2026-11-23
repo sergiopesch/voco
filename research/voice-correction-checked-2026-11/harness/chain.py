@@ -8,7 +8,7 @@ next utterance, with the planted word, is what VOCO pasted; rule 3 decides on
 its words with the correction leaned toward the window typed at the key press;
 and its change is written into the text by the pre-registered form. Writes
 OUT_DIR/chain.json, one entry for each drawn trial, and for each trial where
-the rule made a change, OUT_DIR/trials/<id>.<kind>.json for the field harness.
+the rule made a change, OUT_DIR/trials/<id>-<kind>.json for the field harness.
 Needs neither the recognizer nor the audio.
 """
 import hashlib, json, random, sys
@@ -93,7 +93,7 @@ def build(trial, kind, run, heard_text):
     parts = [pasted[x:y] for x, y in zip([0] + cuts, cuts + [typed_length])]
     assert ''.join(parts) == pasted and all(parts)
     entry.update(change=dict(words=[offset + a, offset + b], new=new, step=step), right=words(expected) == words(final), exact=expected == final)
-    return entry, dict(id=f"{trial['id']}.{kind}", parts=parts, start=start, end=end, replacement=replacement, rest=rest, expected=expected)
+    return entry, dict(id=f"{trial['id']}-{kind}", parts=parts, start=start, end=end, replacement=replacement, rest=rest, expected=expected)
 
 
 def main():
