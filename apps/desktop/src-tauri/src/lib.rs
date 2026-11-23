@@ -1413,13 +1413,26 @@ const DESKTOP_SETUP_GUIDE: &str =
 const SNAP_SETUP_GUIDE: &str =
     "https://github.com/sergiopesch/voco/blob/master/docs/install.md#snap-store";
 
+/// A VOCO release's page on GitHub. Its tag is `voco.` and a version of
+/// digits, letters, dots and hyphens: the address comes from GitHub's answer
+/// or the update cache, and a tag with `../` segments, a query or a fragment
+/// would open another page of github.com under VOCO's name.
+fn is_release_page(url: &str) -> bool {
+    url.strip_prefix("https://github.com/sergiopesch/voco/releases/tag/voco.")
+        .is_some_and(|version| {
+            version.len() <= 64
+                && version.starts_with(|first: char| first.is_ascii_digit())
+                && version
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'-')
+        })
+}
+
 fn is_allowed_external_url(url: &str) -> bool {
     url == DESKTOP_SETUP_GUIDE
         || url == SNAP_SETUP_GUIDE
         || url == panel_setup::COMPANION_PAGE
-        || url
-            .strip_prefix("https://github.com/sergiopesch/voco/releases/tag/")
-            .is_some_and(|tag| !tag.is_empty() && !tag.contains(['\r', '\n', '\\']))
+        || is_release_page(url)
 }
 
 fn prepare_model_at_startup(app: &tauri::AppHandle) -> Result<(), String> {
@@ -2928,6 +2941,35 @@ mod tests {
         assert!(!is_allowed_external_url(
             "https://github.com/sergiopesch/voco"
         ));
+        assert!(is_allowed_external_url(
+            "https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.7-beta.1"
+        ));
+        // Nothing in a tag leads the browser to another page of github.com.
+        for elsewhere in [
+            "voco.2026.0.16/../../../../attacker/repo/releases/download/x/voco-install",
+            "voco.2026.0.16/..",
+            "voco.2026.0.16?tab=elsewhere",
+            "voco.2026.0.16#elsewhere",
+            "voco.2026.0.16%2f..%2f..",
+            "voco.2026.0.16 ",
+            "voco.2026.0.16\n",
+            "voco.",
+            "voco.-",
+            "../../../attacker/repo",
+            "v2026.0.16",
+            "",
+        ] {
+            assert!(
+                !is_allowed_external_url(&format!(
+                    "https://github.com/sergiopesch/voco/releases/tag/{elsewhere}"
+                )),
+                "{elsewhere:?}"
+            );
+        }
+        assert!(!is_allowed_external_url(&format!(
+            "https://github.com/sergiopesch/voco/releases/tag/voco.2026.{}",
+            "1".repeat(64)
+        )));
         assert!(!is_allowed_external_url(
             "https://example.com/sergiopesch/voco/releases/tag/voco.2026.0.16"
         ));

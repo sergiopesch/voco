@@ -61,6 +61,41 @@ describe("selectReleaseForChannel", () => {
   it("allows prerelease builds on the beta channel", () => {
     expect(selectReleaseForChannel(releases, "beta")?.version).toBe("2026.0.7-beta.1");
   });
+
+  it("builds the release page from the tag, whatever address the answer names", () => {
+    const answer = [{ ...releases[1], html_url: "https://github.com/attacker/repo/releases/download/x/voco-install" }];
+    expect(selectReleaseForChannel(answer, "stable")?.url)
+      .toBe("https://github.com/sergiopesch/voco/releases/tag/voco.2026.0.6");
+  });
+
+  it("counts only releases whose tag is one of VOCO's", () => {
+    const tagged = (tag_name: unknown) => [{ ...releases[1], tag_name }];
+    for (const tag of [
+      "voco.2026.0.9/../../../../attacker/repo/releases/download/x/voco-install",
+      "voco.2026.0.9?tab=elsewhere", "voco.2026.0.9#elsewhere", "voco.2026.0.9 ", "voco.2026.0.9\n",
+      "<b>voco.2026.0.9</b>", "v2026.0.9", "2026.0.9", "voco.2026.0", "voco.2026.0.9-", "voco.2026.0.9-beta..1",
+      `voco.2026.0.9-${"a".repeat(64)}`, "", null, 7, undefined,
+    ]) {
+      expect(selectReleaseForChannel(tagged(tag), "beta"), String(tag)).toBeNull();
+    }
+    expect(selectReleaseForChannel(tagged("voco.2026.0.9"), "stable")?.version).toBe("2026.0.9");
+  });
+
+  it("takes an answer that is no list of releases for no release", () => {
+    for (const answer of [null, undefined, "releases", { message: "API rate limit exceeded" }, [null, 7, "x", []]]) {
+      expect(selectReleaseForChannel(answer, "stable")).toBeNull();
+    }
+    // A release without its flags is not known to be published.
+    expect(selectReleaseForChannel([{ tag_name: "voco.2026.0.9" }], "stable")).toBeNull();
+  });
+
+  it("names a release itself when the answer's name is missing, not text or long", () => {
+    const named = (name: unknown) => selectReleaseForChannel([{ ...releases[1], name }], "stable")?.name;
+    expect(named(null)).toBe("VOCO 2026.0.6");
+    expect(named({ toString: () => "x" })).toBe("VOCO 2026.0.6");
+    expect(named("  ")).toBe("VOCO 2026.0.6");
+    expect(named("n".repeat(500))).toHaveLength(80);
+  });
 });
 
 describe("checkForUpdates", () => {

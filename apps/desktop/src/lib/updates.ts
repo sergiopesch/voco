@@ -4,7 +4,6 @@ import type { CachedUpdateCheck, ReleaseInfo, UpdateChannel, UpdateCheckState } 
 interface GitHubReleaseResponse {
   draft: boolean;
   prerelease: boolean;
-  html_url: string;
   name: string | null;
   published_at: string | null;
   tag_name: string;
@@ -103,21 +102,42 @@ export function compareVersions(leftVersion: string, rightVersion: string): numb
   return 0;
 }
 
+// A VOCO release tag: `voco.` and a version, perhaps with a prerelease part.
+// Rust's `is_release_page` accepts the same tags.
+const RELEASE_TAG = /^voco\.\d{1,9}\.\d{1,9}\.\d{1,9}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
+const RELEASE_PAGE = "https://github.com/sergiopesch/voco/releases/tag/";
+
+/** GitHub's answer is data from the network: only a release whose tag is one
+ * of VOCO's counts, and nothing else of it is trusted as an address. */
+function isVocoRelease(release: unknown): release is GitHubReleaseResponse {
+  const candidate = release as Partial<GitHubReleaseResponse> | null;
+  return typeof candidate === "object" && candidate !== null &&
+    typeof candidate.tag_name === "string" && candidate.tag_name.length <= 64 &&
+    RELEASE_TAG.test(candidate.tag_name) &&
+    typeof candidate.draft === "boolean" && typeof candidate.prerelease === "boolean";
+}
+
 function mapRelease(release: GitHubReleaseResponse): ReleaseInfo {
+  const version = normalizeVersion(release.tag_name);
+  const name = typeof release.name === "string" ? release.name.trim().slice(0, 80) : "";
   return {
-    version: normalizeVersion(release.tag_name),
-    name: release.name?.trim() || `VOCO ${normalizeVersion(release.tag_name)}`,
-    url: release.html_url,
-    publishedAt: release.published_at,
+    version,
+    name: name || `VOCO ${version}`,
+    // Built from the tag, never taken from the answer: the page opens in the
+    // person's browser under VOCO's name.
+    url: RELEASE_PAGE + release.tag_name,
+    publishedAt: typeof release.published_at === "string" ? release.published_at : null,
     prerelease: release.prerelease,
   };
 }
 
 export function selectReleaseForChannel(
-  releases: GitHubReleaseResponse[],
+  releases: unknown,
   channel: UpdateChannel,
 ): ReleaseInfo | null {
+  if (!Array.isArray(releases)) return null;
   const candidates = releases
+    .filter(isVocoRelease)
     .filter((release) => !release.draft)
     .filter((release) => (channel === "stable" ? !release.prerelease : true))
     .map(mapRelease)
@@ -154,7 +174,7 @@ export async function checkForUpdates({
     throw new Error(`GitHub release lookup failed with status ${response.status}.`);
   }
 
-  const releases = (await response.json()) as GitHubReleaseResponse[];
+  const releases: unknown = await response.json();
   const latestRelease = selectReleaseForChannel(releases, channel);
   const checkedAt = new Date().toISOString();
 
