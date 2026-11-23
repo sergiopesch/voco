@@ -391,6 +391,14 @@ The production path is `runtime/speech/` → `speech_stream.rs` →
 - `voco-readme-banner.svg` — README banner, written by `scripts/generate-brand-banner.py`.
 - `brand-sources/*` — Source images for the logo, the symbol and the two window textures, with notes on the textures. [Branding](../branding.md) covers their use.
 
+## Security review workspace: `.deepsec/`
+
+- `review.sh` — Runs deepsec's AI security review with the maintainer's own model key, in a clean environment and inside a spending limit.
+- `first-pass.txt` — The files that review covers first, by path and highest risk first: deepsec's pattern scan has none for Rust.
+- `data/voco/INFO.md` — VOCO's threat model as every review batch reads it.
+- `deepsec.config.ts`, `generated-matchers.ts`, `package.json`, `package-lock.json`, `pnpm-workspace.yaml` — deepsec's workspace, pinned to one version of it.
+- `AGENTS.md`, `README.md` — How to run a review here and what to do with its findings, and deepsec's own introduction.
+
 ## Specifications: `specs/`
 
 - `tla/README.md` — What each TLA+ model covers, what it assumes, and how to check it.

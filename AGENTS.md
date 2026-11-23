@@ -944,6 +944,14 @@ only while dictation runs. Run it after a change that could touch the network, t
 update check, the worker sandbox or capture, and keep its evidence folder out of
 the repository.
 
+`.deepsec/review.sh` runs deepsec's AI security review over
+`.deepsec/first-pass.txt` with the maintainer's own Anthropic key, named by
+`DEEPSEC_ANTHROPIC_API_KEY`, inside `DEEPSEC_BUDGET_USD`. It sends those files
+to Anthropic's API, so only the maintainer starts it, and its findings never
+enter a commit, pull request or issue: each is a claim to check, reproduce and
+fix with a test. [.deepsec/AGENTS.md](.deepsec/AGENTS.md) has the rules. CI
+doesn't run it.
+
 `scripts/check-specs.sh` model-checks the TLA+ specifications in `specs/tla`
 with TLC, given `VOCO_TLA_TOOLS`, the path of a `tla2tools.jar`, and Java. Run
 it after a change to a state machine that has a model, and to the model itself.

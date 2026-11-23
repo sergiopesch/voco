@@ -336,6 +336,14 @@ results. Neither
 These need programs or permissions that CI doesn't have. A run is evidence only
 for the host it ran on. Where you don't run them, record them as unavailable.
 
+`.deepsec/review.sh` runs [deepsec](https://github.com/vercel-labs/deepsec),
+an agent-powered vulnerability scanner, over the files in
+`.deepsec/first-pass.txt`. It needs the maintainer's own Anthropic API key in
+`DEEPSEC_ANTHROPIC_API_KEY`, sends those files to Anthropic's API under that
+key, and stops at `DEEPSEC_BUDGET_USD`, 50 US dollars unless set. Its findings
+stay out of Git; [.deepsec/AGENTS.md](../../.deepsec/AGENTS.md) says how to
+handle them.
+
 `scripts/check-specs.sh` model-checks the TLA+ specifications in
 [specs/tla](../../specs/tla/README.md) with TLC. It needs Java and
 `VOCO_TLA_TOOLS`, the path of a `tla2tools.jar` from the TLA+ project's
