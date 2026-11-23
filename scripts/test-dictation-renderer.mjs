@@ -115,8 +115,13 @@ await page.addInitScript(() => {
  window.__TAURI_INTERNALS__ = {invoke: async (command, args) => {
    if(command === 'get_crash_journal_epoch') return 1;
    if(command.endsWith('_crash_journal')) { (window.journalCalls??=[]).push([command,args]); if(command === 'keep_crash_journal' && window.failKeep) throw new Error('Synthetic Review failure'); return; }
-   const {request}=args;
    if(command !== 'speech_stream') throw new Error('Unexpected native command: ' + command);
+   // A push carries its samples as little-endian float32 in base64; read them
+   // as the worker does, so the checks below see numbers.
+   const request=typeof args.request.audio_f32 === 'string'
+     ? {...args.request,audio:Array.from(new Float32Array(Uint8Array.from(atob(args.request.audio_f32),c=>c.charCodeAt(0)).buffer))}
+     : args.request;
+   if(request.op === 'push' && typeof args.request.audio_f32 !== 'string') throw new Error('Stream PCM packet is not packed');
    window.speechRequests.push(request);
    if(request.op === 'warmup' || request.op === 'diagnostic' || request.op === 'quality') return {};
    if(request.op === 'start') {

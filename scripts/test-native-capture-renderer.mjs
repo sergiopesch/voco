@@ -843,7 +843,7 @@ try {
     await page.evaluate(()=>window.listeners['voco:toggle-dictation']({payload:null}));
     await page.waitForFunction(()=>window.store.getState().transcript===''&&window.store.getState().status==='idle');
     const lateProof=await page.evaluate(()=>({released:window.oldDrainReleased,
-      streamSamples:window.nativeCommands.filter(x=>x.name==='speech_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+x.args.request.audio.length,0),
+      streamSamples:window.nativeCommands.filter(x=>x.name==='speech_stream'&&x.args.request.op==='push'&&x.args.request.dictation_session_id===window.captureIdentity.sessionId).reduce((s,x)=>s+atob(x.args.request.audio_f32).length/4,0),
       starts:window.nativeCommands.filter(x=>x.name==='native_capture_begin').map(x=>x.args.request),
       uploads:window.auditUploads.length,cancels:window.nativeCommands.filter(x=>x.name==='native_capture_cancel').map(x=>x.args.request)}));
     assert.equal(lateProof.released,true);assert.equal(lateProof.streamSamples,35280);

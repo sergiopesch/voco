@@ -1,4 +1,6 @@
 """Bounded local speech protocol; diagnostics contain identities and counters only."""
+import base64
+import binascii
 import hashlib
 import json
 import math
@@ -64,6 +66,26 @@ def metadata(request):
     }
 
 
+def push_audio(request):
+    """A push's samples. The desktop sends `audio_f32`, little-endian float32 in
+    base64, which decodes about ten times faster than a JSON list of numbers
+    and to the same samples; `audio`, that list, comes from older clients and
+    fixtures. A push names exactly one of them."""
+    packed = request.get('audio_f32')
+    if packed is None:
+        return request['audio']
+    if 'audio' in request or not isinstance(packed, str) or len(packed) % 4:
+        raise ValueError('audio shape')
+    try:
+        data = base64.b64decode(packed, validate=True)
+    except binascii.Error:
+        raise ValueError('audio shape') from None
+    if len(data) % 4:
+        raise ValueError('audio shape')
+    import numpy as np
+    return np.frombuffer(data, dtype='<f4')
+
+
 def serve(protocol, source, model, metrics, spellings=None):
     # Text goes out with My words as listed and in the session's spelling, so
     # the desktop, its quality reports and the crash journal all see the same words.
@@ -118,7 +140,7 @@ def serve(protocol, source, model, metrics, spellings=None):
                     raise ValueError('sequence')
                 last_request = seq
                 if op == 'push':
-                    text = model.push(request['audio'], request['rate'])
+                    text = model.push(push_audio(request), request['rate'])
                     if text is not None:
                         restored, listed, settled = words.restore(text, final=False)
                         text = spelling.stable(restored[:settled], listed)

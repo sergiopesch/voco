@@ -41,7 +41,10 @@ function harness(rate = 16000, limitSeconds = 600) {
   };
   return { ...fns, stop, rate, buffer, phase, sent, collect, paste, failure, queue, native, flush, disconnect };
 }
-const packets = () => transport.mock.calls.map(c => c[1].request).filter(r => r.op === "push");
+// Each push with its samples as numbers again, read as the worker reads them.
+const unpack = (packed: string) => Array.from(new Float32Array(Uint8Array.from(atob(packed), c => c.charCodeAt(0)).buffer));
+const packets = () => transport.mock.calls.map(c => c[1].request).filter(r => r.op === "push")
+  .map(r => ({ ...r, audio: unpack(r.audio_f32) }));
 const received = () => packets().flatMap(r => r.audio);
 const fixture = (size: number, offset = 0) => Float32Array.from({ length: size }, (_, i) => (i + offset) / 10000);
 beforeEach(() => {

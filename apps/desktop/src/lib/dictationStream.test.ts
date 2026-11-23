@@ -1,10 +1,13 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const transport=vi.hoisted(()=>vi.fn().mockResolvedValue({}));
 vi.mock('@tauri-apps/api/core',()=>({invoke:transport}));
-import {appendOnlySuffix,DictationStream,endsSentence,RecognitionFailure,textLengths} from './dictationStream';
+import {appendOnlySuffix,DictationStream,endsSentence,packSamples,RecognitionFailure,textLengths} from './dictationStream';
 const worker=vi.fn();
 const quality=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='quality');
-const requests=()=>transport.mock.calls.map(c=>c[1].request).filter(r=>!['quality','diagnostic'].includes(r.op));
+// Each push with its samples as numbers again, read as the worker reads them.
+const unpack=(packed:string)=>Array.from(new Float32Array(Uint8Array.from(atob(packed),c=>c.charCodeAt(0)).buffer));
+const sent=()=>transport.mock.calls.map(c=>c[1].request).map(r=>typeof r.audio_f32==='string'?{...r,audio:unpack(r.audio_f32)}:r);
+const requests=()=>sent().filter(r=>!['quality','diagnostic'].includes(r.op));
 const noMutation={outcome:'no-mutation',message:'Physical modifiers are still held.',clipboardChanged:true};
 const make=()=>{const paste=vi.fn(async(_s:string)=>{}),observed=vi.fn(),failure=vi.fn();return {paste,observed,failure,queue:new DictationStream(paste,observed,failure,vi.fn())};};
 beforeEach(()=>{worker.mockReset().mockResolvedValue({});transport.mockReset().mockImplementation((c,args)=>['quality','diagnostic'].includes(args.request.op)?Promise.resolve({logged:true}):worker(c,args));});
@@ -389,7 +392,7 @@ describe('append-only dictation stream',()=>{
   queue.pushAudio(audio.subarray(111,2878),16000);
   queue.pushAudio(audio.subarray(2878),16000);
   queue.enqueue();await queue.finish();
-  const packets=transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='push');
+  const packets=sent().filter(r=>r.op==='push');
   expect(packets.map(r=>r.audio.length)).toEqual([1600,1600,1600,41]);
   expect(packets.flatMap(r=>r.audio)).toEqual(Array.from(audio));
  });
@@ -414,7 +417,7 @@ describe('append-only dictation stream',()=>{
   const audio=Float32Array.from({length:count*2+7},(_,i)=>i/(count*3));
   queue.pushAudio(audio.subarray(0,3),rate);queue.pushAudio(audio.subarray(3),rate);
   queue.enqueue();await queue.finish();
-  const packets=transport.mock.calls.map(c=>c[1].request).filter(r=>r.op==='push');
+  const packets=sent().filter(r=>r.op==='push');
   expect(packets.map(r=>r.audio.length)).toEqual([count,count,7]);
   expect(packets.every(r=>r.rate===rate)).toBe(true);
   expect(packets.flatMap(r=>r.audio)).toEqual(Array.from(audio));
@@ -537,6 +540,22 @@ it('uses ten ordered audio requests per second and flushes Stop without waiting 
  expect(pushes.flatMap(r=>r.audio)).toEqual(Array.from(audio));
  expect(requests()[requests().length-1]?.op).toBe('finish');
  expect(quality()[quality().length-1]).toMatchObject({captured_samples:44117,enqueued_samples:44117,responded_samples:44117,buffered_samples:0});
+});
+
+it('packs samples as little-endian float32 in base64, exactly and at any offset', () => {
+ // 1 and -0.5 in IEEE 754 single precision, least significant byte first.
+ expect(packSamples(Float32Array.of(1,-0.5))).toBe(btoa(String.fromCharCode(0,0,128,63,0,0,0,191)));
+ expect(packSamples(new Float32Array(0))).toBe('');
+ // A view into a longer buffer packs only its own samples.
+ const whole=Float32Array.from({length:10},(_,i)=>i/7);
+ expect(unpack(packSamples(whole.subarray(3,8)))).toEqual(Array.from(whole.subarray(3,8)));
+ // A second of 96 kHz audio, the longest packet the worker takes, with
+ // values a float32 rounds, the smallest subnormal and negative zero.
+ const long=Float32Array.from({length:96000},(_,i)=>Math.sin(i/37)/3);
+ long.set([0,-0,1e-45,3.4028234663852886e38,-1],5);
+ const round=unpack(packSamples(long));
+ expect(round).toHaveLength(96000);
+ expect(round.every((sample,index)=>Object.is(sample,long[index]))).toBe(true);
 });
 
 it('counts Unicode metrics without changing TextEncoder semantics', () => {

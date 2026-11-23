@@ -83,6 +83,26 @@ export function textLengths(text: string, prefix: string): Record<string, number
   };
 }
 
+const littleEndian = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+
+/** A packet's samples as the worker reads `audio_f32`: little-endian float32
+ * in base64. The same samples as a JSON list of numbers, in a quarter of the
+ * bytes, and nothing has to print or parse 1600 numbers ten times a second. */
+export function packSamples(samples: Float32Array): string {
+  let bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
+  if (!littleEndian) {
+    bytes = new Uint8Array(samples.byteLength);
+    const view = new DataView(bytes.buffer);
+    samples.forEach((sample, index) => view.setFloat32(index * 4, sample, true));
+  }
+  let binary = "";
+  // In pieces: a call takes only so many arguments.
+  for (let start = 0; start < bytes.length; start += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+  }
+  return btoa(binary);
+}
+
 /** What finish() rejects with after a recognition failure: the failure's own
  * message, and what was recognized before it and still isn't typed. */
 export class RecognitionFailure extends Error {
@@ -99,7 +119,9 @@ export class DictationStream {
   private deliveryFailure: Error | null = null;
   private deliveryUncertain = false;
   private committed = "";
-  private buffered: number[] = [];
+  // The packet being filled, and how many of its samples are captured.
+  private packet: Float32Array | null = null;
+  private filled = 0;
   private rate = 16000;
   private captureRate: number | null = null;
   private queuedSeconds = 0;
@@ -163,7 +185,7 @@ export class DictationStream {
       active_delivery_seq: this.activeDeliverySeq, failed_delivery_seq: this.failedDeliverySeq,
       pending_delivery_count: this.delivering ? 1 : 0,
       captured_samples: this.capturedSamples, enqueued_samples: this.enqueuedSamples,
-      responded_samples: this.respondedSamples, buffered_samples: this.buffered.length,
+      responded_samples: this.respondedSamples, buffered_samples: this.filled,
       capture_callback_count: this.captureCallbacks, sample_rate: this.captureRate,
       max_queue_age_ms: this.maxQueueAgeMs, finish_responded: this.finishResponded,
       accepted_equals_dispatched: this.latest === this.committed,
@@ -197,7 +219,7 @@ export class DictationStream {
     } else {
       this.failure = failure;
       this.revised = reason === "prefix_revision";
-      this.buffered = [];
+      this.dropPacket();
       this.signalFailure();
     }
     void invoke("speech_stream", {
@@ -206,7 +228,19 @@ export class DictationStream {
     this.onFailure(failure, kind);
   }
 
-  private schedule(op: string, audio?: number[]) {
+  private dropPacket() {
+    this.packet = null;
+    this.filled = 0;
+  }
+
+  /** The samples captured since the last packet, for the worker. */
+  private takePacket(): Float32Array | null {
+    const packet = this.packet?.subarray(0, this.filled) ?? null;
+    this.dropPacket();
+    return packet?.length ? packet : null;
+  }
+
+  private schedule(op: string, audio?: Float32Array) {
     const rate = this.rate;
     const seq = this.seq++;
     const queuedAt = performance.now();
@@ -226,7 +260,7 @@ export class DictationStream {
         const queueAgeMs = performance.now() - queuedAt;
         this.maxQueueAgeMs = Math.max(this.maxQueueAgeMs, queueAgeMs);
         const response = await invoke<{ text: string | null; mode: string; session: string; seq: number }>("speech_stream", {
-          request: { op, audio, rate, session: this.session, seq, dictation_session_id: this.dictationSessionId, queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd,
+          request: { op, audio_f32: audio && packSamples(audio), rate, session: this.session, seq, dictation_session_id: this.dictationSessionId, queue_age_ms: queueAgeMs, sample_start: sampleStart, sample_end: sampleEnd,
             ...(op === "start" && this.wordsCheck ? { words_check: true } : {}) },
         });
         // A stream that failed takes no late answer: finish() doesn't wait for
@@ -403,31 +437,27 @@ export class DictationStream {
     // Fill only one packet at a time. Splicing a complete callback repeatedly
     // shifts its remaining samples and temporarily retains an unbounded buffer.
     while (offset < audio.length && !this.failure) {
-      const end = Math.min(audio.length, offset + count - this.buffered.length);
-      for (; offset < end; offset++) this.buffered.push(audio[offset]!);
-      if (this.buffered.length === count) {
-        const packet = this.buffered;
-        this.buffered = [];
-        this.schedule("push", packet);
-      }
+      this.packet ??= new Float32Array(count);
+      const end = Math.min(audio.length, offset + count - this.filled);
+      this.packet.set(audio.subarray(offset, end), this.filled);
+      this.filled += end - offset;
+      offset = end;
+      if (this.filled === count) this.schedule("push", this.takePacket()!);
     }
   }
 
   enqueue() {
     if (this.ending || this.cancelled || this.failure) return;
     this.ending = true;
-    if (this.buffered.length) {
-      const packet = this.buffered;
-      this.buffered = [];
-      this.schedule("push", packet);
-    }
+    const tail = this.takePacket();
+    if (tail) this.schedule("push", tail);
     this.schedule("finish");
   }
 
   cancel() {
     if (this.cancelled) return;
     this.cancelled = true;
-    this.buffered = [];
+    this.dropPacket();
     this.pending = this.pending.then(async () => {
       await invoke("speech_stream", { request: { op: "cancel", session: this.session, seq: this.seq++, dictation_session_id: this.dictationSessionId } }).catch(() => {});
       await this.delivery;
