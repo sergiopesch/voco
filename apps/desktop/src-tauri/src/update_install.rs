@@ -73,38 +73,59 @@ pub enum InstallEvent {
     },
 }
 
-#[derive(Default)]
-struct Job {
-    running: bool,
-    /// Present only while the download may still be cancelled.
-    cancel: Option<Cancel>,
-}
-
-static JOB: Mutex<Job> = Mutex::new(Job {
-    running: false,
-    cancel: None,
-});
-
 /// How long after its start a recognition session counts as live even before
 /// the renderer reports dictation, which can lag the start request.
 const FRESH_SESSION: Duration = Duration::from_secs(5);
 
+/// Where Install update stands. `specs/tla/UpdateInstall.tla` models these
+/// stages with the recognition sessions they exclude.
+#[derive(Default)]
+enum Install {
+    /// No install is running.
+    #[default]
+    Idle,
+    /// Downloading the release or checking it. Cancel still stops it.
+    Fetching(Cancel),
+    /// The system's password prompt or the package manager. Nothing cancels
+    /// it now, and no recognition starts.
+    Installing,
+    /// The new release is installed and this VOCO is about to be replaced.
+    /// No recognition starts and no other install does, even when the restart
+    /// fails: this process then runs beside files of the release after it.
+    Installed,
+}
+
+/// Why an install didn't go on to the password prompt.
+#[derive(Debug, PartialEq, Eq)]
+enum Unclosed {
+    /// Cancel was chosen while the release was downloaded or checked.
+    Cancelled,
+    /// A recognition session may be running.
+    Dictating,
+}
+
 /// Recognition sessions and the install exclude each other (AGENTS.md: never
 /// install while dictating). Every recognition, dictation, the voice test, Say
 /// it and the browser field, starts with a speech `start`, so the gate sits there.
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct Gate {
     /// The open session and when it started.
     open: Option<(String, std::time::Instant)>,
-    installing: bool,
+    install: Install,
 }
 
 impl Gate {
     fn start(&mut self, session: &str, now: std::time::Instant) -> Result<(), &'static str> {
-        if self.installing {
-            return Err(
-                "VOCO is installing an update and will restart. Dictate again once it has.",
-            );
+        match self.install {
+            Install::Idle | Install::Fetching(_) => {}
+            Install::Installing => {
+                return Err(
+                    "VOCO is installing an update and will restart. Dictate again once it has.",
+                )
+            }
+            Install::Installed => return Err(
+                "VOCO was updated and is restarting. If it doesn't, quit VOCO and open it again.",
+            ),
         }
         self.open = Some((session.to_string(), now));
         Ok(())
@@ -116,29 +137,90 @@ impl Gate {
         }
     }
 
-    /// Close the gate for an install, unless a session may still be running:
-    /// the renderer reports dictation, or a session started moments ago. A
-    /// session the renderer abandoned without finishing doesn't block for ever.
-    fn close(&mut self, dictating: bool, now: std::time::Instant) -> bool {
+    /// An install starts, one at a time, and never after one that succeeded.
+    fn begin(&mut self, cancel: Cancel) -> Result<(), &'static str> {
+        match self.install {
+            Install::Idle => {
+                self.install = Install::Fetching(cancel);
+                Ok(())
+            }
+            Install::Fetching(_) | Install::Installing => {
+                Err("An update is already being installed.")
+            }
+            Install::Installed => {
+                Err("The update is installed. Quit VOCO and open it again to use it.")
+            }
+        }
+    }
+
+    /// Cancel, which counts only until the password prompt. True when it did.
+    fn cancel(&mut self) -> bool {
+        match &self.install {
+            Install::Fetching(cancel) => {
+                cancel.cancel();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The download failed or was cancelled.
+    fn abandon(&mut self) {
+        if matches!(self.install, Install::Fetching(_)) {
+            self.install = Install::Idle;
+        }
+    }
+
+    /// The release is downloaded and checked: close the gate for the
+    /// password prompt, unless Cancel was chosen meanwhile or a session may
+    /// still be running. The renderer reports dictation, or a session started
+    /// moments ago; one the renderer abandoned without finishing doesn't
+    /// block for ever. Cancel is taken under the same lock that reads it
+    /// here, so one that was accepted is never passed over.
+    fn close(&mut self, dictating: bool, now: std::time::Instant) -> Result<(), Unclosed> {
+        let Install::Fetching(cancel) = &self.install else {
+            return Err(Unclosed::Cancelled);
+        };
+        let cancelled = cancel.is_cancelled();
         let fresh = self
             .open
             .as_ref()
             .is_some_and(|(_, started)| now.duration_since(*started) < FRESH_SESSION);
-        if dictating || fresh {
-            return false;
+        if cancelled || dictating || fresh {
+            self.install = Install::Idle;
+            return Err(if cancelled {
+                Unclosed::Cancelled
+            } else {
+                Unclosed::Dictating
+            });
         }
-        self.installing = true;
-        true
+        self.install = Install::Installing;
+        Ok(())
     }
 
+    /// The helper installed nothing: recognition may start again.
     fn reopen(&mut self) {
-        self.installing = false;
+        if matches!(self.install, Install::Installing) {
+            self.install = Install::Idle;
+        }
+    }
+
+    /// The helper installed the release.
+    fn installed(&mut self) {
+        if matches!(self.install, Install::Installing) {
+            self.install = Install::Installed;
+        }
+    }
+
+    /// An install is under way, so its last stage isn't forgotten yet.
+    fn running(&self) -> bool {
+        matches!(self.install, Install::Fetching(_) | Install::Installing)
     }
 }
 
 static GATE: Mutex<Gate> = Mutex::new(Gate {
     open: None,
-    installing: false,
+    install: Install::Idle,
 });
 
 fn with_gate<T>(action: impl FnOnce(&mut Gate) -> T) -> T {
@@ -237,14 +319,7 @@ pub fn install_update(app: tauri::AppHandle, version: String) -> Result<(), Stri
         return Err("Finish dictating first, then install the update.".into());
     }
     let cancel = Cancel::default();
-    {
-        let mut job = JOB.lock().map_err(|_| "Install update is unavailable.")?;
-        if job.running {
-            return Err("An update is already being installed.".into());
-        }
-        job.running = true;
-        job.cancel = Some(cancel.clone());
-    }
+    with_gate(|gate| gate.begin(cancel.clone()))?;
     remember(&InstallEvent::Downloading {
         version: version.to_string(),
         file: 1,
@@ -255,33 +330,26 @@ pub fn install_update(app: tauri::AppHandle, version: String) -> Result<(), Stri
     let spawned = std::thread::Builder::new()
         .name("voco-update-install".into())
         .spawn(move || {
-            let restart = run(&app, kind, version, &cancel);
-            if let Ok(mut job) = JOB.lock() {
-                job.running = false;
-                job.cancel = None;
-            }
-            if restart {
+            if run(&app, kind, version, &cancel) {
                 restart_after_install(&app, version);
             }
         });
     if spawned.is_err() {
-        if let Ok(mut job) = JOB.lock() {
-            job.running = false;
-            job.cancel = None;
+        with_gate(Gate::abandon);
+        // Nothing is downloading after all.
+        if let Ok(mut last) = LAST.lock() {
+            *last = None;
         }
         return Err("VOCO couldn't start the update.".into());
     }
     Ok(())
 }
 
-/// Stop the download. Once the password prompt is up, nothing is cancelled.
+/// Stop the download or the checks after it. Once the password prompt is up,
+/// nothing is cancelled. True when the install will stop.
 #[tauri::command]
 pub fn cancel_update_install() -> bool {
-    JOB.lock()
-        .ok()
-        .and_then(|job| job.cancel.clone())
-        .map(|cancel| cancel.cancel())
-        .is_some()
+    with_gate(Gate::cancel)
 }
 
 /// The last stage reported, so a window opened later shows where the install
@@ -303,7 +371,7 @@ pub fn update_install_status() -> Option<InstallEvent> {
 /// Forget an install that ended, once the user closes its window.
 #[tauri::command]
 pub fn dismiss_update_install() {
-    let running = JOB.lock().map(|job| job.running).unwrap_or(true);
+    let running = with_gate(|gate| gate.running());
     if let Ok(mut last) = LAST.lock() {
         if !running {
             *last = None;
@@ -330,6 +398,7 @@ fn run(app: &tauri::AppHandle, kind: PackageKind, version: Version, cancel: &Can
     {
         Ok(folder) => folder,
         Err(error) => {
+            with_gate(Gate::abandon);
             emit(
                 app,
                 failed(format!("VOCO couldn't prepare its update folder: {error}.")),
@@ -349,25 +418,32 @@ fn run(app: &tauri::AppHandle, kind: PackageKind, version: Version, cancel: &Can
         emit(app, event);
         false
     };
+    let cancelled = || InstallEvent::Cancelled {
+        version: name.clone(),
+    };
     match outcome {
         Ok(()) => {}
         Err(Stop::Cancelled) => {
-            return finish(InstallEvent::Cancelled {
-                version: name.clone(),
-            })
+            with_gate(Gate::abandon);
+            return finish(cancelled());
         }
-        Err(Stop::Failed(message)) => return finish(failed(message)),
+        Err(Stop::Failed(message)) => {
+            with_gate(Gate::abandon);
+            return finish(failed(message));
+        }
     }
-    // From here the download can't be cancelled: the prompt is the system's.
-    if let Ok(mut job) = JOB.lock() {
-        job.cancel = None;
-    }
-    // From the password prompt until VOCO exits, no recognition may start.
+    // From here nothing is cancelled, the prompt being the system's, and
+    // until VOCO exits no recognition may start. A Cancel chosen while the
+    // release was checked still stops the install here.
     let dictating = crate::tray::dictation_active(app);
-    if !with_gate(|gate| gate.close(dictating, std::time::Instant::now())) {
-        return finish(failed(
-            "A dictation started, so VOCO didn't install the update.".into(),
-        ));
+    match with_gate(|gate| gate.close(dictating, std::time::Instant::now())) {
+        Ok(()) => {}
+        Err(Unclosed::Cancelled) => return finish(cancelled()),
+        Err(Unclosed::Dictating) => {
+            return finish(failed(
+                "A dictation started, so VOCO didn't install the update.".into(),
+            ))
+        }
     }
     emit(
         app,
@@ -383,6 +459,7 @@ fn run(app: &tauri::AppHandle, kind: PackageKind, version: Version, cancel: &Can
     let _ = update_download::clear(&folder);
     match result {
         Ok(()) => {
+            with_gate(Gate::installed);
             emit(app, InstallEvent::Installed { version: name });
             true
         }
@@ -746,22 +823,36 @@ mod tests {
         );
     }
 
+    /// A gate whose install has downloaded and checked its release.
+    fn fetching() -> (Gate, Cancel) {
+        let (mut gate, cancel) = (Gate::default(), Cancel::default());
+        gate.begin(cancel.clone()).unwrap();
+        (gate, cancel)
+    }
+
     #[test]
     fn no_recognition_starts_while_an_update_installs() {
         let start = std::time::Instant::now();
         let later = start + Duration::from_secs(60);
-        let mut gate = Gate::default();
+        let (mut gate, _) = fetching();
         gate.start("a", start).unwrap();
-        assert!(
-            !gate.close(false, start + Duration::from_secs(1)),
+        assert_eq!(
+            gate.close(false, start + Duration::from_secs(1)),
+            Err(Unclosed::Dictating),
             "a session that just started blocks the install"
         );
-        assert!(
-            !gate.close(true, later),
+        assert!(!gate.running(), "the install it blocked is over");
+        let (mut gate, _) = fetching();
+        gate.start("a", start).unwrap();
+        assert_eq!(
+            gate.close(true, later),
+            Err(Unclosed::Dictating),
             "dictation the renderer reports blocks the install"
         );
+        let (mut gate, _) = fetching();
+        gate.start("a", start).unwrap();
         gate.end("a");
-        assert!(gate.close(false, later));
+        assert_eq!(gate.close(false, later), Ok(()));
         assert!(
             gate.start("b", later).is_err(),
             "no session starts during the install"
@@ -769,12 +860,87 @@ mod tests {
         gate.reopen();
         gate.start("b", later).unwrap();
         // A session the renderer abandoned, once stale, doesn't block for ever.
-        assert!(gate.close(false, later + Duration::from_secs(10)));
+        gate.begin(Cancel::default()).unwrap();
+        assert_eq!(gate.close(false, later + Duration::from_secs(10)), Ok(()));
         // Ending another session leaves the open one.
-        let mut gate = Gate::default();
+        let (mut gate, _) = fetching();
         gate.start("c", start).unwrap();
         gate.end("other");
-        assert!(!gate.close(false, start));
+        assert_eq!(gate.close(false, start), Err(Unclosed::Dictating));
+    }
+
+    #[test]
+    fn cancel_counts_until_the_password_prompt_and_never_after() {
+        let now = std::time::Instant::now();
+        // No install: nothing to cancel.
+        assert!(!Gate::default().cancel());
+        // While the release downloads or is checked, Cancel is accepted, and
+        // the install then stops short of the prompt: also when it came after
+        // the last download, while the signature and checksum were checked.
+        let (mut gate, cancel) = fetching();
+        assert!(gate.cancel());
+        assert!(cancel.is_cancelled());
+        assert_eq!(gate.close(false, now), Err(Unclosed::Cancelled));
+        assert!(!gate.running());
+        gate.start("a", now).unwrap();
+        // Cancelled and dictating at once: it was cancelled.
+        let (mut gate, _) = fetching();
+        assert!(gate.cancel());
+        assert_eq!(gate.close(true, now), Err(Unclosed::Cancelled));
+        // At the prompt and after, Cancel is refused, so the window never
+        // says an install will stop that won't.
+        let (mut gate, cancel) = fetching();
+        assert_eq!(gate.close(false, now), Ok(()));
+        assert!(!gate.cancel());
+        assert!(!cancel.is_cancelled());
+        gate.installed();
+        assert!(!gate.cancel());
+    }
+
+    #[test]
+    fn one_install_runs_at_a_time_and_none_after_one_that_succeeded() {
+        let now = std::time::Instant::now();
+        let (mut gate, _) = fetching();
+        assert!(gate.running());
+        assert_eq!(
+            gate.begin(Cancel::default()),
+            Err("An update is already being installed.")
+        );
+        // A download that failed or was cancelled leaves room for the next.
+        gate.abandon();
+        assert!(!gate.running());
+        gate.begin(Cancel::default()).unwrap();
+        assert_eq!(gate.close(false, now), Ok(()));
+        assert_eq!(
+            gate.begin(Cancel::default()),
+            Err("An update is already being installed.")
+        );
+        // Abandoning is for a download: it can't reopen a gate at the prompt.
+        gate.abandon();
+        assert!(gate.start("a", now).is_err());
+        // The helper installed nothing: recognition and Install update are back.
+        gate.reopen();
+        gate.start("a", now).unwrap();
+        gate.end("a");
+        gate.begin(Cancel::default()).unwrap();
+        assert_eq!(gate.close(false, now + FRESH_SESSION), Ok(()));
+        // Installed: this VOCO only waits to be replaced. No session starts,
+        // no other install does, and a failed restart changes neither, where
+        // a second install's refusal used to let recognition start again.
+        gate.installed();
+        assert!(!gate.running(), "its window can be closed");
+        assert_eq!(
+            gate.start("b", now),
+            Err("VOCO was updated and is restarting. If it doesn't, quit VOCO and open it again.")
+        );
+        assert_eq!(
+            gate.begin(Cancel::default()),
+            Err("The update is installed. Quit VOCO and open it again to use it.")
+        );
+        gate.reopen();
+        gate.abandon();
+        assert!(gate.start("b", now).is_err());
+        assert!(gate.begin(Cancel::default()).is_err());
     }
 
     #[test]
